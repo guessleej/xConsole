@@ -690,35 +690,62 @@ async function viewLib() {
 
   const jobs = lib.downloads || [];
   if (jobs.length) {
-    const jc = card("下載紀錄", "進行中的下載每 3 秒更新");
-    jobs.slice(0, 5).forEach((j) => {
-      const g = el("div", "dl");
-      const pct = j.total ? Math.floor((j.done / j.total) * 100) : 0;
-      const label = { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
-      const top = el("div", "dl-top");
-      top.appendChild(el("span", "mono", `${j.repo}　${j.stem}`));
-      top.appendChild(el("span", "spacer"));
-      top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"), label));
-      if (j.state === "running" || j.state === "queued") {
-        const c = el("button", "btn sm", "取消");
-        c.onclick = async () => { try { await api(`/api/node/${nodeId}/library/download/${j.id}/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); } };
-        top.appendChild(c);
-      }
-      g.appendChild(top);
-      const bar = el("div", "bar");
-      const fill = el("div", "seg");
-      fill.style.width = (j.state === "done" ? 100 : pct) + "%";
-      bar.appendChild(fill);
-      g.appendChild(bar);
-      g.appendChild(el("div", "small muted", `${fmt(j.done / 1073741824)} / ${fmt(j.total / 1073741824)} GiB${j.error ? "　" + j.error : ""}`));
-      jc.appendChild(g);
-    });
+    const jc = libJobsCard(nodeId, jobs);
     wrap.appendChild(jc);
-    if (jobs.some((j) => j.state === "running" || j.state === "queued")) {
-      clearTimeout(S.libTimer);
-      S.libTimer = setTimeout(() => { if (S.view === `lib:${nodeId}` && !document.querySelector(".overlay")) viewLib(); }, 3000);
-    }
+    watchLibJobs(nodeId, jc, jobs);
   }
+}
+
+const jobActive = (j) => j.state === "running" || j.state === "queued";
+
+function libJobsCard(nodeId, jobs) {
+  const jc = card("下載紀錄", "進行中的下載每 3 秒更新");
+  jobs.slice(0, 5).forEach((j) => {
+    const g = el("div", "dl");
+    const pct = j.total ? Math.floor((j.done / j.total) * 100) : 0;
+    const label = { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
+    const top = el("div", "dl-top");
+    top.appendChild(el("span", "mono", `${j.repo}　${j.stem}`));
+    top.appendChild(el("span", "spacer"));
+    top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"), label));
+    if (j.state === "running" || j.state === "queued") {
+      const c = el("button", "btn sm", "取消");
+      c.onclick = async () => { try { await api(`/api/node/${nodeId}/library/download/${j.id}/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); } };
+      top.appendChild(c);
+    }
+    g.appendChild(top);
+    const bar = el("div", "bar");
+    const fill = el("div", "seg");
+    fill.style.width = (j.state === "done" ? 100 : pct) + "%";
+    bar.appendChild(fill);
+    g.appendChild(bar);
+    g.appendChild(el("div", "small muted", `${fmt(j.done / 1073741824)} / ${fmt(j.total / 1073741824)} GiB${j.error ? "　" + j.error : ""}`));
+    jc.appendChild(g);
+  });
+  return jc;
+}
+
+// 下載進行中只換掉「下載紀錄」這一張卡。以前是每 3 秒整頁 viewLib()：主區塊先清空、出現載入中、
+// 再全部重建，頁長塌掉又長回來，畫面每 3 秒跳一次，Hugging Face 欄位打到一半的字也被清掉（2026-10-22 中原主機實際踩到）。
+// 下載結束時已安裝清單要跟著變，才整頁重畫那一次。
+function watchLibJobs(nodeId, jc, jobs) {
+  clearTimeout(S.libTimer);
+  if (!jobs.some(jobActive)) return;
+  S.libTimer = setTimeout(async () => {
+    if (S.view !== `lib:${nodeId}` || !jc.isConnected) return;
+    let lib;
+    try { lib = await api(`/api/node/${nodeId}/library`); } catch (ex) { watchLibJobs(nodeId, jc, jobs); return; }
+    if (S.view !== `lib:${nodeId}` || !jc.isConnected) return;
+    const now = lib.downloads || [];
+    if (!now.some(jobActive)) {
+      if (document.querySelector(".overlay")) { watchLibJobs(nodeId, jc, jobs); return; }   // 有彈窗開著就晚點再重畫
+      viewLib();
+      return;
+    }
+    const fresh = libJobsCard(nodeId, now);
+    jc.replaceWith(fresh);
+    watchLibJobs(nodeId, fresh, now);
+  }, 3000);
 }
 
 async function doAction(node, s, action) {
