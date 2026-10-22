@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 780" width="1400" height="780" font-family="Noto Sans TC, Microsoft JhengHei, PingFang TC, sans-serif"><defs><marker id="ar-orange" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#ea580c"/></marker><marker id="ar-violet" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#7c3aed"/></marker><marker id="ar-green" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#059669"/></marker><marker id="ar-blue" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#2563eb"/></marker></defs><rect x="470" y="16" width="660" height="212" rx="10" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="10 6"/><text x="1116" y="214" font-size="25" fill="#bf181f" text-anchor="end" font-weight="700">管理者</text><g transform='translate(495.304,-48.534) scale(0.47431)'>
+<g id="paths">
+	<g id="Access_control">
+	</g>
+	<g id="Azure_active_directory">
+	</g>
+	<g id="Generic_code">
+	</g>
+	<g id="Laptop">
+	</g>
+	<g id="Load_balancer">
+	</g>
+	<g id="Lock_x2C__protected">
+	</g>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+<g id="User">
+	
+	<g>
+		<g id="shape101-188_1_" transform="translate(7.20825,-11.5207)">
+			
+			<path fill="#ea580c" d="M380.4,242.5c-21.4,5.1-33.9,28.7-27.9,52.8c6,24,27.9,38.6,49.3,33.5c21.4-5.1,33.9-28.7,27.9-52.8
+				C423.7,252.4,401.4,237.4,380.4,242.5z"/>
+		</g>
+		<g id="shape102-190_1_">
+			
+			<path fill="#ea580c" d="M433.4,323.7c-3.9-0.4-8.6,7.3-14.6,10.3c-6,2.6-12.4,8.1-29.6,0c-17.2-8.1-19.7-15-34.3-15
+				s-37.7,25.7-38.2,63h145.8c-0.4,0-1.7-25.7-9.9-39.5C442.9,324.1,437.3,323.7,433.4,323.7z"/>
+		</g>
+	</g>
+</g>
+</g><text x="680" y="46.0" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">資訊室</text><text x="680" y="158.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">主控台管理者</text><g transform='translate(895.522,46.176) scale(0.16282)'>
+<g id="Layer_1_1_">
+	<g id="File_x2C__general">
+		
+	</g>
+</g>
+<g id="Access_control">
+</g>
+<g id="Azure_active_directory">
+</g>
+<g id="Generic_code">
+</g>
+<g id="Laptop">
+	<path fill="#ea580c" d="M579.7,383.7c0-189.7,0-189.7,0-189.7c0-9.4-8.6-24.9-18.9-24.9c-23.2,0-328.7,0-328.7,0
+		c-10.3,0-20.6,15.5-20.6,24.9c0,189.7,0,189.7,0,189.7c-36.9,39.5-35.2,39.5-35.2,39.5c0,11.2,10.3,19.7,23.2,19.7
+		c394,0,394,0,394,0c12.9,0,23.2-9.4,23.2-19.7L579.7,383.7L579.7,383.7L579.7,383.7z M426.9,426.6c-68.7,0-68.7,0-68.7,0
+		c-3.4,0-6.9-1.7-6.9-3.4c7.7-12.9,7.7-12.9,7.7-12.9c0-1.7,2.6-2.6,6-2.6c54.9,0,54.9,0,54.9,0c2.6,0,5.2,0.9,5.2,2.6
+		c8.6,12.9,8.6,12.9,8.6,12.9C433.8,425.7,430.3,426.6,426.9,426.6L426.9,426.6z M563.4,382.8c-338.2,0-335.6,0-335.6,0
+		c0-187.1,0-187.1,0-187.1c0-4.3,4.3-10.3,9.4-10.3c319.3,0,317.6,0,317.6,0c5.2,0,8.6,6,8.6,10.3V382.8L563.4,382.8L563.4,382.8
+		L563.4,382.8z"/>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+</g><text x="960" y="46.0" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">老師或助教</text><text x="960" y="158.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">也可以是管理者</text><path d="M680 176 V 346" stroke="#ea580c" stroke-width="2.6" fill="none" marker-end="url(#ar-orange)"/><text x="664" y="250" font-size="20" fill="#16202a" text-anchor="end" font-weight="700">1.看各機記憶體</text><text x="664" y="274" font-size="20" fill="#16202a" text-anchor="end" font-weight="700">換模型、下載模型</text><path d="M960 176 V 300 H 732 V 346" stroke="#ea580c" stroke-width="2.6" fill="none" marker-end="url(#ar-orange)"/><text x="976" y="262" font-size="20" fill="#16202a" text-anchor="start" font-weight="700">2.開金鑰、調上下文</text></svg>

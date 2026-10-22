@@ -8,7 +8,7 @@
 
 | 系列 | 代表機 | 記憶體架構 |
 |---|---|---|
-| **AMD Ryzen AI 395 系列** | HP Z2 Mini G1a（`.26`／`.27`） | 96 GiB 給 GPU，系統只剩 31 GiB（切兩塊） |
+| **AMD Ryzen AI 395 系列** | 兩台 AMD AI 395 Strix Halo（HP Z2 Mini G1a） | 96 GiB 給 GPU，系統只剩 31 GiB（切兩塊） |
 | **MIC-743／Jetson 系列** | AGX Thor（`.20`）、AGX Orin、Orin NX | 統一記憶體單一池 |
 | **DGX Spark 系列** | GB10（`.24`／`.25`／`.32`） | 統一記憶體單一池 |
 
@@ -22,7 +22,7 @@
 
 - 線上位置：`https://192.168.11.27:9400`（自簽憑證，瀏覽器會先警告一次）
 - 登入：帳號 `admin`，密碼依交接另行提供（不寫進版控）；登入後可在「設定 → 帳號與安全」自行變更
-- 目前納管：`.26`、`.27`（AI 395）、`.20`（Thor／MIC-743 同一顆 SoC）
+- 目前納管：兩台 AMD AI 395 Strix Halo（HP Z2 Mini G1a）、一台 Jetson AGX Thor（與 MIC-743 同一顆 SoC）
 
 ---
 
@@ -31,7 +31,7 @@
 這套東西的價值不在監控——監控你已經有了（amd-cluster-monitor、gpufleet）。價值在三件監控做不到的事：
 
 1. **准入控制**：載模型之前先算「載下去之後最壞會剩多少」，不夠就擋住。
-   這擋的是 `.26`／`.27` 被 OOM 拖死整台、需要走到機器前面物理重開的那種事故。
+   這擋的是兩台 AMD AI 395 Strix Halo 被 OOM 拖死整台、需要走到機器前面物理重開的那種事故。
 2. **情境切換**：同一顆模型、同一台機器，寫程式後端要長脈絡、抓料要吞吐。
    一鍵切換整組參數，參數留在平台上而不是留在腦袋裡。
 3. **角色欄位**：按「主腦／副腦／聽覺／說話／記憶／判斷／雙手／眼睛」排版，
@@ -43,7 +43,7 @@
 
 | 架構 | 機器 | 怎麼回事 | 底線預設 |
 |---|---|---|---|
-| `unified_split` | `.26` `.27` Strix Halo | BIOS 切 96 GiB 給 GPU，**系統只剩 31 GiB**。會把整台拖死的是系統這塊，不是顯存 | 系統 RAM 15 GiB |
+| `unified_split` | 兩台 AMD AI 395 Strix Halo | BIOS 切 96 GiB 給 GPU，**系統只剩 31 GiB**。會把整台拖死的是系統這塊，不是顯存 | 系統 RAM 15 GiB |
 | `unified_single` | DGX Spark、Jetson | 統一記憶體一個池，GPU 與系統搶同一塊，不能分開算成「各自都夠」 | 12 GiB |
 | `discrete` | MI50 農場、P100、Ada、5090 | 每張卡自己的顯存，另外一塊系統 RAM | 顯存 1 GiB／RAM 8 GiB |
 
@@ -210,15 +210,15 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 
 | 測試 | 在哪跑 | 項數 | 測什麼 |
 |---|---|---|---|
-| `agent/test_admit.py` | 任何機器 | 13 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
+| `agent/test_admit.py` | 任何機器 | 15 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
 | `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
 | `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
 | `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
 | `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |
-| `test/test_llama_engine.py` | 有 systemd --user | 31 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |
-| `test/smoke_real_llama.py` | 有 llama.cpp 的機器 | 13 | 真的 Hugging Face＋真的 llama-server 跑一次（100 MB 小模型，跑完刪掉） |
+| `test/test_llama_engine.py` | 有 systemd --user | 36 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |
+| `test/smoke_real_llama.py` | 有 llama.cpp 的機器 | 12 | 真的 Hugging Face＋真的 llama-server 跑一次（100 MB 小模型，跑完刪掉） |
 
 以上除了最後一支，每次 PR 都在 GitHub Actions 重跑（`.github/workflows/security.yml`），另有 CodeQL、gitleaks、pip-audit、SBOM＋grype、ZAP 五道掃描；`main` 有分支保護，全綠才能合。
 
