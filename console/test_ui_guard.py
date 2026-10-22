@@ -3,6 +3,7 @@
 
 1. 含輸入欄位的彈窗不准點背景關閉（欄位內拖曳選字、滑鼠在窗外放開，整張表單就蒸發）。
 2. Enter 送出要擋中文輸入法組字（注音選字的 Enter 不能被當成送出）。
+3. 自動更新不准讓畫面抖：定時重畫不播進場動畫、不整頁清空重建（2026-10-22 模型庫每 3 秒、總覽每 15 秒閃一次）。
 跑法：python3 test_ui_guard.py（不需要任何套件）
 """
 import os
@@ -57,6 +58,19 @@ check("imeGuard() 三重防護都在", g is not None and all(x in g.group(0) for
 raw = [JS[:mm.start()].count("\n") + 1 for mm in re.finditer(r'e\.key\s*===\s*"Enter"', JS)
        if not re.search(r"function imeGuard", JS[max(0, mm.start() - 400):mm.start()])]
 check("沒有繞過 imeGuard 自己判斷 Enter 的地方", not raw, f"第 {raw} 行")
+
+# ---- 3. 自動更新不准讓畫面抖
+rf = re.search(r"async function refresh\(\)\s*\{(.*?)\n\}", JS, re.S)
+check("自動更新走 quietRender()，不直接整頁 render()", rf is not None and "quietRender()" in rf.group(1)
+      and not re.search(r"\belse render\(\)", rf.group(1)))
+rv = re.search(r"function reveal\(root\)\s*\{(.*?)\n\}", JS, re.S)
+check("reveal() 在自動更新時不播進場動畫", rv is not None and "S.quiet" in rv.group(1))
+timers = []
+for mm in re.finditer(r"set(?:Timeout|Interval)\(", JS):
+    seg = JS[mm.end():mm.end() + 200].split("\n")[0]       # 單行計時器：直接在回呼裡整頁重畫就是當初的寫法
+    if re.search(r"\bview[A-Z]\w*\(|\brender\(\)", seg):
+        timers.append(JS[:mm.start()].count("\n") + 1)
+check("計時器回呼裡沒有直接整頁重畫（只更新有變的那一塊）", not timers, f"第 {timers} 行")
 
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)
