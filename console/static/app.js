@@ -113,6 +113,9 @@ function imeGuard(input, onEnter) {
 function reveal(root) {
   const items = root.querySelectorAll(".rv:not(.in)");
   if (!items.length) return;
+  // 自動更新的重畫不播進場動畫：每 15 秒整頁從透明、下移 26px 重新淡入一次，畫面就會一直閃。
+  // 動畫只留給使用者自己切頁的那一次。
+  if (S.quiet) { items.forEach((n) => n.classList.remove("rv", "d1", "d2", "d3", "d4")); return; }
   const showAll = () => items.forEach((n) => n.classList.add("in"));
   if ("IntersectionObserver" in window) {
     const io = new IntersectionObserver((entries) => {
@@ -2188,6 +2191,14 @@ function render() {
 
 /* ---------------------------------------------------------------- 主迴圈 */
 
+// 資料更新造成的重畫：不播動畫、捲動位置不動。使用者按導覽切頁才走 render()。
+function quietRender() {
+  const y = window.scrollY;
+  S.quiet = true;
+  try { render(); } finally { S.quiet = false; }
+  if (window.scrollY !== y) window.scrollTo(0, y);
+}
+
 async function refresh() {
   try {
     S.fleet = await api("/api/fleet");
@@ -2197,7 +2208,7 @@ async function refresh() {
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
     // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
     if (S.view === "settings" || S.view === "logs" || S.view === "apis" || S.view.startsWith("api:")
-      || S.view.startsWith("lib:")) renderNav(); else render();
+      || S.view.startsWith("lib:")) renderNav(); else quietRender();
   } catch (ex) {
     $("#live").classList.add("stale");
     $("#live-text").textContent = "更新失敗";
