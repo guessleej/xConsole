@@ -22,6 +22,7 @@ import socket
 import ssl
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -802,11 +803,25 @@ def wait_healthy(slot, seconds=240):
                 return True, ""
             rc, code, _ = sh(f"curl -s -o /dev/null -m 6 -w '%{{http_code}}' "
                              f"http://127.0.0.1:{int(port)}/v1/models")
-            if code.strip() == "200":
+            # 401＝服務活著、只是設了金鑰（不帶金鑰打 /v1/models 一定 401）。
+            # 只認 200 的話，開了金鑰之後每次重啟都會被判成「起不來」而自動還原
+            if code.strip() in ("200", "401"):
                 return True, ""
             last = f"服務在跑但 :{port} 還沒回應"
         time.sleep(5)
     return False, last
+
+
+QUANT_RX = re.compile(r"[-_.]((?:UD-)?(?:I?Q\d\w*|F16|BF16|MXFP4\w*))$", re.I)
+
+
+def pretty_model(native):
+    """從權重檔名取給人看的模型名稱與量化：
+    Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf → ("Qwen3.8-Flash-Next", "UD-IQ4_XS")。
+    （以前直接拿資料夾名，畫面就顯示成 unsloth-UD-IQ4_XS，看不出是哪顆模型。）"""
+    base = re.sub(r"-\d{5}-of-\d{5}$", "", os.path.basename(native).removesuffix(".gguf"))
+    m = QUANT_RX.search(base)
+    return (base[:m.start()], m.group(1)) if m else (base, None)
 
 
 def set_model(slot_id, pack, native, force=False):
@@ -851,11 +866,15 @@ def set_model(slot_id, pack, native, force=False):
     # 以該模型自己的設定為底，只覆寫「跟這台機器有關、不跟模型有關」的項目：
     # 引擎執行檔與函式庫路徑（我們自己編的 build-145 ＋ 系統 ROCm 執行，
     # setup 會寫成 TheRock 的路徑，那個編得動但跑不起來）、服務埠、並行數。
-    for key in ("exe", "lib_dirs", "port", "parallel", "fit_max_tokens", "host"):
+    for key in ("exe", "lib_dirs", "port", "parallel", "fit_max_tokens", "host", "api_key", "max_tokens"):
         if key in old_cfg:
             new_cfg[key] = old_cfg[key]
+    # 使用者在網頁上自己取過 API 模型名稱，就沿用（IDE 那邊不必跟著改）；沒取過就用新模型自己的名稱
+    if slot.get("api_model_name"):
+        new_cfg["model_name"] = slot["api_model_name"]
     new_cfg["log"] = old_cfg.get("log", new_cfg.get("log"))
     save_json(slot["config"], new_cfg)
+    os.chmod(slot["config"], 0o600)          # 可能帶著 API 金鑰
 
     verdict = admit(slot_id)
     if not verdict["allow"] and not force:
@@ -885,12 +904,298 @@ def set_model(slot_id, pack, native, force=False):
     reg = registry()
     for sl in reg["slots"]:
         if sl["id"] == slot_id:
-            sl["model"] = pick["name"]
+            sl["model"], quant = pretty_model(pick["native"])
+            if quant:
+                sl["quant"] = quant
+            sl.pop("api_last_test", None)
     reg["measure"].pop(slot_id, None)   # 換了模型，舊的速度實測不再代表它
     save_json(REGISTRY, reg)
     time.sleep(8)                        # 等它把權重載進去再量，不然量到載入中的瞬間
     record_model_measure(slot_id, pick["name"])
-    return 200, {"ok": True, "model": pick["name"], "backup": backup}
+    return 200, {"ok": True, "model": pretty_model(pick["native"])[0], "folder": pick["name"], "backup": backup,
+                 "api_model_name": new_cfg.get("model_name")}
+
+
+# ---------------------------------------------------------------- API 串接
+# 換完模型之後，IDE（GitHub Copilot、OpenCode、Continue、Cline…）與其他服務要知道四件事：
+# 打哪個網址、模型名稱叫什麼、上下文多長、要不要金鑰。這一段負責讀、改、實測。
+
+API_NAME_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}")
+API_URL_RX = re.compile(r"https?://[A-Za-z0-9.\-\[\]:]+(/[A-Za-z0-9._~/-]*)?")
+
+
+def _slot(slot_id):
+    return next((x for x in registry()["slots"] if x["id"] == slot_id), None)
+
+
+def _first_key(v):
+    if isinstance(v, list):
+        return next((str(x) for x in v if str(x).strip()), "")
+    return str(v or "").split(",")[0].strip()
+
+
+def _local_ip():
+    rc, out, _ = sh("ip -4 route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2")
+    return out.strip() if rc == 0 and out.strip() else "127.0.0.1"
+
+
+def _http_json(url, body=None, key="", timeout=8):
+    """打本機的模型服務。回 (狀態碼, JSON 或 None, 毫秒)。連不上回 (0, None, 毫秒)。"""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method="POST" if data else "GET",
+                                 headers={"Content-Type": "application/json",
+                                          **({"Authorization": f"Bearer {key}"} if key else {})})
+    t0 = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, json.load(resp), int((time.time() - t0) * 1000)
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.load(exc), int((time.time() - t0) * 1000)
+        except Exception:  # noqa: BLE001
+            return exc.code, None, int((time.time() - t0) * 1000)
+    except Exception:  # noqa: BLE001
+        return 0, None, int((time.time() - t0) * 1000)
+
+
+def _api_parts(slot):
+    """回 (可改的設定檔內容或 None, 埠, 金鑰)。"""
+    raw = load_json(slot["config"], None) if slot.get("kind") == "strata" and slot.get("config") else None
+    cfg = slot_config(slot) or {}
+    port = (raw or {}).get("port") or cfg.get("port") or slot.get("port")
+    return raw, port, _first_key((raw or {}).get("api_key"))
+
+
+def api_info(slot_id):
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, {"error": "沒有這個欄位"}
+    raw, port, key = _api_parts(slot)
+    if not port:
+        return 400, {"error": "這個欄位沒有對外的 API 埠"}
+    st, models, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=key, timeout=5)
+    served = []
+    for m in (models or {}).get("data") or []:
+        arch = m.get("architecture") or {}
+        served.append({"id": m.get("id"), "ctx": (m.get("meta") or {}).get("n_ctx"),
+                       "vision": "image" in (arch.get("input_modalities") or [])})
+    cfg = slot_config(slot) or {}
+    reg = registry()
+    ip = reg["machine"].get("ip") or _local_ip()
+    strata = slot.get("kind") == "strata" and raw is not None
+    return 200, {
+        "slot": slot_id, "role": slot.get("role"), "tier": slot.get("tier", ""),
+        "model": slot.get("model"), "kind": slot.get("kind"), "critical": bool(slot.get("critical")),
+        "editable": strata, "port": int(port),
+        "bind": (raw or {}).get("host") or "0.0.0.0",
+        "default_url": f"http://{ip}:{int(port)}/v1",
+        "public_url": slot.get("api_public_url") or f"http://{ip}:{int(port)}/v1",
+        "public_url_custom": bool(slot.get("api_public_url")),
+        "model_name": (raw or {}).get("model_name") or (served[0]["id"] if served else None),
+        "online": st == 200 and bool(served), "status": st, "served": served,
+        "max_context": cfg.get("max_context") or (served[0]["ctx"] if served else None),
+        "max_tokens": (raw or {}).get("max_tokens"),
+        "fit_max_tokens": bool(cfg.get("fit_max_tokens")),
+        "parallel": cfg.get("parallel"),
+        "api_key_set": bool(key),
+        # Strata 同時講三種方言；其他引擎只保證 OpenAI 那種
+        "dialects": ["openai", "anthropic", "responses"] if strata else ["openai"],
+        "tools": True if strata else None,
+        "vision": any(m["vision"] for m in served),
+        "last_test": slot.get("api_last_test"),
+    }
+
+
+def _set_slot_fields(slot_id, **fields):
+    reg = registry()
+    for sl in reg["slots"]:
+        if sl["id"] == slot_id:
+            for k, v in fields.items():
+                if v is None:
+                    sl.pop(k, None)
+                else:
+                    sl[k] = v
+    save_json(REGISTRY, reg)
+
+
+def api_settings(slot_id, body, force=False):
+    """網頁改 API 設定。對外網址只記在登錄檔（不重啟）；其餘寫進模型設定檔並重啟，
+    重啟後要真的用新名稱、新金鑰打得通才算數，否則換回原本的設定。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, {"error": "沒有這個欄位"}
+    raw, port, key = _api_parts(slot)
+    if not port:
+        return 400, {"error": "這個欄位沒有對外的 API 埠"}
+    errors = []
+
+    url = body.get("public_url")
+    if url is not None:
+        url = str(url).strip().rstrip("/")
+        if url and (len(url) > 200 or not API_URL_RX.fullmatch(url)):
+            errors.append("對外網址格式不對，例：http://192.168.11.26:8081/v1")
+
+    want = {}
+    if raw is not None:
+        if "model_name" in body:
+            nm = str(body.get("model_name") or "").strip()
+            if not API_NAME_RX.fullmatch(nm):
+                errors.append("模型名稱只能用英數字與 . _ - : /，1～80 字")
+            elif nm != raw.get("model_name"):
+                want["model_name"] = nm
+        cur_ctx = (slot_config(slot) or {}).get("max_context")
+        ctx = cur_ctx
+        if body.get("max_context") not in (None, ""):
+            try:
+                ctx = int(body["max_context"])
+            except (TypeError, ValueError):
+                ctx = -1
+            if not 2048 <= ctx <= 1048576:
+                errors.append("上下文長度要在 2,048～1,048,576 之間")
+            elif ctx != cur_ctx:
+                want["max_context"] = ctx
+        if "max_tokens" in body:
+            mt = body.get("max_tokens")
+            if mt in (None, "", 0):
+                if raw.get("max_tokens") is not None:
+                    want["max_tokens"] = None
+            else:
+                try:
+                    mt = int(mt)
+                except (TypeError, ValueError):
+                    mt = -1
+                if not 256 <= mt <= 131072 or (ctx and mt >= ctx):
+                    errors.append("單次輸出上限要在 256～131,072 之間，而且要小於上下文長度")
+                elif mt != raw.get("max_tokens"):
+                    want["max_tokens"] = mt
+        k = body.get("key")
+        if k not in (None, "keep"):
+            if k == "none":
+                if key:
+                    want["api_key"] = None
+            elif k == "new":
+                want["api_key"] = "xc-" + secrets.token_urlsafe(32)
+            else:
+                errors.append("金鑰的選項不對")
+    elif any(x in body for x in ("model_name", "max_context", "max_tokens", "key")):
+        errors.append("這個欄位的服務不是由 xConsole 管理設定檔，只能改對外網址")
+    if errors:
+        return 400, {"error": "；".join(errors), "errors": errors}
+
+    if url is not None:
+        _set_slot_fields(slot_id, api_public_url=url or None)
+    if not want:
+        return 200, {"ok": True, "restarted": False, "message": "已儲存" if url is not None else "沒有變更"}
+
+    old = dict(raw)
+    new = dict(raw)
+    for k, v in want.items():
+        if k == "max_context":
+            args = list(new.get("args") or [])
+            if "--max-context" in args:
+                args[args.index("--max-context") + 1] = str(v)
+            else:
+                args += ["--max-context", str(v)]
+            new["args"] = args
+        elif v is None:
+            new.pop(k, None)
+        else:
+            new[k] = v
+    backup = slot["config"] + f".bak-api-{int(time.time())}"
+    save_json(backup, old)
+    os.chmod(backup, 0o600)
+    save_json(slot["config"], new)
+    os.chmod(slot["config"], 0o600)          # 設定檔裡有金鑰
+
+    def revert(msg, extra=None):
+        save_json(slot["config"], old)
+        sysctl(slot["unit"], "reset-failed", timeout=20)
+        sysctl(slot["unit"], "restart")
+        back_ok, _ = wait_healthy(slot, seconds=240)
+        return 500, {"error": msg + "，已換回原本的設定" + ("" if back_ok else "，但原本的也還沒起來，請查記錄"),
+                     "reverted": True, "restored_ok": back_ok, **(extra or {})}
+
+    if "max_context" in want:
+        verdict = admit(slot_id)
+        if not verdict["allow"] and not force:
+            save_json(slot["config"], old)
+            return 409, {"error": "上下文調大之後記憶體不夠，設定已還原", "admit": verdict}
+
+    sysctl(slot["unit"], "reset-failed", timeout=20)
+    sysctl(slot["unit"], "restart")
+    ok, why = wait_healthy(slot, seconds=240)
+    if not ok:
+        return revert(f"套用後服務起不來（{why}）")
+    # 埠不開放在網頁改：引擎的 systemd 服務用 --port 帶埠，會蓋過設定檔；而且一改埠，所有已串接的工具一起斷
+    nport = port
+    nkey = _first_key(new.get("api_key"))
+    st, models, _ = _http_json(f"http://127.0.0.1:{int(nport)}/v1/models", key=nkey, timeout=8)
+    ids = [m.get("id") for m in (models or {}).get("data") or []]
+    if st != 200 or (new.get("model_name") and new["model_name"] not in ids):
+        return revert(f"套用後用新設定打不通（/v1/models 回 {st}，模型清單 {ids}）")
+    if nkey:
+        st2, _, _ = _http_json(f"http://127.0.0.1:{int(nport)}/v1/models", timeout=8)
+        if st2 != 401:
+            return revert(f"設了金鑰但沒帶金鑰也打得進去（回 {st2}），引擎沒有吃到金鑰")
+    # 換模型時要沿用使用者自己取的名稱；設定一變，上一次的實測就不算數
+    _set_slot_fields(slot_id, api_model_name=new.get("model_name") if "model_name" in want else slot.get("api_model_name"),
+                     api_last_test=None)
+    out = {"ok": True, "restarted": True, "backup": backup,
+           "changed": [k for k in want if k != "api_key"] + (["api_key"] if "api_key" in want else []),
+           "message": "已套用並重啟，用新設定實際打過一次 /v1/models"}
+    if want.get("api_key"):
+        out["api_key"] = want["api_key"]       # 只在這一次回傳，之後任何 API 都不再回
+    return 200, out
+
+
+def api_test(slot_id):
+    """在這台本機實際打一次：模型清單 → 一般對話 → 工具呼叫（Copilot、OpenCode 的代理模式靠它）。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, {"error": "沒有這個欄位"}
+    raw, port, key = _api_parts(slot)
+    if not port:
+        return 400, {"error": "這個欄位沒有對外的 API 埠"}
+    base = f"http://127.0.0.1:{int(port)}/v1"
+    checks = []
+    st, models, ms = _http_json(base + "/models", key=key, timeout=8)
+    ids = [m.get("id") for m in (models or {}).get("data") or []]
+    checks.append({"name": "模型清單 /v1/models", "ok": st == 200 and bool(ids), "ms": ms,
+                   "detail": "、".join(ids) if ids else f"回 {st or '連不上'}"})
+    name = (raw or {}).get("model_name") or (ids[0] if ids else "")
+    if key:
+        st0, _, _ = _http_json(base + "/models", timeout=8)
+        checks.append({"name": "沒帶金鑰要被擋下", "ok": st0 == 401, "ms": 0,
+                       "detail": "回 401，金鑰保護有效" if st0 == 401 else f"回 {st0}，沒有被擋"})
+    if ids:
+        st, r, ms = _http_json(base + "/chat/completions", key=key, timeout=180, body={
+            "model": name, "max_tokens": 512, "stream": False,
+            "messages": [{"role": "user", "content": "請只回答：連線成功"}]})
+        msg = (((r or {}).get("choices") or [{}])[0].get("message") or {})
+        use = (r or {}).get("usage") or {}
+        checks.append({"name": "一般對話 /v1/chat/completions", "ok": st == 200 and bool(msg.get("content")),
+                       "ms": ms, "detail": (msg.get("content") or f"回 {st}").strip()[:200],
+                       "tokens": use.get("total_tokens")})
+        st, r, ms = _http_json(base + "/chat/completions", key=key, timeout=180, body={
+            "model": name, "max_tokens": 1024, "stream": False,
+            "messages": [{"role": "user", "content": "台北現在幾點？請用工具查。"}],
+            "tools": [{"type": "function", "function": {
+                "name": "get_time", "description": "查某個城市現在的時間",
+                "parameters": {"type": "object", "properties": {"city": {"type": "string"}},
+                               "required": ["city"]}}}]})
+        calls = (((r or {}).get("choices") or [{}])[0].get("message") or {}).get("tool_calls") or []
+        fn = (calls[0].get("function") or {}) if calls else {}
+        try:                                   # 引擎回的參數常是 \uXXXX 跳脫，轉回中文給人看
+            args_txt = json.dumps(json.loads(fn.get("arguments") or "{}"), ensure_ascii=False)
+        except (TypeError, ValueError):
+            args_txt = str(fn.get("arguments"))
+        checks.append({"name": "工具呼叫（IDE 代理模式要用）", "ok": st == 200 and fn.get("name") == "get_time",
+                       "ms": ms, "detail": f"呼叫了 {fn.get('name')}（{args_txt}）" if calls
+                       else f"回 {st}，模型沒有呼叫工具"})
+    ok = all(c["ok"] for c in checks)
+    rec = {"at": int(time.time()), "ok": ok, "where": "本機", "model": name}
+    _set_slot_fields(slot_id, api_last_test=rec)
+    return 200, {"ok": ok, "checks": checks, "model": name, "at": rec["at"]}
 
 
 # ---------------------------------------------------------------- 准入控制
@@ -1291,7 +1596,7 @@ class AgentTLSServer(ThreadingHTTPServer):
 # ---------------------------------------------------------------- HTTP
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "xconsole-agent/1.0"
+    server_version = "xconsole-agent"      # 不公布版本號
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):  # 不要把每個請求都寫進 journal
@@ -1337,6 +1642,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body)
         if path == "/counters":
             return self._send(200, counters())
+        m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
+        if m:
+            code, out = api_info(m.group(1))
+            return self._send(code, out)
         m = re.fullmatch(r"/catalog/([\w.-]+)", path)
         if m:
             return self._send(200, catalog(m.group(1)))
@@ -1370,6 +1679,14 @@ class Handler(BaseHTTPRequestHandler):
             code, out = set_model(m.group(1), body.get("pack") or "",
                                   body.get("native") or "", force=force)
             return self._send(code, out)
+        m = re.fullmatch(r"/apiinfo/([\w.-]+)/settings", path)
+        if m:
+            code, out = api_settings(m.group(1), body, force=force)
+            return self._send(code, out)
+        m = re.fullmatch(r"/apiinfo/([\w.-]+)/test", path)
+        if m:
+            code, out = api_test(m.group(1))
+            return self._send(code, out)
         m = re.fullmatch(r"/profile/([\w.-]+)", path)
         if m:
             code, out = do_profile(m.group(1), force=force)
@@ -1378,11 +1695,8 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, out = do_all(m.group(1), force=force)
             return self._send(code, out)
-        if path == "/registry":
-            if not isinstance(body, dict) or "machine" not in body:
-                return self._send(400, {"error": "登錄檔格式不對"})
-            save_json(REGISTRY, body)
-            return self._send(200, {"ok": True})
+        # ⚠️ 不提供「經 API 覆寫登錄檔」：拿到權杖的人就能把欄位的記錄檔指到 ~/.ssh/id_rsa，
+        # 再從 /logs 讀出來。登錄檔一律由部署腳本經 SSH 寫入。
         return self._send(404, {"error": "找不到"})
 
 

@@ -1,0 +1,18 @@
+服務使用報告能力檢查：.
+  有   彙整端點（usage-report / executive-report）
+       ./test/security/test_security.py
+       ./README.md
+       ./scripts/report/build_usage_report.py
+  有   報表產生器（scripts/report/build_*.py）
+       ./手冊/操作手冊/xConsole主要功能說明.md
+       ./README.md
+       ./scripts/report/build_usage_report.py
+  有   e2e 或測試有斷言報表端點
+       ./test/security/test_security.py
+       ./console/test_e2e_tls.py
+       ./console/test_usage_report.py
+  有   操作手冊或 README 提到怎麼跑報表
+       ./手冊/操作手冊/xConsole主要功能說明.md
+       ./docs/SECURITY_PLAN.md
+       ./README.md
+通過：四項都在

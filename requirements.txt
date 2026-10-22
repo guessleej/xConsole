@@ -1,0 +1,5 @@
+# 主控台執行期相依（版本全部釘死，Dependabot 每週檢查；pip-audit 在 CI 擋 high 以上）
+# 節點代理只用 Python 標準函式庫與系統的 openssl，沒有第三方相依
+cffi==2.1.1
+cryptography==50.0.2
+pycparser==3.11

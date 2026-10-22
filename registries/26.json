@@ -9,7 +9,7 @@
   "ram_floor_gib": 15,
   "vram_floor_gib": 2,
   "profile": "coding",
-  "note": "同事 Samuel 的 GitHub Copilot 寫程式後端。系統 RAM 只有 31 GiB，曾因耗盡整台卡死需物理重開。"
+  "note": "同事的 GitHub Copilot 寫程式後端。系統 RAM 只有 31 GiB，曾因耗盡整台卡死需物理重開。"
  },
  "slots": [
   {
@@ -26,7 +26,7 @@
    "est_vram_gib": 64,
    "est_ram_gib": 14,
    "critical": true,
-   "note": "Samuel 的 Copilot 後端，停掉他就不能寫程式。GDN 混合注意力，KV 極小（1,056 B/token）。"
+   "note": "同事的 Copilot 後端，停掉就不能寫程式。GDN 混合注意力，KV 極小（1,056 B/token）。"
   },
   {
    "id": "eyes",
@@ -50,7 +50,7 @@
  "profiles": {
   "coding": {
    "name": "寫程式後端",
-   "why": "Samuel 的 Copilot 一輪會送四萬 token 以上的提示，上下文不夠就整個送不出去。",
+   "why": "同事的 Copilot 一輪會送四萬 token 以上的提示，上下文不夠就整個送不出去。",
    "changes": [
     {"slot": "brain", "args": {"--max-context": "131072"}, "config": {"parallel": 1, "fit_max_tokens": true}}
    ]

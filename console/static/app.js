@@ -152,11 +152,11 @@ function renderNav() {
 
   const items = [["overview", "總覽"]];
   for (const [name] of groups()) items.push(["group:" + name, name]);
-  items.push(["logs", "記錄"], ["settings", "設定"]);
+  items.push(["apis", "API 串接"], ["logs", "記錄"], ["settings", "設定"]);
 
   const active = S.view.startsWith("node:")
     ? "group:" + (S.fleet.nodes.find((n) => n.id === S.view.slice(5))?.group || "")
-    : S.view;
+    : S.view.startsWith("api:") ? "apis" : S.view;
 
   items.forEach(([key, label]) => {
     const b = el("button", null, label);
@@ -178,6 +178,20 @@ function renderNav() {
       b.onclick = () => { S.settingsTab = key; render(); };
       sub.appendChild(b);
     });
+  }
+
+  // 第二列：API 串接的各個端點
+  if (S.view === "apis" || S.view.startsWith("api:")) {
+    const all = el("button", null, "全部");
+    if (S.view === "apis") all.setAttribute("aria-current", "true");
+    all.onclick = () => go("apis");
+    sub.appendChild(all);
+    (S.fleet.nodes || []).forEach((n) => (n.state?.slots || []).filter(isApiSlot).forEach((s) => {
+      const b = el("button", null, `${n.name} ${s.role}`);
+      if (S.view === `api:${n.id}:${s.id}`) b.setAttribute("aria-current", "true");
+      b.onclick = () => go(`api:${n.id}:${s.id}`);
+      sub.appendChild(b);
+    }));
   }
 
   // 第二列：所在區的各台機器
@@ -351,6 +365,12 @@ function slotCard(node, s, unified) {
     sw.onclick = () => openSwap(node, s);
     acts.appendChild(sw);
   }
+  if (isApiSlot(s)) {
+    const ab = el("button", "btn sm", "API");
+    ab.title = "網址、模型名稱、上下文、各工具設定範例與實測";
+    ab.onclick = () => go(`api:${node.id}:${s.id}`);
+    acts.appendChild(ab);
+  }
   const lg = el("button", "btn sm", "記錄");
   lg.onclick = () => { S.sub = { node: node.id, slot: s.id }; go("logs"); };
   acts.appendChild(lg);
@@ -422,9 +442,16 @@ async function openSwap(node, s) {
     ov.remove();
     toast("換模型中，模型要重新載入…");
     try {
-      await api(`/api/node/${node.id}/slot/${s.id}/model`,
+      const r = await api(`/api/node/${node.id}/slot/${s.id}/model`,
         { method: "POST", body: { pack: chosen.pack, native: chosen.native } });
       toast(`已換成 ${chosen.name}`, "ok");
+      // 換完模型，下一步就是把 IDE 改到新模型：直接帶去 API 串接頁，實測一次再貼設定
+      S.apiNotice = S.apiNotice || {};
+      S.apiNotice[node.id + "/" + s.id] = `已換成 ${chosen.name}。IDE 裡的模型名稱請改成 ${r.api_model_name || "下面的模型名稱"}，`
+        + "上下文與輸出上限照下面填，再按「實測一次」。";
+      await refresh();
+      go(`api:${node.id}:${s.id}`);
+      return;
     } catch (ex) {
       const v = ex.data?.admit;
       toast(v ? `擋下來了：${v.reasons.join("；")}` : ("換模型失敗：" + ex.message), "bad");
@@ -488,6 +515,445 @@ async function run(node, s, action, force) {
     S.busy.delete(key);
     await refresh();
   }
+}
+
+/* ---------------------------------------------------------------- API 串接
+   換完模型之後，IDE（GitHub Copilot、OpenCode、Continue、Cline…）與其他服務要知道四件事：
+   打哪個網址、模型名稱、上下文多長、要不要金鑰。這裡讓管理者在網頁上改、看範例、實測。 */
+
+// 哪些欄位算「有 API」：Strata 引擎，或能力標了文字／嵌入且有埠
+const isApiSlot = (s) => !!s.unit && !!s.port && (s.kind === "strata" || (s.caps || []).some((c) => c === "文字" || c === "嵌入"));
+
+// 剛產生的金鑰只放在這個分頁的記憶體裡，重新整理就沒了（後端也只回這一次）
+S.newKeys = S.newKeys || {};
+
+function copyText(text) {
+  const done = () => toast("已複製", "ok");
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallback());
+  } else fallback();
+  function fallback() {
+    const t = el("textarea");
+    t.value = text;
+    t.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(t);
+    t.select();
+    try { document.execCommand("copy"); done(); } catch (_) { toast("複製失敗，請手動選取", "bad"); }
+    t.remove();
+  }
+}
+
+function copyRow(k, v, opts = {}) {
+  const r = el("div", "copyrow");
+  r.appendChild(el("span", "k", k));
+  const val = el("code", "v", v ?? "—");
+  r.appendChild(val);
+  if (v && !opts.noCopy) {
+    const b = el("button", "btn sm", "複製");
+    b.onclick = () => copyText(v);
+    r.appendChild(b);
+  } else r.appendChild(el("span"));
+  return r;
+}
+
+function apiOutTokens(info) {
+  if (info.max_tokens) return info.max_tokens;
+  return Math.min(16384, Math.floor((info.max_context || 32768) / 4));
+}
+
+/* 依目前設定產生各工具的設定範例。金鑰：剛產生的就直接填；設了但看不到就放提示字；沒設就不放。 */
+function apiExamples(node, info) {
+  const base = info.public_url;
+  const name = info.model_name || "（模型名稱）";
+  const ctx = info.max_context || 32768;
+  const out = apiOutTokens(info);
+  const newKey = S.newKeys[node.id + "/" + info.slot];
+  const key = newKey || (info.api_key_set ? "<貼上金鑰>" : "");
+  const label = `${info.role}（${node.name}）`;
+  const pid = ("xconsole-" + node.name.replace(/[^\w]/g, "") + "-" + info.slot).toLowerCase();
+  const j = (o) => JSON.stringify(o, null, 2);
+  const origin = base.replace(/\/v1\/?$/, "");
+  const ex = [];
+
+  ex.push({
+    key: "copilot", label: "GitHub Copilot（VS Code）",
+    note: "貼進 VS Code 的 settings.json。也可以在 Copilot 對話框的模型選單 → 管理模型 → 新增「OpenAI Compatible」，"
+      + "填同樣的網址與模型名稱。網址填到 /v1；若你的版本要求完整路徑，改填 " + base + "/chat/completions。",
+    code: `"github.copilot.chat.customOAIModels": ${j({
+      [name]: {
+        name: label, url: base, toolCalling: info.tools !== false, vision: !!info.vision, thinking: false,
+        maxInputTokens: ctx - out, maxOutputTokens: out, requiresAPIKey: !!info.api_key_set,
+      },
+    })}`,
+  });
+  ex.push({
+    key: "fields", label: "GitHub Copilot 桌面版／其他 IDE",
+    note: "只要工具有「OpenAI 相容（OpenAI Compatible）」的自訂提供者，就填這幾欄。",
+    code: [
+      `提供者類型   OpenAI Compatible`,
+      `Base URL     ${base}`,
+      `模型名稱     ${name}`,
+      `API 金鑰     ${key || "不需要（工具要求必填就隨便填一串）"}`,
+      `上下文長度   ${ctx}`,
+      `輸出上限     ${out}`,
+      `工具呼叫     ${info.tools === false ? "不支援" : "支援（代理模式可用）"}`,
+      `看圖         ${info.vision ? "支援" : "不支援"}`,
+    ].join("\n"),
+  });
+  const ocProvider = {
+    npm: "@ai-sdk/openai-compatible", name: label,
+    options: { baseURL: base, ...(info.api_key_set ? { apiKey: "{env:XCONSOLE_API_KEY}" } : {}) },
+    models: { [name]: { name: info.model || name, tool_call: info.tools !== false, limit: { context: ctx, output: out } } },
+  };
+  ex.push({
+    key: "opencode", label: "OpenCode",
+    note: "存成專案根目錄的 opencode.json，或 ~/.config/opencode/opencode.json。"
+      + (info.api_key_set ? "金鑰放在環境變數 XCONSOLE_API_KEY，不寫進設定檔。" : ""),
+    code: j({ $schema: "https://opencode.ai/config.json", provider: { [pid]: ocProvider }, model: `${pid}/${name}` }),
+  });
+  ex.push({
+    key: "continue", label: "Continue",
+    note: "加進 ~/.continue/config.yaml 的 models。",
+    code: [
+      "models:",
+      `  - name: ${label}`,
+      "    provider: openai",
+      `    model: ${name}`,
+      `    apiBase: ${base}`,
+      ...(key ? [`    apiKey: ${key}`] : []),
+      "    roles: [chat, edit, apply]",
+      ...(info.tools !== false ? ["    capabilities: [tool_use]"] : []),
+      "    defaultCompletionOptions:",
+      `      contextLength: ${ctx}`,
+      `      maxTokens: ${out}`,
+    ].join("\n"),
+  });
+  ex.push({
+    key: "cline", label: "Cline／Roo Code",
+    note: "設定 → API Provider 選「OpenAI Compatible」，填這幾欄。",
+    code: [
+      `Base URL         ${base}`,
+      `API Key          ${key || "隨便填一串（伺服器沒設金鑰）"}`,
+      `Model ID         ${name}`,
+      `Context Window   ${ctx}`,
+      `Max Output       ${out}`,
+    ].join("\n"),
+  });
+  if ((info.dialects || []).includes("anthropic")) {
+    ex.push({
+      key: "claude", label: "Claude Code（Anthropic 介面）",
+      note: "這個引擎也講 Anthropic 的 /v1/messages，Claude Code 可以直接接。",
+      code: [
+        `export ANTHROPIC_BASE_URL=${origin}`,
+        `export ANTHROPIC_AUTH_TOKEN=${key || "none"}`,
+        `export ANTHROPIC_MODEL=${name}`,
+        "claude",
+      ].join("\n"),
+    });
+  }
+  ex.push({
+    key: "curl", label: "curl",
+    note: "在任何一台連得到的電腦上貼上執行，回「連線成功」就通了。",
+    code: [
+      `curl ${base}/chat/completions \\`,
+      `  -H "Content-Type: application/json" \\`,
+      ...(key ? [`  -H "Authorization: Bearer ${key}" \\`] : []),
+      `  -d '${JSON.stringify({ model: name, messages: [{ role: "user", content: "請只回答：連線成功" }] })}'`,
+    ].join("\n"),
+  });
+  ex.push({
+    key: "python", label: "Python",
+    note: "用官方 openai 套件（pip install openai）。串到自己的服務時照這樣寫。",
+    code: [
+      "from openai import OpenAI",
+      "",
+      `client = OpenAI(base_url="${base}", api_key=${key ? `"${key}"` : '"none"'})`,
+      "r = client.chat.completions.create(",
+      `    model="${name}",`,
+      '    messages=[{"role": "user", "content": "請只回答：連線成功"}],',
+      ")",
+      "print(r.choices[0].message.content)",
+    ].join("\n"),
+  });
+  return ex;
+}
+
+function apiSteps(info) {
+  const t = info.last_test;
+  const steps = [
+    { t: "確認服務在跑", why: "IDE 打過來要有人接；沒在跑就先到機器頁啟動或換模型",
+      done: !!info.online, need: "（服務沒有回應）" },
+    { t: "確認網址、模型名稱與上下文", why: "這三個要原封不動填進 IDE；上下文不夠，IDE 一輪的提示就送不出去",
+      done: !!info.online && !!info.model_name && (info.served || []).some((m) => m.id === info.model_name) },
+    { t: "決定要不要金鑰", why: "有金鑰才不會讓內網任何人都能用；開了之後每個工具都要補上金鑰",
+      done: !!info.api_key_set, optional: true },
+    { t: "實測一次", why: "從這台本機與主控台經網路各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
+      done: !!(t && t.ok) },
+  ];
+  const firstOpen = steps.findIndex((s) => !s.done && !s.optional);
+  steps.forEach((s, i) => {
+    if (s.done) s.state = "done";
+    else if (s.optional && (firstOpen === -1 || i < firstOpen)) s.state = "skip";
+    else if (i === firstOpen) s.state = "now";
+    else s.state = "blocked";
+  });
+  return steps;
+}
+
+/* 全部機器的 API 一覽：要串 IDE 或其他服務時，從這裡挑一個 */
+function viewApis() {
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  const c = card("API 串接", "換完模型之後，IDE 與其他服務要打的網址、模型名稱與上下文都在這裡");
+  const list = [];
+  (S.fleet.nodes || []).forEach((n) => (n.state?.slots || []).filter(isApiSlot).forEach((s) => list.push([n, s])));
+  if (!list.length) {
+    c.appendChild(el("p", "note", "目前沒有提供 API 的模型欄位。先到機器頁啟動或換上一顆文字模型。"));
+    wrap.appendChild(c);
+    return;
+  }
+  const sb = el("div", "scrollbox");
+  const tb = el("table", "api-table");
+  const th = el("thead");
+  const hr = el("tr");
+  ["機器", "欄位", "模型名稱（填進 IDE）", "網址", "上下文", "金鑰", "上次實測", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  th.appendChild(hr);
+  tb.appendChild(th);
+  const body = el("tbody");
+  list.forEach(([n, s]) => {
+    const tr = el("tr");
+    const cells = [n.name, `${s.role}・${s.tier || ""}`, "讀取中…", "", int(s.config?.max_context), "", "", ""].map((v) => el("td", null, v));
+    cells.forEach((td) => tr.appendChild(td));
+    cells[2].className = "mono";
+    cells[3].className = "mono";
+    const b = el("button", "btn sm primary", "設定與實測");
+    b.onclick = () => go(`api:${n.id}:${s.id}`);
+    cells[7].textContent = "";
+    cells[7].appendChild(b);
+    tr.style.cursor = "pointer";
+    tr.onclick = (e) => { if (e.target.tagName !== "BUTTON") go(`api:${n.id}:${s.id}`); };
+    body.appendChild(tr);
+    api(`/api/node/${n.id}/apiinfo/${s.id}`).then((info) => {
+      cells[2].textContent = info.model_name || "—";
+      cells[3].textContent = info.public_url;
+      cells[4].textContent = int(info.max_context);
+      cells[5].textContent = info.api_key_set ? "有" : "沒有";
+      cells[6].textContent = info.last_test
+        ? `${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}` : "還沒測";
+    }).catch((ex) => { cells[2].textContent = ex.message; });
+  });
+  tb.appendChild(body);
+  sb.appendChild(tb);
+  c.appendChild(sb);
+  c.appendChild(el("p", "small muted", "網址是 http：這些模型服務在內網直接對外，沒有經過主控台。設了金鑰的話，金鑰會以明文在內網傳輸。"));
+  wrap.appendChild(c);
+}
+
+async function viewApi() {
+  const [, nodeId, slotId] = S.view.split(":");
+  const node = S.fleet.nodes.find((x) => x.id === nodeId);
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  if (!node) { go("apis"); return; }
+  const slot = (node.state?.slots || []).find((x) => x.id === slotId) || { role: slotId };
+
+  const head = card(`API 串接：${node.name} ${slot.role}・${slot.tier || ""}`,
+    [slot.model, slot.quant].filter(Boolean).join(" ") || "");
+  wrap.appendChild(head);
+  loading(head.appendChild(el("div")));
+  let info;
+  try {
+    info = await api(`/api/node/${nodeId}/apiinfo/${slotId}`);
+  } catch (ex) {
+    head.lastChild.textContent = "";
+    head.lastChild.appendChild(el("p", "note bad", ex.message));
+    return;
+  }
+  if (S.view !== `api:${nodeId}:${slotId}`) return;     // 讀取期間使用者已經切走
+  head.lastChild.remove();
+  if (S.apiNotice?.[nodeId + "/" + slotId]) {
+    head.appendChild(el("p", "note warn", S.apiNotice[nodeId + "/" + slotId]));
+    delete S.apiNotice[nodeId + "/" + slotId];
+  }
+  head.appendChild(renderSteps(apiSteps(info)));
+
+  /* ---- 連線資訊 ｜ 設定 */
+  const pair = el("div", "grid pair");
+  wrap.appendChild(pair);
+  const ci = card("連線資訊", info.online ? "服務有回應" : "服務沒有回應");
+  const newKey = S.newKeys[nodeId + "/" + slotId];
+  ci.appendChild(copyRow("網址（Base URL）", info.public_url));
+  ci.appendChild(copyRow("模型名稱", info.model_name));
+  ci.appendChild(copyRow("上下文長度", info.max_context ? String(info.max_context) : null));
+  ci.appendChild(copyRow("單次輸出上限", info.max_tokens ? String(info.max_tokens) : `引擎預設（範例填 ${apiOutTokens(info)}）`, { noCopy: !info.max_tokens }));
+  ci.appendChild(copyRow("API 金鑰", newKey || (info.api_key_set ? "已設定（只在產生當下顯示一次）" : "沒有設定"), { noCopy: !newKey }));
+  ci.appendChild(copyRow("支援的介面", (info.dialects || []).map((d) => ({ openai: "OpenAI", anthropic: "Anthropic", responses: "Responses" }[d])).join("、"), { noCopy: true }));
+  ci.appendChild(copyRow("工具呼叫／看圖", `${info.tools === false ? "不支援" : info.tools ? "支援" : "未知"}／${info.vision ? "支援" : "不支援"}`, { noCopy: true }));
+  if ((info.served || []).length && !(info.served || []).some((m) => m.id === info.model_name)) {
+    ci.appendChild(el("p", "note warn", `服務實際回報的模型名稱是 ${info.served.map((m) => m.id).join("、")}，跟設定檔不一致，IDE 請填實際的那個。`));
+  }
+  if (!info.online) ci.appendChild(el("p", "note bad", `本機打 :${info.port}/v1/models 沒有回應（${info.status || "連不上"}）。`));
+  pair.appendChild(ci);
+
+  const fc = card("設定", info.editable ? "改完會重啟這個模型並用新設定實際打一次，打不通自動換回" : "這個服務的設定檔不由 xConsole 管理，只能改對外網址");
+  const form = el("div", "form-row");
+  const field = (label, input, hint) => {
+    const w = el("div");
+    w.appendChild(el("label", null, label));
+    w.appendChild(input);
+    if (hint) w.appendChild(el("div", "assume", hint));
+    form.appendChild(w);
+    return input;
+  };
+  const mk = (type, val, ph) => { const i = el("input"); i.type = type; i.value = val ?? ""; if (ph) i.placeholder = ph; return i; };
+  const fUrl = field("對外網址", mk("text", info.public_url_custom ? info.public_url : "", info.default_url),
+    "IDE 所在的電腦要打的位址。留空＝這台的 IP 與埠；前面有反向代理或內部網域時改成那個");
+  const fName = field("模型名稱", mk("text", info.model_name), "IDE 裡填的就是這個；自己取過的名稱，換模型時會沿用");
+  const fCtx = field("上下文長度（token）", mk("number", info.max_context), "調大前會先做記憶體試算，不夠會擋下");
+  const fOut = field("單次輸出上限（token）", mk("number", info.max_tokens || "", "留空＝引擎預設"), "要小於上下文長度");
+  const fKey = el("select");
+  [["keep", info.api_key_set ? "維持現在的金鑰" : "維持不使用金鑰"], ["new", info.api_key_set ? "重新產生金鑰（舊的立即失效）" : "產生金鑰"],
+    ...(info.api_key_set ? [["none", "不使用金鑰"]] : [])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; fKey.appendChild(o); });
+  field("API 金鑰", fKey, "金鑰只在產生的當下顯示一次；之後忘了就重新產生");
+  [fName, fCtx, fOut].forEach((i) => { if (!info.editable) i.disabled = true; });
+  if (!info.editable) fKey.disabled = true;
+  fc.appendChild(form);
+  const save = el("button", "btn primary", "儲存");
+  const acts = el("div", "slot-actions");
+  acts.appendChild(save);
+  fc.appendChild(acts);
+  [fUrl, fName, fCtx, fOut].forEach((i) => imeGuard(i, () => save.click()));
+  pair.appendChild(fc);
+
+  save.onclick = () => {
+    const body = {};
+    const url = fUrl.value.trim();
+    if (url !== (info.public_url_custom ? info.public_url : "")) body.public_url = url;
+    if (info.editable) {
+      if (fName.value.trim() !== (info.model_name || "")) body.model_name = fName.value.trim();
+      if (Number(fCtx.value) !== Number(info.max_context)) body.max_context = Number(fCtx.value);
+      if ((fOut.value || "") !== String(info.max_tokens || "")) body.max_tokens = fOut.value ? Number(fOut.value) : null;
+      if (fKey.value !== "keep") body.key = fKey.value;
+    }
+    if (!Object.keys(body).length) { toast("沒有變更"); return; }
+    const restart = ["model_name", "max_context", "max_tokens", "key"].some((k) => k in body);
+    const send = async (force) => {
+      save.disabled = true;
+      save.textContent = restart ? "套用中，模型重新載入約一到兩分鐘…" : "儲存中…";
+      try {
+        const r = await api(`/api/node/${nodeId}/apiinfo/${slotId}/settings`, { method: "POST", body: { ...body, force } });
+        if (r.api_key) {
+          S.newKeys[nodeId + "/" + slotId] = r.api_key;
+          showNewKey(r.api_key);
+        } else if (body.key === "none") delete S.newKeys[nodeId + "/" + slotId];
+        toast(r.message || "已儲存", "ok");
+      } catch (ex) {
+        const v = ex.data?.admit;
+        if (v && !force) {
+          const d = el("div");
+          v.reasons.forEach((x) => d.appendChild(el("p", "note bad", x)));
+          modal({ title: "上下文調大之後記憶體不夠", bodyNode: d, confirmText: "我知道風險，仍要套用", danger: true, onConfirm: () => send(true) });
+        } else toast(ex.message, "bad");
+      }
+      viewApi();
+    };
+    if (!restart) { send(false); return; }
+    const d = el("div");
+    d.appendChild(el("p", "small muted", "會改寫這個模型的設定檔（先自動備份）並重啟；重啟期間這個模型的 API 會中斷約一到兩分鐘。"
+      + "套用後會用新設定實際打一次，打不通就自動換回原本的設定。"));
+    if (slot.critical) d.appendChild(el("p", "note warn", slot.note || "這是標記為關鍵的服務。"));
+    if ("model_name" in body) d.appendChild(el("p", "note warn", `模型名稱改成 ${body.model_name} 之後，所有已串接的工具都要改成新名稱。`));
+    if (body.key === "new") d.appendChild(el("p", "note warn", info.api_key_set ? "舊金鑰會立即失效，所有已串接的工具都要換上新金鑰。" : "開了金鑰之後，所有已串接的工具都要補上金鑰才連得上。"));
+    if (body.key === "none") d.appendChild(el("p", "note warn", "拿掉金鑰之後，內網任何連得到這台的人都能使用這個模型。"));
+    modal({ title: "套用並重啟", bodyNode: d, confirmText: "套用並重啟", danger: !!slot.critical, onConfirm: () => send(false) });
+  };
+
+  /* ---- 實測 ｜ 工具設定範例 */
+  const pair2 = el("div", "grid pair");
+  wrap.appendChild(pair2);
+  const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}（台北時間）` : "還沒測過");
+  tc.appendChild(el("p", "small muted", "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。"));
+  let fTestKey = null;
+  if (info.api_key_set && !newKey) {
+    const w = el("div");
+    w.appendChild(el("label", "field", "金鑰（選填，只用這一次、不保存；填了會連經網路的那一段一起完整驗）"));
+    fTestKey = el("input");
+    fTestKey.type = "password";
+    fTestKey.autocomplete = "off";
+    w.appendChild(fTestKey);
+    tc.appendChild(w);
+  }
+  const res = el("div");
+  const tb = el("button", "btn primary", "實測一次");
+  if (fTestKey) imeGuard(fTestKey, () => tb.click());
+  tb.disabled = !info.online;
+  tb.onclick = async () => {
+    tb.disabled = true;
+    tb.textContent = "測試中…";
+    res.textContent = "";
+    try {
+      const r = await api(`/api/node/${nodeId}/apiinfo/${slotId}/test`, { method: "POST", body: { key: newKey || fTestKey?.value || "" } });
+      const rows = [...(r.checks || []), ...(r.network ? [{ name: "從主控台經網路連對外網址", ok: r.network.ok, ms: r.network.ms, detail: r.network.detail }] : [])];
+      rows.forEach((c) => {
+        const g = el("div", "res-group " + (c.ok ? "ok" : "bad"));
+        const h4 = el("h4", null, `${c.ok ? "通過" : "失敗"}　${c.name}`);
+        g.appendChild(h4);
+        g.appendChild(el("div", "small", `${c.detail || ""}${c.ms ? `（${int(c.ms)} 毫秒）` : ""}`));
+        res.appendChild(g);
+      });
+      toast(r.ok ? "全部通過，可以貼到 IDE 了" : "有項目沒通過，看下面的說明", r.ok ? "ok" : "bad");
+    } catch (ex) { res.appendChild(el("p", "note bad", ex.message)); }
+    tb.disabled = false;
+    tb.textContent = "再測一次";
+  };
+  const ta = el("div", "slot-actions");
+  ta.appendChild(tb);
+  tc.appendChild(ta);
+  tc.appendChild(res);
+  pair2.appendChild(tc);
+
+  const ec = card("工具設定範例", "依上面的設定即時產生");
+  const exs = apiExamples(node, info);
+  const tabs = el("div", "tabbar");
+  const note = el("p", "small muted");
+  const pre = el("pre", "code");
+  const cp = el("button", "btn sm", "複製這段");
+  let cur = exs.find((x) => x.key === S.apiTab) || exs[0];
+  const show = (x) => {
+    cur = x;
+    S.apiTab = x.key;
+    [...tabs.children].forEach((b) => b.setAttribute("aria-current", b.dataset.k === x.key ? "true" : "false"));
+    note.textContent = x.note;
+    pre.textContent = x.code;
+  };
+  exs.forEach((x) => {
+    const b = el("button", null, x.label);
+    b.dataset.k = x.key;
+    b.onclick = () => show(x);
+    tabs.appendChild(b);
+  });
+  cp.onclick = () => copyText(cur.code);
+  ec.appendChild(tabs);
+  ec.appendChild(note);
+  ec.appendChild(pre);
+  const ea = el("div", "slot-actions");
+  ea.appendChild(cp);
+  ec.appendChild(ea);
+  show(cur);
+  pair2.appendChild(ec);
+}
+
+function showNewKey(k) {
+  const d = el("div");
+  d.appendChild(el("p", "note warn", "這把金鑰只顯示這一次。關掉之後主控台與節點都不會再顯示它；忘了就重新產生。"));
+  const r = copyRow("金鑰", k);
+  d.appendChild(r);
+  d.appendChild(el("p", "small muted", "在這個分頁重新整理之前，下面的設定範例會直接帶入這把金鑰。"));
+  modal({ title: "新的 API 金鑰", bodyNode: d });
 }
 
 /* ---------------------------------------------------------------- 畫面 */
@@ -739,8 +1205,7 @@ function viewNode() {
     ]));
   }
   hwCard.appendChild(hgrid);
-  const twoCol = el("div", "grid");
-  twoCol.style.marginTop = "16px";
+  const twoCol = el("div", "grid pair");
   twoCol.appendChild(memCard);
   twoCol.appendChild(hwCard);
   wrap.appendChild(twoCol);
@@ -968,7 +1433,7 @@ function tlsSteps(st, ui) {
       done: imported || !!(ui.inspected && ui.inspected.ok) },
     { t: "套用", why: "不必重開機，新連線立刻生效；失敗會自動換回原本那張", done: imported },
     { t: "開啟 HSTS", why: "讓瀏覽器以後一律走 HTTPS，不會被降級成 http",
-      done: !!cur.hsts, blocked: !st.hsts_allowed },
+      done: !!cur.hsts, blocked: !st.hsts_allowed, need: "（要先換成正式憑證）" },
   ];
   let firstOpen = steps.findIndex((s) => !s.done);
   steps.forEach((s, i) => {
@@ -986,8 +1451,10 @@ function renderSteps(steps) {
   const next = steps.findIndex((s) => s.state === "now");
   const head = el("div", "steps-head");
   head.appendChild(el("span", "count", `${done}/${steps.length} 步完成`));
+  const required = steps.filter((s) => !s.optional);
   head.appendChild(el("span", "next", next >= 0 ? `下一步：${next + 1}. ${steps[next].t}`
-    : done === steps.length ? "全部完成" : "還有步驟要先完成前面的才能做"));
+    : required.every((s) => s.done) ? (done === steps.length ? "全部完成" : "必要步驟都完成了，其餘可略過")
+      : "還有步驟要先完成前面的才能做"));
   box.appendChild(head);
   const g = el("div", "steps");
   steps.forEach((s, i) => {
@@ -997,9 +1464,9 @@ function renderSteps(steps) {
     t.appendChild(document.createTextNode(s.t));
     d.appendChild(t);
     d.appendChild(el("div", "why", s.why));
-    const lbl = { done: "已完成", now: "現在做這步", blocked: "還不能做" }[s.state];
+    const lbl = { done: "已完成", now: "現在做這步", blocked: "還不能做", skip: "可略過" }[s.state];
     const need = s.state === "blocked"
-      ? (i === 4 && s.blocked ? "（要先換成正式憑證）" : `（要先完成第 ${steps.findIndex((x) => !x.done) + 1} 步）`) : "";
+      ? (s.blocked && s.need ? s.need : `（要先完成第 ${steps.findIndex((x) => !x.done && !x.optional) + 1} 步）`) : "";
     d.appendChild(el("span", "st", lbl + need));
     g.appendChild(d);
   });
@@ -1425,6 +1892,8 @@ function render() {
   renderNav();
   if (S.view === "overview") viewOverview();
   else if (S.view.startsWith("node:")) viewNode();
+  else if (S.view === "apis") viewApis();
+  else if (S.view.startsWith("api:")) viewApi();
   else if (S.view === "logs") viewLogs();
   else if (S.view === "settings") viewSettings();
 }
@@ -1438,7 +1907,8 @@ async function refresh() {
     $("#live").classList.remove("stale");
     $("#live-text").textContent = "即時";
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
-    if (S.view === "settings" || S.view === "logs") renderNav(); else render();
+    // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
+    if (S.view === "settings" || S.view === "logs" || S.view === "apis" || S.view.startsWith("api:")) renderNav(); else render();
   } catch (ex) {
     $("#live").classList.add("stale");
     $("#live-text").textContent = "更新失敗";

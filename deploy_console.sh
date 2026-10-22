@@ -17,6 +17,15 @@ done
 for f in index.html style.css app.js; do
   PUT="$HERE/console/static/$f" DST="/home/xcloud/xconsole/static/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
+PUT="$HERE/requirements.txt" DST="/home/xcloud/xconsole/requirements.txt" bash "$XS" "$HOST_ALIAS" --scp
+
+echo "=== 獨立的 Python 環境（依賴版本照 requirements.txt 釘死，不吃系統套件）==="
+# 系統的 python3-cryptography 跟著發行版走（Ubuntu 24.04 是 41.0.7），版本不受我們控制，
+# SBOM 與弱點掃描也對不上實際跑的版本
+bash "$XS" "$HOST_ALIAS" 'set -e
+[ -x $HOME/xconsole/.venv/bin/python ] || python3 -m venv $HOME/xconsole/.venv
+$HOME/xconsole/.venv/bin/python -m pip install -q --disable-pip-version-check -r $HOME/xconsole/requirements.txt
+$HOME/xconsole/.venv/bin/python -c "import cryptography; print(\"cryptography\", cryptography.__version__)"'
 
 echo "=== 組 fleet.json（含各機代理權杖，0600）==="
 NODE_JSON=""
@@ -48,13 +57,13 @@ done
 
 bash "$XS" "$HOST_ALIAS" "mkdir -p -m 700 \$HOME/.xconsole
 python3 - <<'PY'
-import json, os, secrets
+import json, os
 p = os.path.expanduser('~/.xconsole/fleet.json')
 cfg = {}
 if os.path.exists(p):
     cfg = json.load(open(p))
 cfg['nodes'] = json.loads('''[$NODE_JSON]''')
-cfg.setdefault('session_secret', secrets.token_urlsafe(32))
+cfg.pop('session_secret', None)
 cfg.setdefault('auth', {})
 fd = os.open(p + '.tmp', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as fh:
@@ -88,7 +97,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/xconsole
-ExecStart=/usr/bin/python3 %h/xconsole/xconsole_server.py
+ExecStart=%h/xconsole/.venv/bin/python %h/xconsole/xconsole_server.py
 Restart=always
 RestartSec=5
 MemoryMax=512M

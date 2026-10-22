@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import ssl
 import sys
 import threading
 import time
@@ -41,6 +42,12 @@ SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
 PBKDF2_ROUNDS = 200_000
+# 登入節流：伺服器是多執行緒的，只在每次失敗後睡一秒擋不住並行猜測。
+# 同一來源 15 分鐘內錯 5 次就先擋；全部來源加起來錯 50 次也擋（分散猜測）。
+# 不鎖帳號：鎖帳號等於讓內網任何人都能把管理者鎖在門外。
+LOGIN_WINDOW = 900
+LOGIN_MAX_PER_IP = 5
+LOGIN_MAX_GLOBAL = 50
 
 os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
 STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
@@ -72,14 +79,35 @@ _FLEET_LOCK = threading.Lock()
 def fleet():
     cfg = load_json(FLEET)
     if cfg is None:
-        cfg = {"nodes": [], "auth": {}, "session_secret": secrets.token_urlsafe(32)}
+        cfg = {"nodes": [], "auth": {}}
         save_json(FLEET, cfg)
-    cfg.setdefault("session_secret", secrets.token_urlsafe(32))
     cfg.setdefault("auth", {})
     cfg.setdefault("nodes", [])
     cfg.setdefault("tls", {})
     cfg.setdefault("report", {})
     return cfg
+
+
+def node_token(node):
+    """代理權杖加密落地（enc:v1:，AES-256-GCM，主金鑰在 ~/.xconsole/master.key）。
+    部署腳本寫進來的是明文，主控台啟動時由 migrate_tokens() 轉成密文。"""
+    t = node.get("token") or ""
+    return tls.unseal(CERTS.p, t).decode() if t.startswith("enc:v1:") else t
+
+
+def migrate_tokens():
+    """一次性遷移：fleet.json 裡還是明文的代理權杖一律換成密文。回傳轉了幾個。"""
+    n = 0
+
+    def fn(cfg):
+        nonlocal n
+        for node in cfg["nodes"]:
+            t = node.get("token") or ""
+            if t and not t.startswith("enc:v1:"):
+                node["token"] = tls.seal(CERTS.p, t.encode())
+                n += 1
+    update_fleet(fn)
+    return n
 
 
 def update_fleet(fn):
@@ -109,8 +137,9 @@ def set_credentials(username, password):
         cfg["auth"] = {"username": username, "salt": base64.b64encode(salt).decode(),
                        "hash": _hash(password, salt), "algo": "pbkdf2-sha256-200k",
                        "changed_at": int(time.time())}
-        cfg["session_secret"] = secrets.token_urlsafe(32)   # 換密碼讓既有登入全部失效
+        cfg.pop("session_secret", None)                    # 舊版無狀態票證用的，已不需要
     update_fleet(fn)
+    STORE.session_end_all()                                  # 換密碼讓既有登入全部失效
 
 
 def check_credentials(username, password):
@@ -124,30 +153,60 @@ def check_credentials(username, password):
     return user_ok and pw_ok
 
 
-def make_session(user):
-    cfg = fleet()
-    payload = f"{int(time.time()) + SESSION_HOURS * 3600}:{user}"
-    sig = hmac.new(cfg["session_secret"].encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}.{sig}"
+def session_user(sid):
+    """票證記在伺服器端：登出、換密碼、到期都會讓它失效。
+    （以前是無狀態的簽章票證，登出只是清掉瀏覽器 cookie，被偷走的票證 12 小時內照樣能用。）"""
+    return STORE.session_user(sid)
 
 
-def session_user(cookie):
-    if not cookie or "." not in cookie:
-        return None
-    payload, sig = cookie.rsplit(".", 1)
-    want = hmac.new(fleet()["session_secret"].encode(), payload.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(sig, want):
-        return None
-    exp, _, user = payload.partition(":")
-    try:
-        expired = int(exp) <= time.time()
-    except ValueError:
-        return None
-    # ⚠️ 不要寫成 `user or None if 沒過期 else None`：Python 會解析成 user or (None if … else None)，
-    # 過期的票證照樣通過。拆開寫。
-    if expired or not user:
-        return None
-    return user
+# ---------------------------------------------------------------- API 串接：從主控台經網路打一次
+
+def network_test(node_id, slot_id, key=""):
+    """用 IDE 會打的那個網址，從主控台這台經網路實際連一次。
+    代理在本機測過只證明服務活著；這一步證明別台電腦也連得到、金鑰保護真的有效。
+    key 是管理者這次貼進來的，只用這一次，不存、不寫稽核。"""
+    code, info = call_node(node_id, f"/apiinfo/{slot_id}", timeout=20)
+    if code != 200:
+        return {"ok": False, "url": None, "detail": info.get("error") or f"讀不到設定（{code}）"}
+    base = info["public_url"].rstrip("/")
+    ctx = ssl.create_default_context() if base.startswith("https://") else None   # 驗證開著，不准略過
+    t0 = time.time()
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        # 不跟轉址：對外網址被改成會轉到別處的位址時，金鑰不能跟著送過去
+        def redirect_request(self, *a, **k):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx)) if ctx \
+        else urllib.request.build_opener(NoRedirect)
+
+    def get(with_key):
+        req = urllib.request.Request(base + "/models", headers={"Authorization": f"Bearer {key}"} if with_key else {})
+        try:
+            with opener.open(req, timeout=10) as resp:
+                return resp.status, json.load(resp)
+        except urllib.error.HTTPError as exc:
+            return exc.code, None
+        except Exception as exc:  # noqa: BLE001
+            return 0, str(exc)[:160]
+
+    st, data = get(bool(key))
+    ms = int((time.time() - t0) * 1000)
+    ids = [m.get("id") for m in (data or {}).get("data") or []] if isinstance(data, dict) else []
+    if 300 <= st < 400:
+        return {"ok": False, "url": base, "ms": ms,
+                "detail": f"{base} 回 {st} 轉址；為了不把金鑰送到別處，實測不跟轉址。請把對外網址改成實際提供 API 的位址"}
+    if st == 0:
+        return {"ok": False, "url": base, "ms": ms,
+                "detail": f"從主控台連不到 {base}（{data}）。IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址"}
+    if info["api_key_set"] and not key:
+        return {"ok": st == 401, "url": base, "ms": ms, "partial": True,
+                "detail": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次"
+                if st == 401 else f"設了金鑰，但沒帶金鑰回 {st}"}
+    if st == 200 and info.get("model_name") in ids:
+        return {"ok": True, "url": base, "ms": ms, "detail": f"從主控台連得到，模型清單有 {info['model_name']}"}
+    return {"ok": False, "url": base, "ms": ms,
+            "detail": f"回 {st}" + ("，金鑰不對" if st == 401 else f"，模型清單 {ids}")}
 
 
 # ---------------------------------------------------------------- 代理呼叫
@@ -169,7 +228,7 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     url = f"https://{node['host']}:{node.get('agent_port', 9401)}{path}"
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
-        "Authorization": f"Bearer {node['token']}", "Content-Type": "application/json"})
+        "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             return resp.status, json.load(resp)
@@ -230,7 +289,7 @@ MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "xconsole/1.1"
+    server_version = "xconsole"              # 不公布版本號
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -256,9 +315,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), usb=(), payment=()")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
-                         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'")
+                         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
+                         "frame-ancestors 'none'; object-src 'none'")
         if CERTS.hsts_header():
             # 只有正式憑證且管理者開了開關才送：自簽時送 HSTS 會讓使用者連「略過警告」都沒有
             self.send_header("Strict-Transport-Security", "max-age=31536000")
@@ -289,7 +351,9 @@ class Handler(BaseHTTPRequestHandler):
 
     @property
     def user(self):
-        return session_user(self._cookie())
+        if not hasattr(self, "_user_cache"):
+            self._user_cache = session_user(self._cookie())
+        return self._user_cache
 
     @property
     def ip(self):
@@ -306,8 +370,10 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             n = 0
+        n = max(n, 0)            # 負數交給 read() 會一直讀到連線結束，執行緒就卡住
         if n > MAX_BODY:
-            self.rfile.read(min(n, MAX_BODY))
+            # 不讀完就回 413 並關連線：照宣稱的長度去讀，對方宣稱 10 GB 卻不送，執行緒就被占住
+            self.close_connection = True
             return None
         try:
             return json.loads(self.rfile.read(n) or b"{}")
@@ -316,6 +382,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def _audit(self, action, target="", ok=True, detail=None):
         STORE.audit(self.user or "", self.ip, action, target, ok, detail)
+
+    # ---- 統一錯誤處理：任何未預期的例外都不把堆疊或內部訊息回給前端，原因寫進服務記錄
+    def handle_one_request(self):
+        # 同一條 keep-alive 連線上的每個請求共用同一個 Handler 物件：上一個請求查到的使用者
+        # 一定要清掉，否則登入前查到的「沒人」會跟到登入後，登出後查到的「有人」也會留著
+        # （實際踩到：登入成功後 /api/me 仍回 401，畫面卡在登入頁）
+        self.__dict__.pop("_user_cache", None)
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            self.close_connection = True
+        except Exception:  # noqa: BLE001
+            import traceback
+            print("未預期的錯誤：\n" + traceback.format_exc(), flush=True)
+            try:
+                self._json(500, {"error": "伺服器內部錯誤，已記錄"})
+            except Exception:  # noqa: BLE001
+                pass
+            self.close_connection = True
+
+    def version_string(self):
+        return "xconsole"
 
     # ---- GET
     def do_GET(self):  # noqa: N802
@@ -351,6 +439,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
             return self._json(200, fleet_state())
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
+        if m:
+            return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -393,21 +484,35 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if path.startswith("/api/") and ctype != "application/json":
+            # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
+            return self._json(415, {"error": "只接受 application/json"})
         body = self._body()
         if body is None:
             return self._json(413, {"error": "上傳超過 6 MB"})
 
         if path == "/api/login":
-            user = str(body.get("username") or "")
+            user = str(body.get("username") or "")[:64]
+            since = time.time() - LOGIN_WINDOW
+            if (STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP
+                    or STORE.failed_logins(since) >= LOGIN_MAX_GLOBAL):
+                STORE.audit(user, self.ip, "auth.throttled", user, False)
+                return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
             if not check_credentials(user, str(body.get("password") or "")):
-                time.sleep(1.0)       # 慢一點，讓暴力猜測不划算
+                time.sleep(1.0)
                 STORE.audit(user, self.ip, "auth.login", user, False)
                 return self._json(401, {"error": "帳號或密碼不對"})
             STORE.audit(user, self.ip, "auth.login", user, True)
-            cookie = (f"xconsole={make_session(user)}; Path=/; HttpOnly; SameSite=Strict; "
+            sid = STORE.session_new(user, self.ip, SESSION_HOURS)
+            cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
             return self._json(200, {"ok": True, "user": user}, cookie=cookie)
         if path == "/api/logout":
+            who = self.user                                   # 先記下是誰，作廢之後就查不到了
+            STORE.session_end(self._cookie())                 # 伺服器端作廢，不只是清 cookie
+            if who:
+                STORE.audit(who, self.ip, "auth.logout", who, True)
             return self._json(200, {"ok": True}, cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
         if self._need_auth():
             return None
@@ -427,6 +532,29 @@ class Handler(BaseHTTPRequestHandler):
                         {"to": out.get("model") or os.path.basename(str(body.get("pack", ""))),
                          "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
                          "reverted": out.get("reverted"), "message": out.get("error")})
+            return self._json(code, out)
+        # ---- API 串接：網址、模型名稱、上下文、金鑰（改完重啟並驗證，失敗自動換回）
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/settings", path)
+        if m:
+            want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key")
+                    if k in body}
+            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
+                                  {**want, "force": bool(body.get("force"))}, timeout=600)
+            # 新金鑰只回給這一次的畫面；稽核只記「換了金鑰」，不記內容
+            self._audit("api.settings", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"changed": out.get("changed"), "public_url": want.get("public_url"),
+                         "key": want.get("key"), "restarted": out.get("restarted"),
+                         "reverted": out.get("reverted"), "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/test", path)
+        if m:
+            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/test", "POST", {}, timeout=420)
+            if code == 200:
+                out["network"] = network_test(m.group(1), m.group(2), str(body.get("key") or ""))
+                out["ok"] = out["ok"] and out["network"]["ok"]
+            self._audit("api.test", f"{m.group(1)}/{m.group(2)}", code == 200 and out.get("ok"),
+                        {"checks": [(c["name"], c["ok"]) for c in out.get("checks") or []],
+                         "network": (out.get("network") or {}).get("ok")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/admit/([\w.-]+)", path)
         if m:
@@ -531,7 +659,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(403, {"error": "目前的密碼不對"})
             if len(new) < 8:
                 return self._json(400, {"error": "新密碼至少 8 碼"})
-            set_credentials(user, new)
+            set_credentials(user, new)             # 內含作廢所有登入
             self._audit("account.password", user, True)
             return self._json(200, {"ok": True, "message": "已變更，請用新密碼重新登入"},
                               cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
@@ -565,6 +693,9 @@ def main():
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
+    moved = migrate_tokens()
+    if moved:
+        print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
     fresh = CERTS.ensure(hostnames())
     srv = tls.TLSServer(("0.0.0.0", PORT), Handler)
     srv.certs = CERTS

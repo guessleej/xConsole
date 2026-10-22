@@ -1,0 +1,3 @@
+# .zap/rules.tsv — 已審視的 ZAP 規則調整。格式：規則id<TAB>WARN|IGNORE|FAIL<TAB>備註
+# 預設全部照 ZAP 原判；這裡只放逐條看過、確定不是問題的，並寫理由。
+10109	IGNORE	Modern Web Application：資訊性提示，說明這是單頁程式，不是弱點

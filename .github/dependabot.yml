@@ -1,0 +1,13 @@
+# 每週一 09:00（台北時間）檢查 Python 依賴與 Actions 版本，有新版就開 PR（CI 綠了才合）
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "09:00", timezone: Asia/Taipei }
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "09:00", timezone: Asia/Taipei }

@@ -75,6 +75,17 @@ def _utc(d):
     return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
 
 
+def valid_from(cert):
+    """cryptography 42 起改用 *_utc，舊名在新版會丟棄用警告；兩版都要能跑。"""
+    v = getattr(cert, "not_valid_before_utc", None)
+    return v if v is not None else _utc(cert.not_valid_before)
+
+
+def valid_to(cert):
+    v = getattr(cert, "not_valid_after_utc", None)
+    return v if v is not None else _utc(cert.not_valid_after)
+
+
 def taipei(d):
     """台北時間字串本身不帶括號，外面要寫「（台北時間）」時自己加，不要包兩層。"""
     return _utc(d).astimezone(TPE).strftime("%Y/%m/%d %H:%M")
@@ -125,7 +136,7 @@ def _key_desc(pub):
 
 def cert_summary(cert, now=None):
     now = now or dt.datetime.now(dt.timezone.utc)
-    nva = _utc(cert.not_valid_after)
+    nva = valid_to(cert)
     dns, ips = sans(cert)
     ktype, ksize = _key_desc(cert.public_key())
     return {
@@ -133,7 +144,7 @@ def cert_summary(cert, now=None):
         "issuer": _name(cert.issuer, NameOID.ORGANIZATION_NAME)
                   or _name(cert.issuer, NameOID.COMMON_NAME) or cert.issuer.rfc4514_string(),
         "dns": dns, "ips": ips,
-        "validFromTaipei": taipei(cert.not_valid_before),
+        "validFromTaipei": taipei(valid_from(cert)),
         "validToTaipei": taipei(nva),
         "daysLeft": int((nva - now).total_seconds() // 86400),
         "fingerprint256": fingerprint256(cert),
@@ -338,7 +349,7 @@ def inspect_upload(files, password="", key_password="", hostnames=(), csr_key=No
         warns.append(f"有 {len(unused)} 張憑證跟這張網站憑證無關，已略過")
 
     s = cert_summary(leaf, now)
-    nvb, nva = _utc(leaf.not_valid_before), _utc(leaf.not_valid_after)
+    nvb, nva = valid_from(leaf), valid_to(leaf)
     if nvb > now:
         errors.append(f"憑證還沒生效，要到 {taipei(nvb)}（台北時間）才開始有效")
     if nva < now:

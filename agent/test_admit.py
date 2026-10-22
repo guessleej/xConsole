@@ -108,6 +108,11 @@ def main():
     r = A.admit("edge", reg_for("unified_split", slots6, 31, 29.9), fake_hw(96, 0))
     ok &= case("載完剩 14.9（低於底線）→ 擋", r["allow"], False)
 
+    # 7. 換模型後畫面上的名稱：取權重檔名，不是資料夾名
+    ok &= case("權重檔名 → 模型名稱與量化",
+               A.pretty_model("/m/unsloth-UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf"),
+               ("Qwen3.8-Flash-Next", "UD-IQ4_XS"))
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 

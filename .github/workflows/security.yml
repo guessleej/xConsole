@@ -1,0 +1,171 @@
+# SSDLC 六道安全掃描＋全部測試（PR 與 main 必跑，紅燈不能合）
+# action 一律釘 commit SHA（SSDF PO.3.2）：tag 可以被改指到別的 commit，SHA 不行。
+# 本專案沒有容器映像：交付物是原始碼＋釘版本的 Python 環境，所以 SBOM 是「原始碼」與「執行環境」各一份。
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 1 * * 1'   # 每週一 09:00（台北時間）重掃：新 CVE 不等有人改程式
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 0. 測試（含 test/security/ 安全測試）──────────────────
+  tests:
+    name: 0 Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 准入試算
+        run: cd agent && python test_admit.py
+      - name: 憑證匯入與檢查
+        run: cd console && python test_tls.py
+      - name: 服務使用報告
+        run: cd console && python test_usage_report.py
+      - name: 網頁換憑證端對端
+        run: cd console && python test_e2e_tls.py
+      - name: 前端守衛
+        run: cd console && python test_ui_guard.py
+      - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
+        run: python test/security/test_security.py
+      - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）
+        run: python test/test_api_integration.py
+
+  # ── 1. SAST ────────────────────────────────────────────────
+  codeql:
+    name: 1 SAST (CodeQL)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  # ── 2. 機密掃描（含整個 git 歷史）──────────────────────────
+  gitleaks:
+    name: 2 Secrets (gitleaks)
+    runs-on: ubuntu-24.04
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: { fetch-depth: 0 }
+      - name: 安裝 gitleaks（核對官方 checksum）
+        run: |
+          base=https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}
+          f=gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
+          curl -sSfLO "$base/$f"
+          curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " $f\$" | sha256sum -c -
+          tar xzf "$f" gitleaks
+      - name: 掃全部歷史（有命中就 fail）
+        run: ./gitleaks git . --redact --verbose --report-format sarif --report-path gitleaks.sarif
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with: { name: gitleaks-report, path: gitleaks.sarif, retention-days: 90 }
+
+  # ── 3. 依賴弱點（真的擋，不掛 || true）──────────────────────
+  deps:
+    name: 3 Dependencies (pip-audit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - run: python -m pip install --disable-pip-version-check pip-audit==2.10.1
+      - name: 主控台與報表產生器的依賴（有已知弱點就 fail）
+        run: pip-audit --strict --desc -r requirements.txt -r requirements-report.txt
+
+  # ── 4+5. SBOM 產出與弱點掃描 ─────────────────────────────────
+  sbom:
+    name: 4+5 SBOM (syft) + Vulns (grype)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - name: 建立跟正式環境一樣的執行環境
+        run: python -m venv .venv-runtime && .venv-runtime/bin/pip install --disable-pip-version-check -r requirements.txt
+      - name: SBOM — 原始碼（CycloneDX JSON）
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-source.cdx.json
+          upload-artifact: false
+      - name: SBOM — 執行環境（實際裝進 venv 的套件）
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .venv-runtime
+          format: cyclonedx-json
+          output-file: sbom-runtime.cdx.json
+          upload-artifact: false
+      - name: grype 掃原始碼 SBOM（high 以上 fail）
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: sbom-source.cdx.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+      - name: grype 掃執行環境 SBOM（high 以上 fail）
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: sbom-runtime.cdx.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+      - name: 上傳證據（SBOM，保留 90 天）
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: sbom-${{ github.sha }}
+          retention-days: 90
+          path: sbom-*.cdx.json
+
+  # ── 6. DAST（中級必跑）──────────────────────────────────────
+  zap:
+    name: 6 DAST (OWASP ZAP baseline)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 起一個測試用主控台（暫用自簽、隨機密碼）
+        run: |
+          export HOME="$RUNNER_TEMP/xc-home"; mkdir -p "$HOME"
+          printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
+            | python console/xconsole_server.py --set-credentials
+          nohup python console/xconsole_server.py > "$RUNNER_TEMP/console.log" 2>&1 &
+          for i in $(seq 1 40); do curl -skf https://localhost:9400/healthz && break; sleep 1; done
+      - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: https://localhost:9400
+          rules_file_name: .zap/rules.tsv
+          cmd_options: '-a -j'
+          fail_action: true
+          allow_issue_writing: false
+          artifact_name: zap-report
+      - if: always()
+        run: tail -n 50 "$RUNNER_TEMP/console.log"

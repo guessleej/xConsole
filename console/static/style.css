@@ -247,7 +247,10 @@ main { min-height: calc(100vh - 98px); }
   box-shadow: var(--shadow);
   padding: 18px 20px;
 }
-.card + .card { margin-top: 16px; }
+/* 頁面區塊之間的間距只用這一條規則，所有區塊一樣寬。
+   以前用 .card + .card：並排時後面那張卡被多推 16px（頂邊對不齊），
+   非卡片的區塊後面又漏掉間距（埠口表格緊貼上一列）。 */
+.wrap > * + * { margin-top: 16px; }
 .card-head {
   display: flex;
   align-items: baseline;
@@ -263,8 +266,10 @@ main { min-height: calc(100vh - 98px); }
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-  align-items: start;   /* 不要被同列最高的卡拉齊，否則短的那張下面一大片空白 */
+  align-items: stretch; /* 同一列的卡片一律等高，底邊與按鈕才對得齊 */
 }
+/* grid 子項預設 min-width:auto，裡面有不能斷行的程式碼或長網址就會把整欄撐寬（手機上整頁橫向捲） */
+.grid > * { min-width: 0; }
 .grid.slots { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
 
 /* 硬體卡內層：門檻放小才排得出第二欄。
@@ -347,13 +352,12 @@ main { min-height: calc(100vh - 98px); }
   gap: 10px;
   font-size: 13px;
 }
-/* 欄位變窄後間距自然收斂；再給一個上限避免極寬時又被拉開 */
+/* 數值靠欄位右緣，最右欄就貼齊卡片內緣，跟同列的記憶體條一樣寬 */
 .kv > * { min-width: 0; }
 /* 憑證指紋這類冒號串沒有斷行點，手機上會把整頁撐寬（實際踩到：scrollWidth 502／視窗 375）。
    數值允許任意處斷行。 */
 .kv .v { overflow-wrap: anywhere; text-align: right; }
 .kv .k { flex: none; }      /* 標籤不被長數值擠成「涵蓋的網／址」兩行 */
-.hw-grid .kv { max-width: 260px; }
 .kv .k { color: var(--ink-3); }
 .kv .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
@@ -444,9 +448,9 @@ main { min-height: calc(100vh - 98px); }
   overscroll-behavior: contain;
   border-radius: var(--radius-sm);
 }
+/* 表格一律撐滿它的容器：限寬的話外層捲動框還是全寬，表頭底色只到一半、捲軸跑到最右邊（實際踩到） */
 table {
   width: 100%;
-  max-width: 820px;         /* 七八列的短表格撐滿 1232px，末欄會離內容一大截 */
   border-collapse: collapse;
   font-size: 13.5px;
 }
@@ -508,7 +512,7 @@ pre.log {
 .modal h3 { font-size: 18px; margin-bottom: 8px; }
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-input[type="password"], input[type="text"], select {
+input[type="password"], input[type="text"], input[type="number"], select {
   width: 100%;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
@@ -584,6 +588,49 @@ label.field { display: block; margin-top: 12px; font-size: 13.5px; color: var(--
   .livedot i { animation: none; }
 }
 
+/* ---------------------------------------------------------- API 串接 */
+/* 連線資訊：標籤｜值｜複製鈕 三欄，值可以斷行（網址、金鑰很長），複製鈕對齊卡片右緣 */
+.copyrow {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 13.5px;
+}
+.copyrow + .copyrow { border-top: 1px solid var(--line); }
+.copyrow .k { color: var(--ink-3); }
+.copyrow .v { font-family: var(--mono); overflow-wrap: anywhere; color: var(--ink); }
+.tabbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.tabbar button {
+  border: 0;
+  background: rgba(22, 32, 42, .06);
+  color: var(--ink-2);
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+:root[data-theme="dark"] .tabbar button { background: rgba(255, 255, 255, .08); }
+.tabbar button[aria-current="true"] { background: var(--brand); color: #fff; }
+/* 範例程式碼區塊固定高度、在區塊內捲：頁面不會因為範例長短忽長忽短 */
+pre.code {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  background: #0d1922;
+  color: #cfe0ec;
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  height: 260px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: pre;
+}
+table.api-table th, table.api-table td { width: auto; }
+table.api-table td:last-child { text-align: right; white-space: nowrap; }
+
 /* ---------------------------------------------------------- 手機 */
 
 @media (max-width: 860px) {
@@ -614,7 +661,6 @@ label.field { display: block; margin-top: 12px; font-size: 13.5px; color: var(--
   .empties { grid-template-columns: 1fr 1fr; }
   /* 硬體四區也排兩欄 */
   .hw-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .hw-grid .kv { max-width: none; }
 
 }
 
@@ -737,4 +783,8 @@ textarea {
   .steps > .step { flex: 0 0 min(72vw, 240px); scroll-snap-align: start; }
   /* 表單欄位兩欄 */
   .form-row { grid-template-columns: 1fr 1fr; }
+  /* 連線資訊：標籤放上面一行，值與複製鈕在下面一行 */
+  .copyrow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .copyrow .k { grid-column: 1 / -1; font-size: 12.5px; }
+  pre.code { height: 220px; }
 }

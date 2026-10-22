@@ -4,8 +4,10 @@
 審計最常見的洞就是把整包 request body 寫進去，密碼與私鑰跟著落地。
 取樣：每 5 分鐘一筆各機狀態，服務使用報告的數字全部從這裡算，不靠手抄。
 """
+import hashlib
 import json
 import os
+import secrets
 import sqlite3
 import threading
 import time
@@ -57,6 +59,8 @@ class Store:
           states TEXT, counters TEXT);
         CREATE INDEX IF NOT EXISTS samples_ts ON samples(ts);
         CREATE INDEX IF NOT EXISTS samples_node ON samples(node, ts);
+        CREATE TABLE IF NOT EXISTS sessions(
+          sid_hash TEXT PRIMARY KEY, user TEXT, ip TEXT, created REAL, expires REAL);
         """)
 
     # ---- 稽核
@@ -79,6 +83,49 @@ class Store:
             rows = self.db.execute(q, args).fetchall()
         return [{"ts": r[0], "user": r[1], "ip": r[2], "action": r[3], "target": r[4],
                  "ok": bool(r[5]), "detail": json.loads(r[6] or "{}")} for r in rows]
+
+    # ---- 登入票證（伺服器端記錄：登出就作廢，資料庫只存雜湊）
+    @staticmethod
+    def _h(sid):
+        return hashlib.sha256(sid.encode()).hexdigest()
+
+    def session_new(self, user, ip, hours):
+        sid = secrets.token_urlsafe(32)
+        now = time.time()
+        with self.lock:
+            self.db.execute("DELETE FROM sessions WHERE expires<?", (now,))
+            self.db.execute("INSERT INTO sessions VALUES(?,?,?,?,?)",
+                            (self._h(sid), user, ip, now, now + hours * 3600))
+        return sid
+
+    def session_user(self, sid):
+        if not sid or len(sid) > 200:
+            return None
+        with self.lock:
+            r = self.db.execute("SELECT user, expires FROM sessions WHERE sid_hash=?", (self._h(sid),)).fetchone()
+        if not r or r[1] <= time.time():
+            return None
+        return r[0]
+
+    def session_end(self, sid):
+        if sid:
+            with self.lock:
+                self.db.execute("DELETE FROM sessions WHERE sid_hash=?", (self._h(sid),))
+
+    def session_end_all(self, user=None):
+        with self.lock:
+            if user is None:
+                self.db.execute("DELETE FROM sessions")
+            else:
+                self.db.execute("DELETE FROM sessions WHERE user=?", (user,))
+
+    def failed_logins(self, since, ip=None):
+        q, a = "SELECT COUNT(*) FROM audit WHERE action='auth.login' AND ok=0 AND ts>=?", [since]
+        if ip is not None:
+            q += " AND ip=?"
+            a.append(ip)
+        with self.lock:
+            return self.db.execute(q, a).fetchone()[0]
 
     # ---- 取樣
     def sample(self, node, online, st=None, counters=None):
