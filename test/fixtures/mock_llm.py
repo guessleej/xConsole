@@ -51,7 +51,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         if self.path.startswith("/redir/"):          # 測「實測不跟轉址」用
             self.send_response(302)
-            self.send_header("Location", "/" + "".join(c for c in self.path[len("/redir/"):] if c.isalnum() or c in "/._-"))
+            self.send_header("Location", "/v1/models")   # 固定目標：測試只需要「有轉址」
             self.send_header("Content-Length", "0")
             self.end_headers()
             return

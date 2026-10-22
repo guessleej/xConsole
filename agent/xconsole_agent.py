@@ -27,6 +27,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -1213,7 +1214,7 @@ def _api_apply_llama(slot, raw, port, want, force):
     cfg_path = slot["config"]
     old = load_json(cfg_path, {}) or {}
     new = dict(old)
-    old_key_text = load_text(os.path.join(ENGINE_DIR, f"{slot_id}.key"))
+    old_key_text = load_text(engine_file(slot_id, ".key"))
     for k, v in want.items():
         if k == "model_name":
             new["alias"] = v
@@ -1331,6 +1332,25 @@ def api_test(slot_id):
 GGUF_ROOT_DEFAULT = "~/models/gguf"
 ENGINE_DIR = os.path.join(STATE_DIR, "engines")
 DOWNLOADS_FILE = os.path.join(STATE_DIR, "downloads.json")
+SAFE_ID_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+def inside(base, name):
+    """組出 base 底下的路徑，並確認真的落在 base 裡面（擋 ../ 與符號連結跳出去）。
+    欄位 id、模型 id 雖然都先比對過登錄檔與掃描清單，組路徑時一律再過這一道。"""
+    root = os.path.realpath(base)
+    full = os.path.realpath(os.path.join(root, name))
+    if not full.startswith(root + os.sep):
+        raise ValueError(f"路徑不在 {base} 內")
+    return full
+
+
+def engine_file(slot_id, suffix):
+    """欄位在引擎目錄裡的檔案（設定檔、金鑰檔、記錄檔）。欄位 id 只准英數、底線、連字號。"""
+    if not SAFE_ID_RX.fullmatch(slot_id or ""):
+        raise ValueError("欄位 id 不合法")
+    os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+    return inside(ENGINE_DIR, f"{slot_id}{suffix}")
 HF_BASE = os.environ.get("XCONSOLE_HF_BASE", "https://huggingface.co")   # 測試時指到本機假站
 SHARD_RX = re.compile(r"-(\d{5})-of-(\d{5})$")
 HF_REPO_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,95}/[A-Za-z0-9][\w.-]{0,95}")
@@ -1541,7 +1561,7 @@ def llama_key(raw):
 
 
 def write_llama_key(slot_id, key):
-    p = os.path.join(ENGINE_DIR, f"{slot_id}.key")
+    p = engine_file(slot_id, ".key")
     if not key:
         if os.path.exists(p):
             os.remove(p)
@@ -1587,6 +1607,8 @@ def launch_llama(cfg_path):
 
 
 def llama_unit(slot_id):
+    if not SAFE_ID_RX.fullmatch(slot_id or ""):
+        raise ValueError("欄位 id 不合法")
     return f"xc-{slot_id}-llama.service"
 
 
@@ -1594,10 +1616,10 @@ def ensure_llama_unit(slot_id, cfg_path):
     unit = llama_unit(slot_id)
     # systemd --user 只看「登入帳號」的設定目錄；測試時代理的 HOME 是暫存目錄，所以可以另外指定
     unit_dir = os.environ.get("XCONSOLE_UNIT_DIR") or os.path.join(HOME, ".config/systemd/user")
-    path = os.path.join(unit_dir, unit)
+    path = inside(unit_dir, unit)
     body = (f"[Unit]\nDescription=xConsole 欄位 {slot_id}：llama.cpp\nAfter=network.target\n\n"
             f"[Service]\nType=simple\nExecStart={sys.executable} {os.path.abspath(__file__)} --launch-llama {cfg_path}\n"
-            f"Restart=on-failure\nRestartSec=10\nStandardOutput=append:{os.path.join(ENGINE_DIR, slot_id + '-llama.log')}\n"
+            f"Restart=on-failure\nRestartSec=10\nStandardOutput=append:{engine_file(slot_id, '-llama.log')}\n"
             f"StandardError=inherit\n\n[Install]\nWantedBy=default.target\n")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     if load_text(path) != body:
@@ -1664,6 +1686,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
     if not slot:
         return 404, {"error": f"沒有這個欄位：{slot_id}"}
+    if not SAFE_ID_RX.fullmatch(slot_id):
+        return 400, {"error": "欄位 id 只能用英數、底線與連字號，才能替它建 llama.cpp 服務"}
     if slot.get("kind") not in (None, "strata", "llama") or (slot.get("unit") and not slot.get("kind")):
         return 400, {"error": "這個欄位跑的不是語言模型引擎，不能換成 GGUF"}
     _, models, _ = scan_gguf(reg)
@@ -1698,9 +1722,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     par = int(old_cfg.get("parallel") or 1)
     alias = slot.get("api_model_name") or _slug(f"{m['name']}-{m['quant']}" if m.get("quant") else m["name"])
     os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
-    cfg_path = os.path.join(ENGINE_DIR, f"{slot_id}-llama.json")
+    cfg_path = engine_file(slot_id, "-llama.json")
     prev_llama_raw = load_json(cfg_path, None)
-    prev_key = load_text(os.path.join(ENGINE_DIR, f"{slot_id}.key"))
+    prev_key = load_text(engine_file(slot_id, ".key"))
     keyfile = write_llama_key(slot_id, carry_key)
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
@@ -1772,7 +1796,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
         if st != 200 or alias not in ids:
             ok, why = False, f"/v1/models 回 {st}，模型清單 {ids}"
     if not ok:
-        tail = load_text(os.path.join(ENGINE_DIR, f"{slot_id}-llama.log")) or ""
+        tail = load_text(engine_file(slot_id, "-llama.log")) or ""
         hint = next((ln for ln in reversed(tail.splitlines()) if "error" in ln.lower() or "failed" in ln.lower()), "")
         return undo(f"{m['name']} 載不起來（{why}{'；' + hint[-200:] if hint else ''}）")
 
@@ -1918,6 +1942,15 @@ def downloads_list():
                       key=lambda j: -j["created"])[:20]
 
 
+def _hf_file_url(repo, path):
+    """Hugging Face 檔案網址。repo 已比對過格式、path 取自它自己的檔案清單；這裡再逐段編碼，
+    任何字元都只能留在路徑裡，不能改到主機或查詢字串。"""
+    if not HF_REPO_RX.fullmatch(repo) or ".." in path.split("/"):
+        raise ValueError("Hugging Face 名稱或檔名不合法")
+    q = urllib.parse.quote
+    return f"{HF_BASE}/{q(repo, safe='/')}/resolve/main/{q(path, safe='/')}"
+
+
 def _hf_get(url, token="", rng=None, timeout=30):
     h = {"User-Agent": "xconsole-agent"}
     if token:
@@ -1932,7 +1965,7 @@ def hf_files(repo, token=""):
     if not HF_REPO_RX.fullmatch(repo or ""):
         return 400, {"error": "名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF"}
     try:
-        with _hf_get(f"{HF_BASE}/api/models/{repo}/tree/main?recursive=true", token) as resp:
+        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
             tree = json.load(resp)
     except urllib.error.HTTPError as exc:
         msg = {401: "要登入才看得到（請貼 Hugging Face 權杖）", 403: "要先到 Hugging Face 頁面同意授權條款",
@@ -1983,7 +2016,7 @@ def start_download(repo, stem, mmproj=None, token=""):
     if not pick["fits_disk"]:
         return 400, {"error": f"磁碟不夠：要 {pick['size_gib']} GiB，存放區只剩 {info['free_gib']} GiB（另需保留 10 GiB）"}
     folder = _slug(repo.split("/", 1)[1].removesuffix("-GGUF").removesuffix("-gguf"))
-    dest = os.path.join(gguf_root(), folder)
+    dest = inside(gguf_root(), folder)
     os.makedirs(dest, exist_ok=True)
     with _DL_LOCK:
         if any(j["state"] in ("running", "queued") for j in _DL.values()):
@@ -2004,19 +2037,19 @@ def _download_job(jid, dest):
     try:
         sizes = {}
         for f in j["files"]:
-            with _hf_get(f"{HF_BASE}/{j['repo']}/resolve/main/{f}", j["_token"], timeout=60) as resp:
+            with _hf_get(_hf_file_url(j["repo"], f), j["_token"], timeout=60) as resp:
                 sizes[f] = int(resp.headers.get("Content-Length") or 0)
         j["total"] = sum(sizes.values())
         done_before = 0
         for f in j["files"]:
-            out = os.path.join(dest, os.path.basename(f))
+            out = inside(dest, os.path.basename(f))
             if os.path.exists(out) and os.path.getsize(out) == sizes[f]:
                 done_before += sizes[f]
                 j["done"] = done_before
                 continue
             part = out + ".part"
             have = os.path.getsize(part) if os.path.exists(part) else 0
-            with _hf_get(f"{HF_BASE}/{j['repo']}/resolve/main/{f}", j["_token"],
+            with _hf_get(_hf_file_url(j["repo"], f), j["_token"],
                          rng=have if have else None, timeout=60) as resp:
                 mode = "ab" if have and resp.status == 206 else "wb"
                 if mode == "wb":
@@ -2071,14 +2104,17 @@ def delete_model(model_id):
         return 409, {"error": "有欄位正在使用這顆，先換成別的模型再刪"}
     folder, stem = model_id.split("/", 1)
     root = gguf_root(reg)
-    full = os.path.realpath(os.path.join(root, folder))
-    if os.path.dirname(full) != os.path.realpath(root):
+    try:
+        full = inside(root, folder)
+    except ValueError:
         return 400, {"error": "路徑不在存放區內"}
+    if os.path.dirname(full) != os.path.realpath(root):
+        return 400, {"error": "只能刪存放區第一層的模型資料夾"}
     removed, freed = [], 0
     for f in os.listdir(full):
         base = f[:-5] if f.endswith(".gguf") else f[:-10] if f.endswith(".gguf.part") else None
         if base is not None and SHARD_RX.sub("", base) == stem:
-            p = os.path.join(full, f)
+            p = inside(full, f)
             freed += os.path.getsize(p)
             os.remove(p)
             removed.append(f)
@@ -2086,8 +2122,9 @@ def delete_model(model_id):
     if not rest:
         for f in os.listdir(full):
             if f.lower().startswith("mmproj"):
-                freed += os.path.getsize(os.path.join(full, f))
-                os.remove(os.path.join(full, f))
+                p = inside(full, f)
+                freed += os.path.getsize(p)
+                os.remove(p)
                 removed.append(f)
         if not os.listdir(full):
             os.rmdir(full)
