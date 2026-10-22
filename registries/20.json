@@ -1,0 +1,73 @@
+{
+ "machine": {
+  "id": "20",
+  "ip": "192.168.11.20",
+  "host": "xcloudthor01",
+  "name": ".20 Thor",
+  "group": "Jetson / MIC-743",
+  "memory_model": "unified_single",
+  "ram_floor_gib": 12,
+  "profile": null,
+  "note": "Jetson AGX Thor，122 GiB 統一記憶體。H3 醫美廣告影片產線（同一顆 SoC 可直接移植到 MIC-743 工業機）。機上另有 memguard 在 avail 低於 10 GiB 時砍 ComfyUI，xConsole 的底線設 12 GiB，比它早一步擋。"
+ },
+ "slots": [
+  {
+   "id": "brain", "role": "主腦", "tier": "高",
+   "unit": "twin-llm.service",
+   "model": "twin 劇本與對白模型",
+   "caps": ["文字"],
+   "est_vram_gib": 0, "est_ram_gib": 14,
+   "note": "統一記憶體機，模型吃的就是系統記憶體，不另計顯存。"
+  },
+  {
+   "id": "stt", "role": "STT", "tier": "聽覺",
+   "unit": "twin-asr.service", "port": 8327,
+   "model": "Whisper-Large-v3-Turbo-xVITA-zhTW",
+   "quant": "faster-whisper CPU int8",
+   "caps": ["語音"],
+   "est_vram_gib": 0, "est_ram_gib": 3,
+   "note": "旁白品管用，只綁 127.0.0.1，懶載入。"
+  },
+  {
+   "id": "tts", "role": "TTS", "tier": "說話",
+   "unit": "twin-tts-f5.service",
+   "model": "F5-TTS",
+   "caps": ["語音"],
+   "est_vram_gib": 0, "est_ram_gib": 4
+  },
+  {
+   "id": "narrate", "role": "旁白", "tier": "台灣腔",
+   "unit": "xvita-narrate.service", "port": 8321,
+   "model": "xVITA 旁白",
+   "caps": ["語音"],
+   "est_vram_gib": 0, "est_ram_gib": 4,
+   "note": "全本機產生，旁白不出機器。"
+  },
+  {
+   "id": "lipsync", "role": "對嘴", "tier": "雙手",
+   "unit": "twin-lipsync.service",
+   "model": "LatentSync",
+   "caps": ["影片"],
+   "est_vram_gib": 0, "est_ram_gib": 8,
+   "note": "懶載入，用到才吃記憶體。"
+  },
+  {
+   "id": "matte", "role": "去背", "tier": "雙手",
+   "unit": "twin-matte.service", "port": 8325,
+   "model": "RobustVideoMatting",
+   "caps": ["影片"],
+   "est_vram_gib": 0, "est_ram_gib": 6
+  },
+  {
+   "id": "sonic", "role": "照片分身", "tier": "雙手",
+   "unit": "twin-sonic.service", "port": 8324,
+   "model": "Sonic（聲音驅動整臉）",
+   "caps": ["影片", "語音"],
+   "est_vram_gib": 0, "est_ram_gib": 8
+  },
+  {"id": "embed", "role": "嵌入", "tier": "記憶", "caps": []},
+  {"id": "router", "role": "路由", "tier": "判斷", "caps": []}
+ ],
+ "profiles": {},
+ "measure": {}
+}

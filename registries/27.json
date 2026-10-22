@@ -1,0 +1,78 @@
+{
+ "machine": {
+  "id": "27",
+  "ip": "192.168.11.27",
+  "host": "HP-Z2-Mini-G1a",
+  "name": ".27",
+  "group": "AMD Strix Halo",
+  "memory_model": "unified_split",
+  "ram_floor_gib": 15,
+  "vram_floor_gib": 2,
+  "profile": "coding",
+  "note": "抓料清洗引擎＋xHarness 節點。使用者拍板：這台不當寫程式後端。"
+ },
+ "slots": [
+  {
+   "id": "brain",
+   "role": "主腦",
+   "tier": "高",
+   "unit": "strata.service",
+   "kind": "strata",
+   "config": "/home/xcloud/Strata/strata-prod.json",
+   "log": "/home/xcloud/Strata/strata-prod.log",
+   "model": "Qwen3.8-Flash-Next",
+   "quant": "UD-IQ4_XS",
+   "caps": ["文字"],
+   "est_vram_gib": 64,
+   "est_ram_gib": 14,
+   "critical": true,
+   "note": "抓料的清洗引擎。它掛掉的話每篇都退回正則切法，整輪語料白抓。"
+  },
+  {
+   "id": "eyes",
+   "role": "抓料",
+   "tier": "眼睛",
+   "unit": "camofox.service",
+   "model": "Camoufox 反偵測瀏覽器",
+   "caps": ["網頁"],
+   "port": 9377,
+   "est_vram_gib": 0,
+   "est_ram_gib": 3,
+   "critical": true,
+   "note": "抓料的眼睛。停掉抓料就瞎了；它也是釋放記憶體的關鍵（停 harvest 不夠，要重啟它）。"
+  },
+  {
+   "id": "harness",
+   "role": "代理",
+   "tier": "工具",
+   "unit": "xharness-node.service",
+   "model": "xHarness 節點 engine-27",
+   "caps": ["工具", "Telegram"],
+   "port": 3080,
+   "est_vram_gib": 0,
+   "est_ram_gib": 1
+  },
+  {"id": "brain2", "role": "副腦", "tier": "低", "caps": []},
+  {"id": "embed", "role": "嵌入", "tier": "記憶", "caps": []},
+  {"id": "stt", "role": "STT", "tier": "聽覺", "caps": []},
+  {"id": "tts", "role": "TTS", "tier": "說話", "caps": []},
+  {"id": "hands", "role": "產圖", "tier": "雙手", "caps": []}
+ ],
+ "profiles": {
+  "coding": {
+   "name": "長脈絡",
+   "why": "跟 .26 同一套設定，長提示進得來。",
+   "changes": [
+    {"slot": "brain", "args": {"--max-context": "131072"}, "config": {"parallel": 1, "fit_max_tokens": true}}
+   ]
+  },
+  "harvest": {
+   "name": "抓料清洗",
+   "why": "抓料每段只有幾千 token，把並行讓出來換吞吐。",
+   "changes": [
+    {"slot": "brain", "args": {"--max-context": "32768"}, "config": {"parallel": 2, "fit_max_tokens": true}}
+   ]
+  }
+ },
+ "measure": {}
+}

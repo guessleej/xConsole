@@ -1,0 +1,24 @@
+# 機密：交接用的密碼檔、任何私鑰與憑證容器，一律不進版控
+初始密碼.txt
+*.key
+*.pem
+*.pfx
+*.p12
+*.jks
+certs/
+.xconsole/
+master.key
+.env
+.env.*
+fleet.json
+token
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 作業系統與 Office 暫存
+.DS_Store
+~$*
+*.tmp

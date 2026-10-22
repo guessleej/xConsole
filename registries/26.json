@@ -1,0 +1,67 @@
+{
+ "machine": {
+  "id": "26",
+  "ip": "192.168.11.26",
+  "host": "HP-Z2-Mini-G1a",
+  "name": ".26 hpamd",
+  "group": "AMD Strix Halo",
+  "memory_model": "unified_split",
+  "ram_floor_gib": 15,
+  "vram_floor_gib": 2,
+  "profile": "coding",
+  "note": "同事 Samuel 的 GitHub Copilot 寫程式後端。系統 RAM 只有 31 GiB，曾因耗盡整台卡死需物理重開。"
+ },
+ "slots": [
+  {
+   "id": "brain",
+   "role": "主腦",
+   "tier": "高",
+   "unit": "strata.service",
+   "kind": "strata",
+   "config": "/home/xcloud/Strata/strata-prod.json",
+   "log": "/home/xcloud/Strata/strata-prod.log",
+   "model": "Qwen3.8-Flash-Next",
+   "quant": "UD-IQ4_XS",
+   "caps": ["文字"],
+   "est_vram_gib": 64,
+   "est_ram_gib": 14,
+   "critical": true,
+   "note": "Samuel 的 Copilot 後端，停掉他就不能寫程式。GDN 混合注意力，KV 極小（1,056 B/token）。"
+  },
+  {
+   "id": "eyes",
+   "role": "抓料",
+   "tier": "眼睛",
+   "unit": "camofox.service",
+   "model": "Camoufox 反偵測瀏覽器",
+   "caps": ["網頁"],
+   "port": 9377,
+   "est_vram_gib": 0,
+   "est_ram_gib": 3,
+   "note": "抓訓練語料一律走真瀏覽器拿渲染後 DOM，不准用 API 取代。"
+  },
+  {"id": "brain2", "role": "副腦", "tier": "低", "caps": []},
+  {"id": "embed", "role": "嵌入", "tier": "記憶", "caps": []},
+  {"id": "stt", "role": "STT", "tier": "聽覺", "caps": []},
+  {"id": "tts", "role": "TTS", "tier": "說話", "caps": []},
+  {"id": "router", "role": "路由", "tier": "判斷", "caps": []},
+  {"id": "hands", "role": "產圖", "tier": "雙手", "caps": []}
+ ],
+ "profiles": {
+  "coding": {
+   "name": "寫程式後端",
+   "why": "Samuel 的 Copilot 一輪會送四萬 token 以上的提示，上下文不夠就整個送不出去。",
+   "changes": [
+    {"slot": "brain", "args": {"--max-context": "131072"}, "config": {"parallel": 1, "fit_max_tokens": true}}
+   ]
+  },
+  "harvest": {
+   "name": "抓料清洗",
+   "why": "抓料每段只有幾千 token，不需要長脈絡，把並行讓出來換吞吐。",
+   "changes": [
+    {"slot": "brain", "args": {"--max-context": "32768"}, "config": {"parallel": 2, "fit_max_tokens": true}}
+   ]
+  }
+ },
+ "measure": {}
+}
