@@ -1599,8 +1599,23 @@ def llama_argv(raw, reg=None):
 def no_mmap_args(exe):
     """關 mmap 的寫法跟著 llama.cpp 版本走：build 11626（2026-10）起拿掉 --no-mmap、改成 --load-mode none，
     舊版帶新旗標、新版帶舊旗標都會 invalid argument 直接退出。看 --help 決定。"""
-    rc, out, err = sh(f"{shlex.quote(exe)} --help", timeout=20)
-    return ["--load-mode", "none"] if "--load-mode" in out + err else ["--no-mmap"]
+    # 用跟啟動時一樣的環境去問：靠 LD_LIBRARY_PATH 或 llama_env 才載得起來的那支，裸跑 --help 會失敗，
+    # 結果就退回帶舊旗標，新版照樣起不來
+    try:
+        p = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=20, env=llama_launch_env(exe))
+        text = p.stdout + p.stderr
+    except Exception:  # noqa: BLE001
+        text = ""
+    return ["--load-mode", "none"] if "--load-mode" in text else ["--no-mmap"]
+
+
+def llama_launch_env(exe, reg=None):
+    """llama-server 執行時的環境：登錄檔的 llama_env，加上執行檔目錄放進 LD_LIBRARY_PATH。啟動與偵測版本共用。"""
+    reg = reg or registry()
+    env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
+    lib = os.path.dirname(exe)
+    env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
+    return env
 
 
 def launch_llama(cfg_path):
@@ -1609,11 +1624,8 @@ def launch_llama(cfg_path):
     if not raw:
         raise SystemExit(f"讀不到 {cfg_path}")
     reg = registry()
-    env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
     argv = llama_argv(raw, reg)
-    lib = os.path.dirname(raw["exe"])
-    env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
-    os.execvpe(argv[0], argv, env)
+    os.execvpe(argv[0], argv, llama_launch_env(raw["exe"], reg))
 
 
 def llama_unit(slot_id):

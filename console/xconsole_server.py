@@ -15,6 +15,7 @@ import base64
 import datetime as dt
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -740,10 +741,22 @@ def wait_for_address(seconds=60):
     沒自訂網址時，先等到抓得到 IP 再產憑證；等不到就照舊，不擋啟動。"""
     if fleet()["tls"].get("hostnames"):
         return
+    cur = CERTS.current()
+    if cur and cur.get("source") != "selfsigned":
+        return                      # 匯入的正式憑證 ensure() 不會重產，不必等
     for _ in range(seconds):
-        if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", tls.default_hostnames()[0]):
+        if is_ip(tls.default_hostnames()[0]):
             return
         time.sleep(1)
+
+
+def is_ip(text):
+    """真的解析成 IP 才算；只由十六進位字元組成的主機名稱（容器常見的 abcdef1234）不能當成 IP。"""
+    try:
+        ipaddress.ip_address(text)
+        return True
+    except ValueError:
+        return False
 
 
 def main():
