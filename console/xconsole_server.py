@@ -734,6 +734,18 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "找不到"})
 
 
+def wait_for_address(seconds=60):
+    """開機時 user 服務會比網路先起來：這時抓不到對外 IP，hostnames() 退回主機名稱，
+    ensure() 就產一張不含 IP 的暫用自簽，網路好了再重啟又重產一張（2026-10-22 中原主機重開機實際踩到）。
+    沒自訂網址時，先等到抓得到 IP 再產憑證；等不到就照舊，不擋啟動。"""
+    if fleet()["tls"].get("hostnames"):
+        return
+    for _ in range(seconds):
+        if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", tls.default_hostnames()[0]):
+            return
+        time.sleep(1)
+
+
 def main():
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
@@ -741,6 +753,7 @@ def main():
     moved = migrate_tokens()
     if moved:
         print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
+    wait_for_address()
     fresh = CERTS.ensure(hostnames())
     srv = tls.TLSServer(("0.0.0.0", PORT), Handler)
     srv.certs = CERTS

@@ -108,7 +108,7 @@ def main():
                 check(f"實測：{k}", v[0], v[1])
         ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
         check("金鑰不在任何程序的指令列", d2.get("api_key", "x") not in ps)
-        check("--no-mmap 有帶上（統一記憶體機不多吃一份頁快取）", any("--no-mmap" in ln and f"--port {p}" in ln for ln in ps.splitlines()))
+        check("有關掉 mmap（--no-mmap 或新版的 --load-mode none）", any(("--no-mmap" in ln or "--load-mode none" in ln) and f"--port {p}" in ln for ln in ps.splitlines()))
     finally:
         subprocess.run(["systemctl", "--user", "stop", unit], capture_output=True)
         subprocess.run(["systemctl", "--user", "disable", unit], capture_output=True)

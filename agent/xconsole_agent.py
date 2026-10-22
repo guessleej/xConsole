@@ -13,6 +13,7 @@ node_agent 沒有的那一層：角色欄位與模型、准入控制、啟停、
 
 機密：對外一律 Bearer 權杖，存檔案 0600，不走環境變數、不進網址。
 """
+import functools
 import glob
 import json
 import os
@@ -1588,9 +1589,18 @@ def llama_argv(raw, reg=None):
     if raw.get("api_key_file") and os.path.exists(raw["api_key_file"]):
         argv += ["--api-key-file", raw["api_key_file"]]
     if not raw.get("mmap", False):
-        argv.append("--no-mmap")           # 統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆
+        # 統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆
+        argv += no_mmap_args(raw["exe"])
     extra = reg["machine"].get("llama_args") or []
     return argv + [str(x) for x in extra if isinstance(x, (str, int))]
+
+
+@functools.lru_cache(maxsize=8)
+def no_mmap_args(exe):
+    """關 mmap 的寫法跟著 llama.cpp 版本走：build 11626（2026-10）起拿掉 --no-mmap、改成 --load-mode none，
+    舊版帶新旗標、新版帶舊旗標都會 invalid argument 直接退出。看 --help 決定。"""
+    rc, out, err = sh(f"{shlex.quote(exe)} --help", timeout=20)
+    return ["--load-mode", "none"] if "--load-mode" in out + err else ["--no-mmap"]
 
 
 def launch_llama(cfg_path):
