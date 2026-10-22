@@ -153,7 +153,8 @@ def main():
         check("本機實測四項：模型清單、沒帶金鑰被擋、一般對話、工具呼叫", st == 200 and t["ok"] and len(names) == 4, t)
 
         # ---- 調上下文到引擎起不來：自動換回
-        st, d = ag("POST", "/apiinfo/brain/settings", {"max_context": 300000})
+        st, d = ag("POST", "/apiinfo/brain/settings", {"max_context": 300000, "force": True})
+        # 帶 force：這項要驗的是「套用後起不來 → 自動換回」，不是准入（CI 主機沒有 GPU，准入會先擋）
         check("上下文調到引擎起不來 → 500 並自動換回", st == 500 and d.get("reverted") and d.get("restored_ok"), d)
         st, info = ag("GET", "/apiinfo/brain")
         check("  換回之後原本的設定還在、服務照常",

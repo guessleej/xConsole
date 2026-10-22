@@ -5,7 +5,7 @@
 | # | 類別 | 已實作的控制 | 證據 | 剩餘風險 |
 |---|---|---|---|---|
 | A01 | 存取控制失效 | 所有 `/api/*` 預設要登入；機器與欄位 id 只能指到登錄檔內的項目；換模型只接受掃描清單；代理沒有改登錄檔的入口 | 安全測試第 1、4 節（23 支 API 未登入 401、IDOR 等價 404） | 只有單一管理者角色，未分權 |
-| A02 | 安全設定錯誤 | CSP、X-Frame-Options、COOP、Permissions-Policy、nosniff；不公布版本號；錯誤不回堆疊；沒有預設帳密 | 安全測試第 7 節；CI ZAP baseline | `style-src 'unsafe-inline'` |
+| A02 | 安全設定錯誤 | CSP、X-Frame-Options、COOP、Permissions-Policy、nosniff；不公布版本號；錯誤不回堆疊；沒有預設帳密 | 安全測試第 7 節；CI ZAP baseline | — |
 | A03 | 軟體供應鏈失效 | 依賴全部釘版本；pip-audit 與 grype 擋 high 以上；Dependabot 每週；Actions 釘 commit SHA；SBOM 兩份 | `sbom-*.cdx.json`、`掃描報告/pip-audit.txt`、`grype-*.txt` | 無映像簽章（不以容器交付） |
 | A04 | 加密失效 | TLS 1.2+；AES-256-GCM 加密落地；PBKDF2-SHA256 200,000 輪；票證只存雜湊 | 安全測試第 8、10 節；`check-https.sh` 缺 0 | 模型 API 為 http（G1，2026/12/31） |
 | A05 | 注入 | SQLite 參數化；命令參數白名單＋`shlex.quote`；前端只用 textContent；CodeQL | CI CodeQL（Python、JavaScript） | — |

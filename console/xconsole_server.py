@@ -317,8 +317,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), usb=(), payment=()")
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("Content-Security-Policy",
-                         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+                         "default-src 'self'; style-src 'self'; script-src 'self'; "
                          "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
                          "frame-ancestors 'none'; object-src 'none'")
         if CERTS.hsts_header():

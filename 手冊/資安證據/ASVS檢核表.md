@@ -29,7 +29,7 @@
 | 條 | 要求 | 結果 | 證據 |
 |---|---|---|---|
 | 3.1 | 輸出編碼防 XSS | 符合 | 前端一律 `textContent` 組畫面；CodeQL javascript |
-| 3.2 | CSP | 符合 | `default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'`；`style-src` 含 `'unsafe-inline'`（只開樣式，用於元件內的少量排版） |
+| 3.2 | CSP | 符合 | `default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'`，沒有任何 `unsafe-inline`；另送 COOP、COEP、CORP |
 | 3.3 | Cookie 三旗標 | 符合 | 安全測試「票證 cookie 帶 HttpOnly、Secure、SameSite=Strict」 |
 | 3.4 | 防點擊劫持 | 符合 | CSP frame-ancestors＋X-Frame-Options |
 | 3.5 | CORS 白名單 | 符合 | 不送任何 CORS 標頭（只允許同源） |

@@ -1,3 +1,7 @@
 # .zap/rules.tsv — 已審視的 ZAP 規則調整。格式：規則id<TAB>WARN|IGNORE|FAIL<TAB>備註
 # 預設全部照 ZAP 原判；這裡只放逐條看過、確定不是問題的，並寫理由。
 10109	IGNORE	Modern Web Application：資訊性提示，說明這是單頁程式，不是弱點
+10035	IGNORE	HSTS 未設：CI 起的是暫用自簽憑證，自簽時刻意不送 HSTS（送了使用者連「略過警告」都沒有）；換成正式憑證後由管理者在網頁開啟，見 docs/SECURITY_PLAN.md
+10049	IGNORE	Non-Storable Content：資訊性；API 回應刻意 no-store，靜態檔 no-cache，就是不要被快取
+10015	IGNORE	Re-examine Cache-control Directives：同上，快取標頭是刻意設定（API no-store、靜態檔 no-cache 讓更新即時生效）
+90005	IGNORE	Sec-Fetch-Dest Header is Missing：說的是 ZAP 自己送出的請求沒帶這個標頭，不是伺服器的弱點

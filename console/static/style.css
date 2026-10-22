@@ -558,6 +558,9 @@ label.field { display: block; margin-top: 12px; font-size: 13.5px; color: var(--
   position: relative;
   overflow: hidden;
 }
+.login-actions { justify-content: stretch; margin-top: 16px; }
+.login-submit { width: 100%; }
+.login-err { color: var(--bad); margin-top: 12px; }
 .login-card {
   position: relative;
   background: var(--card);
