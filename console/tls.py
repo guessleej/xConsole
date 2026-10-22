@@ -11,7 +11,6 @@
 """
 import base64
 import datetime as dt
-import hashlib
 import ipaddress
 import json
 import os

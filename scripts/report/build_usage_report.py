@@ -23,7 +23,7 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from http.cookiejar import CookieJar
 from urllib.parse import urlparse
 
@@ -32,7 +32,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from docx import Document  # noqa: E402
 from docx.enum.table import WD_TABLE_ALIGNMENT  # noqa: E402
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK  # noqa: E402
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # noqa: E402
 from docx.oxml import OxmlElement  # noqa: E402
 from docx.oxml.ns import qn  # noqa: E402
 from docx.shared import Cm, Pt, RGBColor  # noqa: E402

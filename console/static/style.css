@@ -769,6 +769,31 @@ textarea {
 .tiles.light .tile .k, .tiles.light .tile .s { color: var(--ink-3); }
 .assume { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; line-height: 1.6; }
 
+/* ---------------------------------------------------------- 換模型與模型庫 */
+.modal.wide { width: min(760px, 100%); }
+.chip.warn { background: rgba(217, 119, 6, .14); color: var(--warn); }
+.chip.bad { background: rgba(198, 40, 40, .12); color: var(--bad); }
+.pick-h { font-size: 14px; margin: 14px 0 2px; }
+.pick-list { display: grid; gap: 6px; margin-top: 8px; }
+label.pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  cursor: pointer;
+}
+label.pick input { width: auto; flex: none; }
+.pick-main { flex: 1; min-width: 0; }
+.pick-main .model { font-weight: 600; overflow-wrap: anywhere; }
+label.pick .chips { flex: none; justify-content: flex-end; max-width: 45%; }
+.dl + .dl { margin-top: 12px; }
+.dl-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.dl .bar { height: 10px; }
+.dl .bar .seg { background: var(--brand); }
+.bad-t { color: var(--bad); }
+
 /* 手機版覆寫要放在檔案最後面：同樣權重下後寫的贏。
    放在前面的媒體查詢裡會被後面才定義的 .steps／.form-row 基本樣式蓋掉（實際踩到：改了頁長完全沒變）。 */
 @media (max-width: 860px) {
@@ -790,4 +815,6 @@ textarea {
   .copyrow { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
   .copyrow .k { grid-column: 1 / -1; font-size: 12.5px; }
   pre.code { height: 220px; }
+  label.pick { flex-wrap: wrap; }
+  label.pick .chips { max-width: none; justify-content: flex-start; }
 }

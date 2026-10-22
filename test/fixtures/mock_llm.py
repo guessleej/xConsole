@@ -4,15 +4,29 @@
 --max-context 超過 200000 就直接退出，用來測「套用後起不來 → 自動換回」。
 跑法：python3 mock_llm.py <設定檔>（由 test_api_integration.py 掛成臨時 systemd 服務）"""
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-cfg = json.load(open(sys.argv[1]))
-args = cfg.get("args") or []
-ctx = int(args[args.index("--max-context") + 1]) if "--max-context" in args else 4096
-if ctx > 200000:
-    sys.exit("上下文太大，起不來")
-KEY = cfg.get("api_key") or ""
+if sys.argv[1].startswith("-"):
+    # 當成 llama-server：吃同樣的參數（-m、--port、--alias、-c、--api-key-file…）
+    a = sys.argv[1:]
+    opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d  # noqa: E731
+    if "broken" in os.path.basename(opt("-m", "")):
+        sys.exit("模型檔壞掉，起不來")
+    cfg = {"port": int(opt("--port")), "model_name": opt("--alias", "mock")}
+    ctx = int(opt("-c", 4096))
+    kf = opt("--api-key-file")
+    KEY = open(kf).read().strip() if kf else ""
+    MODELS_PUBLIC = True              # llama.cpp 的 /v1/models 不需要金鑰，要能測出「不能拿它判斷有沒有金鑰」
+else:
+    cfg = json.load(open(sys.argv[1]))
+    args = cfg.get("args") or []
+    ctx = int(args[args.index("--max-context") + 1]) if "--max-context" in args else 4096
+    if ctx > 200000:
+        sys.exit("上下文太大，起不來")
+    KEY = cfg.get("api_key") or ""
+    MODELS_PUBLIC = False
 NAME = cfg.get("model_name") or "mock"
 
 
@@ -37,11 +51,11 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         if self.path.startswith("/redir/"):          # 測「實測不跟轉址」用
             self.send_response(302)
-            self.send_header("Location", self.path[len("/redir"):])
+            self.send_header("Location", "/v1/models")   # 固定目標：測試只需要「有轉址」
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.path.rstrip("/") == "/v1/models" and self._ok():
+        if self.path.rstrip("/") == "/v1/models" and (MODELS_PUBLIC or self._ok()):
             self._send(200, {"data": [{"id": NAME, "meta": {"n_ctx": ctx},
                                        "architecture": {"input_modalities": ["text"]}}]})
         elif not self.path.startswith("/v1/models"):

@@ -113,6 +113,11 @@ def main():
                A.pretty_model("/m/unsloth-UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf"),
                ("Qwen3.8-Flash-Next", "UD-IQ4_XS"))
 
+    # 8. llama.cpp 的 KV：滑動視窗層每條序列各留一個視窗，要乘並行數
+    got = A.llama_kv_gib({"kv_full_bpt": 1000, "kv_swa_bpt": 2000, "swa_window": 4096}, 32768, 4)
+    ok &= case("滑動視窗 KV × 並行（4 條 32K、視窗 4K）",
+               round(got, 4), round((1000 * 32768 * 4 + 2000 * 4096 * 4) / A.GIB, 4))
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 

@@ -31,7 +31,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import report  # noqa: E402
 import tls  # noqa: E402
-from store import Store, redact  # noqa: E402
+from store import Store  # noqa: E402
 
 HOME = os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME, ".xconsole")
@@ -180,8 +180,10 @@ def network_test(node_id, slot_id, key=""):
     opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx)) if ctx \
         else urllib.request.build_opener(NoRedirect)
 
-    def get(with_key):
-        req = urllib.request.Request(base + "/models", headers={"Authorization": f"Bearer {key}"} if with_key else {})
+    def call(method, path, with_key):
+        h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if with_key else {})}
+        req = urllib.request.Request(base + path, method=method, headers=h,
+                                     data=b"{}" if method == "POST" else None)
         try:
             with opener.open(req, timeout=10) as resp:
                 return resp.status, json.load(resp)
@@ -190,7 +192,7 @@ def network_test(node_id, slot_id, key=""):
         except Exception as exc:  # noqa: BLE001
             return 0, str(exc)[:160]
 
-    st, data = get(bool(key))
+    st, data = call("GET", "/models", bool(key))
     ms = int((time.time() - t0) * 1000)
     ids = [m.get("id") for m in (data or {}).get("data") or []] if isinstance(data, dict) else []
     if 300 <= st < 400:
@@ -199,10 +201,15 @@ def network_test(node_id, slot_id, key=""):
     if st == 0:
         return {"ok": False, "url": base, "ms": ms,
                 "detail": f"從主控台連不到 {base}（{data}）。IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址"}
-    if info["api_key_set"] and not key:
-        return {"ok": st == 401, "url": base, "ms": ms, "partial": True,
-                "detail": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次"
-                if st == 401 else f"設了金鑰，但沒帶金鑰回 {st}"}
+    if info["api_key_set"]:
+        # 驗金鑰一律打需要金鑰的對話端點（送空內容）：llama.cpp 的 /v1/models 本來就公開，拿它驗會誤判
+        auth, _ = call("POST", "/chat/completions", bool(key))
+        if not key:
+            return {"ok": auth == 401, "url": base, "ms": ms, "partial": True,
+                    "detail": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次"
+                    if auth == 401 else f"設了金鑰，但沒帶金鑰打對話端點回 {auth}，沒有被擋"}
+        if auth == 401:
+            return {"ok": False, "url": base, "ms": ms, "detail": "回 401，金鑰不對"}
     if st == 200 and info.get("model_name") in ids:
         return {"ok": True, "url": base, "ms": ms, "detail": f"從主控台連得到，模型清單有 {info['model_name']}"}
     return {"ok": False, "url": base, "ms": ms,
@@ -212,7 +219,12 @@ def network_test(node_id, slot_id, key=""):
 # ---------------------------------------------------------------- 代理呼叫
 
 def trust_file(node_id):
-    return os.path.join(CERTS.p.trust, f"{node_id}.pem")
+    # 路徑一律確認落在 trust 目錄內：node_id 雖然已比對過機器名單，這裡再擋一次 ../ 之類的寫法
+    base = os.path.realpath(CERTS.p.trust)
+    full = os.path.realpath(os.path.join(base, f"{node_id}.pem"))
+    if not full.startswith(base + os.sep):
+        raise ValueError("機器 id 不合法")
+    return full
 
 
 def call_node(node_id, path, method="GET", body=None, timeout=40):
@@ -329,8 +341,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _static(self, path):
         name = os.path.basename("index.html" if path in ("/", "") else path)
-        full = os.path.join(STATIC, name)
-        if not os.path.isfile(full):
+        base = os.path.realpath(STATIC)
+        full = os.path.realpath(os.path.join(base, name))
+        if not full.startswith(base + os.sep) or not os.path.isfile(full):
             return self._json(404, {"error": "找不到"})
         with open(full, "rb") as fh:
             body = fh.read()
@@ -444,6 +457,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
             return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/library", timeout=90))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -529,9 +545,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/model", path)
         if m:
-            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", body, timeout=560)
+            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "force") if k in body}
+            # 載幾十 GB 的模型加上失敗時的還原，最久可能各要十幾分鐘
+            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", want, timeout=2000)
             self._audit("model.swap", f"{m.group(1)}/{m.group(2)}", code == 200,
-                        {"to": out.get("model") or os.path.basename(str(body.get("pack", ""))),
+                        {"to": out.get("model") or body.get("model") or os.path.basename(str(body.get("pack", ""))),
+                         "engine": body.get("engine") or "strata", "switched_engine": out.get("switched_engine"),
                          "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
                          "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
@@ -540,8 +559,9 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key")
                     if k in body}
+            # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
-                                  {**want, "force": bool(body.get("force"))}, timeout=600)
+                                  {**want, "force": bool(body.get("force"))}, timeout=2000)
             # 新金鑰只回給這一次的畫面；稽核只記「換了金鑰」，不記內容
             self._audit("api.settings", f"{m.group(1)}/{m.group(2)}", code == 200,
                         {"changed": out.get("changed"), "public_url": want.get("public_url"),
@@ -557,6 +577,29 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("api.test", f"{m.group(1)}/{m.group(2)}", code == 200 and out.get("ok"),
                         {"checks": [(c["name"], c["ok"]) for c in out.get("checks") or []],
                          "network": (out.get("network") or {}).get("ok")})
+            return self._json(code, out)
+        # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|download|delete)", path)
+        if m:
+            node_id, act = m.groups()
+            if act == "hf":
+                return self._json(*call_node(node_id, "/library/hf", "POST",
+                                             {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
+            if act == "download":
+                want = {k: body.get(k) for k in ("repo", "stem", "mmproj", "token")}
+                code, out = call_node(node_id, "/library/download", "POST", want, timeout=90)
+                self._audit("library.download", node_id, code == 200,
+                            {"repo": want["repo"], "stem": want["stem"], "mmproj": want["mmproj"],
+                             "message": out.get("error")})
+                return self._json(code, out)
+            code, out = call_node(node_id, "/library/delete", "POST", {"id": body.get("id")}, timeout=120)
+            self._audit("library.delete", f"{node_id}/{body.get('id')}", code == 200,
+                        {"freed_gib": out.get("freed_gib"), "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/download/([0-9a-f]{8})/cancel", path)
+        if m:
+            code, out = call_node(m.group(1), f"/library/download/{m.group(2)}/cancel", "POST", {})
+            self._audit("library.cancel", f"{m.group(1)}/{m.group(2)}", code == 200)
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/admit/([\w.-]+)", path)
         if m:
