@@ -13,6 +13,7 @@ node_agent 沒有的那一層：角色欄位與模型、准入控制、啟停、
 
 機密：對外一律 Bearer 權杖，存檔案 0600，不走環境變數、不進網址。
 """
+import glob
 import json
 import os
 import re
@@ -20,7 +21,10 @@ import secrets
 import shlex
 import socket
 import ssl
+import struct
 import subprocess
+import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -515,6 +519,8 @@ def slot_config(slot):
     cfg = None
     if slot.get("kind") == "strata" and slot.get("config"):
         cfg = strata_config(slot["config"])
+    elif slot.get("kind") == "llama" and slot.get("config"):
+        cfg = llama_config(slot["config"])
     if cfg is None and slot.get("max_context"):
         cfg = {"max_context": int(slot["max_context"]), "kv": slot.get("kv", "fp16"),
                "kv_grow": False, "parallel": int(slot.get("parallel", 1)),
@@ -583,8 +589,6 @@ def slot_state(slot, reg, hw):
             # （實測：主腦與抓料都標 63.9，加起來 127.8 > 整機 96，長條就爆掉）。
             # 改成依各欄位「預估顯存需求」的比重分攤，沒宣告需求的欄位分到 0。
             total_used = (gpu.get("vram_used") or 0) / GIB
-            weights = [float(x.get("est_vram_gib") or 0) for x in reg["slots"]
-                       if unit_state(x["unit"]) in ("active", "activating")] if False else None
             mine = float(slot.get("est_vram_gib") or 0)
             denom = sum(float(x.get("est_vram_gib") or 0) for x in reg["slots"]
                         if x.get("unit") and x.get("_busy_cache"))
@@ -682,13 +686,42 @@ def record_model_measure(slot_id, model_name):
 
 
 def catalog(slot_id=None):
-    """掃出這台裝了哪些可以換的模型。
+    """換模型視窗要的清單：Strata 家族＋GGUF 存放區，兩種引擎一起列。"""
+    reg = registry()
+    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None) if slot_id else None
+    probe = dict(slot) if slot else None
+    if probe and probe.get("kind") == "llama" and (probe.get("engines") or {}).get("strata"):
+        probe.update(kind="strata", **probe["engines"]["strata"])      # 欄位現在跑 llama.cpp，Strata 的清單照它原本的服務算
+    out = catalog_for(probe, reg) if probe and probe.get("kind") == "strata" else {"models": [], "orphans": []}
+    for m in out.get("models", []):
+        m["folder"] = m["name"]
+        m["name"], m["quant"] = pretty_model(m["native"])      # 畫面顯示權重檔名的模型名稱，不是資料夾名
+        if slot and slot.get("kind") == "llama":
+            m["current"] = False
+    root, ggufs, problems = scan_gguf(reg)
+    cur = (slot_config(slot) or {}) if slot else {}
+    ctx_default = int(cur.get("max_context") or 32768)
+    par = int(cur.get("parallel") or 1)
+    p = pools(reg, hardware())
+    cap = (p.get("unified") or p.get("vram") or {}).get("total_gib") or 0
+    for m in ggufs:
+        ctx = min(ctx_default, m["ctx_train"]) if m.get("ctx_train") else ctx_default
+        est = llama_est(m, reg["machine"], ctx, par)
+        m.update(est_vram_gib=est["vram"], est_ram_gib=est["ram"], est_kv_gib=est["kv"], ctx_default=ctx,
+                 fits_total=bool(cap) and est["vram"] + est["kv"] < cap,
+                 current=bool(slot and slot.get("kind") == "llama" and os.path.abspath(cur.get("_native") or "") == os.path.abspath(m["path"])))
+    out.update(gguf=ggufs, gguf_problems=problems, gguf_root=root,
+               llama_server=llama_server_exe(reg), engine=(slot or {}).get("kind"),
+               can_llama=bool(slot) and slot.get("kind") in (None, "strata", "llama"))
+    return out
+
+
+def catalog_for(slot, reg):
+    """掃出這台裝了哪些可以換的 Strata 模型。
 
     Strata 一顆模型是「pack（含 tokenizer）＋ 權重檔」兩件成套的，
     少一邊就起不來，所以這裡只回報配得起來的組合，配不起來的另外列出來並說明缺什麼。
     """
-    reg = registry()
-    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None) if slot_id else None
     cur = slot_config(slot) if slot else None
     root = (slot or {}).get("model_root")
     if not root:
@@ -795,6 +828,12 @@ def wait_healthy(slot, seconds=240):
     last = "逾時"
     while time.time() < deadline:
         st = unit_state(slot["unit"])
+        if st == "activating":
+            # 設了 Restart= 的服務一退出就進 auto-restart，狀態看起來仍是 activating，
+            # 只看 failed 會白等到逾時（實際踩到：壞掉的模型讓換模型等了整整 15 分鐘才還原）
+            _, sub, _ = sysctl(slot["unit"], "show -p SubState --value", timeout=20)
+            if sub.strip() == "auto-restart":
+                st = "failed"
         if st == "failed":
             _, tail, _ = sh(f"journalctl --user -u {shlex.quote(slot['unit'])} -n 3 --no-pager -o cat")
             return False, (tail or "服務退出").replace("\n", " ")[:200]
@@ -824,14 +863,14 @@ def pretty_model(native):
     return (base[:m.start()], m.group(1)) if m else (base, None)
 
 
-def set_model(slot_id, pack, native, force=False):
+def set_model(slot_id, pack, native, force=False, extra_free=None):
     """把某個欄位換成另一顆模型：先驗證成套、備份、改設定、重啟，失敗自動還原。"""
     reg = registry()
     slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
     if not slot or not slot.get("config"):
         return 404, {"error": f"{slot_id} 沒有可改的設定檔"}
 
-    allowed = {m["pack"]: m for m in (catalog(slot_id).get("models") or [])}
+    allowed = {m["pack"]: m for m in (catalog_for(slot, reg).get("models") or [])}
     pick = allowed.get(pack)
     if not pick or os.path.abspath(pick["native"]) != os.path.abspath(native):
         # 只接受掃描掃得到的組合，避免有人用這支 API 指到任意路徑
@@ -876,7 +915,7 @@ def set_model(slot_id, pack, native, force=False):
     save_json(slot["config"], new_cfg)
     os.chmod(slot["config"], 0o600)          # 可能帶著 API 金鑰
 
-    verdict = admit(slot_id)
+    verdict = admit(slot_id, extra_free=extra_free)
     if not verdict["allow"] and not force:
         save_json(slot["config"], load_json(backup, {}))
         reg3 = registry()
@@ -959,11 +998,27 @@ def _http_json(url, body=None, key="", timeout=8):
 
 
 def _api_parts(slot):
-    """回 (可改的設定檔內容或 None, 埠, 金鑰)。"""
-    raw = load_json(slot["config"], None) if slot.get("kind") == "strata" and slot.get("config") else None
+    """回 (可改的設定檔內容或 None, 埠, 金鑰)。Strata 與 llama.cpp 的設定檔格式不同，名稱欄位也不同，
+    這裡統一成同一組鍵（model_name、max_tokens），寫回時再轉回各自的格式（_api_write）。"""
     cfg = slot_config(slot) or {}
+    if slot.get("kind") == "strata" and slot.get("config"):
+        raw = load_json(slot["config"], None)
+        key = _first_key((raw or {}).get("api_key"))
+    elif slot.get("kind") == "llama" and slot.get("config"):
+        raw = load_json(slot["config"], None)
+        key = llama_key(raw)
+        if raw is not None:
+            raw = {**raw, "model_name": raw.get("alias")}
+    else:
+        raw, key = None, ""
     port = (raw or {}).get("port") or cfg.get("port") or slot.get("port")
-    return raw, port, _first_key((raw or {}).get("api_key"))
+    return raw, port, key
+
+
+def _no_key_blocked(port):
+    """沒帶金鑰打不打得進去。用 POST 對話端點測：llama.cpp 的 /v1/models 本來就不需要金鑰，拿它測會誤判。"""
+    st, _, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/chat/completions", body={}, timeout=8)
+    return st == 401, st
 
 
 def api_info(slot_id):
@@ -983,10 +1038,11 @@ def api_info(slot_id):
     reg = registry()
     ip = reg["machine"].get("ip") or _local_ip()
     strata = slot.get("kind") == "strata" and raw is not None
+    llama = slot.get("kind") == "llama" and raw is not None
     return 200, {
         "slot": slot_id, "role": slot.get("role"), "tier": slot.get("tier", ""),
         "model": slot.get("model"), "kind": slot.get("kind"), "critical": bool(slot.get("critical")),
-        "editable": strata, "port": int(port),
+        "editable": strata or llama, "engine": slot.get("kind"), "port": int(port),
         "bind": (raw or {}).get("host") or "0.0.0.0",
         "default_url": f"http://{ip}:{int(port)}/v1",
         "public_url": slot.get("api_public_url") or f"http://{ip}:{int(port)}/v1",
@@ -1000,6 +1056,7 @@ def api_info(slot_id):
         "api_key_set": bool(key),
         # Strata 同時講三種方言；其他引擎只保證 OpenAI 那種
         "dialects": ["openai", "anthropic", "responses"] if strata else ["openai"],
+        # llama.cpp 能不能呼叫工具要看模型自己的對話範本，實測那一項會告訴你
         "tools": True if strata else None,
         "vision": any(m["vision"] for m in served),
         "last_test": slot.get("api_last_test"),
@@ -1087,6 +1144,8 @@ def api_settings(slot_id, body, force=False):
     if not want:
         return 200, {"ok": True, "restarted": False, "message": "已儲存" if url is not None else "沒有變更"}
 
+    if slot.get("kind") == "llama":
+        return _api_apply_llama(slot, raw, port, want, force)
     old = dict(raw)
     new = dict(raw)
     for k, v in want.items():
@@ -1134,8 +1193,8 @@ def api_settings(slot_id, body, force=False):
     if st != 200 or (new.get("model_name") and new["model_name"] not in ids):
         return revert(f"套用後用新設定打不通（/v1/models 回 {st}，模型清單 {ids}）")
     if nkey:
-        st2, _, _ = _http_json(f"http://127.0.0.1:{int(nport)}/v1/models", timeout=8)
-        if st2 != 401:
+        blocked, st2 = _no_key_blocked(nport)
+        if not blocked:
             return revert(f"設了金鑰但沒帶金鑰也打得進去（回 {st2}），引擎沒有吃到金鑰")
     # 換模型時要沿用使用者自己取的名稱；設定一變，上一次的實測就不算數
     _set_slot_fields(slot_id, api_model_name=new.get("model_name") if "model_name" in want else slot.get("api_model_name"),
@@ -1145,6 +1204,67 @@ def api_settings(slot_id, body, force=False):
            "message": "已套用並重啟，用新設定實際打過一次 /v1/models"}
     if want.get("api_key"):
         out["api_key"] = want["api_key"]       # 只在這一次回傳，之後任何 API 都不再回
+    return 200, out
+
+
+def _api_apply_llama(slot, raw, port, want, force):
+    """llama.cpp 欄位的 API 設定寫回：名稱＝--alias、上下文＝ctx、輸出上限＝-n、金鑰＝--api-key-file。"""
+    slot_id = slot["id"]
+    cfg_path = slot["config"]
+    old = load_json(cfg_path, {}) or {}
+    new = dict(old)
+    old_key_text = load_text(os.path.join(ENGINE_DIR, f"{slot_id}.key"))
+    for k, v in want.items():
+        if k == "model_name":
+            new["alias"] = v
+        elif k == "max_context":
+            new["ctx"] = int(v)
+        elif k == "max_tokens":
+            new["max_tokens"] = v
+        elif k == "api_key":
+            new["api_key_file"] = write_llama_key(slot_id, v)
+    save_json(cfg_path, new)
+    os.chmod(cfg_path, 0o600)
+
+    def revert(msg):
+        save_json(cfg_path, old)
+        if old_key_text is not None:
+            write_llama_key(slot_id, old_key_text.strip())
+        elif "api_key" in want:
+            write_llama_key(slot_id, "")
+        sysctl(slot["unit"], "reset-failed", timeout=20)
+        sysctl(slot["unit"], "restart")
+        back_ok, _ = wait_healthy(slot, seconds=900)
+        return 500, {"error": msg + "，已換回原本的設定" + ("" if back_ok else "，但原本的也還沒起來，請查記錄"),
+                     "reverted": True, "restored_ok": back_ok}
+
+    if "max_context" in want:
+        verdict = admit(slot_id)
+        if not verdict["allow"] and not force:
+            save_json(cfg_path, old)
+            if "api_key" in want:
+                write_llama_key(slot_id, (old_key_text or "").strip())
+            return 409, {"error": "上下文調大之後記憶體不夠，設定已還原", "admit": verdict}
+    sysctl(slot["unit"], "reset-failed", timeout=20)
+    sysctl(slot["unit"], "restart")
+    ok, why = wait_healthy(slot, seconds=900)
+    if not ok:
+        return revert(f"套用後服務起不來（{why}）")
+    nkey = llama_key(new)
+    st, models, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=nkey, timeout=8)
+    ids = [m.get("id") for m in (models or {}).get("data") or []]
+    if st != 200 or new.get("alias") not in ids:
+        return revert(f"套用後用新設定打不通（/v1/models 回 {st}，模型清單 {ids}）")
+    if nkey:
+        blocked, st2 = _no_key_blocked(port)
+        if not blocked:
+            return revert(f"設了金鑰但沒帶金鑰也打得進去（回 {st2}），引擎沒有吃到金鑰")
+    _set_slot_fields(slot_id, api_model_name=new.get("alias") if "model_name" in want else slot.get("api_model_name"),
+                     api_last_test=None)
+    out = {"ok": True, "restarted": True, "changed": list(want),
+           "message": "已套用並重啟，用新設定實際打過一次 /v1/models"}
+    if want.get("api_key"):
+        out["api_key"] = want["api_key"]
     return 200, out
 
 
@@ -1164,9 +1284,9 @@ def api_test(slot_id):
                    "detail": "、".join(ids) if ids else f"回 {st or '連不上'}"})
     name = (raw or {}).get("model_name") or (ids[0] if ids else "")
     if key:
-        st0, _, _ = _http_json(base + "/models", timeout=8)
-        checks.append({"name": "沒帶金鑰要被擋下", "ok": st0 == 401, "ms": 0,
-                       "detail": "回 401，金鑰保護有效" if st0 == 401 else f"回 {st0}，沒有被擋"})
+        blocked, st0 = _no_key_blocked(port)
+        checks.append({"name": "沒帶金鑰要被擋下", "ok": blocked, "ms": 0,
+                       "detail": "回 401，金鑰保護有效" if blocked else f"回 {st0}，沒有被擋"})
     if ids:
         st, r, ms = _http_json(base + "/chat/completions", key=key, timeout=180, body={
             "model": name, "max_tokens": 512, "stream": False,
@@ -1196,6 +1316,782 @@ def api_test(slot_id):
     rec = {"at": int(time.time()), "ok": ok, "where": "本機", "model": name}
     _set_slot_fields(slot_id, api_last_test=rec)
     return 200, {"ok": ok, "checks": checks, "model": name, "at": rec["at"]}
+
+
+# ---------------------------------------------------------------- 模型庫與 llama.cpp 引擎
+# Strata 只跑 Qwen3.8-Flash-Next 一家；其他模型（Gemma 4、gpt-oss、Llama…）一律走 llama.cpp。
+# 方法固定成四件事：
+#   1. 放哪裡：每台一個 GGUF 存放區（登錄檔 machine.gguf_root，預設 ~/models/gguf），
+#      一顆模型一個資料夾：<存放區>/<資料夾>/<模型>.gguf（可分片），看圖模型把 mmproj*.gguf 放同資料夾
+#   2. 怎麼進來：自己複製進去，或網頁貼 Hugging Face 名稱由代理在背景下載
+#   3. 怎麼選：換模型一次列出 Strata 與 GGUF；記憶體需求讀 GGUF 檔頭算（權重＋上下文的 KV）
+#   4. 怎麼切：同一個欄位、同一個埠；跨引擎時停用舊引擎、啟用新引擎，用新模型實際打一次，打不通整組還原
+
+
+GGUF_ROOT_DEFAULT = "~/models/gguf"
+ENGINE_DIR = os.path.join(STATE_DIR, "engines")
+DOWNLOADS_FILE = os.path.join(STATE_DIR, "downloads.json")
+HF_BASE = os.environ.get("XCONSOLE_HF_BASE", "https://huggingface.co")   # 測試時指到本機假站
+SHARD_RX = re.compile(r"-(\d{5})-of-(\d{5})$")
+HF_REPO_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,95}/[A-Za-z0-9][\w.-]{0,95}")
+# 政府案不得使用中國來源模型；這裡只負責標示，選不選由人決定（內部測試可以用）
+CN_ORIGIN = ("qwen", "deepseek", "glm", "chatglm", "kimi", "moonshot", "minimax", "hunyuan",
+             "internlm", "baichuan", "doubao", "ernie", "seed-oss")
+
+
+def gguf_root(reg=None):
+    reg = reg or registry()
+    return os.path.expanduser(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
+
+
+def gguf_meta(path):
+    """讀 GGUF 檔頭的 key-value（不讀權重）。tokenizer 那種幾十萬筆的陣列直接跳過。"""
+    sz = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
+    fm = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
+    try:
+        with open(path, "rb") as f:
+            if f.read(4) != b"GGUF":
+                return None
+            f.read(4)
+            _, n_kv = struct.unpack("<QQ", f.read(16))
+
+            def rstr():
+                n, = struct.unpack("<Q", f.read(8))
+                return f.read(n).decode("utf-8", "replace")
+
+            def rval(t):
+                if t == 8:
+                    return rstr()
+                if t == 9:
+                    et, = struct.unpack("<I", f.read(4))
+                    cnt, = struct.unpack("<Q", f.read(8))
+                    if et == 8:
+                        if cnt > 64:
+                            for _ in range(cnt):
+                                n, = struct.unpack("<Q", f.read(8))
+                                f.seek(n, 1)
+                            return None
+                        return [rstr() for _ in range(cnt)]
+                    if et in sz:
+                        if cnt > 4096:
+                            f.seek(sz[et] * cnt, 1)
+                            return None
+                        return list(struct.unpack("<" + fm[et] * cnt, f.read(sz[et] * cnt)))
+                    raise ValueError("不支援的巢狀陣列")
+                return struct.unpack("<" + fm[t], f.read(sz[t]))[0]
+
+            out = {}
+            for _ in range(min(n_kv, 100000)):
+                k = rstr()
+                t, = struct.unpack("<I", f.read(4))
+                out[k] = rval(t)
+            return out
+    except (OSError, struct.error, ValueError):
+        return None
+
+
+def gguf_profile(meta):
+    """從檔頭推出：架構、訓練上下文、每個 token 的 KV 位元組（f16）、是否中國來源。
+    KV 照每層的 KV 頭數加總（混合架構的 SSM 層 KV 頭數是 0，自然不算）；
+    滑動視窗層只留視窗內的 token，在 kv_worst 那裡另外處理。"""
+    if not meta:
+        return None
+    arch = meta.get("general.architecture") or "?"
+    g = lambda k, d=None: meta.get(f"{arch}.{k}", d)  # noqa: E731
+    n_layer = int(g("block_count", 0) or 0)
+    heads = g("attention.head_count", 0)
+    heads = max(heads) if isinstance(heads, list) else int(heads or 0)
+    emb = int(g("embedding_length", 0) or 0)
+    k_len = int(g("attention.key_length", 0) or (emb // heads if heads else 0))
+    v_len = int(g("attention.value_length", 0) or k_len)
+    kv_heads = g("attention.head_count_kv", heads)
+    per_layer = kv_heads if isinstance(kv_heads, list) else [int(kv_heads or 0)] * n_layer
+    swa = int(g("attention.sliding_window", 0) or 0)
+    pattern = g("attention.sliding_window_pattern")
+    full_b = swa_b = 0
+    for i, h in enumerate(per_layer):
+        b = int(h or 0) * (k_len + v_len) * 2
+        is_swa = bool(swa) and isinstance(pattern, list) and i < len(pattern) and bool(pattern[i])
+        if is_swa:
+            swa_b += b
+        else:
+            full_b += b
+    name = meta.get("general.name") or meta.get("general.basename") or ""
+    low = f"{arch} {name}".lower()
+    return {"arch": arch, "meta_name": name, "ctx_train": int(g("context_length", 0) or 0) or None,
+            "kv_full_bpt": full_b, "kv_swa_bpt": swa_b, "swa_window": swa if swa_b else 0,
+            "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN)}
+
+
+_META_CACHE = {}
+
+
+def _profile_cached(path):
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key not in _META_CACHE:
+        _META_CACHE[key] = gguf_profile(gguf_meta(path))
+    return _META_CACHE[key]
+
+
+def scan_gguf(reg=None):
+    """掃存放區：一個資料夾裡可以放同一顆模型的多個量化，各自算一顆；分片要齊才算可用。"""
+    reg = reg or registry()
+    root = gguf_root(reg)
+    models, problems = [], []
+    if not os.path.isdir(root):
+        return root, models, problems
+    for folder in sorted(os.listdir(root)):
+        full = os.path.join(root, folder)
+        if not os.path.isdir(full) or folder.startswith("."):
+            continue
+        files = sorted(f for f in os.listdir(full) if f.endswith(".gguf"))
+        mmproj = next((os.path.join(full, f) for f in files if f.lower().startswith("mmproj")), None)
+        groups = {}
+        for f in files:
+            if f.lower().startswith("mmproj"):
+                continue
+            base = f[:-5]
+            m = SHARD_RX.search(base)
+            stem = base[:m.start()] if m else base
+            groups.setdefault(stem, []).append((f, int(m.group(2)) if m else 1))
+        for stem, parts in groups.items():
+            want = parts[0][1]
+            paths = [os.path.join(full, f) for f, _ in sorted(parts)]
+            size = sum(os.path.getsize(p) for p in paths if os.path.exists(p))
+            mm_size = os.path.getsize(mmproj) if mmproj else 0
+            name, quant = pretty_model(paths[0])
+            mid = f"{folder}/{stem}"
+            if len(parts) != want:
+                problems.append({"name": mid, "missing": f"分片不齊：有 {len(parts)} 個，應有 {want} 個（下載可能還沒完成）"})
+                continue
+            prof = _profile_cached(paths[0])
+            if not prof:
+                problems.append({"name": mid, "missing": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載"})
+                continue
+            models.append({
+                # 名稱用檔頭裡的正式名稱（例 Gemma-4-E4B-It），沒有才用檔名推
+                "engine": "llama", "id": mid, "name": prof.get("meta_name") or name, "quant": quant, "folder": folder,
+                "path": paths[0], "shards": want, "size_gib": round(size / GIB, 1),
+                "mmproj": mmproj, "mmproj_gib": round(mm_size / GIB, 1), "vision": bool(mmproj),
+                **prof})
+    return root, models, problems
+
+
+def llama_est(m, machine, ctx, parallel=1):
+    """llama.cpp 跑這顆要多少：權重（＋mmproj）＋1 GiB 計算緩衝放 GPU 那邊，KV 另由 kv_worst 算；
+    系統記憶體那邊只剩引擎本身（--no-mmap 不會再多一份頁快取）。"""
+    mm = machine.get("memory_model", "discrete")
+    vram = round(m["size_gib"] + m.get("mmproj_gib", 0) + 1.0, 1)
+    return {"vram": vram, "ram": 1.5 if mm == "unified_single" else 2.5,
+            "kv": round(llama_kv_gib(m, ctx, parallel), 2)}
+
+
+def llama_kv_gib(prof, ctx, parallel=1):
+    tokens = ctx * parallel
+    swa_tokens = min(tokens, prof.get("swa_window") or tokens)
+    return (prof.get("kv_full_bpt", 0) * tokens + prof.get("kv_swa_bpt", 0) * swa_tokens) / GIB
+
+
+def llama_server_exe(reg=None):
+    """這台用哪支 llama-server：登錄檔指定的優先，否則挑家目錄下版本號最大、有 GPU 後端的那支。"""
+    reg = reg or registry()
+    want = reg["machine"].get("llama_server")
+    if want and os.path.exists(os.path.expanduser(want)):
+        return os.path.expanduser(want)
+    best, best_ver = None, -1
+    for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
+        rc, out, err = sh(f"{shlex.quote(cand)} --version", timeout=15)
+        m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", out + err)
+        ver = int(next(x for x in m.groups() if x)) if m else 0
+        libs = os.listdir(os.path.dirname(cand))
+        gpu = any(x.startswith(("libggml-hip", "libggml-cuda", "libggml-vulkan")) for x in libs)
+        score = ver + (10 ** 6 if gpu else 0)
+        if rc == 0 and score > best_ver:
+            best, best_ver = cand, score
+    return best
+
+
+def llama_config(path):
+    raw = load_json(path, None)
+    if not raw:
+        return None
+    prof = _profile_cached(raw.get("model", "")) or {}
+    par = int(raw.get("parallel", 1) or 1)
+    ctx = int(raw.get("ctx", 4096) or 4096)
+    # kv_worst 用「每 token 位元組 × 上下文 × 並行」：滑動視窗層折算成平均每 token 的位元組
+    tokens = ctx * par
+    per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or tokens) / tokens)) if prof else None
+    return {"max_context": ctx, "kv": "f16", "kv_grow": False, "parallel": par,
+            "expert_cache": None, "resident_budget_gib": 0.0, "fit_max_tokens": False,
+            "port": raw.get("port"), "model_name": raw.get("alias"), "exe": raw.get("exe"),
+            "kv_bytes_per_cell": int(per) if per else None,
+            "_native": raw.get("model"), "_pack": None, "engine": "llama"}
+
+
+def llama_key(raw):
+    p = (raw or {}).get("api_key_file")
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return next((ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")), "")
+    except (OSError, TypeError):
+        return ""
+
+
+def write_llama_key(slot_id, key):
+    p = os.path.join(ENGINE_DIR, f"{slot_id}.key")
+    if not key:
+        if os.path.exists(p):
+            os.remove(p)
+        return None
+    os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+    fd = os.open(p + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(key + "\n")
+    os.replace(p + ".tmp", p)
+    return p
+
+
+def llama_argv(raw, reg=None):
+    """設定檔 → llama-server 參數。金鑰只給檔案路徑（--api-key-file），不放進指令列（ps 看得到）。"""
+    reg = reg or registry()
+    ctx, par = int(raw.get("ctx", 4096)), int(raw.get("parallel", 1))
+    argv = [raw["exe"], "-m", raw["model"], "--host", raw.get("host", "0.0.0.0"), "--port", str(raw["port"]),
+            "-c", str(ctx * par), "-np", str(par), "-ngl", str(raw.get("ngl", 999)),
+            "--alias", raw["alias"], "--jinja"]
+    if raw.get("mmproj"):
+        argv += ["--mmproj", raw["mmproj"]]
+    if raw.get("max_tokens"):
+        argv += ["-n", str(int(raw["max_tokens"]))]
+    if raw.get("api_key_file") and os.path.exists(raw["api_key_file"]):
+        argv += ["--api-key-file", raw["api_key_file"]]
+    if not raw.get("mmap", False):
+        argv.append("--no-mmap")           # 統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆
+    extra = reg["machine"].get("llama_args") or []
+    return argv + [str(x) for x in extra if isinstance(x, (str, int))]
+
+
+def launch_llama(cfg_path):
+    """systemd 服務的進入點：讀設定檔、組參數、exec 成 llama-server（之後就是它本人，不多一層）。"""
+    raw = load_json(cfg_path, None)
+    if not raw:
+        raise SystemExit(f"讀不到 {cfg_path}")
+    reg = registry()
+    env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
+    argv = llama_argv(raw, reg)
+    lib = os.path.dirname(raw["exe"])
+    env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
+    os.execvpe(argv[0], argv, env)
+
+
+def llama_unit(slot_id):
+    return f"xc-{slot_id}-llama.service"
+
+
+def ensure_llama_unit(slot_id, cfg_path):
+    unit = llama_unit(slot_id)
+    # systemd --user 只看「登入帳號」的設定目錄；測試時代理的 HOME 是暫存目錄，所以可以另外指定
+    unit_dir = os.environ.get("XCONSOLE_UNIT_DIR") or os.path.join(HOME, ".config/systemd/user")
+    path = os.path.join(unit_dir, unit)
+    body = (f"[Unit]\nDescription=xConsole 欄位 {slot_id}：llama.cpp\nAfter=network.target\n\n"
+            f"[Service]\nType=simple\nExecStart={sys.executable} {os.path.abspath(__file__)} --launch-llama {cfg_path}\n"
+            f"Restart=on-failure\nRestartSec=10\nStandardOutput=append:{os.path.join(ENGINE_DIR, slot_id + '-llama.log')}\n"
+            f"StandardError=inherit\n\n[Install]\nWantedBy=default.target\n")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if load_text(path) != body:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        sh("systemctl --user daemon-reload", timeout=30)
+    return unit
+
+
+def load_text(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _free_port(reg, start=8090):
+    used = set()
+    for sl in reg["slots"]:
+        p = (slot_config(sl) or {}).get("port") or sl.get("port")
+        if p:
+            used.add(int(p))
+    for p in range(start, start + 200):
+        if p in used or p == PORT:
+            continue
+        s = socket.socket()
+        try:
+            s.bind(("0.0.0.0", p))
+            return p
+        except OSError:
+            continue
+        finally:
+            s.close()
+    return None
+
+
+def _slug(text):
+    return re.sub(r"[^a-z0-9._-]+", "-", text.lower()).strip("-")[:80] or "model"
+
+
+def _alive(slot):
+    return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
+
+
+def _usage_of(slot_id):
+    """這個欄位現在實際吃多少（切換時要先加回可用量，否則會被自己擋住）。"""
+    reg = registry()
+    hw = hardware()
+    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
+    if not slot or not slot.get("unit"):
+        return 0.0, 0.0
+    for sl in reg["slots"]:
+        sl["_busy_cache"] = _alive(sl)
+    st = slot_state(slot, reg, hw)
+    if not st["busy"]:
+        return 0.0, 0.0
+    return float(st["vram_gib"] or 0), float(st["ram_gib"] or 0)
+
+
+def set_llama_model(slot_id, model_id, ctx=None, force=False):
+    """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。"""
+    reg = registry()
+    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
+    if not slot:
+        return 404, {"error": f"沒有這個欄位：{slot_id}"}
+    if slot.get("kind") not in (None, "strata", "llama") or (slot.get("unit") and not slot.get("kind")):
+        return 400, {"error": "這個欄位跑的不是語言模型引擎，不能換成 GGUF"}
+    _, models, _ = scan_gguf(reg)
+    m = next((x for x in models if x["id"] == model_id), None)
+    if not m:
+        return 400, {"error": "這顆不在存放區掃到的模型清單內"}
+    exe = llama_server_exe(reg)
+    if not exe:
+        return 400, {"error": "這台找不到 llama-server。請先編好 llama.cpp，或在登錄檔 machine.llama_server 指定路徑"}
+
+    old = json.loads(json.dumps(slot))                       # 整個欄位的原樣，還原時直接寫回
+    old_unit = slot.get("unit")
+    old_enabled = unit_enabled(old_unit) if old_unit else False
+    old_alive = _alive(slot)
+    old_cfg = slot_config(slot) or {}
+    port = old_cfg.get("port") or slot.get("port") or _free_port(reg)
+    if not port:
+        return 500, {"error": "找不到可用的埠"}
+
+    # 金鑰、輸出上限、自己取的名稱、並行數：跟著欄位走，換引擎也不變
+    carry_key, carry_max = "", None
+    if slot.get("kind") == "strata" and slot.get("config"):
+        sraw = load_json(slot["config"], {}) or {}
+        carry_key, carry_max = _first_key(sraw.get("api_key")), sraw.get("max_tokens")
+    elif slot.get("kind") == "llama" and slot.get("config"):
+        lraw = load_json(slot["config"], {}) or {}
+        carry_key, carry_max = llama_key(lraw), lraw.get("max_tokens")
+    want_ctx = int(ctx or old_cfg.get("max_context") or 32768)
+    if m.get("ctx_train"):
+        want_ctx = min(want_ctx, int(m["ctx_train"]))
+    want_ctx = max(2048, want_ctx)
+    par = int(old_cfg.get("parallel") or 1)
+    alias = slot.get("api_model_name") or _slug(f"{m['name']}-{m['quant']}" if m.get("quant") else m["name"])
+    os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+    cfg_path = os.path.join(ENGINE_DIR, f"{slot_id}-llama.json")
+    prev_llama_raw = load_json(cfg_path, None)
+    prev_key = load_text(os.path.join(ENGINE_DIR, f"{slot_id}.key"))
+    keyfile = write_llama_key(slot_id, carry_key)
+    raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
+           "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
+           "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
+           "api_key_file": keyfile}
+    save_json(cfg_path, raw)
+    os.chmod(cfg_path, 0o600)
+    unit = ensure_llama_unit(slot_id, cfg_path)
+    est = llama_est(m, reg["machine"], want_ctx, par)
+
+    engines = dict(slot.get("engines") or {})
+    if slot.get("kind") == "strata":
+        engines["strata"] = {"unit": old_unit, "config": slot.get("config")}
+
+    def put(fields):
+        r = registry()
+        for sl in r["slots"]:
+            if sl["id"] == slot_id:
+                sl.clear()
+                sl.update(fields)
+        save_json(REGISTRY, r)
+
+    put({**old, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
+         "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
+         "caps": sorted(set((old.get("caps") or []) + ["文字"] + (["看圖"] if m.get("vision") else []))),
+         "model": m["name"], "quant": m.get("quant")})
+
+    def undo(msg, code=500, extra=None):
+        if old_unit != unit:
+            sysctl(unit, "stop")
+            sysctl(unit, "disable", timeout=30)
+        if prev_llama_raw is not None:
+            save_json(cfg_path, prev_llama_raw)
+        if prev_key is not None:
+            write_llama_key(slot_id, prev_key.strip())
+        put(old)
+        back_ok = True
+        if old_unit:
+            if old_enabled:
+                sysctl(old_unit, "enable", timeout=30)
+            if old_alive:
+                sysctl(old_unit, "reset-failed", timeout=20)
+                sysctl(old_unit, "restart")
+                back_ok, _ = wait_healthy(old, seconds=600)
+        return code, {"error": msg + ("，已換回原本的設定" if old_unit else "，欄位維持空的")
+                      + ("" if back_ok else "，但原本的服務還沒起來，請查記錄"),
+                      "reverted": True, "restored_ok": back_ok, **(extra or {})}
+
+    vr, rr = _usage_of(slot_id) if old_unit == unit else (0.0, 0.0)
+    ov, orr = (0.0, 0.0)
+    if old_unit and old_unit != unit and old_alive:
+        ov, orr = _usage_reclaim(old)
+    verdict = admit(slot_id, extra_free=(ov + vr, orr + rr))
+    if not verdict["allow"] and not force:
+        return undo("記憶體不夠", 409, {"admit": verdict})
+
+    if old_unit and old_unit != unit:
+        sysctl(old_unit, "stop")
+        if old_enabled:
+            sysctl(old_unit, "disable", timeout=30)      # 開機自啟一起換，不然重開機兩個引擎搶同一個埠
+    sysctl(unit, "reset-failed", timeout=20)
+    sysctl(unit, "enable", timeout=30)
+    sysctl(unit, "restart")
+    new_slot = next(x for x in registry()["slots"] if x["id"] == slot_id)
+    ok, why = wait_healthy(new_slot, seconds=900)        # 幾十 GB 的權重從 NVMe 讀要幾分鐘
+    if ok:
+        st, data, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=carry_key, timeout=10)
+        ids = [x.get("id") for x in (data or {}).get("data") or []]
+        if st != 200 or alias not in ids:
+            ok, why = False, f"/v1/models 回 {st}，模型清單 {ids}"
+    if not ok:
+        tail = load_text(os.path.join(ENGINE_DIR, f"{slot_id}-llama.log")) or ""
+        hint = next((ln for ln in reversed(tail.splitlines()) if "error" in ln.lower() or "failed" in ln.lower()), "")
+        return undo(f"{m['name']} 載不起來（{why}{'；' + hint[-200:] if hint else ''}）")
+
+    r = registry()
+    for sl in r["slots"]:
+        if sl["id"] == slot_id:
+            sl.pop("api_last_test", None)
+    r["measure"].pop(slot_id, None)
+    save_json(REGISTRY, r)
+    return 200, {"ok": True, "engine": "llama", "model": m["name"], "quant": m.get("quant"),
+                 "api_model_name": alias, "port": int(port), "ctx": want_ctx,
+                 "switched_engine": old.get("kind") not in (None, "llama"),
+                 "kv_gib": est["kv"], "est_vram_gib": est["vram"]}
+
+
+def _usage_reclaim(old_slot):
+    """切換引擎時，舊引擎占的量要算成「會被釋放」。用舊欄位的原樣去量。"""
+    reg = registry()
+    hw = hardware()
+    for sl in reg["slots"]:
+        sl["_busy_cache"] = _alive(sl)
+    probe = dict(old_slot)
+    st = slot_state(probe, reg, hw)
+    return (float(st["vram_gib"] or 0), float(st["ram_gib"] or 0)) if st["busy"] else (0.0, 0.0)
+
+
+def back_to_strata(slot_id, pack, native, force=False):
+    """欄位現在跑 llama.cpp，要換回 Strata 家族的某顆：先切回 Strata 的服務，再走原本的 Strata 換模型流程；
+    任何一步失敗就整組換回 llama.cpp。"""
+    reg = registry()
+    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
+    eng = (slot or {}).get("engines", {}).get("strata")
+    if not slot or slot.get("kind") != "llama" or not eng:
+        return 400, {"error": "這個欄位沒有記錄原本的 Strata 服務，無法切回"}
+    old = json.loads(json.dumps(slot))
+    lunit = slot["unit"]
+    lraw = load_json(slot["config"], {}) or {}
+    key, mt = llama_key(lraw), lraw.get("max_tokens")
+    l_enabled = unit_enabled(lunit)
+    lv, lr = _usage_reclaim(old) if _alive(old) else (0.0, 0.0)
+
+    def put(fields):
+        r = registry()
+        for sl in r["slots"]:
+            if sl["id"] == slot_id:
+                sl.clear()
+                sl.update(fields)
+        save_json(REGISTRY, r)
+
+    put({**old, "kind": "strata", "unit": eng["unit"], "config": eng["config"]})
+    # Strata 設定檔要帶上欄位目前的金鑰與輸出上限（set_model 會沿用設定檔裡的這兩項）
+    sraw = load_json(eng["config"], {}) or {}
+    sold = dict(sraw)
+    if key:
+        sraw["api_key"] = key
+    else:
+        sraw.pop("api_key", None)
+    if mt:
+        sraw["max_tokens"] = mt
+    save_json(eng["config"], sraw)
+    os.chmod(eng["config"], 0o600)
+    sysctl(lunit, "stop")
+    if l_enabled:
+        sysctl(lunit, "disable", timeout=30)
+    sysctl(eng["unit"], "enable", timeout=30)
+    code, out = set_model(slot_id, pack, native, force=force, extra_free=(lv, lr))
+    if code == 200:
+        return code, {**out, "engine": "strata", "switched_engine": True}
+    # 換回 llama.cpp
+    sysctl(eng["unit"], "stop")
+    sysctl(eng["unit"], "disable", timeout=30)
+    save_json(eng["config"], sold)
+    put(old)
+    if l_enabled:
+        sysctl(lunit, "enable", timeout=30)
+    sysctl(lunit, "reset-failed", timeout=20)
+    sysctl(lunit, "restart")
+    back_ok, _ = wait_healthy(old, seconds=900)
+    out = dict(out)
+    out["error"] = (out.get("error") or "切回 Strata 失敗") + "；已換回原本的 llama.cpp 模型" + ("" if back_ok else "，但它還沒起來，請查記錄")
+    out["reverted"] = True
+    out["restored_ok"] = back_ok
+    return code, out
+
+
+def library():
+    """這台的模型庫：Strata 家族＋GGUF 存放區、磁碟剩多少、哪些正在被欄位使用、下載中的工作。"""
+    reg = registry()
+    # 先讀下載狀態再掃存放區：反過來的話，下載剛好在兩步之間完成，會回「已完成」但清單裡還沒有它
+    jobs = downloads_list()
+    root, ggufs, problems = scan_gguf(reg)
+    in_use = {}
+    for sl in reg["slots"]:
+        c = slot_config(sl) or {}
+        if c.get("_native"):
+            in_use[os.path.abspath(c["_native"])] = sl["id"]
+        for e in (sl.get("engines") or {}).values():
+            ec = strata_config(e.get("config")) if e.get("config") else None
+            if ec and ec.get("_native"):
+                in_use.setdefault(os.path.abspath(ec["_native"]), sl["id"] + "（停用中的 Strata）")
+    for m in ggufs:
+        m["in_use"] = in_use.get(os.path.abspath(m["path"]))
+    strata = []
+    sslot = next((s for s in reg["slots"] if s.get("kind") == "strata" or (s.get("engines") or {}).get("strata")), None)
+    if sslot:
+        probe = dict(sslot)
+        if probe.get("kind") != "strata":
+            probe.update(kind="strata", **probe["engines"]["strata"])
+        cat = catalog_for(probe, reg)
+        for m in cat.get("models", []):
+            strata.append({"engine": "strata", "id": m["id"], "name": pretty_model(m["native"])[0],
+                           "quant": pretty_model(m["native"])[1], "folder": m["name"], "size_gib": m["size_gib"],
+                           "ready": m["ready"], "in_use": in_use.get(os.path.abspath(m["native"])),
+                           "cn_origin": True, "arch": "qwen3.8-flash-next"})
+    os.makedirs(root, exist_ok=True)
+    du = os.statvfs(root)
+    return {"root": root, "free_gib": round(du.f_bavail * du.f_frsize / GIB, 1),
+            "total_gib": round(du.f_blocks * du.f_frsize / GIB, 1),
+            "gguf": ggufs, "strata": strata, "problems": problems,
+            "llama_server": llama_server_exe(reg), "downloads": jobs}
+
+
+# ---- 下載（Hugging Face）
+
+_DL = {}
+_DL_LOCK = threading.Lock()
+
+
+def _dl_save():
+    with _DL_LOCK:
+        rows = [{k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()]
+    save_json(DOWNLOADS_FILE, rows[-50:])
+
+
+def downloads_list():
+    if not _DL:
+        for j in load_json(DOWNLOADS_FILE, []) or []:
+            if j.get("state") in ("running", "queued"):
+                j["state"] = "interrupted"                 # 代理重啟過；.part 還在，重新下載會接續
+            _DL[j["id"]] = j
+    with _DL_LOCK:
+        return sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
+                      key=lambda j: -j["created"])[:20]
+
+
+def _hf_get(url, token="", rng=None, timeout=30):
+    h = {"User-Agent": "xconsole-agent"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    if rng:
+        h["Range"] = f"bytes={rng}-"
+    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout)
+
+
+def hf_files(repo, token=""):
+    """列出 Hugging Face 上這個 repo 的 GGUF，依量化分組，並估每組放不放得下。"""
+    if not HF_REPO_RX.fullmatch(repo or ""):
+        return 400, {"error": "名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF"}
+    try:
+        with _hf_get(f"{HF_BASE}/api/models/{repo}/tree/main?recursive=true", token) as resp:
+            tree = json.load(resp)
+    except urllib.error.HTTPError as exc:
+        msg = {401: "要登入才看得到（請貼 Hugging Face 權杖）", 403: "要先到 Hugging Face 頁面同意授權條款",
+               404: "找不到這個 repo"}.get(exc.code, f"Hugging Face 回 {exc.code}")
+        return 400, {"error": msg}
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"連不到 Hugging Face：{str(exc)[:120]}"}
+    files = [{"path": x["path"], "size": (x.get("lfs") or {}).get("size") or x.get("size") or 0}
+             for x in tree if x.get("type") == "file" and x["path"].endswith(".gguf")]
+    groups, mmproj = {}, []
+    for f in files:
+        base = os.path.basename(f["path"])
+        if base.lower().startswith("mmproj"):
+            mmproj.append(f)
+            continue
+        stem = SHARD_RX.sub("", base[:-5])
+        g = groups.setdefault(f"{os.path.dirname(f['path'])}|{stem}", {"stem": stem, "files": [], "size": 0})
+        g["files"].append(f["path"])
+        g["size"] += f["size"]
+    reg = registry()
+    du = os.statvfs(gguf_root(reg)) if os.path.isdir(gguf_root(reg)) else None
+    free = round(du.f_bavail * du.f_frsize / GIB, 1) if du else None
+    out = []
+    for g in groups.values():
+        name, quant = pretty_model(g["stem"] + ".gguf")
+        gib = round(g["size"] / GIB, 1)
+        sub = os.path.dirname(g["files"][0])
+        # 推測解碼用的 MTP 草稿頭、放在子資料夾的檔案不是主模型：標出來、排到最後（實際踩到：0.1 GiB 的 MTP
+        # 檔排在清單第一列，看起來像最小的量化）
+        aux = "mtp" in g["stem"].lower() or (bool(sub) and not SHARD_RX.search(os.path.basename(g["files"][0])[:-5]))
+        out.append({"stem": g["stem"], "name": name, "quant": quant, "files": sorted(g["files"]), "dir": sub,
+                    "aux": aux, "size_gib": gib, "fits_disk": free is None or gib + 10 < free,
+                    "cn_origin": any(c in f"{repo} {name}".lower() for c in CN_ORIGIN)})
+    out.sort(key=lambda c: (c["aux"], c["size_gib"]))
+    return 200, {"repo": repo, "choices": out, "mmproj": sorted(x["path"] for x in mmproj), "free_gib": free}
+
+
+def start_download(repo, stem, mmproj=None, token=""):
+    code, info = hf_files(repo, token)
+    if code != 200:
+        return code, info
+    pick = next((c for c in info["choices"] if c["stem"] == stem and not c["aux"]), None) \
+        or next((c for c in info["choices"] if c["stem"] == stem), None)
+    if not pick:
+        return 400, {"error": "這個量化不在這個 repo 的檔案清單內"}
+    if mmproj and mmproj not in info["mmproj"]:
+        return 400, {"error": "這個 mmproj 不在這個 repo 的檔案清單內"}
+    if not pick["fits_disk"]:
+        return 400, {"error": f"磁碟不夠：要 {pick['size_gib']} GiB，存放區只剩 {info['free_gib']} GiB（另需保留 10 GiB）"}
+    folder = _slug(repo.split("/", 1)[1].removesuffix("-GGUF").removesuffix("-gguf"))
+    dest = os.path.join(gguf_root(), folder)
+    os.makedirs(dest, exist_ok=True)
+    with _DL_LOCK:
+        if any(j["state"] in ("running", "queued") for j in _DL.values()):
+            return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
+        jid = secrets.token_hex(4)
+        files = pick["files"] + ([mmproj] if mmproj else [])
+        _DL[jid] = {"id": jid, "repo": repo, "stem": stem, "folder": folder, "files": files,
+                    "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
+                    "_token": token, "_cancel": False}
+    threading.Thread(target=_download_job, args=(jid, dest), daemon=True).start()
+    return 200, {"ok": True, "id": jid, "folder": folder, "size_gib": pick["size_gib"]}
+
+
+def _download_job(jid, dest):
+    j = _DL[jid]
+    j["state"] = "running"
+    _dl_save()
+    try:
+        sizes = {}
+        for f in j["files"]:
+            with _hf_get(f"{HF_BASE}/{j['repo']}/resolve/main/{f}", j["_token"], timeout=60) as resp:
+                sizes[f] = int(resp.headers.get("Content-Length") or 0)
+        j["total"] = sum(sizes.values())
+        done_before = 0
+        for f in j["files"]:
+            out = os.path.join(dest, os.path.basename(f))
+            if os.path.exists(out) and os.path.getsize(out) == sizes[f]:
+                done_before += sizes[f]
+                j["done"] = done_before
+                continue
+            part = out + ".part"
+            have = os.path.getsize(part) if os.path.exists(part) else 0
+            with _hf_get(f"{HF_BASE}/{j['repo']}/resolve/main/{f}", j["_token"],
+                         rng=have if have else None, timeout=60) as resp:
+                mode = "ab" if have and resp.status == 206 else "wb"
+                if mode == "wb":
+                    have = 0
+                with open(part, mode) as fh:
+                    last = 0
+                    while True:
+                        if j["_cancel"]:
+                            raise InterruptedError("已取消")
+                        chunk = resp.read(8 * 1024 * 1024)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        have += len(chunk)
+                        j["done"] = done_before + have
+                        if time.time() - last > 5:
+                            _dl_save()
+                            last = time.time()
+            if os.path.getsize(part) != sizes[f]:
+                raise IOError(f"{os.path.basename(f)} 大小不對（{os.path.getsize(part)}／{sizes[f]}），可能連線中斷，重新下載會接續")
+            os.replace(part, out)
+            done_before += sizes[f]
+        j["state"] = "done"
+    except InterruptedError as exc:
+        j["state"], j["error"] = "cancelled", str(exc)
+    except Exception as exc:  # noqa: BLE001
+        j["state"], j["error"] = "failed", str(exc)[:240]
+    finally:
+        j["_token"] = ""                                   # 權杖只在下載期間放在記憶體
+        j["finished"] = int(time.time())
+        _dl_save()
+
+
+def cancel_download(jid):
+    j = _DL.get(jid)
+    if not j:
+        return 404, {"error": "沒有這個下載"}
+    j["_cancel"] = True
+    return 200, {"ok": True}
+
+
+def delete_model(model_id):
+    """刪除存放區裡的一顆 GGUF（不可復原）。有欄位正在用、或是 Strata 家族，都不准從這裡刪。"""
+    reg = registry()
+    _, models, problems = scan_gguf(reg)
+    m = next((x for x in models if x["id"] == model_id), None)
+    broken = next((p for p in problems if p["name"] == model_id), None)
+    if not m and not broken:
+        return 404, {"error": "存放區沒有這顆"}
+    lib = library()
+    if m and next((x for x in lib["gguf"] if x["id"] == model_id), {}).get("in_use"):
+        return 409, {"error": "有欄位正在使用這顆，先換成別的模型再刪"}
+    folder, stem = model_id.split("/", 1)
+    root = gguf_root(reg)
+    full = os.path.realpath(os.path.join(root, folder))
+    if os.path.dirname(full) != os.path.realpath(root):
+        return 400, {"error": "路徑不在存放區內"}
+    removed, freed = [], 0
+    for f in os.listdir(full):
+        base = f[:-5] if f.endswith(".gguf") else f[:-10] if f.endswith(".gguf.part") else None
+        if base is not None and SHARD_RX.sub("", base) == stem:
+            p = os.path.join(full, f)
+            freed += os.path.getsize(p)
+            os.remove(p)
+            removed.append(f)
+    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not f.lower().startswith("mmproj")]
+    if not rest:
+        for f in os.listdir(full):
+            if f.lower().startswith("mmproj"):
+                freed += os.path.getsize(os.path.join(full, f))
+                os.remove(os.path.join(full, f))
+                removed.append(f)
+        if not os.listdir(full):
+            os.rmdir(full)
+    return 200, {"ok": True, "removed": removed, "freed_gib": round(freed / GIB, 1)}
 
 
 # ---------------------------------------------------------------- 准入控制
@@ -1247,7 +2143,7 @@ def pools(reg, hw):
     return out
 
 
-def admit(slot_id, reg=None, hw=None):
+def admit(slot_id, reg=None, hw=None, extra_free=None):
     """這台還塞不塞得下這個欄位的模型。用「載下去之後最壞剩多少」判斷，不是「現在剩多少」。"""
     reg = reg or registry()
     hw = hw if hw is not None else hardware()
@@ -1275,6 +2171,10 @@ def admit(slot_id, reg=None, hw=None):
     if self_state and self_state["busy"]:
         reclaim_vram = float(self_state["vram_gib"] or 0)
         reclaim_ram = float(self_state["ram_gib"] or 0)
+    if extra_free:
+        # 跨引擎切換：舊引擎是另一個服務，切換時會先停掉，它占的量也算回可用
+        reclaim_vram += float(extra_free[0] or 0)
+        reclaim_ram += float(extra_free[1] or 0)
 
     reasons, warnings, kv_note = [], [], None
     kv = kv_worst_gib(cfg)
@@ -1412,6 +2312,9 @@ def do_profile(name, force=False):
         slot = next((s for s in reg["slots"] if s["id"] == change["slot"]), None)
         if not slot or not slot.get("config"):
             errors.append(f"{change['slot']} 沒有可改的設定檔")
+            continue
+        if slot.get("kind") != "strata":
+            errors.append(f"{change['slot']} 現在跑的是 llama.cpp，情境裡的參數是給 Strata 的，這一項略過")
             continue
         cfg = load_json(slot["config"], None)
         if cfg is None:
@@ -1642,6 +2545,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body)
         if path == "/counters":
             return self._send(200, counters())
+        if path == "/library":
+            return self._send(200, library())
         m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
         if m:
             code, out = api_info(m.group(1))
@@ -1676,9 +2581,25 @@ class Handler(BaseHTTPRequestHandler):
                                     "est": (registry().get("model_est") or {}).get(nm)})
         m = re.fullmatch(r"/slot/([\w.-]+)/model", path)
         if m:
-            code, out = set_model(m.group(1), body.get("pack") or "",
-                                  body.get("native") or "", force=force)
+            sid = m.group(1)
+            cur = _slot(sid) or {}
+            if body.get("engine") == "llama":
+                code, out = set_llama_model(sid, str(body.get("model") or ""), body.get("ctx"), force=force)
+            elif cur.get("kind") == "llama":
+                code, out = back_to_strata(sid, body.get("pack") or "", body.get("native") or "", force=force)
+            else:
+                code, out = set_model(sid, body.get("pack") or "", body.get("native") or "", force=force)
             return self._send(code, out)
+        if path == "/library/hf":
+            return self._send(*hf_files(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+        if path == "/library/download":
+            return self._send(*start_download(str(body.get("repo") or "").strip(), str(body.get("stem") or ""),
+                                              body.get("mmproj") or None, str(body.get("token") or "")))
+        m = re.fullmatch(r"/library/download/([0-9a-f]{8})/cancel", path)
+        if m:
+            return self._send(*cancel_download(m.group(1)))
+        if path == "/library/delete":
+            return self._send(*delete_model(str(body.get("id") or "")))
         m = re.fullmatch(r"/apiinfo/([\w.-]+)/settings", path)
         if m:
             code, out = api_settings(m.group(1), body, force=force)
@@ -1713,4 +2634,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3 and sys.argv[1] == "--launch-llama":
+        launch_llama(sys.argv[2])
+    else:
+        main()

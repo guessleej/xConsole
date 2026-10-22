@@ -41,6 +41,8 @@ jobs:
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）
         run: python test/test_api_integration.py
+      - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
+        run: python test/test_llama_engine.py
 
   # ── 1. SAST ────────────────────────────────────────────────
   codeql:

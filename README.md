@@ -116,41 +116,34 @@ bash deploy_console.sh 27 26 27 <別名>  # 重新組 fleet.json 把它串進來
 }
 ```
 
-### 換模型（使用者自己在網頁上換）
+### 換模型的方法（任何模型都照這四步）
 
-欄位卡上的「換模型」按鈕會掃這台裝了哪些模型讓人挑，不需要 SSH、不需要改設定檔。
-Strata 一顆模型是 **pack（含 tokenizer）＋ 權重檔** 兩件成套的，少一邊就起不來，
-所以清單只列配得起來的組合；配不起來的（只有 pack、或缺 tokenizer）另外列出來並寫明缺什麼。
+xConsole 管兩種引擎：**Strata 只跑 Qwen3.8-Flash-Next 這一家**（原版、Coder、Swift、Unsloth 各量化），
+**其他模型（Gemma、gpt-oss、Llama…）一律走 llama.cpp**。兩種在畫面上是同一個「換模型」，使用者不用知道差別。
 
-**換模型換的是「一整份設定」，不是兩個路徑。** 每顆模型的 `--ple-gguf`、`--expert-profile`、
-`--expert-cache` 都不一樣（Coder 有自己的 `expert-profile-coder.bin`），只換 `--pack` 與 `--native`
-會讓專家剖析檔還指著舊模型，**引擎三秒就崩**（實際踩到）。所以清單只提供有 `strata-<名稱>.json`
-的模型，換的時候以那份為底，只覆寫「跟這台機器有關、跟模型無關」的項目：
-`exe`（我們自編的 build-145）、`lib_dirs`（系統 ROCm；setup 會寫成 TheRock 的路徑，
-那條編得動但跑不起來）、`port`、`parallel`。
+| 步驟 | 做法 |
+|---|---|
+| 1. 放哪裡 | GGUF 一律放存放區 `~/models/gguf/<資料夾>/<模型>.gguf`（登錄檔 `machine.gguf_root` 可改到別顆碟）。一顆模型一個資料夾；分片放同一個資料夾；看圖模型把 `mmproj*.gguf` 放同資料夾。同一個資料夾放多個量化，各自算一顆 |
+| 2. 怎麼放進來 | 機器頁第二列的「模型庫」→ 貼 Hugging Face 名稱（例 `unsloth/gemma-4-E4B-it-GGUF`）→ 選量化 → 下載。代理在背景下載、可取消、中斷了再按一次會接續；下載前先檢查磁碟。也可以自己把檔案複製進存放區，下次打開就會掃到 |
+| 3. 怎麼選 | 欄位卡按「換模型」（空欄位按「放入」）。清單同時列 Strata 與 GGUF；GGUF 的記憶體需求直接讀檔頭算（權重＋上下文的 KV，KV 照每層 KV 頭數算，滑動視窗層只算視窗內），放不下的標出來，套用前還會再做一次准入試算 |
+| 4. 怎麼切 | 同一個欄位、同一個埠。跨引擎時舊引擎停掉並取消開機自啟、新引擎接手同一個埠並設成開機自啟，IDE 的網址不用改；金鑰、輸出上限、自己取的模型名稱跟著欄位走。用新設定實際打 `/v1/models`，打不通就整組換回原本的引擎與模型 |
 
-套用順序：備份 → 套用該模型的設定 → **記憶體准入試算** → `reset-failed` → 重啟 →
-**等到那個埠真的回得出模型清單才算成功**，否則還原並重啟。
+換完會自動帶到「API 串接」頁，提示 IDE 要改成哪個模型名稱，按「實測一次」確認。
 
-⚠️ **不可以只看 `systemctl restart` 的回傳值**：`Type=simple` 的 unit 只要被接受就回 0，
-載模型失敗是幾秒後才退出的——實際踩到過「API 回成功但服務其實已經死了」，自動還原沒觸發。
-還原前也要 `reset-failed`，否則會撞上 systemd 的 `Start request repeated too quickly`。
+模型庫會把中國來源的模型（Qwen、DeepSeek、GLM、Kimi…）標成「政府案不可用」：內部測試可以用，交付政府案的機器不能裝。
 
-准入試算用的是**要換過去那顆**的大小，不是欄位上為舊模型估的數字（踩過：Coder 比現用的小，
-卻因為沿用舊估值被誤擋）。估算優先序：**實測 > 推自現用模型（按權重比例）> 保底估計**，
-載入成功後會自動量一次真值存起來，下次就不用猜。
+**llama.cpp 欄位怎麼跑起來：** 代理為欄位寫一份 `~/.xconsole/engines/<欄位>-llama.json`（0600）與 systemd 服務
+`xc-<欄位>-llama.service`，服務的進入點是 `xconsole_agent.py --launch-llama <設定檔>`，讀設定後 exec 成 llama-server。
+llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`machine.llama_server` 可指定）。固定帶 `--jinja`、`--no-mmap`
+（統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆）；金鑰用 `--api-key-file` 交給它，不放在指令列。
+機器需要額外參數或環境變數就寫在登錄檔 `machine.llama_args`、`machine.llama_env`。
 
-安全上，這支 API **只接受掃描掃得到的 pack／權重組合**，指到任意路徑會被拒絕
-（實測 `{"pack":"/etc","native":"/etc/passwd"}` 回「這個組合不在本機掃到的模型清單內」）。
+**Strata 家族的模型**照舊由 Strata 的 `setup.sh --setup --family <名稱> --model <量化>` 安裝，會產生
+`<model_root>/packs/<名稱>/`（含 tokenizer）、`<model_root>/models/<名稱>/*.gguf` 與 `strata-<名稱>.json`，三樣齊了才列入清單。
+換 Strata 模型換的是**一整份設定**，不是 `--pack`／`--native` 兩個路徑：以 `strata-<名稱>.json` 為底，
+只覆寫跟機器有關的 `exe`、`lib_dirs`、`port`、`parallel`、`host`，以及跟著欄位走的 `api_key`、`max_tokens`。
 
-要讓它有東西可換，把新模型放成這個樣子即可，不必改任何程式：
-
-```
-<model_root>/packs/<名稱>/tokenizer     ← pack，含 tokenizer
-<model_root>/models/<名稱>/*.gguf       ← 權重，可多分片
-```
-
-兩邊的 `<名稱>` 忽略大小寫與符號後要能對上（例 `unsloth-ud-iq4_xs` ↔ `unsloth-UD-IQ4_XS`）。
+安全上，換模型與刪除只接受掃描清單內的模型，下載只接受 Hugging Face 檔案清單內的檔名；Hugging Face 權杖只在下載期間放在記憶體，不寫任何紀錄。
 
 ### 加一個情境
 
@@ -204,7 +197,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 - 主控台只提供 HTTPS；用 `http://` 打到同埠會被 308 轉走。只開 TLS 1.2／1.3。
 - **主控台連各機代理也走 HTTPS**。各機代理第一次啟動自產憑證，`deploy_console.sh` 經 SSH 取回當作信任依據；
   代理送出的憑證跟當初信任的不同就拒絕連線，不會退回明文或關掉驗證。代理重裝後重跑 `deploy_console.sh`，或在「設定 → 機器」匯入新憑證。
-- 各機代理權杖存在該機 `~/.xconsole/token`（0600），只有主控台伺服器讀得到；瀏覽器只拿 HMAC 簽章的登入票證，`/api/nodes` 已過濾掉 token 欄位。
+- 各機代理權杖存在該機 `~/.xconsole/token`（0600）；主控台端以 AES-256-GCM 加密存在 `fleet.json`（啟動時自動把明文遷移成密文）。瀏覽器拿不到任何代理權杖。
+- 登入票證記在伺服器端（資料庫只存雜湊），登出、換密碼即作廢；同一來源 15 分鐘錯 5 次即擋（429）。POST 只收 `application/json`，跨站表單送不出來。
 - 登入密碼以 PBKDF2-SHA256（200,000 輪）加鹽雜湊後存檔，不存明文；帳號與密碼都算一遍才比對，錯誤時固定延遲一秒。
 - 待配對 CSR 的私鑰以 AES-256-GCM 加密落地（`enc:v1:` 前綴），主金鑰檔 0600。
 - 所有操作寫入稽核紀錄（誰、何時、從哪裡、做了什麼、結果）。寫入前一律經過集中的 `redact()`：密碼、私鑰、權杖、PFX 一律遮罩，憑證只記指紋。
@@ -221,6 +215,12 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
 | `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
+| `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
+| `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |
+| `test/test_llama_engine.py` | 有 systemd --user | 31 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |
+| `test/smoke_real_llama.py` | 有 llama.cpp 的機器 | 13 | 真的 Hugging Face＋真的 llama-server 跑一次（100 MB 小模型，跑完刪掉） |
+
+以上除了最後一支，每次 PR 都在 GitHub Actions 重跑（`.github/workflows/security.yml`），另有 CodeQL、gitleaks、pip-audit、SBOM＋grype、ZAP 五道掃描；`main` 有分支保護，全綠才能合。
 
 交付前另外要跑：`check-https.sh`、`check-usage-report.sh`、`audit-secrets.sh`（三支都在對應的 skill 裡）。
 
@@ -273,3 +273,9 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | 手機版整頁被撐寬 | 憑證指紋這種冒號串沒有斷行點。數值加 `overflow-wrap: anywhere` |
 | 自動更新時正在填的表單蒸發 | 畫面每 15 秒重畫。設定頁與記錄頁不參與自動重畫 |
 | `declare: -A: invalid option` | macOS 內建 bash 是 3.2，不支援關聯陣列。用 `case` |
+| 登出後在同一條連線上仍是登入狀態（反過來，登入後第一個請求被當成未登入） | `BaseHTTPRequestHandler` 在 keep-alive 連線上用同一個物件處理多個請求，身分快取會被下一個請求沿用。每個請求開始時清掉 |
+| 壞掉的模型讓換模型等了十幾分鐘才還原 | 設了 `Restart=` 的服務一退出就進 `auto-restart`，狀態仍是 `activating`；只看 `failed` 會白等到逾時。要看 SubState |
+| 開了金鑰之後每次重啟都被判成起不來 | 不帶金鑰打 `/v1/models` 回 401；健康檢查要把 401 視為服務活著 |
+| llama.cpp 開了金鑰，「沒帶金鑰要被擋」卻驗不出來 | llama.cpp 的 `/v1/models` 本來就公開。要用 POST 對話端點測 |
+| 下載完成了，模型庫卻沒有它 | 先掃存放區、後讀下載狀態，下載剛好在兩步之間完成。先讀狀態再掃 |
+| Hugging Face 清單第一列是 0.1 GiB 的「Q8_0」 | 那是 `MTP/` 子資料夾裡推測解碼用的草稿頭，不是主模型。輔助檔要標出來、排到最後 |
