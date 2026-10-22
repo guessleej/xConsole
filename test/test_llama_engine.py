@@ -254,8 +254,12 @@ def main():
         check("  本機實測（模型清單、沒帶金鑰被擋、對話、工具呼叫）全過", st == 200 and t.get("ok"), t.get("checks"))
 
         # ---- 4. 換到壞掉的 GGUF：整組還原
+        subprocess.run(["systemctl", "--user", "disable", lunit], capture_output=True)   # 原本沒設開機自啟
         st, d3 = ag("POST", f"/slot/{SLOT}/model", {"engine": "llama", "model": "broken/broken-Q4_K_M", "force": True})
         check("換到起不來的模型 → 500 並自動換回", st == 500 and d3.get("reverted") and d3.get("restored_ok"), d3)
+        check("  同一個服務還原後，開機自啟照原本的狀態（沒被試的時候打開）", enabled(lunit) != "enabled" and active(lunit) == "active",
+              (enabled(lunit), active(lunit)))
+        subprocess.run(["systemctl", "--user", "enable", lunit], capture_output=True)
         sc, body = plain("GET", "/v1/models")
         check("  換回後名稱、金鑰都還是原本的", b"gemma-coder" in body
               and plain("POST", "/v1/chat/completions", key, {"model": "gemma-coder", "messages": [{"role": "user", "content": "hi"}]})[0] == 200, body[:120])
@@ -292,23 +296,31 @@ def main():
                 break
             time.sleep(0.2)
         check("  下載完成、大小正確", job.get("state") == "done" and job.get("done") == job.get("total"), job)
-        tm = next((m for m in lib["gguf"] if m["id"] == "tiny/tiny-Q4_K_M"), {})
+        tm = next((m for m in lib["gguf"] if m["id"] == "acme--tiny/tiny-Q4_K_M"), {})
         check("  下載完自動出現在模型庫，帶 mmproj（可看圖）", tm.get("vision") is True, tm)
         dump = json.dumps(lib) + open(os.path.join(ahome, ".xconsole", "downloads.json")).read()
         check("  Hugging Face 權杖不留在任何紀錄", "hf_secret_for_test" not in dump)
 
         # ---- 7. 空欄位直接放一顆 GGUF（自動配埠）
-        st, d5 = ag("POST", f"/slot/{SLOT2}/model", {"engine": "llama", "model": "tiny/tiny-Q4_K_M", "force": True})
+        st, d5 = ag("POST", f"/slot/{SLOT2}/model", {"engine": "llama", "model": "acme--tiny/tiny-Q4_K_M", "force": True})
         check("空欄位放入 GGUF：自動配一個沒人用的埠並啟動", st == 200 and d5.get("port") and d5["port"] != llm_port
               and active(f"xc-{SLOT2}-llama.service") == "active", d5)
 
         # ---- 8. 刪除
-        st, e = ag("POST", "/library/delete", {"id": "tiny/tiny-Q4_K_M"})
+        st, e = ag("POST", "/library/delete", {"id": "acme--tiny/tiny-Q4_K_M"})
         check("有欄位正在用的模型不能刪", st == 409, e)
         st, e = ag("POST", "/library/delete", {"id": "../../etc/passwd"})
         check("刪除路徑穿越 → 擋下", st in (400, 404), e)
         st, e = ag("POST", "/library/delete", {"id": "qwen-x/qwen-x-Q4_K_M"})
         check("刪除沒在用的模型：檔案與空資料夾一起移除", st == 200 and not os.path.exists(os.path.join(groot, "qwen-x")), e)
+
+        # ---- 9. 能力標籤跟著模型走
+        def caps(sid):
+            return next(s for s in ag("GET", "/state")[1]["slots"] if s["id"] == sid)["caps"]
+        had = "看圖" in caps(SLOT2)
+        st, _ = ag("POST", f"/slot/{SLOT2}/model", {"engine": "llama", "model": "gemma-test/gemma-test-Q4_K_M", "force": True})
+        check("換到沒有 mmproj 的模型：「看圖」標籤拿掉", had and st == 200 and "看圖" not in caps(SLOT2), caps(SLOT2))
+        check("下載資料夾帶作者名稱（不同作者的同名 repo 不會互相蓋掉）", os.path.isdir(os.path.join(groot, "acme--tiny")))
     finally:
         agent.terminate()
         agent.wait(timeout=10)

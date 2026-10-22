@@ -419,7 +419,8 @@ async function openSwap(node, s) {
       ctxRow.hidden = engine !== "llama";
       if (engine === "llama") {
         ctxIn.value = m.ctx_default;
-        const kvAt = (c) => ((m.kv_full_bpt || 0) * c + (m.kv_swa_bpt || 0) * Math.min(c, m.swa_window || c)) / 1073741824;
+        const par = m.parallel || 1;   // 滑動視窗每條序列各留一個視窗，所以兩部分都乘並行數
+        const kvAt = (c) => ((m.kv_full_bpt || 0) * c + (m.kv_swa_bpt || 0) * Math.min(c, m.swa_window || c)) * par / 1073741824;
         const upd = () => {
           const c = Number(ctxIn.value) || m.ctx_default;
           ctxHint.textContent = `這顆最多 ${int(m.ctx_train)}；上下文 ${int(c)} 時 KV 約 ${fmt(kvAt(c))} GiB，`

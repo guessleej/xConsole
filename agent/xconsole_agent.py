@@ -708,7 +708,7 @@ def catalog(slot_id=None):
     for m in ggufs:
         ctx = min(ctx_default, m["ctx_train"]) if m.get("ctx_train") else ctx_default
         est = llama_est(m, reg["machine"], ctx, par)
-        m.update(est_vram_gib=est["vram"], est_ram_gib=est["ram"], est_kv_gib=est["kv"], ctx_default=ctx,
+        m.update(est_vram_gib=est["vram"], est_ram_gib=est["ram"], est_kv_gib=est["kv"], ctx_default=ctx, parallel=par,
                  fits_total=bool(cap) and est["vram"] + est["kv"] < cap,
                  current=bool(slot and slot.get("kind") == "llama" and os.path.abspath(cur.get("_native") or "") == os.path.abspath(m["path"])))
     out.update(gguf=ggufs, gguf_problems=problems, gguf_root=root,
@@ -1510,9 +1510,10 @@ def llama_est(m, machine, ctx, parallel=1):
 
 
 def llama_kv_gib(prof, ctx, parallel=1):
-    tokens = ctx * parallel
-    swa_tokens = min(tokens, prof.get("swa_window") or tokens)
-    return (prof.get("kv_full_bpt", 0) * tokens + prof.get("kv_swa_bpt", 0) * swa_tokens) / GIB
+    """全注意力層：上下文 × 並行；滑動視窗層：每條序列各自留一個視窗，所以是 min(上下文, 視窗) × 並行。"""
+    swa = prof.get("swa_window") or ctx
+    return (prof.get("kv_full_bpt", 0) * ctx * parallel
+            + prof.get("kv_swa_bpt", 0) * min(ctx, swa) * parallel) / GIB
 
 
 def llama_server_exe(reg=None):
@@ -1541,9 +1542,8 @@ def llama_config(path):
     prof = _profile_cached(raw.get("model", "")) or {}
     par = int(raw.get("parallel", 1) or 1)
     ctx = int(raw.get("ctx", 4096) or 4096)
-    # kv_worst 用「每 token 位元組 × 上下文 × 並行」：滑動視窗層折算成平均每 token 的位元組
-    tokens = ctx * par
-    per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or tokens) / tokens)) if prof else None
+    # kv_worst 用「每 token 位元組 × 上下文 × 並行」：滑動視窗層折算成「每條序列」平均每 token 的位元組
+    per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or ctx) / ctx)) if prof else None
     return {"max_context": ctx, "kv": "f16", "kv_grow": False, "parallel": par,
             "expert_cache": None, "resident_budget_gib": 0.0, "fit_max_tokens": False,
             "port": raw.get("port"), "model_name": raw.get("alias"), "exe": raw.get("exe"),
@@ -1665,21 +1665,6 @@ def _alive(slot):
     return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
 
 
-def _usage_of(slot_id):
-    """這個欄位現在實際吃多少（切換時要先加回可用量，否則會被自己擋住）。"""
-    reg = registry()
-    hw = hardware()
-    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
-    if not slot or not slot.get("unit"):
-        return 0.0, 0.0
-    for sl in reg["slots"]:
-        sl["_busy_cache"] = _alive(sl)
-    st = slot_state(slot, reg, hw)
-    if not st["busy"]:
-        return 0.0, 0.0
-    return float(st["vram_gib"] or 0), float(st["ram_gib"] or 0)
-
-
 def set_llama_model(slot_id, model_id, ctx=None, force=False):
     """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。"""
     reg = registry()
@@ -1749,13 +1734,20 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
 
     put({**old, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
          "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
-         "caps": sorted(set((old.get("caps") or []) + ["文字"] + (["看圖"] if m.get("vision") else []))),
+         # 跟模型有關的能力（看圖）每次依新模型重算，不沿用上一顆的
+         "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
          "model": m["name"], "quant": m.get("quant")})
 
     def undo(msg, code=500, extra=None):
         if old_unit != unit:
             sysctl(unit, "stop")
             sysctl(unit, "disable", timeout=30)
+        else:
+            # 同一個服務：試的時候強制 enable 並重啟過，要照原本的狀態還原，不能一律留著開
+            if not old_enabled:
+                sysctl(unit, "disable", timeout=30)
+            if not old_alive:
+                sysctl(unit, "stop")
         if prev_llama_raw is not None:
             save_json(cfg_path, prev_llama_raw)
         if prev_key is not None:
@@ -1773,11 +1765,10 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
                       + ("" if back_ok else "，但原本的服務還沒起來，請查記錄"),
                       "reverted": True, "restored_ok": back_ok, **(extra or {})}
 
-    vr, rr = _usage_of(slot_id) if old_unit == unit else (0.0, 0.0)
-    ov, orr = (0.0, 0.0)
-    if old_unit and old_unit != unit and old_alive:
-        ov, orr = _usage_reclaim(old)
-    verdict = admit(slot_id, extra_free=(ov + vr, orr + rr))
+    # 同一個服務（GGUF 換 GGUF）：admit 看得到這個服務開著，會自己把它占的量算回，這裡不能再加一次。
+    # 跨引擎：舊服務是另一個 unit，admit 看不到，要另外算回
+    ov, orr = _usage_reclaim(old) if old_unit and old_unit != unit and old_alive else (0.0, 0.0)
+    verdict = admit(slot_id, extra_free=(ov, orr))
     if not verdict["allow"] and not force:
         return undo("記憶體不夠", 409, {"admit": verdict})
 
@@ -1846,7 +1837,8 @@ def back_to_strata(slot_id, pack, native, force=False):
                 sl.update(fields)
         save_json(REGISTRY, r)
 
-    put({**old, "kind": "strata", "unit": eng["unit"], "config": eng["config"]})
+    put({**old, "kind": "strata", "unit": eng["unit"], "config": eng["config"],
+         "caps": sorted(set(old.get("caps") or []) - {"看圖"})})      # Strata 這一家目前只有文字
     # Strata 設定檔要帶上欄位目前的金鑰與輸出上限（set_model 會沿用設定檔裡的這兩項）
     sraw = load_json(eng["config"], {}) or {}
     sold = dict(sraw)
@@ -1856,6 +1848,8 @@ def back_to_strata(slot_id, pack, native, force=False):
         sraw.pop("api_key", None)
     if mt:
         sraw["max_tokens"] = mt
+    else:
+        sraw.pop("max_tokens", None)          # 使用者在 llama.cpp 那邊清掉了上限，不要讓 Strata 的舊值復活
     save_json(eng["config"], sraw)
     os.chmod(eng["config"], 0o600)
     sysctl(lunit, "stop")
@@ -2000,7 +1994,8 @@ def hf_files(repo, token=""):
                     "aux": aux, "size_gib": gib, "fits_disk": free is None or gib + 10 < free,
                     "cn_origin": any(c in f"{repo} {name}".lower() for c in CN_ORIGIN)})
     out.sort(key=lambda c: (c["aux"], c["size_gib"]))
-    return 200, {"repo": repo, "choices": out, "mmproj": sorted(x["path"] for x in mmproj), "free_gib": free}
+    return 200, {"repo": repo, "choices": out, "mmproj": sorted(x["path"] for x in mmproj), "free_gib": free,
+                 "mmproj_sizes": {x["path"]: round(x["size"] / GIB, 2) for x in mmproj}}
 
 
 def start_download(repo, stem, mmproj=None, token=""):
@@ -2013,9 +2008,12 @@ def start_download(repo, stem, mmproj=None, token=""):
         return 400, {"error": "這個量化不在這個 repo 的檔案清單內"}
     if mmproj and mmproj not in info["mmproj"]:
         return 400, {"error": "這個 mmproj 不在這個 repo 的檔案清單內"}
-    if not pick["fits_disk"]:
-        return 400, {"error": f"磁碟不夠：要 {pick['size_gib']} GiB，存放區只剩 {info['free_gib']} GiB（另需保留 10 GiB）"}
-    folder = _slug(repo.split("/", 1)[1].removesuffix("-GGUF").removesuffix("-gguf"))
+    need = pick["size_gib"] + (info["mmproj_sizes"].get(mmproj, 0) if mmproj else 0)
+    if info["free_gib"] is not None and need + 10 >= info["free_gib"]:
+        return 400, {"error": f"磁碟不夠：要 {round(need, 1)} GiB，存放區只剩 {info['free_gib']} GiB（另需保留 10 GiB）"}
+    owner, name = repo.split("/", 1)
+    # 資料夾帶作者：alice/model-GGUF 與 bob/model-GGUF 同名檔案不能互相蓋掉或被誤認成已下載
+    folder = _slug(f"{owner}--{name.removesuffix('-GGUF').removesuffix('-gguf')}")
     dest = inside(gguf_root(), folder)
     os.makedirs(dest, exist_ok=True)
     with _DL_LOCK:

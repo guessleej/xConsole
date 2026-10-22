@@ -180,8 +180,10 @@ def network_test(node_id, slot_id, key=""):
     opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx)) if ctx \
         else urllib.request.build_opener(NoRedirect)
 
-    def get(with_key):
-        req = urllib.request.Request(base + "/models", headers={"Authorization": f"Bearer {key}"} if with_key else {})
+    def call(method, path, with_key):
+        h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if with_key else {})}
+        req = urllib.request.Request(base + path, method=method, headers=h,
+                                     data=b"{}" if method == "POST" else None)
         try:
             with opener.open(req, timeout=10) as resp:
                 return resp.status, json.load(resp)
@@ -190,7 +192,7 @@ def network_test(node_id, slot_id, key=""):
         except Exception as exc:  # noqa: BLE001
             return 0, str(exc)[:160]
 
-    st, data = get(bool(key))
+    st, data = call("GET", "/models", bool(key))
     ms = int((time.time() - t0) * 1000)
     ids = [m.get("id") for m in (data or {}).get("data") or []] if isinstance(data, dict) else []
     if 300 <= st < 400:
@@ -199,10 +201,15 @@ def network_test(node_id, slot_id, key=""):
     if st == 0:
         return {"ok": False, "url": base, "ms": ms,
                 "detail": f"從主控台連不到 {base}（{data}）。IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址"}
-    if info["api_key_set"] and not key:
-        return {"ok": st == 401, "url": base, "ms": ms, "partial": True,
-                "detail": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次"
-                if st == 401 else f"設了金鑰，但沒帶金鑰回 {st}"}
+    if info["api_key_set"]:
+        # 驗金鑰一律打需要金鑰的對話端點（送空內容）：llama.cpp 的 /v1/models 本來就公開，拿它驗會誤判
+        auth, _ = call("POST", "/chat/completions", bool(key))
+        if not key:
+            return {"ok": auth == 401, "url": base, "ms": ms, "partial": True,
+                    "detail": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次"
+                    if auth == 401 else f"設了金鑰，但沒帶金鑰打對話端點回 {auth}，沒有被擋"}
+        if auth == 401:
+            return {"ok": False, "url": base, "ms": ms, "detail": "回 401，金鑰不對"}
     if st == 200 and info.get("model_name") in ids:
         return {"ok": True, "url": base, "ms": ms, "detail": f"從主控台連得到，模型清單有 {info['model_name']}"}
     return {"ok": False, "url": base, "ms": ms,
@@ -552,8 +559,9 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key")
                     if k in body}
+            # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
-                                  {**want, "force": bool(body.get("force"))}, timeout=600)
+                                  {**want, "force": bool(body.get("force"))}, timeout=2000)
             # 新金鑰只回給這一次的畫面；稽核只記「換了金鑰」，不記內容
             self._audit("api.settings", f"{m.group(1)}/{m.group(2)}", code == 200,
                         {"changed": out.get("changed"), "public_url": want.get("public_url"),
