@@ -1,35 +1,50 @@
 #!/usr/bin/env python3
 """xConsole 主控台 — 彙整各機節點代理，對人提供一個畫面。
 
-機密處理（照 secret-handling）：
-  各機代理的權杖存在 ~/.xconsole/fleet.json（0600），不走環境變數、不進網址；
-  瀏覽器只拿一個 HMAC 簽章的 session cookie，看不到任何代理權杖。
+機密（照 secret-handling）：
+  各機代理權杖存在 ~/.xconsole/fleet.json（0600），不走環境變數、不進網址；
+  瀏覽器只拿 HMAC 簽章的 session cookie，看不到任何代理權杖；
+  寫稽核前一律經過 store.redact()。
 憑證（照 https-certificate）：
-  第一次啟動沒有正式憑證時自動產生暫用自簽，絕不只開 http。
-  換正式憑證把 cert.pem／key.pem 放進 ~/.xconsole/tls/ 再重啟即可。
+  第一次啟動自動產暫用自簽；管理者在網頁上匯入正式憑證、熱套用、失敗自動還原；
+  連各機代理時用部署時取回的對方憑證驗證，不關驗證。
+服務使用報告（照 service-usage-report）：
+  GET /api/admin/usage-report?days=30，六塊數字全由稽核與取樣算出。
 """
 import base64
+import datetime as dt
 import hashlib
 import hmac
 import json
 import os
 import re
 import secrets
-import ssl
-import subprocess
+import sys
+import threading
 import time
 import urllib.error
 import urllib.request
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import report  # noqa: E402
+import tls  # noqa: E402
+from store import Store, redact  # noqa: E402
 
 HOME = os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME, ".xconsole")
 FLEET = os.path.join(STATE_DIR, "fleet.json")
-TLS_DIR = os.path.join(STATE_DIR, "tls")
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 PORT = int(os.environ.get("XCONSOLE_PORT", "9400"))
 SESSION_HOURS = 12
+SAMPLE_EVERY = 300
+MAX_BODY = 6 * 1024 * 1024
+PBKDF2_ROUNDS = 200_000
+
+os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
+STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
+CERTS = tls.CertManager(STATE_DIR, PORT)
 
 
 def load_json(path, default=None):
@@ -51,6 +66,9 @@ def save_json(path, obj, mode=0o600):
 
 # ---------------------------------------------------------------- 設定
 
+_FLEET_LOCK = threading.Lock()
+
+
 def fleet():
     cfg = load_json(FLEET)
     if cfg is None:
@@ -59,65 +77,101 @@ def fleet():
     cfg.setdefault("session_secret", secrets.token_urlsafe(32))
     cfg.setdefault("auth", {})
     cfg.setdefault("nodes", [])
+    cfg.setdefault("tls", {})
+    cfg.setdefault("report", {})
     return cfg
 
 
-def set_password(password):
-    cfg = fleet()
+def update_fleet(fn):
+    with _FLEET_LOCK:
+        cfg = fleet()
+        fn(cfg)
+        save_json(FLEET, cfg)
+        return cfg
+
+
+def hostnames():
+    """使用者會打的網址。沒設定就只用對外那張網卡的 IP（見 tls.default_hostnames 的說明）。"""
+    h = fleet()["tls"].get("hostnames")
+    return h if h else tls.default_hostnames()
+
+
+# ---------------------------------------------------------------- 帳號
+
+def _hash(password, salt):
+    return base64.b64encode(hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)).decode()
+
+
+def set_credentials(username, password):
     salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
-    cfg["auth"] = {"salt": base64.b64encode(salt).decode(),
-                   "hash": base64.b64encode(digest).decode(), "algo": "pbkdf2-sha256-200k"}
-    save_json(FLEET, cfg)
+
+    def fn(cfg):
+        cfg["auth"] = {"username": username, "salt": base64.b64encode(salt).decode(),
+                       "hash": _hash(password, salt), "algo": "pbkdf2-sha256-200k",
+                       "changed_at": int(time.time())}
+        cfg["session_secret"] = secrets.token_urlsafe(32)   # 換密碼讓既有登入全部失效
+    update_fleet(fn)
 
 
-def check_password(password):
-    cfg = fleet()
-    a = cfg.get("auth") or {}
+def check_credentials(username, password):
+    a = fleet().get("auth") or {}
     if not a.get("hash"):
         return False
-    salt = base64.b64decode(a["salt"])
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
-    return hmac.compare_digest(base64.b64encode(digest).decode(), a["hash"])
+    want_user = a.get("username", "admin")
+    # 帳號與密碼都算一遍再比，免得帳號錯時回得特別快，被拿來猜帳號
+    user_ok = hmac.compare_digest(username.encode(), want_user.encode())
+    pw_ok = hmac.compare_digest(_hash(password, base64.b64decode(a["salt"])), a["hash"])
+    return user_ok and pw_ok
 
 
-def make_session():
+def make_session(user):
     cfg = fleet()
-    exp = int(time.time()) + SESSION_HOURS * 3600
-    payload = f"{exp}"
+    payload = f"{int(time.time()) + SESSION_HOURS * 3600}:{user}"
     sig = hmac.new(cfg["session_secret"].encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}.{sig}"
 
 
-def valid_session(cookie):
+def session_user(cookie):
     if not cookie or "." not in cookie:
-        return False
+        return None
     payload, sig = cookie.rsplit(".", 1)
-    cfg = fleet()
-    want = hmac.new(cfg["session_secret"].encode(), payload.encode(), hashlib.sha256).hexdigest()
+    want = hmac.new(fleet()["session_secret"].encode(), payload.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, want):
-        return False
+        return None
+    exp, _, user = payload.partition(":")
     try:
-        return int(payload) > time.time()
+        expired = int(exp) <= time.time()
     except ValueError:
-        return False
+        return None
+    # ⚠️ 不要寫成 `user or None if 沒過期 else None`：Python 會解析成 user or (None if … else None)，
+    # 過期的票證照樣通過。拆開寫。
+    if expired or not user:
+        return None
+    return user
 
 
 # ---------------------------------------------------------------- 代理呼叫
+
+def trust_file(node_id):
+    return os.path.join(CERTS.p.trust, f"{node_id}.pem")
+
 
 def call_node(node_id, path, method="GET", body=None, timeout=40):
     cfg = fleet()
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
     if not node:
         return 404, {"error": f"沒有這台機器：{node_id}"}
-    url = f"http://{node['host']}:{node.get('agent_port', 9401)}{path}"
+    ctx = tls.client_context(trust_file(node_id))
+    if ctx is None:
+        # 沒有對方憑證就不連：不准退回不驗證或明文 http
+        return 502, {"error": f"還沒信任 {node['name']} 的代理憑證，請重新執行 deploy_console.sh "
+                              f"或在「設定 → 機器」匯入該機憑證", "offline": True, "untrusted": True}
+    url = f"https://{node['host']}:{node.get('agent_port', 9401)}{path}"
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
-        "Authorization": f"Bearer {node['token']}",
-        "Content-Type": "application/json",
-    })
+        "Authorization": f"Bearer {node['token']}", "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             return resp.status, json.load(resp)
     except urllib.error.HTTPError as exc:
         try:
@@ -125,27 +179,47 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
         except Exception:  # noqa: BLE001
             return exc.code, {"error": f"代理回 {exc.code}"}
     except Exception as exc:  # noqa: BLE001
-        return 502, {"error": f"連不上 {node['name']} 的代理：{exc}", "offline": True}
+        msg = str(exc)
+        if "CERTIFICATE_VERIFY_FAILED" in msg or "certificate verify failed" in msg:
+            return 502, {"error": f"{node['name']} 送出的憑證跟當初信任的不同，已拒絕連線（可能是代理重裝，"
+                                  f"或有人冒充）。確認後請重新執行 deploy_console.sh", "offline": True}
+        return 502, {"error": f"連不上 {node['name']} 的代理：{msg}", "offline": True}
 
 
-# ---------------------------------------------------------------- 憑證
+def fleet_state():
+    nodes = []
+    for n in fleet()["nodes"]:
+        code, body = call_node(n["id"], "/state", timeout=30)
+        nodes.append({"id": n["id"], "name": n["name"], "host": n["host"],
+                      "group": n.get("group", "未分類"), "online": code == 200,
+                      "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
+                      "state": body if code == 200 else None})
+    return {"ts": time.time(), "nodes": nodes}
 
-def ensure_tls():
-    """沒有憑證就自己產一張暫用自簽，絕不退回只開 http。"""
-    os.makedirs(TLS_DIR, mode=0o700, exist_ok=True)
-    cert, key = os.path.join(TLS_DIR, "cert.pem"), os.path.join(TLS_DIR, "key.pem")
-    if os.path.exists(cert) and os.path.exists(key):
-        return cert, key, False
-    rc = subprocess.run(
-        ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-         "-keyout", key, "-out", cert, "-days", "825",
-         "-subj", "/C=TW/O=xCloudinfo/CN=xconsole",
-         "-addext", "subjectAltName=DNS:xconsole,DNS:localhost,IP:127.0.0.1"],
-        capture_output=True)
-    if rc.returncode != 0:
-        return None, None, False
-    os.chmod(key, 0o600)
-    return cert, key, True
+
+# ---------------------------------------------------------------- 背景取樣
+
+def sampler():
+    """每 5 分鐘記一筆各機狀態，服務使用報告從這裡算。另外順便檢查憑證到期提醒。"""
+    last_prune = 0
+    while True:
+        try:
+            for n in fleet()["nodes"]:
+                code, st = call_node(n["id"], "/state", timeout=30)
+                c_code, ctr = call_node(n["id"], "/counters", timeout=30) if code == 200 else (0, {})
+                STORE.sample(n["id"], code == 200, st if code == 200 else None,
+                             (ctr or {}).get("slots") if c_code == 200 else None)
+            for tag in CERTS.due_notices():
+                cur = CERTS.current() or {}
+                STORE.audit("系統", "", "tls.expiry_notice", cur.get("subject", ""), True,
+                            {"threshold": tag, "daysLeft": cur.get("daysLeft"),
+                             "validToTaipei": cur.get("validToTaipei")})
+            if time.time() - last_prune > 86400:
+                STORE.prune()
+                last_prune = time.time()
+        except Exception as exc:  # noqa: BLE001
+            print(f"取樣失敗：{exc}", flush=True)
+        time.sleep(SAMPLE_EVERY)
 
 
 # ---------------------------------------------------------------- HTTP
@@ -156,48 +230,48 @@ MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "xconsole/1.0"
+    server_version = "xconsole/1.1"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
         pass
 
-    # -------------------------------------------------- 回應
-
-    def _json(self, code, obj, cookie=None):
-        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    # ---- 回應
+    def _send(self, code, body, ctype, extra=None):
         self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self._sec_headers()
-        if cookie:
-            self.send_header("Set-Cookie", cookie)
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
+
+    def _json(self, code, obj, cookie=None):
+        self._send(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8",
+                   {"Set-Cookie": cookie} if cookie else None)
 
     def _sec_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header(
-            "Content-Security-Policy",
-            "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "script-src 'self'; img-src 'self' data:; connect-src 'self'; "
-            "base-uri 'none'; form-action 'self'")
+        self.send_header("Content-Security-Policy",
+                         "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; "
+                         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'")
+        if CERTS.hsts_header():
+            # 只有正式憑證且管理者開了開關才送：自簽時送 HSTS 會讓使用者連「略過警告」都沒有
+            self.send_header("Strict-Transport-Security", "max-age=31536000")
 
     def _static(self, path):
-        name = "index.html" if path in ("/", "") else path.lstrip("/")
-        if "/" in name or ".." in name:          # 只服務 static 根目錄下的檔案
-            name = os.path.basename(name)
+        name = os.path.basename("index.html" if path in ("/", "") else path)
         full = os.path.join(STATIC, name)
         if not os.path.isfile(full):
             return self._json(404, {"error": "找不到"})
-        ext = os.path.splitext(full)[1]
         with open(full, "rb") as fh:
             body = fh.read()
         self.send_response(200)
-        self.send_header("Content-Type", MIME.get(ext, "application/octet-stream"))
+        self.send_header("Content-Type", MIME.get(os.path.splitext(full)[1], "application/octet-stream"))
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-cache")
         self._sec_headers()
@@ -205,21 +279,24 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         return None
 
-    # -------------------------------------------------- 工具
-
+    # ---- 工具
     def _cookie(self):
-        raw = self.headers.get("Cookie") or ""
-        for part in raw.split(";"):
+        for part in (self.headers.get("Cookie") or "").split(";"):
             k, _, v = part.strip().partition("=")
             if k == "xconsole":
                 return v
         return None
 
-    def _authed(self):
-        return valid_session(self._cookie())
+    @property
+    def user(self):
+        return session_user(self._cookie())
+
+    @property
+    def ip(self):
+        return self.client_address[0] if self.client_address else ""
 
     def _need_auth(self):
-        if self._authed():
+        if self.user:
             return False
         self._json(401, {"error": "請先登入"})
         return True
@@ -227,128 +304,294 @@ class Handler(BaseHTTPRequestHandler):
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if n > MAX_BODY:
+            self.rfile.read(min(n, MAX_BODY))
+            return None
+        try:
             return json.loads(self.rfile.read(n) or b"{}")
         except Exception:  # noqa: BLE001
             return {}
 
-    # -------------------------------------------------- 路由
+    def _audit(self, action, target="", ok=True, detail=None):
+        STORE.audit(self.user or "", self.ip, action, target, ok, detail)
 
+    # ---- GET
     def do_GET(self):  # noqa: N802
-        path = urlparse(self.path).path
+        u = urlparse(self.path)
+        path, q = u.path, parse_qs(u.query)
         if path == "/healthz":
             return self._json(200, {"ok": True, "service": "xconsole"})
+        if path == "/api/health":
+            cur = CERTS.current() or {}
+            return self._json(200, {"ok": True, "service": "xconsole", "tls": {
+                "daysLeft": cur.get("daysLeft"), "validToTaipei": cur.get("validToTaipei"),
+                "source": cur.get("source"), "selfSigned": cur.get("selfSigned")}})
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
             return None
 
         if path == "/api/me":
-            return self._json(200, {"ok": True})
+            cur = CERTS.current() or {}
+            return self._json(200, {"user": self.user, "tls": {
+                "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
+                "validToTaipei": cur.get("validToTaipei"), "selfSigned": cur.get("selfSigned")}})
         if path == "/api/nodes":
-            cfg = fleet()
-            return self._json(200, {"nodes": [
-                {k: v for k, v in n.items() if k != "token"} for n in cfg["nodes"]]})
+            out = []
+            for n in fleet()["nodes"]:
+                tf = trust_file(n["id"])
+                fp = None
+                if os.path.exists(tf):
+                    r, _ = tls.inspect_trusted_ca(open(tf, "rb").read())
+                    fp = (r.get("summary") or {}).get("fingerprint256")
+                out.append({**{k: v for k, v in n.items() if k != "token"},
+                            "trusted": os.path.exists(tf), "trust_fingerprint": fp})
+            return self._json(200, {"nodes": out})
         if path == "/api/fleet":
-            return self._json(200, self._fleet_state())
-        m = re.fullmatch(r"/api/node/([\w.-]+)/state", path)
+            return self._json(200, fleet_state())
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
-            code, body = call_node(m.group(1), "/state")
-            return self._json(code, body)
-        m = re.fullmatch(r"/api/node/([\w.-]+)/logs/([\w.-]+)", path)
+            return self._json(*call_node(m.group(1), "/" + m.group(2)))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(logs|catalog)/([\w.-]+)", path)
         if m:
-            code, body = call_node(m.group(1), f"/logs/{m.group(2)}")
-            return self._json(code, body)
-        m = re.fullmatch(r"/api/node/([\w.-]+)/catalog/([\w.-]+)", path)
-        if m:
-            code, body = call_node(m.group(1), f"/catalog/{m.group(2)}")
-            return self._json(code, body)
+            return self._json(*call_node(m.group(1), f"/{m.group(2)}/{m.group(3)}"))
+
+        if path == "/api/tls/status":
+            rec, _ = tls.pending_csr(CERTS.p)
+            return self._json(200, {
+                "current": CERTS.current(), "hostnames": hostnames(),
+                "hsts_allowed": CERTS.hsts_allowed(), "history": CERTS.history(),
+                "csr": ({"cn": rec["cn"], "hostnames": rec["hostnames"],
+                         "createdTaipei": tls.taipei(dt.datetime.fromtimestamp(rec["created"], dt.timezone.utc))}
+                        if rec else None)})
+        if path == "/api/tls/csr":
+            rec, _ = tls.pending_csr(CERTS.p)
+            if not rec:
+                return self._json(404, {"error": "目前沒有待配對的 CSR"})
+            return self._send(200, rec["csr_pem"].encode(), "application/pkcs10",
+                              {"Content-Disposition": f'attachment; filename="{rec["cn"]}.csr"'})
+        if path == "/api/admin/usage-report":
+            try:
+                days = max(1, min(400, int((q.get("days") or ["30"])[0])))
+            except ValueError:
+                days = 30
+            return self._json(200, report.build(STORE, CERTS, fleet(), days))
+        if path == "/api/admin/audit":
+            try:
+                limit = max(1, min(500, int((q.get("limit") or ["100"])[0])))
+            except ValueError:
+                limit = 100
+            return self._json(200, {"items": STORE.audit_list(limit)})
+        if path == "/api/settings":
+            cfg = fleet()
+            return self._json(200, {"report": cfg["report"], "hostnames": hostnames(),
+                                    "username": cfg["auth"].get("username", "admin")})
         return self._json(404, {"error": "找不到"})
 
+    # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        body = self._body()
+        if body is None:
+            return self._json(413, {"error": "上傳超過 6 MB"})
+
         if path == "/api/login":
-            body = self._body()
-            if not check_password(str(body.get("password") or "")):
-                time.sleep(1.0)           # 慢一點，讓暴力猜測不划算
-                return self._json(401, {"error": "密碼不對"})
-            cookie = (f"xconsole={make_session()}; Path=/; HttpOnly; SameSite=Strict; "
+            user = str(body.get("username") or "")
+            if not check_credentials(user, str(body.get("password") or "")):
+                time.sleep(1.0)       # 慢一點，讓暴力猜測不划算
+                STORE.audit(user, self.ip, "auth.login", user, False)
+                return self._json(401, {"error": "帳號或密碼不對"})
+            STORE.audit(user, self.ip, "auth.login", user, True)
+            cookie = (f"xconsole={make_session(user)}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
-            return self._json(200, {"ok": True}, cookie=cookie)
+            return self._json(200, {"ok": True, "user": user}, cookie=cookie)
         if path == "/api/logout":
-            return self._json(200, {"ok": True},
-                              cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
+            return self._json(200, {"ok": True}, cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
         if self._need_auth():
             return None
 
-        body = self._body()
+        # ---- 各機動作：轉給代理，並記稽核
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/(start|stop|restart)", path)
         if m:
-            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/{m.group(3)}",
-                                  "POST", body, timeout=240)
+            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/{m.group(3)}", "POST", body, timeout=240)
+            self._audit(f"slot.{m.group(3)}", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
+                         "message": out.get("message") or out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/model", path)
         if m:
-            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", body, timeout=300)
+            code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", body, timeout=560)
+            self._audit("model.swap", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"to": out.get("model") or os.path.basename(str(body.get("pack", ""))),
+                         "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
+                         "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/admit/([\w.-]+)", path)
         if m:
-            code, out = call_node(m.group(1), f"/admit/{m.group(2)}", "POST", body)
-            return self._json(code, out)
+            return self._json(*call_node(m.group(1), f"/admit/{m.group(2)}", "POST", body))
         m = re.fullmatch(r"/api/node/([\w.-]+)/profile/([\w.-]+)", path)
         if m:
-            code, out = call_node(m.group(1), f"/profile/{m.group(2)}", "POST", body, timeout=300)
+            code, out = call_node(m.group(1), f"/profile/{m.group(2)}", "POST", body, timeout=560)
+            self._audit("profile.apply", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"force": bool(body.get("force")), "errors": out.get("errors")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/all/(start|stop|restart)", path)
         if m:
-            code, out = call_node(m.group(1), f"/all/{m.group(2)}", "POST", body, timeout=300)
+            code, out = call_node(m.group(1), f"/all/{m.group(2)}", "POST", body, timeout=560)
+            self._audit(f"all.{m.group(2)}", m.group(1), code == 200, {"force": bool(body.get("force"))})
             return self._json(code, out)
+
+        # ---- 信任各機代理的憑證（每個串接對象各一份）
+        m = re.fullmatch(r"/api/node/([\w.-]+)/trusted-ca", path)
+        if m:
+            node_id = m.group(1)
+            if not any(n["id"] == node_id for n in fleet()["nodes"]):
+                return self._json(404, {"error": "沒有這台機器"})
+            try:
+                data = base64.b64decode(str(body.get("file") or ""))
+            except Exception:  # noqa: BLE001
+                return self._json(400, {"error": "檔案格式不對"})
+            r, pem = tls.inspect_trusted_ca(data)
+            if not r["ok"]:
+                return self._json(400, r)
+            with open(trust_file(node_id) + ".tmp", "wb") as fh:
+                fh.write(pem)
+            os.chmod(trust_file(node_id) + ".tmp", 0o600)
+            os.replace(trust_file(node_id) + ".tmp", trust_file(node_id))
+            self._audit("trust.import", node_id, True, {"fingerprint256": r["summary"]["fingerprint256"],
+                                                        "subject": r["summary"]["subject"]})
+            return self._json(200, r)
+
+        # ---- 憑證
+        if path == "/api/tls/inspect":
+            files = []
+            for f in body.get("files") or []:
+                try:
+                    files.append((str(f.get("name", "檔案"))[:120], base64.b64decode(f.get("data", ""))))
+                except Exception:  # noqa: BLE001
+                    return self._json(400, {"error": "有檔案讀不出來"})
+            if not files:
+                return self._json(400, {"error": "請先選擇檔案"})
+            res = CERTS.inspect(files, str(body.get("password") or ""), str(body.get("key_password") or ""),
+                                hostnames())
+            self._audit("tls.inspect", ",".join(n for n, _ in files), res["ok"],
+                        {"fingerprint256": (res.get("summary") or {}).get("fingerprint256"),
+                         "errors": res["errors"]})
+            return self._json(200, res)
+        if path == "/api/tls/apply":
+            ok, msg, summary = CERTS.apply(str(body.get("token") or ""))
+            self._audit("tls.apply", (summary or {}).get("subject", ""), ok,
+                        {"fingerprint256": (summary or {}).get("fingerprint256"),
+                         "validToTaipei": (summary or {}).get("validToTaipei"), "message": msg})
+            return self._json(200 if ok else 409, {"ok": ok, "message": msg, "current": CERTS.current()})
+        if path == "/api/tls/rollback":
+            ok, msg = CERTS.rollback()
+            cur = CERTS.current() or {}
+            self._audit("tls.rollback", cur.get("subject", ""), ok,
+                        {"fingerprint256": cur.get("fingerprint256"), "message": msg})
+            return self._json(200 if ok else 409, {"ok": ok, "message": msg, "current": cur})
+        if path == "/api/tls/csr":
+            cn = str(body.get("cn") or "").strip()
+            names = [h.strip() for h in body.get("hostnames") or [] if str(h).strip()]
+            if not cn:
+                return self._json(400, {"error": "請填主要網址（CN）"})
+            pem = tls.generate_csr(CERTS.p, cn, names, str(body.get("org") or ""),
+                                   "ec256" if body.get("key_type") == "ec256" else "rsa2048")
+            self._audit("tls.csr", cn, True, {"hostnames": names})
+            return self._json(200, {"ok": True, "csr": pem})
+        if path == "/api/tls/bootstrap":
+            cur = CERTS.current() or {}
+            if cur.get("source") == "imported" and not body.get("confirm"):
+                return self._json(409, {"error": "目前是正式憑證，換回暫用自簽會讓使用者看到安全警告；確定要換請再確認一次"})
+            ok, msg = CERTS.bootstrap(hostnames())
+            self._audit("tls.bootstrap", "", ok, {"message": msg})
+            return self._json(200 if ok else 409, {"ok": ok, "message": msg, "current": CERTS.current()})
+        if path == "/api/tls/settings":
+            if "hostnames" in body:
+                names = [h.strip() for h in body.get("hostnames") or [] if str(h).strip()]
+                if not names:
+                    return self._json(400, {"error": "至少要有一個網址"})
+                update_fleet(lambda c: c["tls"].__setitem__("hostnames", names))
+                self._audit("tls.hostnames", "", True, {"hostnames": names})
+            if "hsts" in body:
+                ok, msg = CERTS.set_hsts(bool(body["hsts"]))
+                self._audit("tls.hsts", "", ok, {"on": bool(body["hsts"]), "message": msg})
+                if not ok:
+                    return self._json(409, {"error": msg})
+            return self._json(200, {"ok": True, "hostnames": hostnames(), "current": CERTS.current()})
+
+        # ---- 帳號與報表設定
+        if path == "/api/account/password":
+            old, new, user = str(body.get("old") or ""), str(body.get("new") or ""), self.user
+            if not check_credentials(user, old):
+                time.sleep(1.0)
+                self._audit("account.password", user, False, {"reason": "舊密碼不對"})
+                return self._json(403, {"error": "目前的密碼不對"})
+            if len(new) < 8:
+                return self._json(400, {"error": "新密碼至少 8 碼"})
+            set_credentials(user, new)
+            self._audit("account.password", user, True)
+            return self._json(200, {"ok": True, "message": "已變更，請用新密碼重新登入"},
+                              cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
+        if path == "/api/settings":
+            rep = body.get("report") or {}
+
+            def num(v):
+                if v in (None, ""):
+                    return None
+                try:
+                    return round(float(v), 4)
+                except (TypeError, ValueError):
+                    raise ValueError(f"「{v}」不是數字")
+            try:
+                new = {"price_ntd_per_kwh": num(rep.get("price_ntd_per_kwh"))}
+                ref = rep.get("cloud_ref") or {}
+                if any(ref.get(k) not in (None, "") for k in ("usd_per_mtok_in", "usd_per_mtok_out")):
+                    new["cloud_ref"] = {"name": str(ref.get("name") or "")[:60],
+                                        "usd_per_mtok_in": num(ref.get("usd_per_mtok_in")),
+                                        "usd_per_mtok_out": num(ref.get("usd_per_mtok_out")),
+                                        "ntd_per_usd": num(ref.get("ntd_per_usd"))}
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            update_fleet(lambda c: c.__setitem__("report", new))
+            self._audit("settings.report", "", True, new)
+            return self._json(200, {"ok": True, "report": new})
         return self._json(404, {"error": "找不到"})
-
-    # -------------------------------------------------- 彙整
-
-    def _fleet_state(self):
-        cfg = fleet()
-        nodes = []
-        for n in cfg["nodes"]:
-            code, body = call_node(n["id"], "/state", timeout=30)
-            nodes.append({
-                "id": n["id"], "name": n["name"], "host": n["host"],
-                "group": n.get("group", "未分類"),
-                "online": code == 200,
-                "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
-                "state": body if code == 200 else None,
-            })
-        return {"ts": time.time(), "nodes": nodes}
 
 
 def main():
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
-        print("還沒設密碼。先跑：python3 xconsole_server.py --set-password", flush=True)
-    cert, key, fresh = ensure_tls()
-    srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    srv.daemon_threads = True
-    if cert and key:
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.load_cert_chain(cert, key)
-        srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
-        kind = "暫用自簽憑證（請於設定頁換成正式憑證）" if fresh else "憑證"
-        print(f"xConsole 聽在 https://0.0.0.0:{PORT}（{kind}）", flush=True)
-    else:
-        print("產不出憑證（缺 openssl），停止啟動，不退回只開 http", flush=True)
-        raise SystemExit(2)
+        print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
+    fresh = CERTS.ensure(hostnames())
+    srv = tls.TLSServer(("0.0.0.0", PORT), Handler)
+    srv.certs = CERTS
+    threading.Thread(target=sampler, daemon=True).start()
+    cur = CERTS.current()
+    kind = "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）" if cur["selfSigned"] else cur["issuer"]
+    print(f"xConsole 聽在 https://0.0.0.0:{PORT}；憑證：{kind}"
+          + ("（剛產生）" if fresh else "") + f"；涵蓋 {', '.join(cur['dns'] + cur['ips'])}", flush=True)
     srv.serve_forever()
 
 
 if __name__ == "__main__":
-    import sys
-    if "--set-password" in sys.argv:
-        import getpass
-        pw = os.environ.get("XCONSOLE_INIT_PASSWORD") or getpass.getpass("設定 xConsole 密碼：")
+    if "--set-credentials" in sys.argv or "--set-password" in sys.argv:
+        # 帳密從標準輸入讀（第一行帳號、第二行密碼），不走環境變數也不進指令列——
+        # 那兩個地方都會被 ps、/proc/<pid>/environ 與 shell 歷史留下
+        if sys.stdin.isatty():
+            import getpass
+            user = input("帳號（預設 admin）：").strip() or "admin"
+            pw = getpass.getpass("密碼：")
+        else:
+            lines = sys.stdin.read().splitlines()
+            user = (lines[0].strip() if lines else "") or "admin"
+            pw = lines[1] if len(lines) > 1 else ""
         if len(pw) < 8:
             raise SystemExit("密碼至少 8 碼")
-        set_password(pw)
-        print("已設定")
+        set_credentials(user, pw)
+        STORE.audit(user, "本機", "account.password", user, True, {"via": "cli"})
+        print(f"已設定帳號 {user}")
         raise SystemExit(0)
     main()

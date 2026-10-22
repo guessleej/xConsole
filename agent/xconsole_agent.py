@@ -19,6 +19,7 @@ import re
 import secrets
 import shlex
 import socket
+import ssl
 import subprocess
 import time
 import urllib.request
@@ -1187,6 +1188,106 @@ def do_all(action, force=False):
     return 200, {"action": action, "results": results}
 
 
+# ---------------------------------------------------------------- token 累計計數器
+
+COUNTERS = os.path.join(STATE_DIR, "counters.json")
+REQ_RX = re.compile(r"serve: prompt (\d+) tokens = (\d+) reused \+ \d+ read in [\d.]+ ms "
+                    r"\([\d.]+ tok/s\), (\d+) generated")
+
+
+def counters():
+    """引擎每處理一個請求寫一行記錄，但那一行沒有時間戳——
+    所以「本期處理多少 token」不能事後從記錄切。這裡把每個欄位的處理量一路累計，
+    主控台每 5 分鐘取一次，兩次的差就是那段時間的量。
+    只讀上次讀到之後新增的部分；記錄被輪替（inode 變了或檔案變小）就從頭讀。"""
+    reg = registry()
+    state = load_json(COUNTERS, {})
+    out = {}
+    for slot in reg["slots"]:
+        log = slot.get("log")
+        if not log or not os.path.exists(log):
+            continue
+        st = state.get(slot["id"]) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
+        try:
+            info = os.stat(log)
+        except OSError:
+            continue
+        if st.get("inode") != info.st_ino or info.st_size < st.get("offset", 0):
+            st["offset"] = 0
+            st["inode"] = info.st_ino
+        with open(log, "rb") as fh:
+            fh.seek(st["offset"])
+            chunk = fh.read()
+        # 最後一行可能還沒寫完：只吃到最後一個換行為止，剩下的下次再讀
+        cut = chunk.rfind(b"\n") + 1
+        for line in chunk[:cut].decode("utf-8", "replace").splitlines():
+            m = REQ_RX.search(line)
+            if m:
+                st["requests"] += 1
+                st["prompt"] += int(m.group(1))
+                st["reused"] += int(m.group(2))
+                st["generated"] += int(m.group(3))
+        st["offset"] += cut
+        state[slot["id"]] = st
+        out[slot["id"]] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
+    save_json(COUNTERS, state)
+    return {"ts": time.time(), "slots": out}
+
+
+# ---------------------------------------------------------------- HTTPS
+
+CERT_FILE = os.path.join(STATE_DIR, "agent-cert.pem")
+KEY_FILE = os.path.join(STATE_DIR, "agent-key.pem")
+
+
+def local_names():
+    names = {"localhost", "127.0.0.1", socket.gethostname()}
+    _, out, _ = sh("hostname -I")
+    names.update(out.split())
+    return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
+
+
+def ensure_cert():
+    """代理也走 HTTPS：主控台用 Bearer 權杖連過來，明文 http 等於權杖在內網裸奔。
+    第一次啟動產一張自簽，SAN 涵蓋本機所有 IP；主控台部署時經 SSH 取回這張當作信任依據。"""
+    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        return
+    san = ",".join(("IP:" if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", n) and (":" in n or n.count(".") == 3)
+                    else "DNS:") + n for n in local_names())
+    rc, _, err = sh(f"openssl req -x509 -newkey rsa:2048 -nodes -days 3650 "
+                    f"-keyout {shlex.quote(KEY_FILE)} -out {shlex.quote(CERT_FILE)} "
+                    f"-subj /C=TW/O=xCloudinfo/CN=xconsole-agent-{shlex.quote(socket.gethostname())} "
+                    f"-addext {shlex.quote('subjectAltName=' + san)} "
+                    f"-addext basicConstraints=critical,CA:FALSE", timeout=60)
+    if rc != 0:
+        raise SystemExit(f"產不出代理憑證（{err[:200]}），停止啟動，不退回明文 http")
+    os.chmod(KEY_FILE, 0o600)
+
+
+class AgentTLSServer(ThreadingHTTPServer):
+    """在處理執行緒裡才握手，掃描器之類不講 TLS 的連線直接關掉，不會卡住主執行緒。"""
+    daemon_threads = True
+    ctx = None
+
+    def finish_request(self, request, client_address):
+        try:
+            request.settimeout(15)
+            first = request.recv(1, socket.MSG_PEEK)
+            if not first or first[0] != 0x16:
+                return
+            conn = self.ctx.wrap_socket(request, server_side=True)
+        except Exception:  # noqa: BLE001
+            return
+        try:
+            conn.settimeout(600)       # 換模型會等到 9 分鐘
+            self.RequestHandlerClass(conn, client_address, self)
+        finally:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
 # ---------------------------------------------------------------- HTTP
 
 class Handler(BaseHTTPRequestHandler):
@@ -1234,6 +1335,8 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, body = do_logs(m.group(1))
             return self._send(code, body)
+        if path == "/counters":
+            return self._send(200, counters())
         m = re.fullmatch(r"/catalog/([\w.-]+)", path)
         if m:
             return self._send(200, catalog(m.group(1)))
@@ -1285,9 +1388,13 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     registry()
-    srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    srv.daemon_threads = True
-    print(f"xconsole-agent 聽在 :{PORT}（權杖在 {TOKEN_FILE}）", flush=True)
+    ensure_cert()
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_cert_chain(CERT_FILE, KEY_FILE)
+    srv = AgentTLSServer(("0.0.0.0", PORT), Handler)
+    srv.ctx = ctx
+    print(f"xconsole-agent 聽在 https://0.0.0.0:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
 
 

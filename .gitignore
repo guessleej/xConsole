@@ -22,3 +22,6 @@ __pycache__/
 .DS_Store
 ~$*
 *.tmp
+
+# 產出的報告：內含實際營運數字，由產生器重建，不進版控
+dist-report/

@@ -350,12 +350,12 @@ def inspect_upload(files, password="", key_password="", hostnames=(), csr_key=No
 
     if not s["dns"] and not s["ips"]:
         errors.append("憑證沒有主體別名（SAN）。現在的瀏覽器只看 SAN，不看 CN，這張會被瀏覽器拒絕")
-    missing = [h for h in hostnames if h and not _covers(s["dns"], s["ips"], h)]
+    missing = [h for h in hostnames if h and h not in LOCAL_ONLY and not _covers(s["dns"], s["ips"], h)]
     if missing:
         errors.append("憑證沒有涵蓋這些網址：" + "、".join(missing)
                       + "。使用者用這些網址連線會看到憑證錯誤")
     elif hostnames:
-        passes.append("涵蓋所有使用者會打的網址：" + "、".join(h for h in hostnames if h))
+        passes.append("涵蓋所有使用者會打的網址：" + "、".join(h for h in hostnames if h and h not in LOCAL_ONLY))
 
     if s["selfSigned"]:
         warns.append("這是自簽憑證，瀏覽器會出現安全警告；正式上線請改用憑證廠商或貴單位 CA 簽發的憑證")
@@ -470,20 +470,38 @@ def clear_csr(paths):
 
 # ------------------------------------------------------------------ 暫用自簽
 
-def local_hostnames():
-    names = {"localhost", "127.0.0.1", socket.gethostname()}
+LOCAL_ONLY = {"localhost", "127.0.0.1"}
+
+
+def default_hostnames():
+    """使用者會打的網址，預設只取「對外那張網卡」的 IP（走預設路由出去的那個來源位址）。
+
+    ⚠️ 不要把本機所有 IP 都當成預設：Docker 橋接的 172.17.0.1、127.0.1.1、機器之間的專線位址
+    都不是使用者會打的，而匯入檢查要求憑證涵蓋「每一個」網址——任何一張正式憑證都不可能涵蓋
+    Docker 的內部 IP，結果是客戶上傳正確的憑證也被擋下來（2026-10-22 實際踩到）。
+    """
+    import subprocess
     try:
-        for info in socket.getaddrinfo(socket.gethostname(), None):
-            names.add(info[4][0])
+        out = subprocess.run(["ip", "-4", "route", "get", "1.1.1.1"], capture_output=True,
+                             text=True, timeout=5).stdout
+        m = __import__("re").search(r"\bsrc\s+(\S+)", out)
+        if m:
+            return [m.group(1)]
     except Exception:  # noqa: BLE001
         pass
     try:
-        import subprocess
-        out = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5).stdout
-        names.update(out.split())
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("1.1.1.1", 80))        # UDP 不會真的送出封包，只是讓系統選出來源位址
+        ip = s.getsockname()[0]
+        s.close()
+        return [ip]
     except Exception:  # noqa: BLE001
-        pass
-    return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
+        return [socket.gethostname()]
+
+
+def self_signed_names(hostnames):
+    """暫用自簽另外加上 localhost 與 127.0.0.1，給本機的健康檢查與工具用；不列入匯入時的涵蓋檢查。"""
+    return sorted(set(hostnames) | LOCAL_ONLY)
 
 
 def generate_self_signed(hostnames, cn="xconsole", days=825):
@@ -569,7 +587,7 @@ class CertManager:
             if any(h not in have for h in hostnames):
                 need = True
         if need:
-            cert_pem, key_pem = generate_self_signed(hostnames)
+            cert_pem, key_pem = generate_self_signed(self_signed_names(hostnames))
             _write(self.p.live_cert, cert_pem)
             _write(self.p.live_key, key_pem)
             m = self.meta()
@@ -636,7 +654,7 @@ class CertManager:
         return ok, msg, summary
 
     def bootstrap(self, hostnames):
-        cert_pem, key_pem = generate_self_signed(hostnames)
+        cert_pem, key_pem = generate_self_signed(self_signed_names(hostnames))
         return self.reload_cert(cert_pem, key_pem, "selfsigned")
 
     def history(self):
@@ -733,3 +751,79 @@ def client_context(trust_file):
     ctx = ssl.create_default_context(cafile=trust_file)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     return ctx
+
+
+# ------------------------------------------------------------------ 伺服器：同埠轉址＋執行緒內握手＋熱套用
+
+import re as _re
+from http.server import ThreadingHTTPServer
+
+
+class HTTPSRedirect:
+    """有人用 http:// 打到 https 埠時，回 308 轉到 https://（同一個埠）。
+
+    用 308 不用 301／302：POST 轉址後還是 POST，不會變成 GET。
+    """
+
+    @staticmethod
+    def handle(sock, port):
+        try:
+            sock.settimeout(5)
+            data = b""
+            while b"\r\n\r\n" not in data and len(data) < 8192:
+                chunk = sock.recv(2048)
+                if not chunk:
+                    break
+                data += chunk
+            line, _, rest = data.partition(b"\r\n")
+            parts = line.decode("latin-1", "replace").split()
+            path = parts[1] if len(parts) >= 2 and parts[1].startswith("/") else "/"
+            if any(ord(ch) < 0x21 or ord(ch) > 0x7e for ch in path):
+                path = "/"
+            host = ""
+            for h in rest.split(b"\r\n"):
+                if h.lower().startswith(b"host:"):
+                    host = h[5:].strip().decode("latin-1", "replace")
+            if not _re.fullmatch(r"[A-Za-z0-9.\-\[\]:]{1,255}", host or ""):
+                host = f"localhost:{port}"
+            sock.sendall((
+                "HTTP/1.1 308 Permanent Redirect\r\n"
+                f"Location: https://{host}{path}\r\n"
+                "Content-Length: 0\r\nConnection: close\r\n\r\n").encode())
+        except Exception:  # noqa: BLE001
+            pass
+
+
+class TLSServer(ThreadingHTTPServer):
+    """在處理執行緒裡才做 TLS 握手，並且每條連線當下才讀憑證內容。
+
+    兩個好處：(1) 換憑證只要換掉 certs.ctx，新連線立刻用新的，不必重開服務；
+    (2) 握手前先偷看第一個位元組，不是 TLS 就走 HTTPSRedirect，不會讓瀏覽器看到一堆亂碼錯誤。
+    監聽 socket 不先包 TLS：包了的話握手會卡在接受連線的主執行緒，一個慢客戶端就能拖住所有人。
+    """
+    daemon_threads = True
+    certs = None   # CertManager
+
+    def finish_request(self, request, client_address):
+        try:
+            request.settimeout(15)
+            first = request.recv(1, socket.MSG_PEEK)
+        except Exception:  # noqa: BLE001
+            return
+        if not first:
+            return
+        if first[0] != 0x16:                    # 0x16 = TLS 握手的第一個位元組
+            HTTPSRedirect.handle(request, self.server_address[1])
+            return
+        try:
+            tls = self.certs.ctx.wrap_socket(request, server_side=True)
+        except Exception:  # noqa: BLE001
+            return
+        try:
+            tls.settimeout(120)
+            self.RequestHandlerClass(tls, client_address, self)
+        finally:
+            try:
+                tls.close()
+            except Exception:  # noqa: BLE001
+                pass

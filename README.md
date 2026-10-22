@@ -21,7 +21,7 @@
 機群裡的傳統多卡伺服器（MI50 農場、P100、Ada）也能納管，走 `discrete` 架構，但不是本產品的主場。
 
 - 線上位置：`https://192.168.11.27:9400`（自簽憑證，瀏覽器會先警告一次）
-- 初始密碼：見同目錄 `初始密碼.txt`，**登入後請盡快換掉**
+- 登入：帳號 `admin`，密碼依交接另行提供（不寫進版控）；登入後可在「設定 → 帳號與安全」自行變更
 - 目前納管：`.26`、`.27`（AI 395）、`.20`（Thor／MIC-743 同一顆 SoC）
 
 ---
@@ -62,7 +62,7 @@
 ## 三、架構
 
 ```
-瀏覽器 ──HTTPS──> xConsole 主控台（.27:9400）──HTTP+Bearer──> 各機節點代理（:9401）
+瀏覽器 ──HTTPS──> xConsole 主控台（.27:9400）──HTTPS＋Bearer（驗證對方憑證）──> 各機節點代理（:9401）
                                                               └─> 同機 node_agent（:9300）取硬體指標
 ```
 
@@ -157,34 +157,72 @@ Strata 一顆模型是 **pack（含 tokenizer）＋ 權重檔** 兩件成套的�
 在該機 registry 的 `profiles` 加一筆，`changes` 寫要改哪個欄位的哪些參數。
 套用時會先備份設定檔，重啟失敗自動還原回上一版並重啟。
 
-### 改密碼
+### 帳號與密碼
+
+登入改為「帳號＋密碼」，帳號預設 `admin`。平常在網頁「設定 → 帳號與安全」變更；
+變更後所有已登入的裝置會被登出。忘記密碼時在主控台機器上重設（從標準輸入讀，不進指令列也不走環境變數）：
 
 ```bash
-# 在 .27 上
-cd ~/xconsole && python3 xconsole_server.py --set-password
+# 在 .27 上執行，會互動詢問帳號與密碼
+cd ~/xconsole && python3 xconsole_server.py --set-credentials
 ```
 
-### 換正式憑證
+### HTTPS 與憑證（管理者在網頁上自己換）
 
-把 `cert.pem` 與 `key.pem` 放進 `.27` 的 `~/.xconsole/tls/`，再 `systemctl --user restart xconsole`。
-第一次啟動沒有憑證時會自動產生暫用自簽，**不會退回只開 http**。
+「設定 → HTTPS 與憑證」照 5 步設定順序軸操作，每一步的狀態由系統實際資料算出：
+
+| 步驟 | 做什麼 |
+|---|---|
+| 1. 確認使用者會打的網址 | 預設只取對外那張網卡的 IP；有網域名稱就填網域 |
+| 2. 取得憑證 | 已有憑證就直接上傳；沒有就在頁面上產 CSR 交給憑證廠商（私鑰加密存在伺服器，不會離開） |
+| 3. 上傳並檢查 | 拖放任何格式：PFX／P12（含 Windows 匯出的 RC2-40＋3DES 舊式加密）、PEM、DER 的 CER／CRT、KEY、P7B，順序不拘。檢查結果分「不能套用／要注意／可以套用」三段，全部講人話 |
+| 4. 套用 | **不重開服務**：新連線立刻用新憑證，已連上的不中斷；系統實際連自己一次核對指紋，不對就自動換回 |
+| 5. 開啟 HSTS | 只有正式憑證才能開；暫用自簽時開關是灰的 |
+
+另外有「還原上一張」（保留最近十張）與「依目前網址重產暫用自簽」。剩 30／14／7／1 天會記一次到期提醒，
+剩 7 天內每一頁頂端都會出現提醒列；健康檢查 `GET /api/health` 回 `tls.daysLeft`。
+
+用 `http://` 打到 9400 埠會收到 308 轉到 `https://` 同埠同路徑（用 308 不用 301，POST 轉址後還是 POST）。
+
+### 服務使用報告
+
+網頁「設定 → 使用報告」可直接看近 7／30／90 天的六塊數字，也能下載 JSON。
+要產出給主管看的 Word 月報（含 PDF），在有原始碼的電腦上執行：
+
+```bash
+# 密碼檔要自己建，權限必須是 600（產生器會檢查，太寬就拒絕執行）
+/usr/bin/python3 scripts/report/build_usage_report.py --days 30 --password-file ~/.xconsole/report.pw
+```
+
+連線時用 `deploy_console.sh` 帶回本機的主控台憑證驗證；主控台換成正式憑證後改用系統的憑證庫。**不提供略過驗證的選項。**
+產出放在 `dist-report/`（不進版控）。電價與雲端參考單價在網頁上填；沒填就只報用電度數與 token 量、不換算金額，並在報告裡寫明。
+
+需要 `matplotlib` 與 `python-docx`，以及 `soffice`、`pdftotext`。macOS 上 Homebrew 的 Python 3.15 裝不上 python-docx 的相依套件，請用系統的 `/usr/bin/python3`。
 
 ## 五、安全
 
-- 各機代理權杖存在該機 `~/.xconsole/token`（0600），**只有主控台伺服器讀得到**；
-  瀏覽器拿到的只是 HMAC 簽章的登入票證，`/api/nodes` 已過濾掉 token 欄位。
-- 登入密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊存檔，不存明文；錯誤時固定延遲 1 秒。
-- 主控台只走 HTTPS，帶 CSP／nosniff／X-Frame-Options／Referrer-Policy。
-- 代理與主控台都掛 `MemoryMax`／`CPUQuota`，自己不會變成壓垮機器的那一根稻草。
+- 主控台只提供 HTTPS；用 `http://` 打到同埠會被 308 轉走。只開 TLS 1.2／1.3。
+- **主控台連各機代理也走 HTTPS**。各機代理第一次啟動自產憑證，`deploy_console.sh` 經 SSH 取回當作信任依據；
+  代理送出的憑證跟當初信任的不同就拒絕連線，不會退回明文或關掉驗證。代理重裝後重跑 `deploy_console.sh`，或在「設定 → 機器」匯入新憑證。
+- 各機代理權杖存在該機 `~/.xconsole/token`（0600），只有主控台伺服器讀得到；瀏覽器只拿 HMAC 簽章的登入票證，`/api/nodes` 已過濾掉 token 欄位。
+- 登入密碼以 PBKDF2-SHA256（200,000 輪）加鹽雜湊後存檔，不存明文；帳號與密碼都算一遍才比對，錯誤時固定延遲一秒。
+- 待配對 CSR 的私鑰以 AES-256-GCM 加密落地（`enc:v1:` 前綴），主金鑰檔 0600。
+- 所有操作寫入稽核紀錄（誰、何時、從哪裡、做了什麼、結果）。寫入前一律經過集中的 `redact()`：密碼、私鑰、權杖、PFX 一律遮罩，憑證只記指紋。
+- 回應帶內容安全政策、禁止被嵌入框架、禁止 MIME 類型猜測等標頭；HSTS 由後台開關控制。
+- 含輸入欄位的彈窗不准點背景關閉；所有 Enter 送出的欄位都擋中文輸入法組字（`test_ui_guard.py` 守著）。
+- 代理與主控台都設有記憶體與 CPU 用量上限。
 
 ## 六、自我檢查
 
-```bash
-python3 agent/test_admit.py
-```
+| 測試 | 在哪跑 | 項數 | 測什麼 |
+|---|---|---|---|
+| `agent/test_admit.py` | 任何機器 | 13 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
+| `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
+| `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
+| `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
+| `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
 
-13 項，涵蓋三種記憶體架構的放行／擋下、KV 兩種量級、底線邊界、重啟既有服務。
-**這支壞掉代表主控台會放行一個會把機器弄死的載入**，改准入邏輯前後都要跑。
+交付前另外要跑：`check-https.sh`、`check-usage-report.sh`、`audit-secrets.sh`（三支都在對應的 skill 裡）。
 
 ## 七、已安裝的模型與實測
 
@@ -227,3 +265,11 @@ python3 agent/test_admit.py
 | `setup.sh` 編譯掛在 `iq_kernels.cu:1856` 的 `alignas` | 系統 ROCm 7.1.1 的 clang 20 編不過 0.1.45，要用 TheRock 的 clang 23（`~/rocm/install`）。跑的時候仍要用系統 ROCm 的函式庫 |
 | `systemd-run` 跑 setup 被配成 CPU-only | 它的環境極簡，沒有 `ROCM_PATH`／`/opt/rocm/bin`，HIP 偵測失敗。要用 `--setenv` 補齊 |
 | 量到的速度好得不像話 | 先看 `cached_tokens`。同一份提示第二次跑會命中快取（68,615 重用、61 毫秒），那不是冷啟動成績 |
+| 客戶上傳正確的憑證也被擋下 | 預設網址抓了本機所有 IP（含 Docker 的 172.17.0.1），任何正式憑證都不可能涵蓋。預設只取對外網卡的 IP，`localhost`／`127.0.0.1` 不列入涵蓋檢查 |
+| 過期的登入票證照樣能用 | `user or None if 沒過期 else None` 在 Python 會解析成 `user or (None if … else None)`。拆開寫 |
+| 自動還原沒觸發，服務其實已經死了 | 只看了 `systemctl restart` 的回傳值。`Type=simple` 被接受就回 0，載模型失敗是幾秒後才退出；要等埠回得出 `/v1/models` 才算成功，還原前先 `reset-failed` |
+| 換模型三秒就崩 | 換模型換的是一整份設定，不是 `--pack`／`--native` 兩個路徑。以 `setup.sh` 產的 `strata-<名稱>.json` 為底，只覆寫 exe／lib_dirs／port／parallel |
+| 改了手機版 CSS 完全沒效果 | 手機覆寫寫在前面的媒體查詢，後面才定義的基本樣式同權重蓋掉了它。手機覆寫放檔案最後 |
+| 手機版整頁被撐寬 | 憑證指紋這種冒號串沒有斷行點。數值加 `overflow-wrap: anywhere` |
+| 自動更新時正在填的表單蒸發 | 畫面每 15 秒重畫。設定頁與記錄頁不參與自動重畫 |
+| `declare: -A: invalid option` | macOS 內建 bash 是 3.2，不支援關聯陣列。用 `case` |

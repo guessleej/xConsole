@@ -54,7 +54,7 @@ $("#login-form").addEventListener("submit", async (e) => {
   const err = $("#login-err");
   err.hidden = true;
   try {
-    await api("/api/login", { method: "POST", body: { password: $("#pw").value } });
+    await api("/api/login", { method: "POST", body: { username: $("#un").value.trim(), password: $("#pw").value } });
     $("#pw").value = "";
     start();
   } catch (ex) {
@@ -169,6 +169,16 @@ function renderNav() {
     };
     nav.appendChild(b);
   });
+
+  // 第二列：設定頁的分頁（依管理者實際的先後：先看機器、再處理憑證、再看報告、最後才是帳號）
+  if (S.view === "settings") {
+    SETTINGS_TABS.forEach(([key, label]) => {
+      const b = el("button", null, label);
+      if ((S.settingsTab || "machines") === key) b.setAttribute("aria-current", "true");
+      b.onclick = () => { S.settingsTab = key; render(); };
+      sub.appendChild(b);
+    });
+  }
 
   // 第二列：所在區的各台機器
   if (S.view.startsWith("node:")) {
@@ -818,56 +828,596 @@ function viewLogs() {
   main.appendChild(wrap);
 }
 
+/* ================================================================ 設定頁（四個分頁）
+   分頁順序照管理者實際的先後：先確認機器都連得上 → 處理憑證 → 看使用報告 → 帳號。 */
+
+const SETTINGS_TABS = [
+  ["machines", "1 機器"], ["tls", "2 HTTPS 與憑證"], ["report", "3 使用報告"], ["account", "4 帳號與安全"],
+];
+
 function viewSettings() {
+  const tab = S.settingsTab || "machines";
   const main = $("#main");
   main.textContent = "";
   const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  ({ machines: settingsMachines, tls: settingsTls, report: settingsReport, account: settingsAccount }[tab])(wrap);
+}
 
-  const c1 = el("section", "card");
-  const h1 = el("div", "card-head");
-  h1.appendChild(el("h2", null, "納管的機器"));
-  h1.appendChild(el("span", "sub", `共 ${S.fleet.nodes.length} 台`));
-  c1.appendChild(h1);
+function card(title, sub) {
+  const c = el("section", "card");
+  const h = el("div", "card-head");
+  h.appendChild(el("h2", null, title));
+  if (sub) h.appendChild(el("span", "sub", sub));
+  c.appendChild(h);
+  return c;
+}
+
+function readB64(file) {
+  return new Promise((ok, bad) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1] || "");
+    r.onerror = () => bad(new Error(`讀不到 ${file.name}`));
+    r.readAsDataURL(file);
+  });
+}
+
+function download(name, text, type) {
+  const a = el("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function loading(node) {
+  node.textContent = "";
+  node.appendChild(el("p", "small muted", "讀取中…"));
+}
+
+/* 頂部到期提醒：剩 7 天內或已過期，每一頁都看得到 */
+async function checkTlsBanner() {
+  const b = $("#tls-banner");
+  try {
+    const me = await api("/api/me");
+    const t = me.tls || {};
+    if (t.level === "urgent" || t.level === "expired") {
+      b.textContent = t.daysLeft < 0
+        ? `主控台憑證已在 ${t.validToTaipei}（台北時間）過期，使用者連線會看到錯誤。請到「設定 → HTTPS 與憑證」匯入新憑證。`
+        : `主控台憑證剩 ${t.daysLeft} 天，${t.validToTaipei}（台北時間）到期。請盡快到「設定 → HTTPS 與憑證」匯入新憑證。`;
+      b.hidden = false;
+    } else b.hidden = true;
+  } catch (_) { b.hidden = true; }
+}
+
+/* ---------------------------------------------------------------- 1 機器 */
+
+async function settingsMachines(wrap) {
+  const c = card("納管的機器", `共 ${S.fleet.nodes.length} 台`);
+  const box = el("div");
+  loading(box);
+  c.appendChild(box);
+  c.appendChild(el("p", "small muted",
+    "主控台連各機代理一律走 HTTPS，並用部署時經 SSH 取回的該機憑證驗證對方；"
+    + "憑證不符就拒絕連線，不會退回明文或關掉驗證。代理重裝之後，重新執行 deploy_console.sh，或在下面匯入新憑證。"));
+  wrap.appendChild(c);
+
+  let nodes;
+  try { nodes = (await api("/api/nodes")).nodes; } catch (ex) { box.textContent = ex.message; return; }
+  const MM = { unified_split: "統一記憶體（切兩塊）", unified_single: "統一記憶體（單一池）", discrete: "獨立顯存" };
   const sb = el("div", "scrollbox");
   const tb = el("table");
-  tb.innerHTML = "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>狀態</th></tr></thead>";
+  tb.innerHTML = "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>信任的代理憑證</th><th></th></tr></thead>";
   const body = el("tbody");
-  const MM = { unified_split: "統一記憶體（切兩塊）", unified_single: "統一記憶體（單一池）", discrete: "獨立顯存" };
-  S.fleet.nodes.forEach((n) => {
+  nodes.forEach((n) => {
+    const live = S.fleet.nodes.find((x) => x.id === n.id);
     const tr = el("tr");
     tr.appendChild(el("td", null, n.name));
     tr.appendChild(el("td", null, n.group));
     tr.appendChild(Object.assign(el("td", "mono"), { textContent: n.host }));
-    tr.appendChild(el("td", null, n.online ? (MM[n.state.pools.memory_model] || "—") : "—"));
-    tr.appendChild(el("td", null, n.online ? "在線" : "連不上"));
+    tr.appendChild(el("td", null, live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
+    tr.appendChild(el("td", null, live?.online ? "在線" : "連不上"));
+    tr.appendChild(Object.assign(el("td", "mono small"),
+      { textContent: n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
+    const td = el("td");
+    const btn = el("button", "btn sm", "匯入憑證");
+    btn.onclick = () => importTrust(n);
+    td.appendChild(btn);
+    tr.appendChild(td);
     body.appendChild(tr);
   });
   tb.appendChild(body);
   sb.appendChild(tb);
-  c1.appendChild(sb);
-  c1.appendChild(el("p", "small muted",
-    "要加機器：在該機部署節點代理（deploy_agent.sh），再把它的位址與權杖加進主控台的 ~/.xconsole/fleet.json。"));
-  wrap.appendChild(c1);
+  box.textContent = "";
+  box.appendChild(sb);
+}
 
-  const c2 = el("section", "card rv");
-  const h2 = el("div", "card-head");
-  h2.appendChild(el("h2", null, "安全"));
-  c2.appendChild(h2);
-  [
-    ["連線", "主控台以 HTTPS 提供服務。第一次啟動若沒有正式憑證會自動產生暫用自簽；要換成正式憑證，把 cert.pem 與 key.pem 放進主控台機器的 ~/.xconsole/tls/ 再重啟即可。"],
-    ["各機代理權杖", "存在每台機器的 ~/.xconsole/token（權限 0600），只有主控台伺服器讀得到。瀏覽器拿到的只是一個簽章過的登入票證，看不到任何代理權杖。"],
-    ["登入密碼", "以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。要改密碼在主控台機器上跑 xconsole_server.py --set-password。"],
-    ["准入底線", "統一記憶體機的系統記憶體底線預設 15 GiB、DGX 與 Jetson 預設 12 GiB，可在各機 registry.json 以 ram_floor_gib 調整。"],
-  ].forEach(([k, v]) => {
-    const d = el("div");
-    d.appendChild(el("div", "role", k));
-    d.appendChild(el("p", "small muted", v));
-    c2.appendChild(d);
+function importTrust(n) {
+  const d = el("div");
+  d.appendChild(el("p", "small muted",
+    `選 ${n.name} 代理的憑證檔（在該機的 ~/.xconsole/agent-cert.pem）。主控台之後只接受這張憑證，其他人冒充會被拒絕。`));
+  const inp = el("input");
+  inp.type = "file";
+  inp.accept = ".pem,.crt,.cer";
+  d.appendChild(inp);
+  modal({
+    title: `匯入 ${n.name} 的代理憑證`, bodyNode: d, confirmText: "匯入", hasInput: true,
+    onConfirm: async () => {
+      if (!inp.files[0]) { toast("沒有選檔案", "bad"); return; }
+      try {
+        const r = await api(`/api/node/${n.id}/trusted-ca`, { method: "POST", body: { file: await readB64(inp.files[0]) } });
+        toast(`已信任 ${n.name}：${r.summary.fingerprint256.slice(0, 23)}…`, "ok");
+        render();
+      } catch (ex) { toast(ex.message, "bad"); }
+    },
   });
-  wrap.appendChild(c2);
+}
 
-  main.appendChild(wrap);
-  reveal(main);
+/* ---------------------------------------------------------------- 2 HTTPS 與憑證 */
+
+function tlsSteps(st, ui) {
+  const cur = st.current || {};
+  const imported = cur.source === "imported";
+  const steps = [
+    { t: "確認使用者會打的網址", why: "憑證必須涵蓋這些網址與 IP，不然使用者會看到憑證錯誤",
+      done: (st.hostnames || []).length > 0 },
+    { t: "取得憑證", why: "已有憑證就直接上傳；沒有就在下面產生 CSR 交給憑證廠商",
+      done: imported || !!st.csr || !!ui.inspected },
+    { t: "上傳並檢查", why: "先看懂哪裡有問題再決定套不套，不會直接換上去",
+      done: imported || !!(ui.inspected && ui.inspected.ok) },
+    { t: "套用", why: "不必重開機，新連線立刻生效；失敗會自動換回原本那張", done: imported },
+    { t: "開啟 HSTS", why: "讓瀏覽器以後一律走 HTTPS，不會被降級成 http",
+      done: !!cur.hsts, blocked: !st.hsts_allowed },
+  ];
+  let firstOpen = steps.findIndex((s) => !s.done);
+  steps.forEach((s, i) => {
+    if (s.done) s.state = "done";
+    else if (s.blocked && i !== firstOpen) s.state = "blocked";
+    else if (i === firstOpen) s.state = s.blocked ? "blocked" : "now";
+    else s.state = "blocked";
+  });
+  return steps;
+}
+
+function renderSteps(steps) {
+  const box = el("div");
+  const done = steps.filter((s) => s.done).length;
+  const next = steps.findIndex((s) => s.state === "now");
+  const head = el("div", "steps-head");
+  head.appendChild(el("span", "count", `${done}/${steps.length} 步完成`));
+  head.appendChild(el("span", "next", next >= 0 ? `下一步：${next + 1}. ${steps[next].t}`
+    : done === steps.length ? "全部完成" : "還有步驟要先完成前面的才能做"));
+  box.appendChild(head);
+  const g = el("div", "steps");
+  steps.forEach((s, i) => {
+    const d = el("div", "step " + s.state);
+    const t = el("div", "t");
+    t.appendChild(el("span", "n", String(i + 1)));
+    t.appendChild(document.createTextNode(s.t));
+    d.appendChild(t);
+    d.appendChild(el("div", "why", s.why));
+    const lbl = { done: "已完成", now: "現在做這步", blocked: "還不能做" }[s.state];
+    const need = s.state === "blocked"
+      ? (i === 4 && s.blocked ? "（要先換成正式憑證）" : `（要先完成第 ${steps.findIndex((x) => !x.done) + 1} 步）`) : "";
+    d.appendChild(el("span", "st", lbl + need));
+    g.appendChild(d);
+  });
+  box.appendChild(g);
+  // 手機上順序軸是橫向滑動的：把「現在做這步」捲到眼前，不要讓人以為只有第一步
+  setTimeout(() => {
+    const now = g.querySelector(".step.now");
+    if (now && g.scrollWidth > g.clientWidth) g.scrollLeft = now.offsetLeft - g.offsetLeft;
+  }, 0);
+  return box;
+}
+
+async function settingsTls(wrap) {
+  const ui = S.tlsUi || (S.tlsUi = {});
+  let st;
+  const top = card("HTTPS 與憑證", "換憑證不必找工程師、不必重開機");
+  loading(top);
+  wrap.appendChild(top);
+  try { st = await api("/api/tls/status"); } catch (ex) { top.textContent = ex.message; return; }
+  const cur = st.current || {};
+
+  // ---- 順序軸
+  top.textContent = "";
+  const h = el("div", "card-head");
+  h.appendChild(el("h2", null, "HTTPS 與憑證"));
+  h.appendChild(el("span", "sub", "換憑證不必找工程師、不必重開機"));
+  top.appendChild(h);
+  top.appendChild(renderSteps(tlsSteps(st, ui)));
+
+  // ---- 目前憑證
+  const cc = card("目前使用的憑證", cur.source === "imported" ? "已匯入" : "暫用自簽");
+  const lvl = cur.level === "ok" ? "" : cur.level === "warn" ? "warn" : "bad";
+  if (cur.selfSigned) cc.appendChild(el("p", "note warn",
+    "目前是系統自己產生的暫用自簽憑證，使用者第一次連線會看到安全警告。正式上線請匯入憑證廠商或貴單位 CA 簽發的憑證。"));
+  const rows = [
+    ["涵蓋的網址", [...(cur.dns || []), ...(cur.ips || [])].join("、") || "—"],
+    ["發行者", cur.issuer || "—"],
+    ["到期", `${cur.validToTaipei}（台北時間），剩 ${cur.daysLeft} 天`],
+    ["金鑰", cur.key || "—"],
+    ["憑證鏈", `${cur.chainLength || 1} 張`],
+    ["指紋（SHA-256 前 16 碼）", (cur.fingerprint256 || "").slice(0, 47)],
+    ["套用時間", cur.appliedAtTaipei ? cur.appliedAtTaipei + "（台北時間）" : "—"],
+  ];
+  const kvb = el("div");
+  kvb.style.maxWidth = "640px";
+  rows.forEach(([k, v]) => {
+    const r = kvRow(k, v);
+    if (k === "到期" && lvl) r.querySelector(".v").style.color = lvl === "warn" ? "var(--warn)" : "var(--bad)";
+    kvb.appendChild(r);
+  });
+  cc.appendChild(kvb);
+  const ccAct = el("div", "slot-actions");
+  const rb = el("button", "btn sm", "還原上一張");
+  rb.disabled = !(st.history || []).length;
+  rb.title = (st.history || [])[0] ? `上一張：${st.history[0].subject}，${st.history[0].validToTaipei} 到期` : "沒有上一張";
+  rb.onclick = () => modal({
+    title: "還原上一張憑證", hasInput: false, danger: true, confirmText: "還原",
+    bodyNode: el("p", "small muted", `會換回 ${st.history[0]?.subject || "上一張"}（${st.history[0]?.validToTaipei || ""} 到期）。新連線立刻生效，不必重開。`),
+    onConfirm: async () => {
+      try { const r = await api("/api/tls/rollback", { method: "POST" }); toast(r.message, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+      checkTlsBanner(); render();
+    },
+  });
+  ccAct.appendChild(rb);
+  const bs = el("button", "btn sm", "依目前網址重產暫用自簽");
+  bs.onclick = () => modal({
+    title: "重新產生暫用自簽", danger: cur.source === "imported", confirmText: "重新產生",
+    bodyNode: el("p", "small muted", cur.source === "imported"
+      ? "目前是正式憑證。換回暫用自簽之後，使用者連線會看到安全警告，確定嗎？"
+      : "會依「使用者會打的網址」重新產一張暫用自簽，瀏覽器需要再確認一次。"),
+    onConfirm: async () => {
+      try { const r = await api("/api/tls/bootstrap", { method: "POST", body: { confirm: true } }); toast(r.message, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+      render();
+    },
+  });
+  ccAct.appendChild(bs);
+  cc.appendChild(ccAct);
+  wrap.appendChild(cc);
+
+  // ---- 第 1 步：網址
+  const hc = card("1. 使用者會打的網址", "一行一個，網域或 IP 都可以");
+  const ta = el("textarea");
+  ta.value = (st.hostnames || []).join("\n");
+  hc.appendChild(ta);
+  const hb = el("button", "btn sm", "儲存網址");
+  hb.onclick = async () => {
+    const list = ta.value.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+    try { await api("/api/tls/settings", { method: "POST", body: { hostnames: list } }); toast("網址已儲存", "ok"); render(); }
+    catch (ex) { toast(ex.message, "bad"); }
+  };
+  const hbr = el("div", "slot-actions");
+  hbr.appendChild(hb);
+  hc.appendChild(hbr);
+  wrap.appendChild(hc);
+
+  // ---- 第 2 步：CSR
+  const csrc = card("2. 還沒有憑證：產生 CSR 交給憑證廠商", "私鑰在這台伺服器上產生並加密保存，不會離開伺服器");
+  if (st.csr) {
+    csrc.appendChild(el("p", "note", `已有一份待配對的 CSR（${st.csr.cn}，${st.csr.createdTaipei}（台北時間）產生）。`
+      + "廠商簽回憑證後，在下面第 3 步只要上傳憑證，系統會自動對上這把私鑰。"));
+    const dl = el("button", "btn sm primary", "下載 CSR");
+    dl.onclick = async () => {
+      try {
+        const res = await fetch("/api/tls/csr", { credentials: "same-origin" });
+        if (!res.ok) throw new Error("下載失敗");
+        download(`${st.csr.cn}.csr`, await res.text(), "application/pkcs10");
+      } catch (ex) { toast(ex.message, "bad"); }
+    };
+    const r = el("div", "slot-actions"); r.appendChild(dl); csrc.appendChild(r);
+  }
+  const fr = el("div", "form-row");
+  const mk = (label, node) => { const d = el("div"); d.appendChild(el("label", null, label)); d.appendChild(node); fr.appendChild(d); return node; };
+  // 不預填：憑證廠商要的是完整網域名稱，預填主機名稱（例 HP-Z2-Mini-G1a）會被直接退件
+  const cnI = mk("主要網址（CN）", Object.assign(el("input"), { type: "text", value: "", placeholder: "例：xconsole.貴單位網域.tw" }));
+  const orgI = mk("單位名稱（選填）", Object.assign(el("input"), { type: "text", value: "" }));
+  const ktI = mk("金鑰類型", el("select"));
+  [["rsa2048", "RSA 2048（相容性最好）"], ["ec256", "ECC P-256（較新、較快）"]].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; ktI.appendChild(o); });
+  csrc.appendChild(fr);
+  csrc.appendChild(el("p", "small muted", "其他網址會自動放進 CSR 的主體別名（SAN）：" + (st.hostnames || []).join("、")));
+  const gb = el("button", "btn sm", st.csr ? "重新產生 CSR（舊的會作廢）" : "產生 CSR");
+  gb.onclick = async () => {
+    try {
+      const r = await api("/api/tls/csr", { method: "POST",
+        body: { cn: cnI.value.trim(), org: orgI.value.trim(), key_type: ktI.value, hostnames: st.hostnames } });
+      download(`${cnI.value.trim()}.csr`, r.csr, "application/pkcs10");
+      toast("CSR 已產生並下載，請交給憑證廠商", "ok");
+      render();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  const gr = el("div", "slot-actions"); gr.appendChild(gb); csrc.appendChild(gr);
+  wrap.appendChild(csrc);
+
+  // ---- 第 3、4 步：上傳、檢查、套用
+  const up = card("3. 上傳並檢查　4. 套用", "PFX／P12、PEM、CER、CRT、KEY、P7B 都可以，順序不拘");
+  const dz = el("div", "dropzone");
+  dz.innerHTML = "<strong>把憑證檔拖到這裡，或點這裡選檔</strong>可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）";
+  const fi = el("input");
+  fi.type = "file"; fi.multiple = true; fi.hidden = true;
+  fi.accept = ".pfx,.p12,.pem,.cer,.crt,.key,.p7b,.p7c,.der";
+  dz.appendChild(fi);
+  const fl = el("div", "filelist");
+  const pwBox = el("div", "form-row");
+  pwBox.style.marginTop = "10px";
+  const pfxPw = Object.assign(el("input"), { type: "password", autocomplete: "off", placeholder: "PFX 匯出時設定的密碼" });
+  const keyPw = Object.assign(el("input"), { type: "password", autocomplete: "off", placeholder: "私鑰的密碼" });
+  const pfxWrap = el("div"); pfxWrap.appendChild(el("label", null, "PFX／P12 密碼")); pfxWrap.appendChild(pfxPw);
+  const keyWrap = el("div"); keyWrap.appendChild(el("label", null, "私鑰密碼")); keyWrap.appendChild(keyPw);
+  pfxWrap.hidden = true; keyWrap.hidden = true;
+  pwBox.appendChild(pfxWrap); pwBox.appendChild(keyWrap);
+  const res = el("div");
+  const act = el("div", "slot-actions");
+  const ib = el("button", "btn sm primary", "檢查");
+  const ab = el("button", "btn sm", "套用這張憑證");
+  ab.disabled = true;
+  act.appendChild(ib); act.appendChild(ab);
+  ui.files = ui.files || [];
+
+  const showFiles = async () => {
+    fl.textContent = "";
+    let needPfx = false, needKey = false;
+    for (const f of ui.files) {
+      fl.appendChild(el("span", "chip", f.name));
+      if (/\.(pfx|p12)$/i.test(f.name)) needPfx = true;
+      if (/\.(pem|key)$/i.test(f.name) && f.size < 200000) {
+        const txt = await f.text();
+        if (/ENCRYPTED/.test(txt)) needKey = true;
+      }
+    }
+    // 偵測到 PFX 才出現密碼欄、偵測到加密私鑰才出現私鑰密碼欄
+    pfxWrap.hidden = !needPfx && !ui.inspected?.need_password;
+    keyWrap.hidden = !needKey && !ui.inspected?.need_key_password;
+  };
+  const addFiles = (list) => {
+    for (const f of list) if (!ui.files.some((x) => x.name === f.name && x.size === f.size)) ui.files.push(f);
+    ui.inspected = null; ab.disabled = true; res.textContent = "";
+    showFiles();
+  };
+  dz.onclick = () => fi.click();
+  fi.onchange = () => addFiles(fi.files);
+  dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });
+  dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+  dz.addEventListener("drop", (e) => { e.preventDefault(); dz.classList.remove("over"); addFiles(e.dataTransfer.files); });
+  [pfxPw, keyPw].forEach((x) => imeGuard(x, () => ib.click()));
+
+  const showResult = (r) => {
+    res.textContent = "";
+    const grp = (cls, title, items) => {
+      if (!items?.length) return;
+      const g = el("div", "res-group " + cls);
+      g.appendChild(el("h4", null, title));
+      const ul = el("ul");
+      items.forEach((t) => ul.appendChild(el("li", null, t)));
+      g.appendChild(ul);
+      res.appendChild(g);
+    };
+    grp("bad", "不能套用", r.errors);
+    grp("warn", "要注意", r.warnings);
+    grp("ok", "可以套用", r.passes);
+    if (r.summary) {
+      const s = r.summary;
+      res.appendChild(el("p", "small muted", `這張憑證：${s.subject}，發行者 ${s.issuer}，${s.validToTaipei}（台北時間）到期，`
+        + `涵蓋 ${[...s.dns, ...s.ips].join("、")}，指紋 ${s.fingerprint256.slice(0, 23)}…`));
+    }
+  };
+  ib.onclick = async () => {
+    if (!ui.files.length) { toast("請先選擇檔案", "bad"); return; }
+    ib.disabled = true;
+    try {
+      const files = [];
+      for (const f of ui.files) files.push({ name: f.name, data: await readB64(f) });
+      const r = await api("/api/tls/inspect", { method: "POST", body: { files, password: pfxPw.value, key_password: keyPw.value } });
+      ui.inspected = r;
+      showResult(r);
+      ab.disabled = !r.ok;
+      if (r.need_password) pfxWrap.hidden = false;
+      if (r.need_key_password) keyWrap.hidden = false;
+    } catch (ex) { toast(ex.message, "bad"); }
+    ib.disabled = false;
+  };
+  ab.onclick = () => {
+    const s = ui.inspected.summary;
+    modal({
+      title: "套用這張憑證", confirmText: "套用",
+      bodyNode: el("p", "small muted", `換成 ${s.subject}（${s.issuer}，${s.validToTaipei} 到期）。`
+        + "新連線立刻使用，已連上的不會中斷；系統會實際連自己一次核對，不對就自動換回原本那張。"),
+      onConfirm: async () => {
+        try {
+          const r = await api("/api/tls/apply", { method: "POST", body: { token: ui.inspected.token } });
+          toast(r.message, "ok");
+          ui.files = []; ui.inspected = null;
+        } catch (ex) { toast(ex.message, "bad"); }
+        checkTlsBanner(); render();
+      },
+    });
+  };
+  up.appendChild(dz); up.appendChild(fl); up.appendChild(pwBox); up.appendChild(act); up.appendChild(res);
+  wrap.appendChild(up);
+  if (ui.files.length) showFiles();
+  if (ui.inspected) { showResult(ui.inspected); ab.disabled = !ui.inspected.ok; }
+
+  // ---- 第 5 步：HSTS
+  const hs = card("5. HSTS", "讓瀏覽器以後一律走 HTTPS");
+  const lab = el("label", "switch" + (st.hsts_allowed ? "" : " disabled"));
+  const cb = el("input");
+  cb.type = "checkbox"; cb.checked = !!cur.hsts; cb.disabled = !st.hsts_allowed;
+  lab.appendChild(cb);
+  lab.appendChild(document.createTextNode(cur.hsts ? "已開啟" : "未開啟"));
+  hs.appendChild(lab);
+  hs.appendChild(el("p", "small muted", st.hsts_allowed
+    ? "開啟後一年內，瀏覽器不會再用 http 連這台。之後憑證出問題時，使用者連「略過警告」都沒有，所以只在正式憑證驗證過後才開。"
+    : "目前是暫用自簽或憑證已過期，不能開啟——開了之後憑證一出問題，使用者連「略過警告」都沒有。"));
+  cb.onchange = async () => {
+    try { await api("/api/tls/settings", { method: "POST", body: { hsts: cb.checked } }); toast(cb.checked ? "HSTS 已開啟" : "HSTS 已關閉", "ok"); }
+    catch (ex) { toast(ex.message, "bad"); }
+    render();
+  };
+  wrap.appendChild(hs);
+}
+
+/* ---------------------------------------------------------------- 3 使用報告 */
+
+async function settingsReport(wrap) {
+  const days = S.reportDays || 30;
+  const head = card("服務使用報告", "數字全由系統的取樣與操作紀錄算出");
+  const per = el("div", "slot-actions");
+  per.appendChild(el("span", "small muted", "期間："));
+  [7, 30, 90].forEach((d) => {
+    const b = el("button", "btn sm" + (d === days ? " primary" : ""), `近 ${d} 天`);
+    b.onclick = () => { S.reportDays = d; render(); };
+    per.appendChild(b);
+  });
+  per.appendChild(el("span", "spacer"));
+  const dj = el("button", "btn sm", "下載 JSON");
+  per.appendChild(dj);
+  head.appendChild(per);
+  const box = el("div");
+  loading(box);
+  head.appendChild(box);
+  wrap.appendChild(head);
+
+  let r;
+  try { r = await api(`/api/admin/usage-report?days=${days}`); } catch (ex) { box.textContent = ex.message; return; }
+  dj.onclick = () => download(`xConsole-使用報告-近${days}天.json`, JSON.stringify(r, null, 1), "application/json");
+  box.textContent = "";
+  box.appendChild(el("p", "small muted", `${r.period.from} 至 ${r.period.to}（台北時間）`));
+  if (r.period.note) box.appendChild(el("p", "note warn", r.period.note));
+
+  const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString("zh-TW");
+  const t = r.build_vs_buy.local;
+  const tiles = el("div", "tiles light");
+  const tile = (k, v, s) => { const d = el("div", "tile"); d.appendChild(el("div", "k", k)); d.appendChild(el("div", "v", v)); if (s) d.appendChild(el("div", "s", s)); return d; };
+  tiles.appendChild(tile("登入次數", fmtN(r.people.logins_ok), `失敗 ${fmtN(r.people.logins_failed)} 次`));
+  tiles.appendChild(tile("操作次數", fmtN(r.people.operations), `${fmtN(r.people.distinct_users)} 個帳號`));
+  tiles.appendChild(tile("地端處理請求", fmtN(t.requests), `匯入 ${fmtN(t.prompt)} token`));
+  tiles.appendChild(tile("快取命中", r.build_vs_buy.cache_hit_ratio === null ? "—" : `${(r.build_vs_buy.cache_hit_ratio * 100).toFixed(1)}%`, "重用的提示占比"));
+  tiles.appendChild(tile("GPU 用電", `${r.spend.gpu_energy_kwh} 度`, r.spend.est_ntd ? `約 NT$ ${fmtN(r.spend.est_ntd)}` : "未設電價"));
+  tiles.appendChild(tile("待處理", String(r.health.items.length), r.health.summary));
+  box.appendChild(tiles);
+
+  // 設備
+  const ac = card("設備有沒有用到");
+  const sb = el("div", "scrollbox");
+  const tb = el("table");
+  tb.innerHTML = "<thead><tr><th>機器</th><th>在線比例</th><th>池子平均／峰值</th><th>系統記憶體最低</th><th>低於底線</th><th>運作中欄位</th></tr></thead>";
+  const body = el("tbody");
+  r.assets.nodes.forEach((n) => {
+    const tr = el("tr");
+    [n.node, n.online_ratio === null ? "—" : `${(n.online_ratio * 100).toFixed(1)}%`,
+     `${fmt(n.pool_used_avg_gib)}／${fmt(n.pool_used_peak_gib)} GiB（共 ${fmt(n.pool_total_gib, 0)}）`,
+     n.memory_model === "unified_single" ? "單一池" : `${fmt(n.ram_free_min_gib)} GiB`,
+     `${n.below_floor_samples} 次`, `${fmt(n.slots_busy_avg, 1)}／${n.slots_total}`].forEach((v) => tr.appendChild(el("td", null, v)));
+    body.appendChild(tr);
+  });
+  if (!r.assets.nodes.length) { const tr = el("tr"); const td = el("td", null, "本期還沒有取樣資料"); td.colSpan = 6; tr.appendChild(td); body.appendChild(tr); }
+  tb.appendChild(body); sb.appendChild(tb); ac.appendChild(sb);
+  wrap.appendChild(ac);
+
+  // 健康
+  const hc = card("系統健康與治理", r.health.summary);
+  if (!r.health.items.length) hc.appendChild(el("p", "note", "本期無異常。"));
+  r.health.items.forEach((it) => {
+    const g = el("div", "res-group " + (it.level === "緊急" ? "bad" : "warn"));
+    g.appendChild(el("h4", null, `${it.level}：${it.what}`));
+    g.appendChild(el("div", "small", it.fix));
+    hc.appendChild(g);
+  });
+  wrap.appendChild(hc);
+
+  // 估算假設
+  const sc = card("估算用的假設", "沒有設定就不換算金額，報告裡會寫明");
+  sc.appendChild(el("p", "assume", r.spend.assumption));
+  sc.appendChild(el("p", "assume", r.build_vs_buy.assumption || r.build_vs_buy.cloud_equivalent?.assumption || ""));
+  let cfg;
+  try { cfg = (await api("/api/settings")).report || {}; } catch (_) { cfg = {}; }
+  // 填單價是罕用的管理動作，平常收起來；假設的文字說明上面照常顯示
+  const det = el("details");
+  const sumy = el("summary", "small", "修改估算假設（電價、雲端參考單價）");
+  sumy.style.cursor = "pointer";
+  det.appendChild(sumy);
+  const fr = el("div", "form-row");
+  fr.style.marginTop = "10px";
+  const mk = (label, v, ph) => { const d = el("div"); d.appendChild(el("label", null, label)); const i = Object.assign(el("input"), { type: "text", value: v ?? "", placeholder: ph || "" }); d.appendChild(i); fr.appendChild(d); return i; };
+  const ref = cfg.cloud_ref || {};
+  const pI = mk("電價（NT$／度）", cfg.price_ntd_per_kwh, "例：貴單位電費單上的平均單價");
+  const nI = mk("雲端參考模型名稱", ref.name, "例：某雲端模型");
+  const iI = mk("每百萬輸入 token（US$）", ref.usd_per_mtok_in, "照該模型官方定價填");
+  const oI = mk("每百萬輸出 token（US$）", ref.usd_per_mtok_out, "照該模型官方定價填");
+  const fI = mk("匯率（NT$／US$）", ref.ntd_per_usd, "選填");
+  det.appendChild(fr);
+  sc.appendChild(det);
+  const sv = el("button", "btn sm", "儲存假設");
+  sv.onclick = async () => {
+    try {
+      await api("/api/settings", { method: "POST", body: { report: { price_ntd_per_kwh: pI.value,
+        cloud_ref: { name: nI.value, usd_per_mtok_in: iI.value, usd_per_mtok_out: oI.value, ntd_per_usd: fI.value } } } });
+      toast("已儲存，報告會依新的假設重算", "ok"); render();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  const svr = el("div", "slot-actions"); svr.appendChild(sv); det.appendChild(svr);
+  sc.appendChild(el("p", "small muted", "要產出給主管看的 Word 月報，在有 xConsole 原始碼的電腦上執行："
+    + "python3 scripts/report/build_usage_report.py --days 30"));
+  wrap.appendChild(sc);
+}
+
+/* ---------------------------------------------------------------- 4 帳號與安全 */
+
+async function settingsAccount(wrap) {
+  let me = {};
+  try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
+  const c = card("變更密碼", `目前登入：${me.username || "admin"}`);
+  const fr = el("div", "form-row");
+  const mk = (label) => { const d = el("div"); d.appendChild(el("label", null, label)); const i = Object.assign(el("input"), { type: "password", autocomplete: "new-password" }); d.appendChild(i); fr.appendChild(d); return i; };
+  const o = mk("目前的密碼");
+  const n1 = mk("新密碼（至少 8 碼）");
+  const n2 = mk("再輸入一次新密碼");
+  c.appendChild(fr);
+  const b = el("button", "btn sm primary", "變更密碼");
+  const go2 = async () => {
+    if (n1.value !== n2.value) { toast("兩次輸入的新密碼不一樣", "bad"); return; }
+    try {
+      const r = await api("/api/account/password", { method: "POST", body: { old: o.value, new: n1.value } });
+      toast(r.message, "ok");
+      setTimeout(showLogin, 800);
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  b.onclick = go2;
+  [o, n1, n2].forEach((x) => imeGuard(x, go2));
+  const br = el("div", "slot-actions"); br.appendChild(b); c.appendChild(br);
+  c.appendChild(el("p", "small muted", "密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。變更後所有已登入的裝置都會被登出。"));
+  wrap.appendChild(c);
+
+  const ac = card("最近的操作紀錄", "只記操作與結果，不記密碼、私鑰與權杖");
+  const box = el("div");
+  loading(box);
+  ac.appendChild(box);
+  wrap.appendChild(ac);
+  try {
+    const items = (await api("/api/admin/audit?limit=200")).items;
+    const LABEL = { "auth.login": "登入", "slot.start": "啟動", "slot.stop": "停止", "slot.restart": "重啟",
+      "model.swap": "換模型", "profile.apply": "切換情境", "all.stop": "全部停止", "tls.inspect": "檢查憑證",
+      "tls.apply": "套用憑證", "tls.rollback": "還原憑證", "tls.csr": "產生 CSR", "tls.hsts": "HSTS 開關",
+      "tls.hostnames": "修改網址", "tls.bootstrap": "重產自簽", "tls.expiry_notice": "憑證到期提醒",
+      "trust.import": "信任代理憑證", "account.password": "變更密碼", "settings.report": "修改報告假設" };
+    const sb = el("div", "scrollbox");
+    const tb = el("table");
+    tb.innerHTML = "<thead><tr><th>時間（台北）</th><th>帳號</th><th>來源</th><th>動作</th><th>對象</th><th>結果</th></tr></thead>";
+    const body = el("tbody");
+    items.forEach((a) => {
+      const tr = el("tr");
+      [new Date(a.ts * 1000).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }),
+       a.user || "—", a.ip || "—", LABEL[a.action] || a.action, a.target || "—",
+       a.ok ? "成功" : ((a.detail && a.detail.blocked) ? "被准入擋下" : "失敗")].forEach((v) => tr.appendChild(el("td", null, v)));
+      body.appendChild(tr);
+    });
+    if (!items.length) { const tr = el("tr"); const td = el("td", null, "還沒有紀錄"); td.colSpan = 6; tr.appendChild(td); body.appendChild(tr); }
+    tb.appendChild(body); sb.appendChild(tb);
+    box.textContent = ""; box.appendChild(sb);
+  } catch (ex) { box.textContent = ex.message; }
 }
 
 function render() {
@@ -887,7 +1437,8 @@ async function refresh() {
     S.lastOk = Date.now();
     $("#live").classList.remove("stale");
     $("#live-text").textContent = "即時";
-    render();
+    // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
+    if (S.view === "settings" || S.view === "logs") renderNav(); else render();
   } catch (ex) {
     $("#live").classList.add("stale");
     $("#live-text").textContent = "更新失敗";
@@ -897,6 +1448,7 @@ async function refresh() {
 function start() {
   $("#login").hidden = true;
   $("#app").hidden = false;
+  checkTlsBanner();
   refresh();
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!S.busy.size) refresh(); }, 15000);

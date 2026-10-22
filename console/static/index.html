@@ -16,6 +16,8 @@
   <form class="login-card" id="login-form">
     <h1>xConsole 模型主控台</h1>
     <p>云碩科技地端 AI 機群</p>
+    <label class="field" for="un">帳號</label>
+    <input type="text" id="un" autocomplete="username" required value="admin">
     <label class="field" for="pw">密碼</label>
     <input type="password" id="pw" autocomplete="current-password" required>
     <div class="actions" style="justify-content:stretch;margin-top:16px">
@@ -51,6 +53,7 @@
     <div class="topbar-row two"><div class="subnav" id="subnav"></div></div>
   </header>
 
+  <div id="tls-banner" class="banner" hidden></div>
   <main id="main"></main>
 </div>
 

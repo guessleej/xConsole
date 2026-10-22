@@ -349,6 +349,10 @@ main { min-height: calc(100vh - 98px); }
 }
 /* 欄位變窄後間距自然收斂；再給一個上限避免極寬時又被拉開 */
 .kv > * { min-width: 0; }
+/* 憑證指紋這類冒號串沒有斷行點，手機上會把整頁撐寬（實際踩到：scrollWidth 502／視窗 375）。
+   數值允許任意處斷行。 */
+.kv .v { overflow-wrap: anywhere; text-align: right; }
+.kv .k { flex: none; }      /* 標籤不被長數值擠成「涵蓋的網／址」兩行 */
 .hw-grid .kv { max-width: 260px; }
 .kv .k { color: var(--ink-3); }
 .kv .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -611,4 +615,126 @@ label.field { display: block; margin-top: 12px; font-size: 13.5px; color: var(--
   /* 硬體四區也排兩欄 */
   .hw-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .hw-grid .kv { max-width: none; }
+
+}
+
+
+/* ---------------------------------------------------------- 憑證、報表、帳號（2026-10-22）
+   一樣的規矩：狀態靠色底與圓點表達，不用色條、不用彩色描邊。 */
+
+.banner {
+  max-width: 1440px;
+  margin: 12px auto 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(198, 40, 40, .12);
+  color: var(--bad);
+  font-size: 14px;
+  font-weight: 600;
+}
+.banner a { color: inherit; }
+
+.steps-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.steps-head .count { font-weight: 700; }
+.steps-head .next { font-size: 13px; color: var(--ink-3); }
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+.step {
+  background: var(--panel);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.step .t { font-weight: 700; font-size: 14px; display: flex; gap: 7px; align-items: center; }
+.step .why { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+.step .st { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 20px; align-self: flex-start; }
+.step.done .st { background: rgba(46, 125, 50, .13); color: var(--ok); }
+.step.now { background: rgba(191, 24, 31, .07); }
+.step.now .st { background: var(--brand); color: #fff; }
+.step.blocked .st { background: rgba(22, 32, 42, .07); color: var(--ink-3); }
+:root[data-theme="dark"] .step.blocked .st { background: rgba(255, 255, 255, .08); }
+.step.skip .st { background: rgba(217, 119, 6, .13); color: var(--warn); }
+.step .n {
+  width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center;
+  font-size: 11.5px; background: rgba(22, 32, 42, .08); color: var(--ink-2); flex: none;
+}
+.step.done .n { background: var(--ok); color: #fff; }
+.step.now .n { background: var(--brand); color: #fff; }
+
+.dropzone {
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background .15s ease;
+  outline: 2px dashed rgba(22, 32, 42, .14);
+  outline-offset: -8px;
+}
+:root[data-theme="dark"] .dropzone { outline-color: rgba(255, 255, 255, .14); }
+.dropzone.over { background: rgba(191, 24, 31, .07); }
+.dropzone strong { color: var(--ink); display: block; margin-bottom: 4px; }
+.filelist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+.res-group { border-radius: var(--radius-sm); padding: 10px 14px; margin-top: 10px; }
+.res-group h4 { margin: 0 0 4px; font-size: 13.5px; }
+.res-group ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+.res-group.ok { background: rgba(46, 125, 50, .09); }
+.res-group.ok h4 { color: var(--ok); }
+.res-group.warn { background: rgba(217, 119, 6, .1); }
+.res-group.warn h4 { color: var(--warn); }
+.res-group.bad { background: rgba(198, 40, 40, .09); }
+.res-group.bad h4 { color: var(--bad); }
+
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; }
+.form-row label { font-size: 13px; color: var(--ink-2); display: block; margin-bottom: 4px; }
+textarea {
+  width: 100%;
+  min-height: 74px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  resize: vertical;
+}
+.switch { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+.switch input { width: auto; }
+.switch.disabled { opacity: .5; cursor: not-allowed; }
+
+.big-num { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.tiles.light .tile {
+  background: var(--panel);
+  border: 1px solid transparent;
+  color: var(--ink);
+  backdrop-filter: none;
+}
+.tiles.light .tile .k, .tiles.light .tile .s { color: var(--ink-3); }
+.assume { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; line-height: 1.6; }
+
+/* 手機版覆寫要放在檔案最後面：同樣權重下後寫的贏。
+   放在前面的媒體查詢裡會被後面才定義的 .steps／.form-row 基本樣式蓋掉（實際踩到：改了頁長完全沒變）。 */
+@media (max-width: 860px) {
+  /* 設定順序軸：五步疊起來將近一屏，手機改成橫向滑動，現在這步會被捲到眼前 */
+  .steps {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .steps::-webkit-scrollbar { display: none; }
+  .steps > .step { flex: 0 0 min(72vw, 240px); scroll-snap-align: start; }
+  /* 表單欄位兩欄 */
+  .form-row { grid-template-columns: 1fr 1fr; }
 }

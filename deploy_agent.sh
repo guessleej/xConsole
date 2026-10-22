@@ -51,4 +51,6 @@ systemctl --user restart xconsole-agent.service   # 已在跑時 enable --now �
 sleep 2
 systemctl --user is-active xconsole-agent.service
 echo "權杖已產生於 $HOME/.xconsole/token（0600，不印出內容）"
-curl -s -m 5 http://127.0.0.1:9401/healthz; echo'
+sleep 2
+# 代理現在走 HTTPS：用它自己的憑證驗證，不加 -k
+curl -s -m 8 --cacert $HOME/.xconsole/agent-cert.pem https://127.0.0.1:9401/healthz; echo'

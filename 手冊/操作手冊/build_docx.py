@@ -337,7 +337,13 @@ def build(meta, blocks, pages):
                         add_inline(par, txt, 9.5, INK)
                 if ri == 0:
                     repeat_header(tb.rows[0])
-                # 短表格整張不拆頁：三列的表最後一列單獨掉到下一頁很難看（表 1-1 實際踩到）
+                # 每一列本身都不准拆成兩半掉到下一頁
+                trpr = tb.rows[ri]._tr.get_or_add_trPr()
+                if trpr.find(qn("w:cantSplit")) is None:
+                    trpr.append(OxmlElement("w:cantSplit"))
+                # 短表格整張不拆頁：三列的表最後一列單獨掉到下一頁很難看（表 1-1 實際踩到）。
+                # 門檻不要開太大：表格整張推到下一頁時，章標題會孤零零留在上一頁（試過 12 列，第五章就這樣）。
+                # 表格太長就該把內容收斂，不是硬撐門檻
                 if len(rows) <= 10 and ri < len(rows) - 1:
                     for cell in tb.rows[ri].cells:
                         for par in cell.paragraphs:
