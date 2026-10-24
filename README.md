@@ -160,6 +160,18 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 cd ~/xconsole && python3 xconsole_server.py --set-credentials
 ```
 
+### 客戶品牌與頁尾（賣給客戶時換成客戶的名稱與 Logo）
+
+「設定 → 5 品牌與外觀」可以改**單位名稱**（例：中原大學）、**系統名稱**（例：AI 模型主控台）並上傳 **Logo**。
+套用後頁首、登入頁、瀏覽器分頁標題與小圖示一起換，不用重開服務。
+
+- Logo 只收 PNG、JPEG、WebP，1 MB 以內，寬高 16～4096 像素；看檔頭判斷格式，不看副檔名。**不收 SVG**（可以夾帶程式碼）。
+- Logo 一律放在白底上顯示，深色模式下深色字的校徽也看得清楚；瀏覽器分頁小圖示用單位名稱第一個字產生（橫式 Logo 縮成正方形會擠成一團）。
+- 品牌資料與 Logo 不用登入就讀得到（登入頁要用），改動要登入，每次變更都寫進稽核紀錄（不記圖檔內容）。
+- 存在 `~/.xconsole/fleet.json` 的 `branding` 與 `~/.xconsole/branding/logo.*`（0600）。
+- 每一頁最下方的「Powered by xCloudinfo 云碩科技」寫死在 `index.html`，**不開放關掉**；`test_branding.py` 守著登入頁與主畫面各一個。
+- 品牌資料回來之前先把品牌區藏住，避免畫面先閃一下預設的 xConsole 才換成客戶名稱。
+
 ### HTTPS 與憑證（管理者在網頁上自己換）
 
 「設定 → HTTPS 與憑證」照 5 步設定順序軸操作，每一步的狀態由系統實際資料算出：
@@ -212,6 +224,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 |---|---|---|---|
 | `agent/test_admit.py` | 任何機器 | 15 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
 | `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
+| `console/test_branding.py` | 任何 Linux | 49 | 客戶品牌：名稱驗證、Logo 只認 PNG／JPEG／WebP 檔頭（SVG、偽裝檔、超大檔被擋）、未登入、權限 0600、稽核不記圖檔、頁尾寫死 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
 | `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
