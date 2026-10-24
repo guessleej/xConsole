@@ -197,7 +197,7 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 /* ---------------------------------------------------------- 內容 */
 
-main { min-height: calc(100vh - 98px - 56px); }   /* 扣掉頁尾，短頁面不用捲就看得到頁尾 */
+main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不用捲就看得到頁尾 */
 .wrap { max-width: 1440px; margin: 0 auto; padding: 22px 24px 48px; }
 
 .hero {
@@ -880,7 +880,13 @@ html.brand-pending #login-org { visibility: hidden; }
 }
 .brand-preview img { height: 34px; width: auto; max-width: 220px; object-fit: contain; background: #fff; border-radius: 7px; padding: 3px 7px; }
 
+/* 品牌區不准被導覽列擠壓：客戶名稱多半是中文長字串，被壓縮就變成一字一行 */
+.brand { flex: none; white-space: nowrap; }
+.livedot { white-space: nowrap; }
+
 @media (max-width: 860px) {
   .brand-logo { height: 26px; max-width: 120px; padding: 2px 5px; }
-  #brand-name { font-size: 15px; }
+  /* 手機上有 Logo 就只放 Logo（它已經表明是誰）；沒有 Logo 時名稱太長用省略號收尾 */
+  .brand-logo:not([hidden]) ~ #brand-name { display: none; }
+  #brand-name { font-size: 15px; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; }
 }
