@@ -15,6 +15,7 @@ import base64
 import datetime as dt
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
@@ -734,6 +735,30 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "找不到"})
 
 
+def wait_for_address(seconds=60):
+    """開機時 user 服務會比網路先起來：這時抓不到對外 IP，hostnames() 退回主機名稱，
+    ensure() 就產一張不含 IP 的暫用自簽，網路好了再重啟又重產一張（2026-10-22 中原主機重開機實際踩到）。
+    沒自訂網址時，先等到抓得到 IP 再產憑證；等不到就照舊，不擋啟動。"""
+    if fleet()["tls"].get("hostnames"):
+        return
+    cur = CERTS.current()
+    if cur and cur.get("source") != "selfsigned":
+        return                      # 匯入的正式憑證 ensure() 不會重產，不必等
+    for _ in range(seconds):
+        if is_ip(tls.default_hostnames()[0]):
+            return
+        time.sleep(1)
+
+
+def is_ip(text):
+    """真的解析成 IP 才算；只由十六進位字元組成的主機名稱（容器常見的 abcdef1234）不能當成 IP。"""
+    try:
+        ipaddress.ip_address(text)
+        return True
+    except ValueError:
+        return False
+
+
 def main():
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
@@ -741,6 +766,7 @@ def main():
     moved = migrate_tokens()
     if moved:
         print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
+    wait_for_address()
     fresh = CERTS.ensure(hostnames())
     srv = tls.TLSServer(("0.0.0.0", PORT), Handler)
     srv.certs = CERTS
