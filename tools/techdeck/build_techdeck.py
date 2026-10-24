@@ -321,7 +321,7 @@ def build():
     return out, len(d.prs.slides)
 
 
-BAD_CHARS = re.compile(r"[①-⓿❶-➓㉑-㊿─-╿▀-▟■□▲▼◆◇★☆※\U0001F300-\U0001FAFF☀-⛿✀-➿]")
+BAD_CHARS = re.compile(r"[①-⓿㉑-㊿─-╿▀-▟■□▲▼◆◇★☆※\U0001F300-\U0001FAFF☀-⛿✀-➿]")
 OK_FILLS = ("zebra", "cover-mask", "inner-status")
 
 

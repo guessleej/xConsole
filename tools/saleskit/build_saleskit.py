@@ -279,7 +279,7 @@ def build(ind_name, c):
     return out, len(d.prs.slides)
 
 
-BAD_CHARS = re.compile(r"[\u2460-\u24FF\u2776-\u2793\u3251-\u32BF\u2500-\u259F\u2600-\u27BF\U0001F300-\U0001FAFF]")
+BAD_CHARS = re.compile(r"[\u2460-\u24FF\u3251-\u32BF\u2500-\u259F\u2600-\u27BF\U0001F300-\U0001FAFF]")
 
 
 def qa_pptx(path, prs):
