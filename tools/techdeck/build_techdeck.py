@@ -26,6 +26,12 @@ from pptx.oxml.ns import qn
 from pptx.util import Inches as I, Pt
 
 HERE = Path(__file__).resolve().parent
+SKILLS = Path(os.path.expanduser("~/.claude/skills"))
+_need = [SKILLS / "xcloud-deck-build/assets/xcloud-template.pptx", SKILLS / "xcloud-deck-build/assets/pptx_anim.py",
+         SKILLS / "arch-diagram-style/msicon_png.py", SKILLS / "xcloud-visio-diagram"]
+_miss = [str(x) for x in _need if not x.exists()]
+if _miss:  # 內部素材不在公開 repo，見 手冊/Sales Kit/README.md「前置條件」
+    sys.exit("缺少云碩內部簡報素材，無法建置：\n  " + "\n  ".join(_miss))
 sys.path.insert(0, os.path.expanduser("~/.claude/skills/arch-diagram-style"))
 sys.path.insert(0, os.path.expanduser("~/.claude/skills/xcloud-deck-build/assets"))
 from msicon_png import icon_png  # noqa: E402

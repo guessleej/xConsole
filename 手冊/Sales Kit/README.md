@@ -16,10 +16,17 @@
 
 ## 重建
 
+在 repo 根目錄執行（兩行各自獨立，可以只跑其中一行）：
+
 ```bash
-cd tools/saleskit && /opt/homebrew/bin/python3.14 build_saleskit.py --industry all
-cd tools/techdeck && /opt/homebrew/bin/python3.14 build_techdeck.py
+(cd tools/saleskit && /opt/homebrew/bin/python3.14 build_saleskit.py --industry all)
+(cd tools/techdeck && /opt/homebrew/bin/python3.14 build_techdeck.py)
 ```
+
+前置條件：python-pptx、LibreOffice（`soffice`）、rsvg-convert，以及云碩內部的三組簡報素材——
+公司簡報模板與動畫模組（`~/.claude/skills/xcloud-deck-build/assets/`）、圖示庫（`~/.claude/skills/arch-diagram-style/`）、
+Visio 風圖產生器（`~/.claude/skills/xcloud-visio-diagram/`）。這三組含公司識別與授權圖示，不放進本公開 repo，
+所以 repo 外的人無法重建簡報，只能使用已產出的 pptx 與 pdf；缺任何一組時，建置腳本會直接列出缺哪一個路徑。
 
 文案在 `tools/saleskit/content.py`（產業差異）與 `pages.py`（共用頁）、技術長版在 `tools/techdeck/pages_tech.py`；
 圖在 `diagrams.py`、`diagrams_tech.py`。建置時會先跑自動檢查（超出頁面、色條、壓到 logo、字級、圈碼與 emoji、
