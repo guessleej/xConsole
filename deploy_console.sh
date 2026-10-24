@@ -33,7 +33,7 @@ NODE_JSON=""
 # （實際踩到：declare -A 報錯，但因為鍵剛好都是數字被當成一般陣列索引，群組碰巧還是對的）
 group_of() {
   case "$1" in
-    26|27)          echo "AMD Strix Halo" ;;
+    26|27)          echo "AMD AI 395 Strix Halo" ;;
     24|25|32)       echo "DGX Spark" ;;
     20|21|23|248)   echo "Jetson / MIC-743" ;;
     28|29|30|50)    echo "NVIDIA 伺服器" ;;

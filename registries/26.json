@@ -4,7 +4,7 @@
   "ip": "192.168.11.26",
   "host": "HP-Z2-Mini-G1a",
   "name": ".26 hpamd",
-  "group": "AMD Strix Halo",
+  "group": "AMD AI 395 Strix Halo",
   "memory_model": "unified_split",
   "ram_floor_gib": 15,
   "vram_floor_gib": 2,

@@ -250,8 +250,8 @@ Jetson 與 DGX Spark 則相反，它們的 `nvidia-smi` 在記憶體總量欄位
 
 | 機器 | 群組 | 記憶體架構 | 角色 |
 |---|---|---|---|
-| .27（192.168.11.27） | AMD Strix Halo | unified_split | 主控台所在機器，同時為抓料清洗引擎 |
-| .26（192.168.11.26） | AMD Strix Halo | unified_split | 寫程式後端（同事 Copilot 使用） |
+| .27（192.168.11.27） | AMD AI 395 Strix Halo | unified_split | 主控台所在機器，同時為抓料清洗引擎 |
+| .26（192.168.11.26） | AMD AI 395 Strix Halo | unified_split | 寫程式後端（同事 Copilot 使用） |
 | .20（192.168.11.20） | Jetson／MIC-743 | unified_single | 醫美廣告影片產線 |
 
 : 表 4-1　目前納管的機器（2026/10/22）

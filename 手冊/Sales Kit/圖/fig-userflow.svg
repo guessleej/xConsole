@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 780" width="1400" height="780" font-family="Noto Sans TC, Microsoft JhengHei, PingFang TC, sans-serif">
+  <defs><marker id="ar-orange" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#ea580c"/></marker><marker id="ar-violet" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#7c3aed"/></marker><marker id="ar-green" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#059669"/></marker><marker id="ar-blue" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0 1 L11 6 L0 11 z" fill="#2563eb"/></marker></defs>
+  <rect width="1400" height="780" fill="#ffffff"/>
+  <g transform='translate(600.000,322.727) scale(0.25253)'>
+<g id="File_x2C__general">
+	
+</g>
+<g id="Management_console">
+	<g>
+		<path fill="#7c3aed" d="M198.7,172.9v266.1h394.8V172.9H198.7z M576.4,421.8H215.9V232.9h360.5V421.8z"/>
+		<polygon fill="#7c3aed" points="258.8,396 318.9,396 318.9,335.9 258.8,335.9 		"/>
+		<path fill="#7c3aed" d="M323.2,323.1h-68.7v-68.7h68.7V323.1z M263.1,314.5h51.5V263h-51.5V314.5z"/>
+		<path fill="#7c3aed" d="M426.2,400.3h-68.7v-68.7h68.7V400.3z M366.1,391.7h51.5v-51.5h-51.5V391.7z"/>
+		<polygon fill="#7c3aed" points="361.8,318.8 421.9,318.8 421.9,258.7 361.8,258.7 		"/>
+		<polygon fill="#7c3aed" points="464.8,396 524.9,396 524.9,335.9 464.8,335.9 		"/>
+		<path fill="#7c3aed" d="M529.2,323.1h-68.7v-68.7h68.7V323.1z M469.1,314.5h51.5V263h-51.5V314.5z"/>
+	</g>
+</g>
+<g id="paths">
+	<g id="Access_control">
+	</g>
+	<g id="Azure_active_directory">
+	</g>
+	<g id="Generic_code">
+	</g>
+	<g id="Laptop">
+	</g>
+	<g id="Load_balancer">
+	</g>
+	<g id="Lock_x2C__protected">
+	</g>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+</g>
+  <text x="772" y="340" font-size="25" fill="#bf181f" text-anchor="start" font-weight="700">xConsole主控台</text>
+  <text x="640" y="476" font-size="20" fill="#16202a" text-anchor="end" font-weight="700">先算再載入</text>
+  <text x="640" y="501" font-size="18" fill="#64748b" text-anchor="end">全程HTTPS</text>
+  <text x="640" y="524" font-size="18" fill="#64748b" text-anchor="end">動作全程留紀錄</text>
+  <rect x="770" y="744" width="20" height="20" rx="5" fill="#059669"/>
+  <text x="800" y="760" font-size="20" fill="#334155" text-anchor="start">資料進來</text>
+  <rect x="906" y="744" width="20" height="20" rx="5" fill="#2563eb"/>
+  <text x="936" y="760" font-size="20" fill="#334155" text-anchor="start">使用者操作</text>
+  <rect x="1062" y="744" width="20" height="20" rx="5" fill="#ea580c"/>
+  <text x="1092" y="760" font-size="20" fill="#334155" text-anchor="start">管理者設定</text>
+  <rect x="1218" y="744" width="20" height="20" rx="5" fill="#7c3aed"/>
+  <text x="1248" y="760" font-size="20" fill="#334155" text-anchor="start">平台輸出</text>
+  <!--xh-step-->
+  <rect x="470" y="16" width="660" height="212" rx="10" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="10 6"/>
+  <text x="1116" y="214" font-size="25" fill="#bf181f" text-anchor="end" font-weight="700">管理者</text>
+  <g transform='translate(495.304,-48.534) scale(0.47431)'>
+<g id="paths">
+	<g id="Access_control">
+	</g>
+	<g id="Azure_active_directory">
+	</g>
+	<g id="Generic_code">
+	</g>
+	<g id="Laptop">
+	</g>
+	<g id="Load_balancer">
+	</g>
+	<g id="Lock_x2C__protected">
+	</g>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+<g id="User">
+	
+	<g>
+		<g id="shape101-188_1_" transform="translate(7.20825,-11.5207)">
+			
+			<path fill="#ea580c" d="M380.4,242.5c-21.4,5.1-33.9,28.7-27.9,52.8c6,24,27.9,38.6,49.3,33.5c21.4-5.1,33.9-28.7,27.9-52.8
+				C423.7,252.4,401.4,237.4,380.4,242.5z"/>
+		</g>
+		<g id="shape102-190_1_">
+			
+			<path fill="#ea580c" d="M433.4,323.7c-3.9-0.4-8.6,7.3-14.6,10.3c-6,2.6-12.4,8.1-29.6,0c-17.2-8.1-19.7-15-34.3-15
+				s-37.7,25.7-38.2,63h145.8c-0.4,0-1.7-25.7-9.9-39.5C442.9,324.1,437.3,323.7,433.4,323.7z"/>
+		</g>
+	</g>
+</g>
+</g>
+  <text x="680" y="46.0" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">資訊室</text>
+  <text x="680" y="158.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">主控台管理者</text>
+  <g transform='translate(895.522,46.176) scale(0.16282)'>
+<g id="Layer_1_1_">
+	<g id="File_x2C__general">
+		
+	</g>
+</g>
+<g id="Access_control">
+</g>
+<g id="Azure_active_directory">
+</g>
+<g id="Generic_code">
+</g>
+<g id="Laptop">
+	<path fill="#ea580c" d="M579.7,383.7c0-189.7,0-189.7,0-189.7c0-9.4-8.6-24.9-18.9-24.9c-23.2,0-328.7,0-328.7,0
+		c-10.3,0-20.6,15.5-20.6,24.9c0,189.7,0,189.7,0,189.7c-36.9,39.5-35.2,39.5-35.2,39.5c0,11.2,10.3,19.7,23.2,19.7
+		c394,0,394,0,394,0c12.9,0,23.2-9.4,23.2-19.7L579.7,383.7L579.7,383.7L579.7,383.7z M426.9,426.6c-68.7,0-68.7,0-68.7,0
+		c-3.4,0-6.9-1.7-6.9-3.4c7.7-12.9,7.7-12.9,7.7-12.9c0-1.7,2.6-2.6,6-2.6c54.9,0,54.9,0,54.9,0c2.6,0,5.2,0.9,5.2,2.6
+		c8.6,12.9,8.6,12.9,8.6,12.9C433.8,425.7,430.3,426.6,426.9,426.6L426.9,426.6z M563.4,382.8c-338.2,0-335.6,0-335.6,0
+		c0-187.1,0-187.1,0-187.1c0-4.3,4.3-10.3,9.4-10.3c319.3,0,317.6,0,317.6,0c5.2,0,8.6,6,8.6,10.3V382.8L563.4,382.8L563.4,382.8
+		L563.4,382.8z"/>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+</g>
+  <text x="960" y="46.0" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">老師或助教</text>
+  <text x="960" y="158.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">也可以是管理者</text>
+  <path d="M680 176 V 346" stroke="#ea580c" stroke-width="2.6" fill="none" marker-end="url(#ar-orange)"/>
+  <text x="664" y="250" font-size="20" fill="#16202a" text-anchor="end" font-weight="700">1.看各機記憶體</text>
+  <text x="664" y="274" font-size="20" fill="#16202a" text-anchor="end" font-weight="700">換模型、下載模型</text>
+  <path d="M960 176 V 300 H 732 V 346" stroke="#ea580c" stroke-width="2.6" fill="none" marker-end="url(#ar-orange)"/>
+  <text x="976" y="262" font-size="20" fill="#16202a" text-anchor="start" font-weight="700">2.開金鑰、調上下文</text>
+  <!--xh-step-->
+  <g transform='translate(1040.000,337.500) scale(1.43885)'>
+<g id="Layer_1">
+	<g id="File_x2C__general">
+		
+	</g>
+	<g id="Message">
+	</g>
+	<g id="Monitor">
+	</g>
+	<g id="Monitor_running_apps">
+	</g>
+	<g id="Mouse">
+	</g>
+	<g id="Network_card">
+	</g>
+	<g id="Not_allowed">
+	</g>
+	<g id="Performance">
+	</g>
+	<g id="Phone">
+	</g>
+	<g id="Plug_and_play">
+	</g>
+	<g id="Powershell_script_file">
+	</g>
+	<g id="Protocol_stack">
+	</g>
+	<g id="Queue_x2C__general">
+	</g>
+	<g id="RMS_connector">
+	</g>
+	<g id="Router">
+	</g>
+	<g id="Script_file">
+	</g>
+	<g id="Secure_virtual_machine">
+	</g>
+	<g id="Server_farm">
+		<g>
+			<g>
+				<path fill="#7c3aed" d="M29.5,26H15.9c-0.9,0-1.7,0.7-1.7,1.7V61h17V27.7C31.2,26.8,30.4,26,29.5,26z M28.2,58h-11v-2h11V58z
+					 M28.2,54h-11v-2h11V54z M28.2,33h-11v-2h11V33z"/>
+			</g>
+			<g>
+				<path fill="#7c3aed" d="M48.5,25.9H34.9c-0.9,0-1.7,0.7-1.7,1.7v33.3h17V27.6C50.2,26.7,49.4,25.9,48.5,25.9z M47.2,57.9h-11v-2
+					h11V57.9z M47.2,53.9h-11v-2h11V53.9z M47.2,32.9h-11v-2h11V32.9z"/>
+			</g>
+			<g>
+				<path fill="#7c3aed" d="M67.5,26H53.9c-0.9,0-1.7,0.7-1.7,1.7V61h17V27.7C69.2,26.8,68.4,26,67.5,26z M66.2,58h-11v-2h11V58z
+					 M66.2,54h-11v-2h11V54z M66.2,33h-11v-2h11V33z"/>
+			</g>
+		</g>
+	</g>
+</g>
+<g id="paths">
+	<g id="Access_control">
+	</g>
+	<g id="Azure_active_directory">
+	</g>
+	<g id="Generic_code">
+	</g>
+	<g id="Laptop">
+	</g>
+	<g id="Load_balancer">
+	</g>
+	<g id="Lock_x2C__protected">
+	</g>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+</g>
+  <text x="1100" y="346" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">AI機</text>
+  <text x="1154" y="396" font-size="20" fill="#16202a" text-anchor="start" font-weight="700">AI 395、Jetson</text>
+  <text x="1154" y="421" font-size="20" fill="#16202a" text-anchor="start" font-weight="700">DGX Spark</text>
+  <text x="1154" y="446" font-size="18" fill="#64748b" text-anchor="start">失敗自動換回</text>
+  <path d="M754 384 H 1052" stroke="#7c3aed" stroke-width="2.6" fill="none" marker-end="url(#ar-violet)"/>
+  <text x="903" y="368" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">3.先試算，再載入並驗證</text>
+  <path d="M1052 424 H 754" stroke="#059669" stroke-width="2.6" fill="none" marker-end="url(#ar-green)"/>
+  <text x="903" y="456" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">6.每5分鐘取樣</text>
+  <!--xh-step-->
+  <g transform='translate(38.358,344.640) scale(0.18091)'>
+<g id="Layer_1_1_">
+	<g id="File_x2C__general">
+		
+	</g>
+</g>
+<g id="Access_control">
+</g>
+<g id="Azure_active_directory">
+</g>
+<g id="Generic_code">
+</g>
+<g id="Laptop">
+	<path fill="#2563eb" d="M579.7,383.7c0-189.7,0-189.7,0-189.7c0-9.4-8.6-24.9-18.9-24.9c-23.2,0-328.7,0-328.7,0
+		c-10.3,0-20.6,15.5-20.6,24.9c0,189.7,0,189.7,0,189.7c-36.9,39.5-35.2,39.5-35.2,39.5c0,11.2,10.3,19.7,23.2,19.7
+		c394,0,394,0,394,0c12.9,0,23.2-9.4,23.2-19.7L579.7,383.7L579.7,383.7L579.7,383.7z M426.9,426.6c-68.7,0-68.7,0-68.7,0
+		c-3.4,0-6.9-1.7-6.9-3.4c7.7-12.9,7.7-12.9,7.7-12.9c0-1.7,2.6-2.6,6-2.6c54.9,0,54.9,0,54.9,0c2.6,0,5.2,0.9,5.2,2.6
+		c8.6,12.9,8.6,12.9,8.6,12.9C433.8,425.7,430.3,426.6,426.9,426.6L426.9,426.6z M563.4,382.8c-338.2,0-335.6,0-335.6,0
+		c0-187.1,0-187.1,0-187.1c0-4.3,4.3-10.3,9.4-10.3c319.3,0,317.6,0,317.6,0c5.2,0,8.6,6,8.6,10.3V382.8L563.4,382.8L563.4,382.8
+		L563.4,382.8z"/>
+</g>
+<g id="symbols">
+</g>
+<g id="slices">
+</g>
+</g>
+  <text x="110" y="346.0" font-size="25" fill="#bf181f" text-anchor="middle" font-weight="700">寫程式的同仁</text>
+  <text x="110" y="466.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">Copilot、OpenCode</text>
+  <path d="M170 400 H 646" stroke="#2563eb" stroke-width="2.6" fill="none" marker-end="url(#ar-blue)"/>
+  <text x="408" y="382" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">4.照API串接頁的範例設定</text>
+  <path d="M110 486 V 716 H 1100 V 448" stroke="#2563eb" stroke-width="2.6" fill="none" marker-end="url(#ar-blue)"/>
+  <text x="400" y="698" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">5.用IDE直接打自家模型</text>
+  <!--xh-step-->
+  <g transform='translate(248.235,158.353) scale(1.39434)'>
+<g id="Layer_1">
+</g>
+<g id="Completed_Icons">
+	<path fill="#FFFFFF" d="M340.5,346.3h-32.9v-2.6H305v-4.3h2.6v-2.2H305v-4.3h2.6v-2.2H305v-4.3h2.6v-2.2H305v-4.3h2.6v-2.2H305
+		v-4.3h2.6v-2.2H305v-4.3h2.6v-2.6h32.9v1.3h3.9v38.2h-3.9V346.3z"/>
+	<g id="spiral_binding_2_">
+		<g>
+			<path fill="#7c3aed" d="M318.2,320h14.3v-7.8h-14.3V320z M310.4,334.4h-3.9v1.3h3.9V334.4z M310.4,327.9h-3.9v1.3h3.9V327.9z
+				 M310.4,308.3h-3.9v1.3h3.9V308.3z M310.4,314.8h-3.9v1.3h3.9V314.8z M310.4,321.3h-3.9v1.3h3.9V321.3z M340.3,307v7.8h2.6V307
+				H340.3z M340.3,333.1h2.6v-6.5h-2.6V333.1z M340.3,323.9h2.6v-6.5h-2.6V323.9z M340.3,342.2h2.6v-6.5h-2.6V342.2z M309.1,307.7h2
+				v2.6h-2v3.9h2v2.6h-2v3.9h2v2.6h-2v3.9h2v2.6h-2v3.9h2v2.6h-2v3.9h2v2.6h-2v2H339v-39.1h-29.9V307.7z M316.9,310.9h16.9v10.4
+				h-16.9V310.9z M310.4,340.9h-3.9v1.3h3.9V340.9z"/>
+		</g>
+	</g>
+</g>
+</g>
+  <text x="700" y="670.0" font-size="20" fill="#16202a" text-anchor="middle" font-weight="700">主管</text>
+  <text x="700" y="694.0" font-size="18" fill="#64748b" text-anchor="middle">服務使用報告</text>
+  <path d="M700 452 V 576" stroke="#7c3aed" stroke-width="2.6" fill="none" marker-end="url(#ar-violet)"/>
+  <text x="716" y="522" font-size="20" fill="#16202a" text-anchor="start" font-weight="700">7.每月報告與操作紀錄</text>
+</svg>

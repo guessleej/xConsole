@@ -45,7 +45,7 @@ with sync_playwright() as p:
         pg.goto(BASE + "/", wait_until="networkidle")
         pg.fill("#un", USER); pg.fill("#pw", PASS); pg.click("button[type=submit]")
         pg.wait_for_selector("#app:not([hidden])"); pg.wait_for_timeout(3500)
-        for grp, node in (("AMD Strix Halo", ".26"), ("AMD Strix Halo", ".27"), ("Jetson / MIC-743", ".20")):
+        for grp, node in (("AMD AI 395 Strix Halo", ".26"), ("AMD AI 395 Strix Halo", ".27"), ("Jetson / MIC-743", ".20")):
             pg.click(f"nav#nav >> text={grp}"); pg.wait_for_timeout(1500)
             pg.click(f"#subnav >> text={node}"); pg.wait_for_timeout(3500)
             print(f"===== {w} 寬　{node} =====")
