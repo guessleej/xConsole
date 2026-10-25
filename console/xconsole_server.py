@@ -20,6 +20,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import ssl
 import sys
 import threading
@@ -467,18 +468,27 @@ def join_node(handler, body):
         return fail("代理的埠不對", j)
     hostname = re.sub(r"[^\w.-]", "-", str(body.get("hostname") or ""))[:40].strip("-.") or "node"
     cands = [ip] + [x for x in (body.get("ips") or [])[:4] if isinstance(x, str)]
+    # 這個端點不需登入：只去連「加入的那台自己的位址」，不讓請求叫主控台去連任意主機。
+    # 連線來源一定試；那台回報的位址排除群播、未指定、保留位址；主機名稱只有解析結果正好是上面這些位址之一才試。
     hosts = []
     for h in cands:
         try:
             a = ipaddress.ip_address(h)
         except ValueError:
             continue
-        if not a.is_loopback and str(a) not in hosts:
+        if a.is_loopback or a.is_multicast or a.is_unspecified or a.is_reserved:
+            continue
+        if str(a) not in hosts:
             hosts.append(str(a))
     if ip in ("127.0.0.1", "::1"):
         hosts.insert(0, "127.0.0.1")         # 主控台自己這台
     if valid_host(hostname) and hostname != "node":
-        hosts.append(hostname)               # 重新加入時 IP 可能換了：舊憑證的 SAN 還有主機名稱
+        try:
+            resolved = {i[4][0] for i in socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)}
+        except OSError:
+            resolved = set()
+        if resolved and resolved <= set(hosts):
+            hosts.append(hostname)           # 重新加入時 IP 可能換了：舊憑證的 SAN 還有主機名稱
     tmp = os.path.join(CERTS.p.trust, f".join-{secrets.token_hex(6)}.pem")
     with open(tmp, "wb") as fh:
         fh.write(pem)
