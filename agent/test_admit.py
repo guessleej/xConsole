@@ -197,6 +197,18 @@ def main():
     ok &= case("啟動環境：沒綁卡不動 CUDA_VISIBLE_DEVICES", env.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
     A.shutil.which = real_which
 
+    # 12. 指令一律不經過 shell（防命令注入）：sh() 不收字串、原始碼裡不准有 shell=True／os.system
+    try:
+        A.sh("echo hi; id")
+        ok &= case("sh() 收到整條字串要拒絕", False, True)
+    except TypeError:
+        ok &= case("sh() 收到整條字串要拒絕", True, True)
+    rc, out, _ = A.sh(["echo", "a; id"])
+    ok &= case("參數裡的分號只是文字，不會被當成第二個指令", out, "a; id")
+    src = open(A.__file__, encoding="utf-8").read()
+    ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
+               [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 
