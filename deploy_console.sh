@@ -65,14 +65,17 @@ p = os.path.expanduser('~/.xconsole/fleet.json')
 cfg = {}
 if os.path.exists(p):
     cfg = json.load(open(p))
-cfg['nodes'] = json.loads('''[$NODE_JSON]''')
+# 合併而不是整份換掉：網頁上「加一台機器」加進來的機器不在這次的別名清單裡，不能被洗掉
+new = json.loads('''[$NODE_JSON]''')
+ids = {n['id'] for n in new}
+cfg['nodes'] = [n for n in cfg.get('nodes', []) if n['id'] not in ids] + new
 cfg.pop('session_secret', None)
 cfg.setdefault('auth', {})
 fd = os.open(p + '.tmp', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as fh:
     json.dump(cfg, fh, ensure_ascii=False, indent=1)
 os.replace(p + '.tmp', p)
-print('fleet.json 已寫入，納管', len(cfg['nodes']), '台')
+print('fleet.json 已寫入：本次更新', len(new), '台，共納管', len(cfg['nodes']), '台')
 PY"
 
 echo "=== 取回各機代理憑證，當作主控台連線時的信任依據 ==="

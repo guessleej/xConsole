@@ -238,7 +238,8 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
         return 502, {"error": f"還沒信任 {node['name']} 的代理憑證，請重新執行 deploy_console.sh "
                               f"或在「設定 → 機器」匯入該機憑證", "offline": True, "untrusted": True}
-    url = f"https://{node['host']}:{node.get('agent_port', 9401)}{path}"
+    h = node["host"]
+    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
@@ -357,16 +358,24 @@ def _join_key(code):
     return hashlib.sha256(code.encode()).hexdigest()
 
 
-def join_lookup(code, use=False):
-    """回這個加入碼的狀態；過期或已用過回 None。"""
+def join_lookup(code, reserve=False):
+    """回這個加入碼的狀態；過期或已用過回 None。reserve=True 時同時鎖住，驗證完成前別的請求拿不到
+    （兩台同時拿同一個指令加入，不能兩台都成功）。驗證失敗要呼叫 join_release() 放回去讓它重試。"""
     with _JOIN_LOCK:
         now = time.time()
         for k in [k for k, v in _JOINS.items() if v["exp"] < now - 3600]:
             _JOINS.pop(k)
         j = _JOINS.get(_join_key(str(code or "")))
-        if not j or j["exp"] < now or j.get("node_id"):
+        if not j or j["exp"] < now or j.get("node_id") or (reserve and j.get("busy")):
             return None
+        if reserve:
+            j["busy"] = True
         return j
+
+
+def join_release(j):
+    with _JOIN_LOCK:
+        j["busy"] = False
 
 
 def install_script(code, j):
@@ -405,7 +414,7 @@ for i in $(seq 1 30); do
 done
 [ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
 echo "== 4/4 加入主控台 =="
-RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 60 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
+RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
 import json, os, socket, subprocess
 home = os.path.expanduser("~")
 ips = subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split()[:4]
@@ -437,12 +446,13 @@ def join_node(handler, body):
             _JOIN_FAILS.setdefault(ip, []).append(time.time())
             if j is not None:
                 j["error"] = msg
+                j["busy"] = False
         STORE.audit("", ip, "node.join", "", False, {"message": msg})
         return 400, {"error": msg}
 
-    j = join_lookup(body.get("code"))
+    j = join_lookup(body.get("code"), reserve=True)
     if not j:
-        return fail("加入碼不對、已經用過或過期了，請在主控台重新按「加一台機器」")
+        return fail("加入碼不對、已經用過、過期了，或另一台正在用它加入；請在主控台重新按「加一台機器」")
     token = str(body.get("token") or "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,128}", token):
         return fail("代理的權杖格式不對", j)
@@ -467,6 +477,8 @@ def join_node(handler, body):
             hosts.append(str(a))
     if ip in ("127.0.0.1", "::1"):
         hosts.insert(0, "127.0.0.1")         # 主控台自己這台
+    if valid_host(hostname) and hostname != "node":
+        hosts.append(hostname)               # 重新加入時 IP 可能換了：舊憑證的 SAN 還有主機名稱
     tmp = os.path.join(CERTS.p.trust, f".join-{secrets.token_hex(6)}.pem")
     with open(tmp, "wb") as fh:
         fh.write(pem)
@@ -479,7 +491,7 @@ def join_node(handler, body):
             url = f"https://{'[' + h + ']' if ':' in h else h}:{port}/state"
             req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             try:
-                with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
+                with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
                     if resp.status == 200:
                         good = h
                         break
@@ -491,11 +503,23 @@ def join_node(handler, body):
                         f"請確認防火牆讓主控台連得到這台的 {port} 埠。{why}", j)
         nid = None
 
+        fp = r["summary"]["fingerprint256"]
+
+        def same_agent(n):
+            # 同一台：位址與埠相同，或代理憑證相同（換了 IP 重新加入時，憑證沒變）
+            if n["host"] == good and int(n.get("agent_port", 9401)) == port:
+                return True
+            tf = trust_file(n["id"])
+            if os.path.exists(tf):
+                rr, _ = tls.inspect_trusted_ca(open(tf, "rb").read())
+                return (rr.get("summary") or {}).get("fingerprint256") == fp
+            return False
+
         def put(cfg):
             nonlocal nid
-            same = next((n for n in cfg["nodes"] if n["host"] == good and int(n.get("agent_port", 9401)) == port), None)
-            if same:                                   # 同一台重新安裝：換新的權杖與憑證，名稱群組不動
-                same["token"] = tls.seal(CERTS.p, token.encode())
+            same = next((n for n in cfg["nodes"] if same_agent(n)), None)
+            if same:                                   # 同一台重新安裝：換新的權杖、位址與憑證，名稱群組不動
+                same.update(host=good, agent_port=port, token=tls.seal(CERTS.p, token.encode()))
                 nid = same["id"]
                 return
             taken = {n["id"] for n in cfg["nodes"]}
@@ -793,8 +817,9 @@ class Handler(BaseHTTPRequestHandler):
             name = str(body.get("name") or "").strip()[:40]
             group = str(body.get("group") or "").strip()[:30]
             host = str(body.get("console") or self.headers.get("Host") or "").strip()
-            if not HOST_RX.fullmatch(host):
-                return self._json(400, {"error": "主控台位址格式不對，例：140.135.107.216:9400"})
+            port_s = host.rsplit(":", 1)[1] if re.search(r":\d+$", host) else "443"
+            if not HOST_RX.fullmatch(host) or not 1 <= int(port_s) <= 65535:
+                return self._json(400, {"error": "主控台位址格式不對，例：140.135.107.216:9400（埠要在 1～65535）"})
             if not agent_source():
                 return self._json(500, {"error": "主控台找不到代理程式檔，請重新部署主控台"})
             code = secrets.token_urlsafe(24)

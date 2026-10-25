@@ -116,6 +116,19 @@ def default_registry():
     }
 
 
+# 登錄檔是「讀進來、改一部分、整份寫回」：兩個請求交錯就會有一個人的修改被蓋掉。
+# 網頁上改設定的入口與每 15 秒的狀態更新都在這把鎖裡做；狀態更新只寫回它自己量到的實測值。
+REG_LOCK = threading.RLock()
+
+
+def _locked(fn):
+    @functools.wraps(fn)
+    def run(*a, **k):
+        with REG_LOCK:
+            return fn(*a, **k)
+    return run
+
+
 def registry():
     reg = load_json(REGISTRY, None)
     if reg is None:
@@ -2412,10 +2425,19 @@ def full_state():
     for sl in reg["slots"]:
         sl["_busy_cache"] = (unit_state(sl["unit"]) in ("active", "activating")
                              if sl.get("unit") else False)
+    before = json.loads(json.dumps(reg["measure"]))
     slots = [slot_state(s, reg, hw) for s in reg["slots"]]
     for sl in reg["slots"]:
         sl.pop("_busy_cache", None)
-    save_json(REGISTRY, reg)  # 把這一輪撈到的實測值寫回去
+    # 只把這一輪新撈到的實測值寫回最新的登錄檔。以前整份寫回：這一輪開始後管理者在網頁上存的設定，
+    # 會被這份舊的蓋掉（Codex 審查抓到）
+    changed = {k: v for k, v in reg["measure"].items() if before.get(k) != v}
+    if changed:
+        with REG_LOCK:
+            cur = registry()
+            live = {sl["id"] for sl in cur["slots"]}
+            cur["measure"].update({k: v for k, v in changed.items() if k in live})
+            save_json(REGISTRY, cur)
 
     p = pools(reg, hw)
     # 最壞情況：已開著、但 KV 還沒長滿的模型，若長滿還要再吃多少
@@ -2725,6 +2747,7 @@ def check_llama(raw):
     return p, None
 
 
+@_locked
 def save_machine(body):
     reg = registry()
     m = reg["machine"]
@@ -2833,6 +2856,7 @@ def _slot_fields(body, base):
     return out, None
 
 
+@_locked
 def add_slot(body):
     reg = registry()
     kind = body.get("type")
@@ -2855,6 +2879,7 @@ def add_slot(body):
     return 200, {"ok": True, "slot": slot}
 
 
+@_locked
 def edit_slot(sid, body):
     reg = registry()
     slot = next((s for s in reg["slots"] if s["id"] == sid), None)
@@ -2874,6 +2899,7 @@ def edit_slot(sid, body):
     return 200, {"ok": True, "slot": slot}
 
 
+@_locked
 def delete_slot(sid):
     reg = registry()
     slot = next((s for s in reg["slots"] if s["id"] == sid), None)

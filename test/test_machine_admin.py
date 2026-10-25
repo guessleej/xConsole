@@ -86,6 +86,9 @@ def main():
                                                        capture_output=True).returncode not in (0, 1):
         print("略過：這台沒有 systemd --user")
         return 0
+    if subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True).returncode != 0:
+        print("略過：連不到 systemd 使用者 bus（daemon-reload 失敗）")
+        return 0
     os.makedirs(os.path.dirname(UNIT_FILE), exist_ok=True)
     with open(UNIT_FILE, "w") as fh:
         fh.write("[Unit]\nDescription=xConsole 機器管理測試用假服務\n[Service]\nExecStart=/bin/sleep 600\n")
@@ -156,6 +159,17 @@ def main():
         check("埠連不到 → 不能加入，提示開防火牆", st == 400 and "防火牆" in d.get("error", ""), d)
         st, js = co("GET", f"/api/nodes/join-code/{jc['id']}")
         check("  網頁上看得到這次失敗的原因", st == 200 and js["state"] == "waiting" and "防火牆" in (js.get("error") or ""), js)
+        # 兩個請求同時拿同一個加入碼：第一個驗證期間（這裡故意讓它去試一個連不到的位址）第二個要被擋
+        import threading
+        slow = {}
+        th = threading.Thread(target=lambda: slow.update(r=anon("POST", "/api/join", {
+            "code": code, "token": "wrong" * 8, "cert": acert, "hostname": "agent-a", "port": aport, "ips": ["10.255.255.1"]})))
+        th.start()
+        time.sleep(2)
+        st, d = anon("POST", "/api/join", {"code": code, "token": token, "cert": acert, "hostname": "agent-a", "port": aport})
+        check("同一個加入碼另一個請求還在驗證時 → 擋下（不會兩台都加入）", st == 400 and "正在用" in d.get("error", ""), d)
+        th.join()
+        check("  第一個驗證失敗後放回去，還可以重試", slow["r"][0] == 400, slow)
         st, d = anon("POST", "/api/join", {"code": code, "token": token, "cert": acert, "hostname": "agent-a",
                                             "port": aport, "linger": True, "ips": ["10.255.255.1"]})
         check("權杖與憑證都對 → 加入成功", st == 200 and d.get("id") == "agent-a", d)
@@ -247,6 +261,15 @@ def main():
         n = next((x for x in co("GET", "/api/nodes")[1]["nodes"] if x["id"] == "agent-a"), {})
         check("移除後可以重新加入；沒填名稱就用主機名稱、群組是未分類",
               st == 200 and n.get("name") == "agent-a" and n.get("group") == "未分類", (d, n))
+        co("POST", "/api/nodes/agent-a/update", {"name": "改過的名字"})
+        st, jc3 = co("POST", "/api/nodes/join-code", {"console": f"127.0.0.1:{cport}"})
+        code3 = re.search(r"/install/([^/]+)/", jc3["command"]).group(1)
+        st, d = anon("POST", "/api/join", {"code": code3, "token": token, "cert": acert, "hostname": "agent-a", "port": aport})
+        ns = co("GET", "/api/nodes")[1]["nodes"]
+        check("同一台重新安裝再加入：更新原本那筆，不會多一台，名稱不變",
+              st == 200 and len(ns) == 1 and ns[0]["name"] == "改過的名字", ns)
+        st, d = co("POST", "/api/nodes/join-code", {"console": "127.0.0.1:99999"})
+        check("主控台位址的埠超過 65535 → 400", st == 400, d)
 
         # ---- 7. 加入失敗太多次要擋
         for _ in range(12):
