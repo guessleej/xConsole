@@ -1658,6 +1658,15 @@ def llama_kv_gib(prof, ctx, parallel=1):
             + prof.get("kv_swa_bpt", 0) * min(ctx, swa) * parallel) / GIB
 
 
+def llama_build_no(path, version_text):
+    """llama-server 的版本號。網頁編譯是淺層下載（只抓那一版），--version 會回 1；
+    這時改用資料夾名稱裡的正式版編號（llama.cpp-b11870 → 11870），不然自動挑選會把新編的當成最舊的。"""
+    m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", version_text or "")
+    ver = int(next(x for x in m.groups() if x)) if m else 0
+    d = re.search(r"llama\.cpp-b(\d+)", path)
+    return max(ver, int(d.group(1))) if d else ver
+
+
 def llama_server_exe(reg=None):
     """這台用哪支 llama-server：登錄檔指定的優先，否則挑家目錄下版本號最大、有 GPU 後端的那支。"""
     reg = reg or registry()
@@ -1667,8 +1676,7 @@ def llama_server_exe(reg=None):
     best, best_ver = None, -1
     for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
         rc, out, err = sh([cand, "--version"], timeout=15)
-        m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", out + err)
-        ver = int(next(x for x in m.groups() if x)) if m else 0
+        ver = llama_build_no(cand, out + err)
         libs = os.listdir(os.path.dirname(cand))
         gpu = any(x.startswith(("libggml-hip", "libggml-cuda", "libggml-vulkan")) for x in libs)
         score = ver + (10 ** 6 if gpu else 0)
@@ -2127,13 +2135,26 @@ def _hf_file_url(repo, path):
     return f"{HF_BASE}/{q(repo, safe='/')}/resolve/main/{q(path, safe='/')}"
 
 
+class _HFRedirect(urllib.request.HTTPRedirectHandler):
+    """Hugging Face 下載會轉到它自己的 CDN；轉到 Hugging Face 以外的網域時，權杖不跟著送過去。"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        host = (urllib.parse.urlparse(newurl).hostname or "").lower()
+        if new is not None and not (host == "huggingface.co" or host.endswith((".huggingface.co", ".hf.co")) or host == "hf.co"):
+            new.remove_header("Authorization")
+        return new
+
+
+_HF_OPENER = urllib.request.build_opener(_HFRedirect)
+
+
 def _hf_get(url, token="", rng=None, timeout=30):
     h = {"User-Agent": "xconsole-agent"}
     if token:
         h["Authorization"] = f"Bearer {token}"
     if rng:
         h["Range"] = f"bytes={rng}-"
-    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout)
+    return _HF_OPENER.open(urllib.request.Request(url, headers=h), timeout=timeout)
 
 
 def hf_files(repo, token=""):
@@ -2301,7 +2322,7 @@ def delete_model(model_id):
     rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not f.lower().startswith("mmproj")]
     if not rest:
         for f in os.listdir(full):
-            if f.lower().startswith("mmproj"):
+            if f.lower().startswith("mmproj") and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
                 p = inside(full, f)
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -2948,11 +2969,10 @@ def llama_candidates():
     out = []
     for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
         rc, o, e = sh([cand, "--version"], timeout=15)
-        m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", o + e)
         libs = os.listdir(os.path.dirname(cand))
         gpu = next((b for b, pre in (("CUDA", "libggml-cuda"), ("ROCm", "libggml-hip"), ("Vulkan", "libggml-vulkan"))
                     if any(x.startswith(pre) for x in libs)), "只有 CPU")
-        out.append({"path": cand, "ok": rc == 0, "build": int(next(x for x in m.groups() if x)) if m else None,
+        out.append({"path": cand, "ok": rc == 0, "build": llama_build_no(cand, o + e) or None,
                     "backend": gpu})
     return out
 
@@ -2985,7 +3005,9 @@ def data_bases():
     """存放區只准放在這些位置底下：家目錄、另外掛載的資料碟、常見的資料目錄。"""
     mounts = [ln.split()[1].replace("\\040", " ") for ln in (load_text("/proc/mounts") or "").splitlines()
               if len(ln.split()) > 2 and ln.split()[2] in ("ext4", "xfs", "btrfs", "f2fs")]
-    return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot")), "/data", "/models", "/srv", "/opt"]
+    # 家目錄所在的分割區（例：/home 獨立掛載）不能整個當允許位置，否則存放區可以設到別的使用者家目錄裡
+    return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot") and not HOME.startswith(m.rstrip("/") + "/")),
+            "/data", "/models", "/srv", "/opt"]
 
 
 def contained(raw, bases):

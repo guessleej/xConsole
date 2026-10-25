@@ -194,6 +194,10 @@ def main():
         st, t = co("POST", "/api/node/t1/apiinfo/brain/test", {"key": key})
         check("經網路實測（金鑰對）→ 全部通過", st == 200 and t["ok"] and t["network"]["ok"], t.get("network"))
 
+        co("POST", "/api/node/t1/apiinfo/brain/settings", {"public_url": "http://10.255.255.1:8080/v1"})
+        st, t2 = co("POST", "/api/node/t1/apiinfo/brain/test", {"key": key})
+        check("對外網址不是這台機器 → 主控台不代為實測（不把金鑰送到別處）", st == 200 and not t2["network"]["ok"]
+              and "不是這台機器" in t2["network"]["detail"], t2.get("network"))
         co("POST", "/api/node/t1/apiinfo/brain/settings", {"public_url": f"http://127.0.0.1:{llm_port}/redir/v1"})
         st, t = co("POST", "/api/node/t1/apiinfo/brain/test", {"key": key})
         check("對外網址會轉址 → 實測不跟過去（金鑰不送到別處）", st == 200 and not t["network"]["ok"]

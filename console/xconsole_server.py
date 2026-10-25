@@ -43,13 +43,17 @@ PORT = int(os.environ.get("XCONSOLE_PORT", "9400"))
 SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
+MAX_ANON_BODY = 64 * 1024        # 登入與加入機器不需登入：本文只要幾 KB
+NODE_REPLY_MAX = 32 * 1024 * 1024
+NODE_DEADLINE = 300             # 跟代理的一次呼叫，連同讀完回應的總時限（秒）
 PBKDF2_ROUNDS = 200_000
 # 登入節流：伺服器是多執行緒的，只在每次失敗後睡一秒擋不住並行猜測。
 # 同一來源 15 分鐘內錯 5 次就先擋；全部來源加起來錯 50 次也擋（分散猜測）。
 # 不鎖帳號：鎖帳號等於讓內網任何人都能把管理者鎖在門外。
 LOGIN_WINDOW = 900
 LOGIN_MAX_PER_IP = 5
-LOGIN_MAX_GLOBAL = 50
+_LOGIN_LOCK = threading.Lock()
+_THROTTLE_LOGGED = {}
 
 os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
 STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
@@ -170,7 +174,21 @@ def network_test(node_id, slot_id, key=""):
     code, info = call_node(node_id, f"/apiinfo/{slot_id}", timeout=20)
     if code != 200:
         return {"ok": False, "url": None, "detail": info.get("error") or f"讀不到設定（{code}）"}
-    base = info["public_url"].rstrip("/")
+    base = str(info.get("public_url") or "").rstrip("/")
+    # 網址是代理回報的：代理被接管時可能塞內網位址或雲端 metadata，主控台會帶著管理者貼的金鑰去打。
+    # 只准打「這台機器自己」：網址要是 http(s)，主機解析出來的位址要全部等於這台的位址（資安審查）
+    node = next((x for x in fleet()["nodes"] if x["id"] == node_id), None)
+    u = urlparse(base)
+    if u.scheme not in ("http", "https") or not u.hostname or not node:
+        return {"ok": False, "url": base, "detail": "對外網址格式不對，主控台不代為實測"}
+    try:
+        mine = {i[4][0] for i in socket.getaddrinfo(node["host"], None)}
+        theirs = {i[4][0] for i in socket.getaddrinfo(u.hostname, None)}
+    except OSError:
+        mine, theirs = set(), set()
+    if not theirs or not theirs <= mine:
+        return {"ok": False, "url": base, "detail": f"對外網址的主機不是這台機器（{node['host']}），主控台不代為實測，免得把金鑰送到別處。"
+                                                     "請用 IDE 所在的電腦直接測"}
     ctx = ssl.create_default_context() if base.startswith("https://") else None   # 驗證開著，不准略過
     t0 = time.time()
 
@@ -188,7 +206,7 @@ def network_test(node_id, slot_id, key=""):
                                      data=b"{}" if method == "POST" else None)
         try:
             with opener.open(req, timeout=10) as resp:
-                return resp.status, json.load(resp)
+                return resp.status, json.loads(resp.read(4 * 1024 * 1024) or b"{}")
         except urllib.error.HTTPError as exc:
             return exc.code, None
         except Exception as exc:  # noqa: BLE001
@@ -215,7 +233,7 @@ def network_test(node_id, slot_id, key=""):
     if st == 200 and info.get("model_name") in ids:
         return {"ok": True, "url": base, "ms": ms, "detail": f"從主控台連得到，模型清單有 {info['model_name']}"}
     return {"ok": False, "url": base, "ms": ms,
-            "detail": f"回 {st}" + ("，金鑰不對" if st == 401 else f"，模型清單 {ids}")}
+            "detail": f"回 {st}" + ("，金鑰不對" if st == 401 else "，模型清單裡沒有這個欄位的模型名稱")}
 
 
 # ---------------------------------------------------------------- 代理呼叫
@@ -227,6 +245,22 @@ def trust_file(node_id):
     if not full.startswith(base + os.sep):
         raise ValueError("機器 id 不合法")
     return full
+
+
+def _read_capped(resp, deadline):
+    """讀代理的回應：有大小上限與總時限。被接管的代理回幾 GB、或每 29 秒吐一個位元組，都不能拖垮主控台。"""
+    chunks, total = [], 0
+    while True:
+        if time.time() > deadline:
+            raise TimeoutError("代理回應太慢")
+        b = resp.read(65536)
+        if not b:
+            break
+        total += len(b)
+        if total > NODE_REPLY_MAX:
+            raise ValueError("代理回應太大")
+        chunks.append(b)
+    return json.loads(b"".join(chunks) or b"{}")
 
 
 def call_node(node_id, path, method="GET", body=None, timeout=40):
@@ -244,12 +278,14 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
+    deadline = time.time() + timeout + 60
     try:
+        # 單次等待用呼叫端給的時限（換模型要等好幾分鐘才回），讀完整個回應另有總時限
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            return resp.status, json.load(resp)
+            return resp.status, _read_capped(resp, deadline)
     except urllib.error.HTTPError as exc:
         try:
-            return exc.code, json.load(exc)
+            return exc.code, _read_capped(exc, deadline)
         except Exception:  # noqa: BLE001
             return exc.code, {"error": f"代理回 {exc.code}"}
     except Exception as exc:  # noqa: BLE001
@@ -371,6 +407,7 @@ def join_lookup(code, reserve=False):
             return None
         if reserve:
             j["busy"] = True
+            j["busy_by"] = threading.get_ident()
         return j
 
 
@@ -434,6 +471,17 @@ exit 0
 
 
 def join_node(handler, body):
+    """包一層：預留加入碼之後不論怎麼結束（含沒預料到的例外），沒加入成功就把碼放回去，不會卡在「另一台正在用」。"""
+    try:
+        return _join_node(handler, body if isinstance(body, dict) else {})
+    finally:
+        with _JOIN_LOCK:
+            for j in _JOINS.values():
+                if j.get("busy") and j.get("busy_by") == threading.get_ident():
+                    j["busy"] = False
+
+
+def _join_node(handler, body):
     """安裝腳本送回來的代理資訊：驗加入碼、驗憑證、用那張憑證與權杖實際連一次成功才納管。"""
     ip = handler.ip
     with _JOIN_LOCK:
@@ -457,9 +505,18 @@ def join_node(handler, body):
     token = str(body.get("token") or "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,128}", token):
         return fail("代理的權杖格式不對", j)
+    # 只收剛好一張、不是 CA 的憑證（代理自己產的那張）。以前收整串：攻擊者把「別台代理的憑證＋自己的 CA」
+    # 串在一起送，指紋算的是第一張（別台的），連線驗證卻信整串，於是能搶走已納管的那台（資安審查重現）
     r, pem = tls.inspect_trusted_ca(str(body.get("cert") or "").encode())
-    if not r.get("ok"):
-        return fail("代理的憑證讀不出來", j)
+    if not r.get("ok") or r.get("count") != 1:
+        return fail("代理的憑證要剛好一張（代理自己產生的那張）", j)
+    from cryptography import x509
+    try:
+        bc = x509.load_pem_x509_certificate(pem).extensions.get_extension_for_class(x509.BasicConstraints).value
+        if bc.ca:
+            return fail("代理的憑證不能是 CA 憑證", j)
+    except x509.ExtensionNotFound:
+        pass
     try:
         port = int(body.get("port") or 9401)
     except (TypeError, ValueError):
@@ -467,7 +524,8 @@ def join_node(handler, body):
     if not 1 <= port <= 65535:
         return fail("代理的埠不對", j)
     hostname = re.sub(r"[^\w.-]", "-", str(body.get("hostname") or ""))[:40].strip("-.") or "node"
-    cands = [ip] + [x for x in (body.get("ips") or [])[:4] if isinstance(x, str)]
+    ips = body.get("ips") if isinstance(body.get("ips"), list) else []
+    cands = [ip] + [x for x in ips[:4] if isinstance(x, str)]
     # 這個端點不需登入：只去連「加入的那台自己的位址」，不讓請求叫主控台去連任意主機。
     # 連線來源一定試；那台回報的位址排除群播、未指定、保留位址；主機名稱只有解析結果正好是上面這些位址之一才試。
     hosts = []
@@ -476,7 +534,7 @@ def join_node(handler, body):
             a = ipaddress.ip_address(h)
         except ValueError:
             continue
-        if a.is_loopback or a.is_multicast or a.is_unspecified or a.is_reserved:
+        if a.is_loopback or a.is_multicast or a.is_unspecified or a.is_reserved or a.is_link_local:
             continue
         if str(a) not in hosts:
             hosts.append(str(a))
@@ -506,11 +564,12 @@ def join_node(handler, body):
                         good = h
                         break
             except Exception as exc:  # noqa: BLE001
-                why = str(exc)[:160]
+                why = str(exc)[:160]           # 只寫進操作紀錄，不回給請求方（不讓人拿加入端點分辨埠的狀態）
         if not good:
             os.remove(tmp)
+            STORE.audit("", ip, "node.join_probe", "", False, {"hosts": hosts, "port": port, "why": why})
             return fail(f"主控台連不到這台的代理（試過 {', '.join(f'{h}:{port}' for h in hosts)}）。"
-                        f"請確認防火牆讓主控台連得到這台的 {port} 埠。{why}", j)
+                        f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
         nid = None
 
         fp = r["summary"]["fingerprint256"]
@@ -639,13 +698,13 @@ class Handler(BaseHTTPRequestHandler):
         self._json(401, {"error": "請先登入"})
         return True
 
-    def _body(self):
+    def _body(self, limit=None):
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             n = 0
         n = max(n, 0)            # 負數交給 read() 會一直讀到連線結束，執行緒就卡住
-        if n > MAX_BODY:
+        if n > (limit or MAX_BODY):
             # 不讀完就回 413 並關連線：照宣稱的長度去讀，對方宣稱 10 GB 卻不送，執行緒就被占住
             self.close_connection = True
             return None
@@ -794,21 +853,33 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
-        body = self._body()
+        anon = path in ("/api/login", "/api/join", "/api/logout")
+        if not anon and not self.user:
+            # 先驗登入再讀本文：沒登入的人不能讓主控台讀 6 MB。小的本文照樣讀掉再回 401（沒讀完就關連線，
+            # TCP 會送重置，對方連 401 都收不到）；超過 64 KB 的直接關
+            if self._body(MAX_ANON_BODY) is None:
+                return None
+            return self._json(401, {"error": "請先登入"})
+        body = self._body(MAX_ANON_BODY if anon else MAX_BODY)
         if body is None:
-            return self._json(413, {"error": "上傳超過 6 MB"})
+            return self._json(413, {"error": "請求內容太大"})
 
         if path == "/api/login":
             user = str(body.get("username") or "")[:64]
-            since = time.time() - LOGIN_WINDOW
-            if (STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP
-                    or STORE.failed_logins(since) >= LOGIN_MAX_GLOBAL):
-                STORE.audit(user, self.ip, "auth.throttled", user, False)
-                return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
-            if not check_credentials(user, str(body.get("password") or "")):
-                time.sleep(1.0)
-                STORE.audit(user, self.ip, "auth.login", user, False)
-                return self._json(401, {"error": "帳號或密碼不對"})
+            # 一次只驗一個登入，失敗等一秒才放下一個：同時開幾百條連線也繞不過節流（以前檢查在寫入失敗紀錄之前，
+            # 平行送出全部都會通過），全網分散猜密碼的速度上限約每秒一次。
+            # 不再做「全部來源加起來錯 50 次就全部封鎖」：內網任何人都能藉此把管理者鎖在門外（資安審查）
+            with _LOGIN_LOCK:
+                since = time.time() - LOGIN_WINDOW
+                if STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP:
+                    if time.time() - _THROTTLE_LOGGED.get(self.ip, 0) > 60:     # 被擋的請求每個來源每分鐘只記一筆，免得灌爆稽核表
+                        _THROTTLE_LOGGED[self.ip] = time.time()
+                        STORE.audit(user, self.ip, "auth.throttled", user, False)
+                    return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
+                if not check_credentials(user, str(body.get("password") or "")):
+                    STORE.audit(user, self.ip, "auth.login", user, False)
+                    time.sleep(1.0)
+                    return self._json(401, {"error": "帳號或密碼不對"})
             STORE.audit(user, self.ip, "auth.login", user, True)
             sid = STORE.session_new(user, self.ip, SESSION_HOURS)
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "

@@ -153,8 +153,16 @@ def main():
         st, _ = anon("GET", f"/install/{'x' * 32}/agent.sh", raw=True)
         check("加入碼不對 → 404", st == 404, st)
 
+        # 資安審查 H1：送「別台代理的憑證＋自己的 CA」整串，想搶走已納管的那台 → 只收剛好一張
+        ccert_pem = open(ccert).read()
+        st, d = anon("POST", "/api/join", {"code": code, "token": token, "cert": acert + ccert_pem, "hostname": "agent-a", "port": aport})
+        check("加入時送兩張憑證串在一起 → 拒絕（不能用來搶走別台）", st == 400 and "剛好一張" in d.get("error", ""), d)
+        st, d = anon("POST", "/api/join", {"code": code, "token": "wrong" * 8, "cert": acert, "hostname": "agent-a", "port": aport, "ips": 5})
+        check("ips 不是清單也不會讓加入碼卡住（回 400 之後還能用）", st == 400, d)
         st, d = anon("POST", "/api/join", {"code": code, "token": "wrong" * 8, "cert": acert, "hostname": "agent-a", "port": aport})
         check("權杖不對 → 不能加入，並說明連不到", st == 400 and "連不到" in d.get("error", ""), d)
+        check("  失敗原因不回連線細節（不能拿加入端點分辨埠的狀態）", "refused" not in d.get("error", "").lower()
+              and "Errno" not in d.get("error", ""), d)
         st, d = anon("POST", "/api/join", {"code": code, "token": token, "cert": acert, "hostname": "agent-a", "port": free_port()})
         check("埠連不到 → 不能加入，提示開防火牆", st == 400 and "防火牆" in d.get("error", ""), d)
         st, js = co("GET", f"/api/nodes/join-code/{jc['id']}")
@@ -316,6 +324,48 @@ def main():
         for _ in range(12):
             st, d = anon("POST", "/api/join", {"code": "x" * 32, "token": token, "cert": acert})
         check("同一來源加入失敗太多次 → 429", st == 429, (st, d))
+
+        # ---- 7b. 資安審查 L1：沒登入的請求不讀大本文；其他端點先驗登入
+        def anon_or_closed(path, body):
+            try:
+                return anon("POST", path, body)[0]
+            except (ConnectionError, http.client.HTTPException, ssl.SSLError, OSError):
+                return "closed"            # 超過上限不讀就關連線：對方多半收不到回應，這正是要的
+        st = anon_or_closed("/api/nodes/agent-a/update", {"name": "x" * 200000})
+        check("沒登入打需要登入的端點、本文 200 KB → 不讀就擋（401 或直接關連線）", st in (401, "closed"), st)
+        st, d = anon("POST", "/api/nodes/agent-a/update", {"name": "x"})
+        check("沒登入、本文很小 → 401", st == 401, st)
+        st = anon_or_closed("/api/login", {"username": "a", "password": "b" * 100000})
+        check("登入的本文超過 64 KB → 擋下（413 或直接關連線）", st in (413, "closed"), st)
+        st, fl = co("GET", "/api/fleet")
+        check("  擋完之後主控台照常服務", st == 200, st)
+
+        # ---- 7c. 資安審查 M4：代理回應有大小上限與總時限
+        r = subprocess.run([sys.executable, "-c", f"""
+import io, os, sys, time
+os.environ["HOME"] = {repr(os.path.join(W, "cap-home"))}
+sys.path.insert(0, {repr(os.path.join(ROOT, "console"))})
+import xconsole_server as X
+class Big(io.RawIOBase):
+    def readinto(self, b):
+        b[:len(b)] = b"x" * len(b); return len(b)
+class Drip:
+    def read(self, n):
+        time.sleep(0.2); return b" "
+try:
+    X._read_capped(Big(), time.time() + 30); print("big-ok")
+except ValueError: print("big-blocked")
+try:
+    X._read_capped(Drip(), time.time() + 1); print("drip-ok")
+except TimeoutError: print("drip-blocked")
+"""], capture_output=True, text=True, timeout=120)
+        check("代理回超大內容 → 擋下；每次吐一點拖時間 → 到總時限就斷", "big-blocked" in r.stdout and "drip-blocked" in r.stdout, r.stdout + r.stderr[-300:])
+
+        # ---- 7d. 資安審查 M2：同一來源同時送很多次錯的密碼，也只會驗前 5 次
+        import concurrent.futures as cf
+        with cf.ThreadPoolExecutor(20) as ex:
+            codes = list(ex.map(lambda _: anon("POST", "/api/login", {"username": "admin", "password": "wrong"})[0], range(20)))
+        check("同時送 20 次錯的密碼：最多 5 次被驗、其餘直接擋", codes.count(401) <= 5 and codes.count(429) >= 15, codes)
 
         # ---- 8. 操作紀錄
         st, au = co("GET", "/api/admin/audit?limit=200")
