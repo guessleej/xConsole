@@ -45,11 +45,12 @@ with sync_playwright() as p:
         pg.goto(BASE + "/", wait_until="networkidle")
         pg.fill("#un", USER); pg.fill("#pw", PASS); pg.click("button[type=submit]")
         pg.wait_for_selector("#app:not([hidden])"); pg.wait_for_timeout(3500)
-        for grp, node in (("AMD AI 395 Strix Halo", ".26"), ("AMD AI 395 Strix Halo", ".27"), ("Jetson / MIC-743", ".20")):
-            pg.click(f"nav#nav >> text={grp}"); pg.wait_for_timeout(1500)
-            pg.click(f"#subnav >> text={node}"); pg.wait_for_timeout(3500)
-            print(f"===== {w} 寬　{node} =====")
-            print(pg.evaluate(JS))
-            if w == 1440 and node == ".20":
-                pg.screenshot(path=os.environ.get("XC_SHOT", "/tmp/align-20.png"), full_page=True)
+        # 頂層第 2 格是「機器」（只有一個群組時顯示群組名），第 3 格是「模型庫」；第二列逐台點過去
+        for top, name in ((1, "機器"), (2, "模型庫")):
+            pg.locator("#nav button").nth(top).click(); pg.wait_for_timeout(1500)
+            subs = [t for t in pg.locator("#subnav button").all_inner_texts()]
+            for t in subs:
+                pg.locator("#subnav button", has_text=t).first.click(); pg.wait_for_timeout(3500)
+                print(f"===== {w} 寬　{name}　{t} =====")
+                print(pg.evaluate(JS))
     b.close()

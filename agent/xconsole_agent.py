@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import shlex
 import socket
 import ssl
@@ -227,6 +228,79 @@ def probe_amd_sysfs():
 
 def probe_gpus():
     return probe_nvidia() or probe_amd_sysfs() or []
+
+
+# ---- 多卡：欄位綁哪幾張卡
+# 卡號一律用 probe_gpus() 的 id：NVIDIA 是 nvidia-smi 的 index，AMD 是 /sys/class/drm/cardN 的 N。
+# 啟動時要換成引擎看得懂的序號，對不上就拒絕啟動——綁錯卡比不綁更糟（會把別的欄位的卡吃爆）。
+KFD_NODES = "/sys/class/kfd/kfd/topology/nodes"
+DRM_DIR = "/sys/class/drm"
+
+
+def amd_hip_order(drm=DRM_DIR, kfd=KFD_NODES):
+    """drm 的 cardN → HIP 裝置序號。HIP 依 KFD 拓撲節點順序編號（跳過 CPU 節點），兩邊用 render minor 對起來。"""
+    minors = []
+    try:
+        nodes = sorted((n for n in os.listdir(kfd) if n.isdigit()), key=int)
+    except OSError:
+        return {}
+    for n in nodes:
+        props = load_text(os.path.join(kfd, n, "properties")) or ""
+        mi = re.search(r"^drm_render_minor (\d+)", props, re.M)
+        simd = re.search(r"^simd_count (\d+)", props, re.M)
+        if mi and simd and int(simd.group(1)) > 0 and int(mi.group(1)) > 0:
+            minors.append(int(mi.group(1)))
+    order = {}
+    for card in os.listdir(drm) if os.path.isdir(drm) else []:
+        if not re.fullmatch(r"card\d+", card):
+            continue
+        rd = glob.glob(os.path.join(drm, card, "device", "drm", "renderD*"))
+        if rd:
+            minor = int(os.path.basename(rd[0])[len("renderD"):])
+            if minor in minors:
+                order[card[4:]] = minors.index(minor)
+    return order
+
+
+def visible_env(gpu_ids, nvidia=None):
+    """綁卡的環境變數。沒綁（None 或空）就不設，引擎看得到全部卡。"""
+    ids = [str(x) for x in gpu_ids or []]
+    if not ids:
+        return {}
+    if nvidia is None:
+        nvidia = bool(shutil.which("nvidia-smi"))
+    if nvidia:
+        # CUDA 預設把最快的卡排第一，跟 nvidia-smi 的編號不同；照 PCI 匯流排排才對得上
+        return {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": ",".join(ids)}
+    order = amd_hip_order()
+    miss = [i for i in ids if i not in order]
+    if miss:
+        raise ValueError(f"對不到這些卡的 HIP 序號：{', '.join(miss)}")
+    return {"HIP_VISIBLE_DEVICES": ",".join(str(order[i]) for i in ids)}
+
+
+def pick_gpus(want, cards):
+    """檢查要綁的卡。回 (卡號清單或 None, 錯誤)。None＝自動（全部）；全選也當成自動，登錄檔不留多餘的綁定。"""
+    if want is None:
+        return None, None
+    if not isinstance(want, list):
+        return None, "gpus 要是卡號清單"
+    have = [str(c["id"]) for c in cards]
+    ids = list(dict.fromkeys(str(x) for x in want))
+    bad = [i for i in ids if i not in have]
+    if bad:
+        return None, f"這台沒有這些卡：{', '.join(bad)}（偵測到 {', '.join(have) or '沒有卡'}）"
+    if not ids or sorted(ids) == sorted(have):
+        return None, None
+    return sorted(ids, key=have.index), None
+
+
+def card_split(gib, gpu_ids, cards):
+    """把一個欄位的顯存用量攤到它用的每張卡：綁卡的照綁的卡，沒綁的攤到全部卡；照卡的大小比例分（llama.cpp 預設也是這樣分層）。"""
+    ids = {str(x) for x in gpu_ids or []}
+    sel = [c for c in cards if not ids or str(c["id"]) in ids]
+    tot = sum(c["total_gib"] for c in sel) or 1
+    return {str(c["id"]): float(gib or 0) * c["total_gib"] / tot for c in sel}
 
 
 def hardware():
@@ -613,6 +687,8 @@ def slot_state(slot, reg, hw):
         "est_vram_gib": slot.get("est_vram_gib"), "est_ram_gib": slot.get("est_ram_gib"),
         "config": cfg, "kv_worst_gib": kv_worst_gib(cfg), "measure": meas,
         "critical": slot.get("critical", False), "note": slot.get("note", ""),
+        # 換得回 Strata 的欄位：本來就是 Strata，或現在跑 llama.cpp 但還留著 Strata 的設定
+        "has_strata": slot.get("kind") == "strata" or bool((slot.get("engines") or {}).get("strata")),
     }
 
 
@@ -1609,10 +1685,12 @@ def no_mmap_args(exe):
     return ["--load-mode", "none"] if "--load-mode" in text else ["--no-mmap"]
 
 
-def llama_launch_env(exe, reg=None):
-    """llama-server 執行時的環境：登錄檔的 llama_env，加上執行檔目錄放進 LD_LIBRARY_PATH。啟動與偵測版本共用。"""
+def llama_launch_env(exe, reg=None, gpus=None):
+    """llama-server 執行時的環境：登錄檔的 llama_env，加上執行檔目錄放進 LD_LIBRARY_PATH。啟動與偵測版本共用。
+    欄位綁了卡就再加上綁卡的變數（蓋過 llama_env 裡同名的設定）。"""
     reg = reg or registry()
     env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
+    env.update(visible_env(gpus))
     lib = os.path.dirname(exe)
     env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
     return env
@@ -1625,7 +1703,7 @@ def launch_llama(cfg_path):
         raise SystemExit(f"讀不到 {cfg_path}")
     reg = registry()
     argv = llama_argv(raw, reg)
-    os.execvpe(argv[0], argv, llama_launch_env(raw["exe"], reg))
+    os.execvpe(argv[0], argv, llama_launch_env(raw["exe"], reg, raw.get("gpus")))
 
 
 def llama_unit(slot_id):
@@ -1687,7 +1765,7 @@ def _alive(slot):
     return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
 
 
-def set_llama_model(slot_id, model_id, ctx=None, force=False):
+def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。"""
     reg = registry()
     slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
@@ -1704,6 +1782,18 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     exe = llama_server_exe(reg)
     if not exe:
         return 400, {"error": "這台找不到 llama-server。請先編好 llama.cpp，或在登錄檔 machine.llama_server 指定路徑"}
+
+    hw0 = hardware()
+    cards = pools(reg, hw0)["gpus"]
+    # gpus 沒帶＝維持原本的綁定；帶 None 或空清單＝自動（全部卡）；帶清單＝只用這幾張
+    gpu_ids, err = pick_gpus(slot.get("gpu_ids") if gpus is ... else gpus, cards)
+    if err:
+        return 400, {"error": err}
+    if gpu_ids and not shutil.which("nvidia-smi"):
+        try:
+            visible_env(gpu_ids)
+        except ValueError as ex:
+            return 400, {"error": f"{ex}，不能綁卡；請改回自動"}
 
     old = json.loads(json.dumps(slot))                       # 整個欄位的原樣，還原時直接寫回
     old_unit = slot.get("unit")
@@ -1736,7 +1826,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
            "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
-           "api_key_file": keyfile}
+           "api_key_file": keyfile, "gpus": gpu_ids}
     save_json(cfg_path, raw)
     os.chmod(cfg_path, 0o600)
     unit = ensure_llama_unit(slot_id, cfg_path)
@@ -1754,7 +1844,10 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
                 sl.update(fields)
         save_json(REGISTRY, r)
 
-    put({**old, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
+    fields = {k: v for k, v in old.items() if k != "gpu_ids"}
+    if gpu_ids:
+        fields["gpu_ids"] = gpu_ids
+    put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
          "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
          # 跟模型有關的能力（看圖）每次依新模型重算，不沿用上一顆的
          "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
@@ -1790,7 +1883,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     # 同一個服務（GGUF 換 GGUF）：admit 看得到這個服務開著，會自己把它占的量算回，這裡不能再加一次。
     # 跨引擎：舊服務是另一個 unit，admit 看不到，要另外算回
     ov, orr = _usage_reclaim(old) if old_unit and old_unit != unit and old_alive else (0.0, 0.0)
-    verdict = admit(slot_id, extra_free=(ov, orr))
+    # 逐張卡試算時，舊模型釋放的量要還給它「原本」用的卡，不是新綁的卡
+    old_v = _usage_reclaim(old)[0] if old_unit and old_alive else 0.0
+    verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
     if not verdict["allow"] and not force:
         return undo("記憶體不夠", 409, {"admit": verdict})
 
@@ -1822,7 +1917,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     return 200, {"ok": True, "engine": "llama", "model": m["name"], "quant": m.get("quant"),
                  "api_model_name": alias, "port": int(port), "ctx": want_ctx,
                  "switched_engine": old.get("kind") not in (None, "llama"),
-                 "kv_gib": est["kv"], "est_vram_gib": est["vram"]}
+                 "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids}
 
 
 def _usage_reclaim(old_slot):
@@ -2200,7 +2295,7 @@ def pools(reg, hw):
     return out
 
 
-def admit(slot_id, reg=None, hw=None, extra_free=None):
+def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
     """這台還塞不塞得下這個欄位的模型。用「載下去之後最壞剩多少」判斷，不是「現在剩多少」。"""
     reg = reg or registry()
     hw = hw if hw is not None else hardware()
@@ -2267,7 +2362,25 @@ def admit(slot_id, reg=None, hw=None, extra_free=None):
                           "need": round(need_vram, 1), "worst": wv, "floor": fl["vram"]}
         detail["ram"] = {"total": p["ram"]["total_gib"], "free": rfree,
                          "need": round(need_ram, 1), "worst": wr, "floor": fl["ram"]}
-        if need_vram and wv < fl["vram"]:
+        cards = p["gpus"]
+        if mm == "discrete" and len(cards) > 1 and need_vram:
+            # 多卡：總量夠不代表每張都夠。模型照卡的大小攤到它用的每張卡，任何一張跌破底線就擋
+            share = card_split(need_vram, slot.get("gpu_ids"), cards)
+            back = reclaim_cards if reclaim_cards is not None else card_split(reclaim_vram, slot.get("gpu_ids"), cards)
+            detail["cards"] = []
+            for c in cards:
+                cid = str(c["id"])
+                if cid not in share:
+                    continue
+                free_c = round(c["free_gib"] + back.get(cid, 0.0), 1)
+                worst_c = round(free_c - share[cid], 1)
+                detail["cards"].append({"id": cid, "total": c["total_gib"], "free": free_c,
+                                        "need": round(share[cid], 1), "worst": worst_c})
+                if worst_c < fl["vram"]:
+                    reasons.append(
+                        f"卡 {cid} 顯存不足：這張要放約 {share[cid]:.0f} GiB，現在只剩 {free_c:.0f} GiB，"
+                        f"載下去會剩 {worst_c} GiB（低於 {fl['vram']} GiB 底線）")
+        elif need_vram and wv < fl["vram"]:
             reasons.append(
                 f"顯存不足：需要約 {need_vram:.0f} GiB，現在只剩 {vfree:.0f} GiB，"
                 f"載下去會剩 {wv} GiB（低於 {fl['vram']} GiB 底線）")
@@ -2641,7 +2754,8 @@ class Handler(BaseHTTPRequestHandler):
             sid = m.group(1)
             cur = _slot(sid) or {}
             if body.get("engine") == "llama":
-                code, out = set_llama_model(sid, str(body.get("model") or ""), body.get("ctx"), force=force)
+                code, out = set_llama_model(sid, str(body.get("model") or ""), body.get("ctx"), force=force,
+                                            **({"gpus": body.get("gpus")} if "gpus" in body else {}))
             elif cur.get("kind") == "llama":
                 code, out = back_to_strata(sid, body.get("pack") or "", body.get("native") or "", force=force)
             else:
