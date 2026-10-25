@@ -196,6 +196,8 @@ def network_test(node_id, slot_id, key=""):
     port0 = u.port or (443 if u.scheme == "https" else 80)
     path0 = (u.path or "").rstrip("/")
     ctx = ssl.create_default_context() if u.scheme == "https" else None   # 驗證開著，不准略過
+    if ctx:
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2                        # 不接受 TLS 1.0／1.1
     t0 = time.time()
 
     def call(method, path, with_key):
