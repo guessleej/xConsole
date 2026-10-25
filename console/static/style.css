@@ -361,7 +361,7 @@ main { min-height: calc(100vh - 98px); }
 .kv .k { color: var(--ink-3); }
 .kv .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.slot-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+.slot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
 
 .btn {
   border: 1px solid transparent;
@@ -371,6 +371,7 @@ main { min-height: calc(100vh - 98px); }
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 13.5px;
+  white-space: nowrap;            /* 卡片窄的時候整顆換行，不要擠成一個字一行（「重／啟」） */
   transition: background .15s ease;
 }
 :root[data-theme="dark"] .btn { background: rgba(255, 255, 255, .09); }
