@@ -3136,18 +3136,25 @@ def save_machine(body):
 
 
 def register_candidates(reg=None):
-    """這台可以登記成欄位的服務：使用者層的 systemd 服務，扣掉 xConsole 自己的、已經登記過的。"""
+    """這台可以登記成欄位的服務：使用者自己建立的 systemd 使用者服務（服務檔在家目錄底下），
+    扣掉 xConsole 自己的、已經登記過的。系統內建的桌面服務（GNOME、音效、印表機…）一台就上百個，全列出來管理者找不到自己的。"""
     reg = reg or registry()
     used = {s.get("unit") for s in reg["slots"]} | {e.get("unit") for s in reg["slots"]
                                                    for e in (s.get("engines") or {}).values()}
     _, out, _ = sh(["systemctl", "--user", "list-unit-files", "--type=service", "--no-legend", "--no-pager"], timeout=20)
-    names = []
-    for line in out.splitlines():
-        u = (line.split() or [""])[0]
-        if UNIT_RX.fullmatch(u) and u not in OWN_UNITS and u not in used and not re.fullmatch(r"xc-.*-llama\.service", u) \
-                and "@" not in u:
-            names.append(u)
-    return sorted(names)
+    names = [u for u in ((ln.split() or [""])[0] for ln in out.splitlines())
+             if UNIT_RX.fullmatch(u) and u not in OWN_UNITS and u not in used and "@" not in u
+             and not re.fullmatch(r"xc-.*-llama\.service", u)]
+    if not names:
+        return []
+    _, show, _ = sh(["systemctl", "--user", "show", "-p", "Id", "-p", "FragmentPath", "--", *names], timeout=30)
+    mine = []
+    for block in show.split("\n\n"):
+        kv = dict(ln.split("=", 1) for ln in block.splitlines() if "=" in ln)
+        frag = kv.get("FragmentPath", "")
+        if kv.get("Id") in names and frag.startswith(("/home/", os.path.realpath(HOME) + "/")):
+            mine.append(kv["Id"])
+    return sorted(mine)
 
 
 def _slot_fields(body, base):
