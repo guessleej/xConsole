@@ -53,6 +53,7 @@ def wait_tls(port):
 
 def https(port, cafile, method, path, body=None, headers=None, raw=False):
     ctx = ssl.create_default_context(cafile=cafile)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = False
     c = http.client.HTTPSConnection("127.0.0.1", port, context=ctx, timeout=120)
     h = {"Content-Type": "application/json", **(headers or {})}
@@ -382,6 +383,7 @@ except TimeoutError: print("drip-blocked", round(time.time() - t0, 1))
 
         # ---- 7c2. 慢速佔線：請求列與標頭 15 秒內沒送完就關（以前每 100 秒送一個位元組就能無限期佔住）
         ctx0 = ssl.create_default_context(cafile=ccert)
+        ctx0.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx0.check_hostname = False
         sk = ctx0.wrap_socket(socket.create_connection(("127.0.0.1", cport), timeout=40))
         sk.sendall(b"GET /healthz HTTP/1.1\r\nHost: x\r\n")
