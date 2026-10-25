@@ -68,17 +68,25 @@ def sh(argv, timeout=20):
         return 1, "", str(exc)
 
 
-def tail_lines(path, n):
-    """檔案最後 n 行（取代 tail -n）。只讀檔尾一段，幾 GB 的記錄檔也不會整個讀進來。"""
+def tail_lines(path, n, cap=8 * 1024 * 1024):
+    """檔案最後 n 行（取代 tail -n）。從檔尾往回一塊一塊讀，湊滿 n 行為止；
+    最多讀 cap 位元組，幾 GB 的記錄檔也不會整個讀進來。"""
     try:
         with open(path, "rb") as fh:
             fh.seek(0, os.SEEK_END)
-            size = fh.tell()
-            fh.seek(max(0, size - n * 400))
-            data = fh.read().decode("utf-8", "replace")
+            end = pos = fh.tell()
+            buf = b""
+            while pos > 0 and buf.count(b"\n") <= n and end - pos < cap:
+                step = min(65536, pos)
+                pos -= step
+                fh.seek(pos)
+                buf = fh.read(step) + buf
     except OSError:
         return []
-    return data.splitlines()[-n:]
+    lines = buf.decode("utf-8", "replace").splitlines()
+    if pos > 0 and lines:
+        lines = lines[1:]          # 沒讀到檔頭時，第一行可能只讀到後半段
+    return lines[-n:]
 
 
 def load_json(path, default):
@@ -506,16 +514,32 @@ ACTIVE_LABEL = {
 }
 
 
+UNIT_NAME_RX = re.compile(r"[A-Za-z0-9][\w@.:-]{0,120}\.(?:service|socket|target|timer)")
+
+
+def unit_name(unit):
+    """服務名稱進 systemctl／journalctl 之前一律比對格式（另外參數前也加 --）：不經過 shell 之後，
+    剩下的風險只有「名稱被當成選項」，這裡兩道都擋。"""
+    unit = str(unit or "")
+    if not UNIT_NAME_RX.fullmatch(unit):
+        raise ValueError(f"服務名稱格式不對：{unit[:60]}")
+    return unit
+
+
 def unit_state(unit):
     """回 systemd 的真實狀態字串，不要壓成開／關兩種。
 
     卡在 activating 的服務（Type=notify 但程式沒送就緒訊號，或 ExecStartPre 很久）
     壓成「關」會讓人以為它沒跑、壓成「開」又會以為它好了，兩種都會誤導。
     """
-    _, out, _ = sh(["systemctl", "--user", "is-active", unit])
+    try:
+        unit = unit_name(unit)
+    except ValueError:
+        return "unknown"          # 登錄檔裡的名字不合格式：當成查不到，不要讓整個狀態頁出錯
+    _, out, _ = sh(["systemctl", "--user", "is-active", "--", unit])
     st = out.strip()
     if st in ("unknown", "", "inactive"):
-        _, out2, _ = sh(["systemctl", "is-active", unit])
+        _, out2, _ = sh(["systemctl", "is-active", "--", unit])
         if out2.strip() not in ("unknown", ""):
             st = out2.strip()
     return st or "unknown"
@@ -527,14 +551,20 @@ def unit_active(unit):
 
 def unit_scope(unit):
     """這個 unit 是 user 層還是 system 層。兩層指令不一樣，猜錯就全部失敗。"""
-    rc, _, _ = sh(["systemctl", "--user", "cat", unit])
+    try:
+        rc, _, _ = sh(["systemctl", "--user", "cat", "--", unit_name(unit)])
+    except ValueError:
+        return "user"
     return "user" if rc == 0 else "system"
 
 
 def sysctl(unit, verb, timeout=200):
     scope = unit_scope(unit)
     flag = "--user " if scope == "user" else ""
-    return sh(["systemctl", *flag.split(), *verb.split(), unit], timeout=timeout)
+    try:
+        return sh(["systemctl", *flag.split(), *verb.split(), "--", unit_name(unit)], timeout=timeout)
+    except ValueError as ex:
+        return 1, "", str(ex)
 
 
 def unit_enabled(unit):
@@ -931,7 +961,10 @@ def wait_healthy(slot, seconds=240):
             if sub.strip() == "auto-restart":
                 st = "failed"
         if st == "failed":
-            _, tail, _ = sh(["journalctl", "--user", "-u", slot["unit"], "-n", "3", "--no-pager", "-o", "cat"])
+            try:
+                _, tail, _ = sh(["journalctl", "--user", "-u", unit_name(slot["unit"]), "-n", "3", "--no-pager", "-o", "cat"])
+            except ValueError as ex:
+                tail = str(ex)
             return False, (tail or "服務退出").replace("\n", " ")[:200]
         if st == "active":
             if not port:
@@ -2563,7 +2596,10 @@ def do_logs(slot_id, lines=300):
         return 404, {"error": "沒有這個欄位"}
     scope = unit_scope(slot["unit"])
     flag = "--user " if scope == "user" else ""
-    _, out, err = sh(["journalctl", *flag.split(), "-u", slot["unit"], "-n", int(lines), "--no-pager", "-o", "short-iso"])
+    try:
+        _, out, err = sh(["journalctl", *flag.split(), "-u", unit_name(slot["unit"]), "-n", int(lines), "--no-pager", "-o", "short-iso"])
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
     text = out or err
     if slot.get("log") and os.path.exists(slot["log"]):
         out2 = "\n".join(tail_lines(slot["log"], int(lines)))
