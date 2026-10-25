@@ -136,9 +136,19 @@ def main():
     big = [{"id": "b", "role": "主腦", "unit": "x.service", "est_vram_gib": 92}]
     r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
     ok &= case("92 GiB 攤到兩張 48 → 放行", r["allow"], True)
-    big[0]["est_vram_gib"] = 95
+    big[0]["est_vram_gib"] = 96
     r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
-    ok &= case("95 GiB 攤到兩張 48 → 每張剩 0.5 低於底線 → 擋", r["allow"], False)
+    ok &= case("96 GiB 攤到兩張 48 → 每張剩 0，低於分到的 0.5 底線 → 擋", r["allow"], False)
+    # 中原實況：Mistral 128B 跨兩張 48 GB 已經在跑（卡 0 剩 0.8、卡 1 剩 1.7），重啟它不能被擋。
+    # 底線 1 GiB 是總量要留的，分到兩張各 0.5；每張都要留滿 1 GiB 就會擋（2026-10-25 實際踩到）
+    cy = [{"id": "brain", "role": "主腦", "unit": "x.service", "est_vram_gib": 92.8}]
+    real_state, A.unit_state = A.unit_state, lambda u: "active"
+    cycu = fake_hw(95.6, 93.1, gpus=[      # 中原 nvidia-smi 實測：每張 47.8 GiB，已用 47.0／46.1
+        {"id": "0", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 47.0 * GIB},
+        {"id": "1", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 46.1 * GIB}])
+    r = A.admit("brain", reg_for("discrete", cy, 123, 117), cycu)
+    A.unit_state = real_state
+    ok &= case("中原 Mistral 128B 跨兩張卡在跑，重啟 → 放行", r["allow"], True)
     # 換綁卡：舊模型在卡 0 佔 40，要搬到卡 1；釋放量要還給卡 0，不是卡 1
     r = A.admit("m", reg_for("discrete", m9b, 123, 100), two(46, 46), reclaim_cards={"0": 40.0})
     ok &= case("舊模型在卡 0、改綁卡 1：卡 1 沒空間 → 擋（不能把卡 0 釋放的量算給卡 1）", r["allow"], False)
