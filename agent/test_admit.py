@@ -218,6 +218,14 @@ def main():
     open(lp, "w").write("\n".join(rows) + "\n")
     ok &= case("tail_lines：含 3000 字的長行，最後 50 行完整", A.tail_lines(lp, 50), rows[-50:])
     ok &= case("tail_lines：要的行數比檔案多就回整個檔", A.tail_lines(lp, 1000), rows)
+    ok &= case("llama-server 版本號：淺層下載回 1 時用資料夾名稱的正式版編號",
+               A.llama_build_no("/h/llama.cpp-b11870/build/bin/llama-server", "version: 1 (abc)\nbuilt with"), 11870)
+    ok &= case("  一般編譯照 --version 的 build 號", A.llama_build_no("/h/llama.cpp/build/bin/llama-server", "version: 11626 (df18bee11)"), 11626)
+    lr = ("1111111111111111111111111111111111111111\trefs/tags/b100\n"
+          "2222222222222222222222222222222222222222\trefs/tags/b200\n"
+          "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
+    ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
+               {100: "1" * 40, 200: "3" * 40})
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])

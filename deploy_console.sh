@@ -18,6 +18,9 @@ for f in index.html style.css app.js; do
   PUT="$HERE/console/static/$f" DST="/home/xcloud/xconsole/static/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
 PUT="$HERE/requirements.txt" DST="/home/xcloud/xconsole/requirements.txt" bash "$XS" "$HOST_ALIAS" --scp
+# 「加一台機器」的安裝指令從主控台下載代理程式：放一份在主控台旁邊
+bash "$XS" "$HOST_ALIAS" 'mkdir -p $HOME/xconsole/agent'
+PUT="$HERE/agent/xconsole_agent.py" DST="/home/xcloud/xconsole/agent/xconsole_agent.py" bash "$XS" "$HOST_ALIAS" --scp
 
 echo "=== 獨立的 Python 環境（依賴版本照 requirements.txt 釘死，不吃系統套件）==="
 # 系統的 python3-cryptography 跟著發行版走（Ubuntu 24.04 是 41.0.7），版本不受我們控制，
@@ -62,14 +65,17 @@ p = os.path.expanduser('~/.xconsole/fleet.json')
 cfg = {}
 if os.path.exists(p):
     cfg = json.load(open(p))
-cfg['nodes'] = json.loads('''[$NODE_JSON]''')
+# 合併而不是整份換掉：網頁上「加一台機器」加進來的機器不在這次的別名清單裡，不能被洗掉
+new = json.loads('''[$NODE_JSON]''')
+ids = {n['id'] for n in new}
+cfg['nodes'] = [n for n in cfg.get('nodes', []) if n['id'] not in ids] + new
 cfg.pop('session_secret', None)
 cfg.setdefault('auth', {})
 fd = os.open(p + '.tmp', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, 'w') as fh:
     json.dump(cfg, fh, ensure_ascii=False, indent=1)
 os.replace(p + '.tmp', p)
-print('fleet.json 已寫入，納管', len(cfg['nodes']), '台')
+print('fleet.json 已寫入：本次更新', len(new), '台，共納管', len(cfg['nodes']), '台')
 PY"
 
 echo "=== 取回各機代理憑證，當作主控台連線時的信任依據 ==="
