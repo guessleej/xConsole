@@ -850,3 +850,8 @@ pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 
 /* 換模型：用哪幾張卡 */
 .gpu-pick { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 4px; }
 .gpu-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; }
+
+/* 機器的納管與設定 */
+td.nowrap, .nowrap { white-space: nowrap; }
+.need-list { margin: 8px 0 10px; padding-left: 18px; line-height: 1.7; }
+.modal h4.pick-h + .form-row { margin-top: 4px; }

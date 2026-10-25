@@ -18,6 +18,9 @@ for f in index.html style.css app.js; do
   PUT="$HERE/console/static/$f" DST="/home/xcloud/xconsole/static/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
 PUT="$HERE/requirements.txt" DST="/home/xcloud/xconsole/requirements.txt" bash "$XS" "$HOST_ALIAS" --scp
+# 「加一台機器」的安裝指令從主控台下載代理程式：放一份在主控台旁邊
+bash "$XS" "$HOST_ALIAS" 'mkdir -p $HOME/xconsole/agent'
+PUT="$HERE/agent/xconsole_agent.py" DST="/home/xcloud/xconsole/agent/xconsole_agent.py" bash "$XS" "$HOST_ALIAS" --scp
 
 echo "=== 獨立的 Python 環境（依賴版本照 requirements.txt 釘死，不吃系統套件）==="
 # 系統的 python3-cryptography 跟著發行版走（Ubuntu 24.04 是 41.0.7），版本不受我們控制，

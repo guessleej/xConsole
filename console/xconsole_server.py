@@ -294,6 +294,225 @@ def sampler():
         time.sleep(SAMPLE_EVERY)
 
 
+
+# ---------------------------------------------------------------- 加一台機器（網頁上做完）
+# 管理者在網頁按「加一台機器」→ 主控台產一次性加入碼與一行安裝指令 → 在那台貼上執行 →
+# 腳本裝好代理、把代理的權杖與憑證送回來 → 主控台用那張憑證與權杖實際連一次成功才納管。
+# 安裝指令釘住主控台憑證的公鑰（curl --pinnedpubkey），自簽憑證也不用關驗證；加入碼 30 分鐘、只能用一次。
+JOIN_TTL = 1800
+JOIN_FAIL_MAX = 10
+_JOINS = {}                      # 加入碼雜湊 → 狀態（只放記憶體：主控台重啟就作廢，重新產一個即可）
+_JOIN_FAILS = {}
+_JOIN_LOCK = threading.Lock()
+NODE_ID_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,39}")
+HOST_RX = re.compile(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+                     r"|\[[0-9A-Fa-f:]+\])(?::\d{1,5})?")
+AGENT_UNIT = """[Unit]
+Description=xConsole 節點代理（模型欄位、准入控制、啟停）
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/xconsole_agent.py
+Restart=always
+RestartSec=5
+MemoryMax=256M
+CPUQuota=25%
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def valid_host(h):
+    """機器位址：IP，或主機名稱（不含埠）。"""
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        return bool(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*", h))
+
+
+def agent_source():
+    """安裝腳本要下載的代理程式：部署時放在主控台旁的 agent/，開發時在 repo 的 agent/，單機版在家目錄。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in (os.path.join(here, "agent", "xconsole_agent.py"), os.path.join(here, "..", "agent", "xconsole_agent.py"),
+              os.path.join(HOME, "xconsole_agent.py")):
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def console_pin():
+    """主控台目前憑證的公鑰雜湊（curl --pinnedpubkey 的格式）。換憑證後產的新指令會跟著換。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    with open(CERTS.p.live_cert, "rb") as fh:
+        cert = x509.load_pem_x509_certificates(fh.read())[0]
+    spki = cert.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return "sha256//" + base64.b64encode(hashlib.sha256(spki).digest()).decode()
+
+
+def _join_key(code):
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+def join_lookup(code, use=False):
+    """回這個加入碼的狀態；過期或已用過回 None。"""
+    with _JOIN_LOCK:
+        now = time.time()
+        for k in [k for k, v in _JOINS.items() if v["exp"] < now - 3600]:
+            _JOINS.pop(k)
+        j = _JOINS.get(_join_key(str(code or "")))
+        if not j or j["exp"] < now or j.get("node_id"):
+            return None
+        return j
+
+
+def install_script(code, j):
+    url = f"https://{j['console']}"
+    return f"""#!/usr/bin/env bash
+# xConsole 節點代理安裝：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。
+set -euo pipefail
+C='{url}'
+PIN='{j["pin"]}'
+CODE='{code}'
+get() {{ curl -fsSk --pinnedpubkey "$PIN" "$C/install/$CODE/$1"; }}
+echo "== 1/4 檢查這台 =="
+[ "$(id -u)" = 0 ] && {{ echo "請用一般帳號執行，不要用 root 或 sudo"; exit 1; }}
+for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
+systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+echo "== 2/4 下載節點代理 =="
+mkdir -p -m 700 "$HOME/.xconsole" "$HOME/.config/systemd/user"
+get xconsole_agent.py > "$HOME/xconsole_agent.py.new"
+python3 -m py_compile "$HOME/xconsole_agent.py.new"
+mv "$HOME/xconsole_agent.py.new" "$HOME/xconsole_agent.py"
+echo "== 3/4 建立服務並啟動 =="
+cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
+{AGENT_UNIT}UNIT
+systemctl --user daemon-reload
+systemctl --user enable xconsole-agent.service >/dev/null
+systemctl --user restart xconsole-agent.service
+LINGER=yes
+loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+for i in $(seq 1 30); do [ -s "$HOME/.xconsole/token" ] && [ -s "$HOME/.xconsole/agent-cert.pem" ] && break; sleep 1; done
+curl -fsS -m 10 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null \\
+  || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
+echo "== 4/4 加入主控台 =="
+RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 60 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
+import json, os, socket, subprocess
+home = os.path.expanduser("~")
+ips = subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split()[:4]
+print(json.dumps({{"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
+                  "linger": os.environ["XC_LINGER"] == "yes",
+                  "token": open(os.path.join(home, ".xconsole/token")).read().strip(),
+                  "cert": open(os.path.join(home, ".xconsole/agent-cert.pem")).read()}}))
+PY
+) || {{ echo "連不到主控台 $C"; exit 1; }}
+STATUS=$(printf '%s' "$RESP" | tail -n 1)
+printf '%s' "$RESP" | sed '$d' | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
+[ "$STATUS" = 200 ] || exit 1
+[ "$LINGER" = no ] && echo "提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER"
+exit 0
+"""
+
+
+def join_node(handler, body):
+    """安裝腳本送回來的代理資訊：驗加入碼、驗憑證、用那張憑證與權杖實際連一次成功才納管。"""
+    ip = handler.ip
+    with _JOIN_LOCK:
+        fails = [t for t in _JOIN_FAILS.get(ip, []) if t > time.time() - 900]
+        _JOIN_FAILS[ip] = fails
+    if len(fails) >= JOIN_FAIL_MAX:
+        return 429, {"error": "失敗次數過多，請 15 分鐘後再試"}
+
+    def fail(msg, j=None):
+        with _JOIN_LOCK:
+            _JOIN_FAILS.setdefault(ip, []).append(time.time())
+            if j is not None:
+                j["error"] = msg
+        STORE.audit("", ip, "node.join", "", False, {"message": msg})
+        return 400, {"error": msg}
+
+    j = join_lookup(body.get("code"))
+    if not j:
+        return fail("加入碼不對、已經用過或過期了，請在主控台重新按「加一台機器」")
+    token = str(body.get("token") or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,128}", token):
+        return fail("代理的權杖格式不對", j)
+    r, pem = tls.inspect_trusted_ca(str(body.get("cert") or "").encode())
+    if not r.get("ok"):
+        return fail("代理的憑證讀不出來", j)
+    try:
+        port = int(body.get("port") or 9401)
+    except (TypeError, ValueError):
+        port = 0
+    if not 1 <= port <= 65535:
+        return fail("代理的埠不對", j)
+    hostname = re.sub(r"[^\w.-]", "-", str(body.get("hostname") or ""))[:40].strip("-.") or "node"
+    cands = [ip] + [x for x in (body.get("ips") or [])[:4] if isinstance(x, str)]
+    hosts = []
+    for h in cands:
+        try:
+            a = ipaddress.ip_address(h)
+        except ValueError:
+            continue
+        if not a.is_loopback and str(a) not in hosts:
+            hosts.append(str(a))
+    if ip in ("127.0.0.1", "::1"):
+        hosts.insert(0, "127.0.0.1")         # 主控台自己這台
+    tmp = os.path.join(CERTS.p.trust, f".join-{secrets.token_hex(6)}.pem")
+    with open(tmp, "wb") as fh:
+        fh.write(pem)
+    os.chmod(tmp, 0o600)
+    good, why = None, ""
+    try:
+        # 跟日後 call_node 同一套驗證（含主機名稱）：這裡連得上，之後就連得上
+        ctx = tls.client_context(tmp)
+        for h in hosts:
+            url = f"https://{'[' + h + ']' if ':' in h else h}:{port}/state"
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+            try:
+                with urllib.request.urlopen(req, timeout=20, context=ctx) as resp:
+                    if resp.status == 200:
+                        good = h
+                        break
+            except Exception as exc:  # noqa: BLE001
+                why = str(exc)[:160]
+        if not good:
+            os.remove(tmp)
+            return fail(f"主控台連不到這台的代理（試過 {', '.join(f'{h}:{port}' for h in hosts)}）。"
+                        f"請確認防火牆讓主控台連得到這台的 {port} 埠。{why}", j)
+        nid = None
+
+        def put(cfg):
+            nonlocal nid
+            same = next((n for n in cfg["nodes"] if n["host"] == good and int(n.get("agent_port", 9401)) == port), None)
+            if same:                                   # 同一台重新安裝：換新的權杖與憑證，名稱群組不動
+                same["token"] = tls.seal(CERTS.p, token.encode())
+                nid = same["id"]
+                return
+            taken = {n["id"] for n in cfg["nodes"]}
+            base = hostname if NODE_ID_RX.fullmatch(hostname) else "node"
+            nid = base if base not in taken else next(f"{base}-{i}" for i in range(2, 999) if f"{base}-{i}" not in taken)
+            cfg["nodes"].append({"id": nid, "name": j.get("name") or hostname, "host": good,
+                                 "group": j.get("group") or "未分類", "agent_port": port,
+                                 "token": tls.seal(CERTS.p, token.encode())})
+        update_fleet(put)
+        os.replace(tmp, trust_file(nid))
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    with _JOIN_LOCK:
+        j["node_id"] = nid
+        j["linger"] = bool(body.get("linger"))
+        j["error"] = None
+    STORE.audit(j["by"], ip, "node.join", nid, True, {"host": good, "port": port,
+                                                       "fingerprint256": r["summary"]["fingerprint256"]})
+    name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
+    return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
+
 # ---------------------------------------------------------------- HTTP
 
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -432,6 +651,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "service": "xconsole", "tls": {
                 "daysLeft": cur.get("daysLeft"), "validToTaipei": cur.get("validToTaipei"),
                 "source": cur.get("source"), "selfSigned": cur.get("selfSigned")}})
+        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|xconsole_agent\.py)", path)
+        if m:
+            # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
+            j = join_lookup(m.group(1))
+            if not j:
+                return self._send(404, "加入碼不對、已經用過或過期了，請在主控台重新按「加一台機器」。\n".encode(),
+                                  "text/plain; charset=utf-8")
+            if m.group(2) == "agent.sh":
+                return self._send(200, install_script(m.group(1), j).encode(), "text/x-shellscript; charset=utf-8")
+            src = agent_source()
+            if not src:
+                return self._send(500, "主控台找不到代理程式檔，請重新部署主控台。\n".encode(), "text/plain; charset=utf-8")
+            with open(src, "rb") as fh:
+                return self._send(200, fh.read(), "text/x-python; charset=utf-8")
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
@@ -455,6 +688,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
             return self._json(200, fleet_state())
+        m = re.fullmatch(r"/api/nodes/join-code/([0-9a-f]{12})", path)
+        if m:
+            with _JOIN_LOCK:
+                j = next((v for k, v in _JOINS.items() if k.startswith(m.group(1))), None)
+            if not j:
+                return self._json(404, {"error": "沒有這個加入碼"})
+            state = "joined" if j.get("node_id") else "expired" if j["exp"] < time.time() else "waiting"
+            return self._json(200, {"state": state, "node_id": j.get("node_id"), "error": j.get("error"),
+                                    "linger": j.get("linger"), "expires_at": j["exp"]})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/machine", timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
             return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
@@ -527,6 +772,8 @@ class Handler(BaseHTTPRequestHandler):
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
             return self._json(200, {"ok": True, "user": user}, cookie=cookie)
+        if path == "/api/join":
+            return self._json(*join_node(self, body))
         if path == "/api/logout":
             who = self.user                                   # 先記下是誰，作廢之後就查不到了
             STORE.session_end(self._cookie())                 # 伺服器端作廢，不只是清 cookie
@@ -535,6 +782,79 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True}, cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
         if self._need_auth():
             return None
+
+        # ---- 納管的機器：加入、改名與位址、移除
+        if path == "/api/nodes/join-code":
+            name = str(body.get("name") or "").strip()[:40]
+            group = str(body.get("group") or "").strip()[:30]
+            host = str(body.get("console") or self.headers.get("Host") or "").strip()
+            if not HOST_RX.fullmatch(host):
+                return self._json(400, {"error": "主控台位址格式不對，例：140.135.107.216:9400"})
+            if not agent_source():
+                return self._json(500, {"error": "主控台找不到代理程式檔，請重新部署主控台"})
+            code = secrets.token_urlsafe(24)
+            with _JOIN_LOCK:
+                _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group,
+                                           "console": host, "pin": console_pin(), "by": self.user}
+            self._audit("node.join_code", host, True, {"name": name, "group": group})
+            url = f"https://{host}/install/{code}/agent.sh"
+            return self._json(200, {"id": _join_key(code)[:12], "expires_at": time.time() + JOIN_TTL,
+                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash"})
+        m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove)", path)
+        if m:
+            nid, act = m.group(1), m.group(2)
+            node = next((n for n in fleet()["nodes"] if n["id"] == nid), None)
+            if not node:
+                return self._json(404, {"error": "沒有這台機器"})
+            if act == "remove":
+                update_fleet(lambda cfg: cfg.__setitem__("nodes", [n for n in cfg["nodes"] if n["id"] != nid]))
+                if os.path.exists(trust_file(nid)):
+                    os.remove(trust_file(nid))
+                self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"]})
+                return self._json(200, {"ok": True})
+            name = str(body.get("name", node["name"]) or "").strip()
+            group = str(body.get("group", node.get("group", "")) or "").strip() or "未分類"
+            host = str(body.get("host", node["host"]) or "").strip()
+            try:
+                port = int(body.get("agent_port", node.get("agent_port", 9401)))
+            except (TypeError, ValueError):
+                port = 0
+            if not 1 <= len(name) <= 40 or re.search(r"[\x00-\x1f<>]", name):
+                return self._json(400, {"error": "名稱要 1～40 個字"})
+            if len(group) > 30 or re.search(r"[\x00-\x1f<>]", group):
+                return self._json(400, {"error": "群組最多 30 個字"})
+            if not valid_host(host):
+                return self._json(400, {"error": "位址格式不對，填 IP 或主機名稱（不含埠）"})
+            if not 1 <= port <= 65535:
+                return self._json(400, {"error": "代理的埠要在 1～65535"})
+            moved = (host, port) != (node["host"], int(node.get("agent_port", 9401)))
+            old = {k: node.get(k) for k in ("name", "group", "host", "agent_port")}
+
+            def put(cfg):
+                for n in cfg["nodes"]:
+                    if n["id"] == nid:
+                        n.update(name=name, group=group, host=host, agent_port=port)
+            update_fleet(put)
+            if moved:
+                # 換位址先實際連一次，連不上就換回來，免得改一個字就整台失聯
+                code, out = call_node(nid, "/healthz", timeout=15)
+                if code != 200:
+                    update_fleet(lambda cfg: [n.update(old) for n in cfg["nodes"] if n["id"] == nid])
+                    self._audit("node.update", nid, False, {"message": out.get("error")})
+                    return self._json(400, {"error": f"新位址連不到這台的代理，已改回原本的位址。{out.get('error') or ''}"})
+            self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
+                                                                       "agent_port": port}})
+            return self._json(200, {"ok": True})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete))", path)
+        if m:
+            code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
+            act = {"machine": "machine.settings", "slots/add": "slot.add"}.get(m.group(2)) or (
+                "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
+            self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "gguf_root",
+                                                  "llama_server", "type", "unit", "role", "tier", "port") if k in body}
+                        | ({"message": out.get("error")} if code != 200 else {}))
+            return self._json(code, out)
 
         # ---- 各機動作：轉給代理，並記稽核
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/(start|stop|restart)", path)

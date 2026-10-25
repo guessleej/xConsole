@@ -173,7 +173,8 @@ function renderNav() {
     b.onclick = () => {
       if (key === "nodes") {
         const last = S.fleet.nodes.find((n) => n.id === S.lastNode) || S.fleet.nodes[0];
-        go(last ? "node:" + last.id : "overview");
+        if (last) go("node:" + last.id);
+        else { S.settingsTab = "machines"; go("settings"); }     // 一台都還沒有：直接帶到加機器的地方
       } else go(key);
     };
     nav.appendChild(b);
@@ -218,7 +219,12 @@ function renderNav() {
     machineRow("lib:", v.startsWith("lib:") ? v.slice(4) : null);
   }
 
-  if (v.startsWith("node:")) machineRow("node:", v.slice(5));
+  if (v.startsWith("node:")) {
+    machineRow("node:", v.slice(5));
+    const add = el("button", null, "加一台機器");
+    add.onclick = openAddMachine;
+    sub.appendChild(add);
+  }
 }
 
 function go(view) {
@@ -313,9 +319,13 @@ function slotCard(node, s, unified) {
     const c = el("div", "slot empty");
     c.appendChild(el("div", "role", `${s.role}・${s.tier || ""}`));
     const b = el("button", "btn sm", "放入");
-    // 空欄位直接從模型庫挑一顆 GGUF 放進來（自動配埠、啟動）；非語言模型的服務仍由登錄檔設定
+    // 空欄位直接從模型庫挑一顆 GGUF 放進來（自動配埠、啟動）
     b.onclick = () => openSwap(node, s);
-    c.appendChild(b);
+    const g = el("button", "btn sm", "設定");
+    g.onclick = () => openSlotEditor(node, s);
+    const acts = el("div", "slot-actions");
+    acts.append(b, g);
+    c.appendChild(acts);
     return c;
   }
 
@@ -382,6 +392,9 @@ function slotCard(node, s, unified) {
   const lg = el("button", "btn sm", "記錄");
   lg.onclick = () => { S.sub = { node: node.id, slot: s.id }; go("logs"); };
   acts.appendChild(lg);
+  const cfg = el("button", "btn sm", "設定");
+  cfg.onclick = () => openSlotEditor(node, s);
+  acts.appendChild(cfg);
   c.appendChild(acts);
   return c;
 }
@@ -1476,6 +1489,13 @@ function viewOverview() {
   hero.appendChild(hw);
 
   const wrap = el("div", "wrap");
+  if (!nodes.length) {
+    const c = card("還沒有納管任何機器", "加一台機器之後，這裡會列出每台的記憶體與正在跑的模型");
+    const b = el("button", "btn primary", "加一台機器");
+    b.onclick = openAddMachine;
+    c.appendChild(b);
+    wrap.appendChild(c);
+  }
   for (const [gname, gnodes] of groups()) {
     const card = el("section", "card rv");
     const head = el("div", "card-head");
@@ -1551,11 +1571,22 @@ function viewNode() {
     return;
   }
   const st = n.state;
+  const setBtn = el("button", "btn sm", "這台的設定");
+  setBtn.onclick = () => openMachineSettings(n.id);
   const libBtn = el("button", "btn sm", "這台的模型庫");
   libBtn.onclick = () => go("lib:" + n.id);
   h.appendChild(el("span", "spacer"));
-  h.appendChild(libBtn);
+  h.append(setBtn, libBtn);
   if (st.machine.note) head.appendChild(el("p", "note", st.machine.note));
+  // 新機器從零到能用的順序軸：全部完成就不顯示（已經設好的機器不佔版面）
+  const info = S.minfo?.[n.id];
+  if (info) {
+    const steps = machineSteps(n, info);
+    if (steps.some((x) => !x.done && !x.optional)) head.appendChild(renderSteps(steps));
+  } else if (!S.minfoAsked?.[n.id]) {
+    S.minfoAsked = { ...(S.minfoAsked || {}), [n.id]: true };
+    machineInfo(n.id).then(() => { if (S.view === "node:" + n.id) quietRender(); }).catch(() => {});
+  }
 
   // 情境切換
   const profs = Object.entries(st.profiles || {});
@@ -1617,7 +1648,11 @@ function viewNode() {
   sh.appendChild(el("h2", null, "角色欄位"));
   sh.appendChild(el("span", "sub",
     `${st.slots.filter((s) => s.busy).length} 個運作中，共 ${st.slots.length} 格`));
+  const addSlot = el("button", "btn sm", "新增欄位");
+  addSlot.onclick = () => openSlotEditor(n, null);
+  sh.appendChild(addSlot);
   slotsCard.appendChild(sh);
+  if (!st.slots.length) slotsCard.appendChild(el("p", "note", "這台還沒有欄位。按「新增欄位」建一格空欄位，再到模型庫挑模型放進來。"));
   const grid = el("div", "grid slots");
   const unified = st.pools.memory_model === "unified_single";
   st.slots.filter((s) => s.unit).forEach((s) => grid.appendChild(slotCard(n, s, unified)));
@@ -1867,35 +1902,45 @@ async function checkTlsBanner() {
 
 async function settingsMachines(wrap) {
   const c = card("納管的機器", `共 ${S.fleet.nodes.length} 台`);
+  const add = el("button", "btn sm primary", "加一台機器");
+  add.onclick = openAddMachine;
+  c.querySelector(".card-head").append(el("span", "spacer"), add);
+  c.appendChild(el("p", "small muted",
+    "機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"
+    + "主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
   const box = el("div");
   loading(box);
   c.appendChild(box);
-  c.appendChild(el("p", "small muted",
-    "主控台連各機代理一律走 HTTPS，並用部署時經 SSH 取回的該機憑證驗證對方；"
-    + "憑證不符就拒絕連線，不會退回明文或關掉驗證。代理重裝之後，重新執行 deploy_console.sh，或在下面匯入新憑證。"));
   wrap.appendChild(c);
 
   let nodes;
   try { nodes = (await api("/api/nodes")).nodes; } catch (ex) { box.textContent = ex.message; return; }
+  if (!nodes.length) {
+    box.textContent = "";
+    box.appendChild(el("p", "note", "還沒有納管任何機器。按右上角「加一台機器」開始。"));
+    return;
+  }
   const MM = { unified_split: "統一記憶體（切兩塊）", unified_single: "統一記憶體（單一池）", discrete: "獨立顯存" };
   const sb = el("div", "scrollbox");
   const tb = el("table");
-  tb.innerHTML = "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>信任的代理憑證</th><th></th></tr></thead>";
+  tb.innerHTML = "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>代理憑證</th><th></th></tr></thead>";
   const body = el("tbody");
   nodes.forEach((n) => {
     const live = S.fleet.nodes.find((x) => x.id === n.id);
     const tr = el("tr");
-    tr.appendChild(el("td", null, n.name));
-    tr.appendChild(el("td", null, n.group));
-    tr.appendChild(Object.assign(el("td", "mono"), { textContent: n.host }));
-    tr.appendChild(el("td", null, live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
-    tr.appendChild(el("td", null, live?.online ? "在線" : "連不上"));
+    tr.appendChild(el("td", "nowrap", n.name));
+    tr.appendChild(el("td", "nowrap", n.group));
+    tr.appendChild(Object.assign(el("td", "mono"), { textContent: `${n.host}:${n.agent_port || 9401}` }));
+    tr.appendChild(el("td", "nowrap", live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
+    tr.appendChild(el("td", "nowrap " + (live?.online ? "" : "bad-t"), live?.online ? "在線" : "連不上"));
     tr.appendChild(Object.assign(el("td", "mono small"),
       { textContent: n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
-    const td = el("td");
-    const btn = el("button", "btn sm", "匯入憑證");
-    btn.onclick = () => importTrust(n);
-    td.appendChild(btn);
+    const td = el("td", "row-acts");
+    const e = el("button", "btn sm", "修改");
+    e.onclick = () => openMachineSettings(n.id);
+    const r = el("button", "btn sm danger", "移除");
+    r.onclick = () => removeMachine(n);
+    td.append(e, r);
     tr.appendChild(td);
     body.appendChild(tr);
   });
@@ -2409,6 +2454,368 @@ function render() {
   else if (S.view === "lib" || S.view.startsWith("lib:")) viewLib();
   else if (S.view === "logs") viewLogs();
   else if (S.view === "settings") viewSettings();
+}
+
+
+/* ================================================================ 機器的納管與設定：全部在網頁上做完
+   加一台機器（一次性安裝指令）→ 這台的設定（記憶體架構、底線、存放區、llama-server）→ 新增欄位 → 放入模型。
+   以前這些都要工程師跑部署腳本或手改 registry.json／fleet.json，管理者看得到機器卻不知道它怎麼來的。 */
+
+const MEM_LABEL = {
+  unified_split: "統一記憶體・切兩塊（AMD AI 395 這類）",
+  unified_single: "統一記憶體・單一池（DGX Spark、Jetson）",
+  discrete: "獨立顯存（一般 GPU 伺服器）",
+};
+
+function fieldBox(label, input, hint) {
+  const d = el("div");
+  d.appendChild(el("label", "field", label));
+  d.appendChild(input);
+  if (hint) d.appendChild(el("div", "assume", hint));
+  return d;
+}
+function textInput(v, ph) { const i = el("input"); i.type = "text"; i.value = v ?? ""; if (ph) i.placeholder = ph; return i; }
+function numInput(v, ph) { const i = el("input"); i.type = "number"; i.step = "any"; i.min = "0"; i.value = v ?? ""; if (ph) i.placeholder = ph; return i; }
+function selectInput(opts, v) {
+  const s = el("select");
+  opts.forEach(([val, t]) => { const o = el("option", null, t); o.value = val; s.appendChild(o); });
+  if (v !== undefined && opts.some(([val]) => val === v)) s.value = v;
+  return s;
+}
+function groupInput(v) {
+  const i = textInput(v, "例：NVIDIA 伺服器");
+  const id = "grp-" + Math.random().toString(36).slice(2, 8);
+  const dl = el("datalist");
+  dl.id = id;
+  [...new Set((S.fleet?.nodes || []).map((n) => n.group).filter(Boolean))].forEach((g) => { const o = el("option"); o.value = g; dl.appendChild(o); });
+  i.setAttribute("list", id);
+  return [i, dl];
+}
+// 送出失敗時彈窗留著、錯誤顯示在窗內（modal() 的確定鈕會先關窗，填了半天的表單會蒸發）
+function formButton(ov, text, cls, fn) {
+  const b = el("button", "btn " + cls, text);
+  b.onclick = async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } };
+  ov.querySelector(".actions").appendChild(b);
+  return b;
+}
+function errNote(box, msg) {
+  box.textContent = "";
+  if (msg) box.appendChild(el("p", "note bad", msg));
+}
+
+async function machineInfo(nid, fresh) {
+  S.minfo = S.minfo || {};
+  if (!fresh && S.minfo[nid]) return S.minfo[nid];
+  S.minfo[nid] = await api(`/api/node/${nid}/machine`);
+  return S.minfo[nid];
+}
+
+function openAddMachine() {
+  const body = el("div");
+  body.appendChild(el("p", "small muted",
+    "主控台會產生一行安裝指令。到要加入的那台機器上貼上執行，它會裝好節點代理、自動出現在這裡。指令 30 分鐘內有效、只能用一次。"));
+  const form = el("div", "form-row");
+  const fName = textInput("", "選填，不填就用那台的主機名稱");
+  const [fGroup, dl] = groupInput("");
+  const fHost = textInput(location.host);
+  form.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("主控台位址", fHost, "要加入的那台機器連得到的位址（IP:埠）"));
+  body.append(form, dl);
+  const out = el("div");
+  body.appendChild(out);
+  const ov = modal({ title: "加一台機器", bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  let run = 0;
+  const gen = formButton(ov, "產生安裝指令", "primary", async () => {
+    let r;
+    try {
+      r = await api("/api/nodes/join-code", { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), console: fHost.value.trim() } });
+    } catch (ex) { errNote(out, ex.message); return; }
+    const me = ++run;                       // 重新產生時，舊指令的等待就不再更新畫面
+    gen.textContent = "重新產生";
+    out.textContent = "";
+    out.appendChild(el("h4", "pick-h", "到那台機器上，用一般帳號（不要用 root）貼上執行"));
+    out.appendChild(copyRow("安裝指令", r.command));
+    const need = el("ul", "small muted need-list");
+    ["那台要有 python3、curl、openssl（Ubuntu 預設都有）",
+      `那台要連得到 ${fHost.value.trim()}；主控台要連得到那台的 9401 埠，有防火牆要先開`,
+      "指令會下載代理、建立使用者服務並設成開機自啟，最後把代理的憑證與權杖送回主控台；下載時釘住主控台憑證的公鑰，不是關掉驗證"]
+      .forEach((t) => need.appendChild(el("li", null, t)));
+    out.appendChild(need);
+    const st = el("p", "note", "等待那台執行…（這個視窗開著會自動更新）");
+    out.appendChild(st);
+    const poll = async () => {
+      if (!ov.isConnected || me !== run) return;
+      let j;
+      try { j = await api(`/api/nodes/join-code/${r.id}`); } catch (_) { setTimeout(poll, 3000); return; }
+      if (!ov.isConnected || me !== run) return;
+      if (j.state === "joined") {
+        st.className = "note ok";
+        st.textContent = "已加入。" + (j.linger === false ? "提醒：那台還沒開 linger，帳號登出後代理會停，請照安裝畫面最後一行處理。" : "");
+        await refresh();
+        const next = el("button", "btn primary", "到這台設定記憶體與欄位");
+        next.onclick = () => { ov.remove(); go("node:" + j.node_id); openMachineSettings(j.node_id); };
+        ov.querySelector(".actions").appendChild(next);
+        gen.remove();
+        return;
+      }
+      if (j.state === "expired") { st.className = "note bad"; st.textContent = "加入碼過期了，請按「重新產生」"; return; }
+      st.className = j.error ? "note bad" : "note";
+      st.textContent = j.error ? `那台執行了，但還沒加入成功：${j.error}` : "等待那台執行…（這個視窗開著會自動更新）";
+      setTimeout(poll, 3000);
+    };
+    setTimeout(poll, 3000);
+  });
+  [fName, fGroup, fHost].forEach((i) => imeGuard(i, () => gen.click()));
+}
+
+async function openMachineSettings(nid) {
+  const n = S.fleet.nodes.find((x) => x.id === nid);
+  if (!n) return;
+  const body = el("div");
+  loading(body);
+  const ov = modal({ title: `${n.name} 的設定`, bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  let rec, info = null, infoErr = "";
+  try { rec = (await api("/api/nodes")).nodes.find((x) => x.id === nid); } catch (ex) { errNote(body, ex.message); return; }
+  if (n.online) { try { info = await machineInfo(nid, true); } catch (ex) { infoErr = ex.message; } }
+  body.textContent = "";
+
+  body.appendChild(el("h4", "pick-h", "基本"));
+  const f1 = el("div", "form-row");
+  const fName = textInput(rec.name);
+  const [fGroup, dl] = groupInput(rec.group);
+  const fHost = textInput(rec.host);
+  const fPort = numInput(rec.agent_port || 9401);
+  f1.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("位址", fHost, "主控台連這台代理用的 IP 或主機名稱；改了會先實際連一次，連不上就不改"),
+    fieldBox("代理的埠", fPort));
+  body.append(f1, dl);
+  const tr = el("div", "slot-actions");
+  tr.appendChild(el("span", "small muted", rec.trusted ? `信任的代理憑證：${(rec.trust_fingerprint || "").slice(0, 23)}…` : "還沒信任這台的代理憑證"));
+  tr.appendChild(el("span", "spacer"));
+  const tb = el("button", "btn sm", "匯入新憑證（代理重裝後用）");
+  tb.onclick = () => importTrust(rec);
+  tr.appendChild(tb);
+  body.appendChild(tr);
+
+  let fMM, fRam, fVram, fRoot, fRootC, fLlama, fLlamaC, fNote;
+  if (!info) {
+    body.appendChild(el("p", "note warn", `這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定。${infoErr}`));
+  } else {
+    const st = info.settings;
+    body.appendChild(el("h4", "pick-h", "記憶體"));
+    const f2 = el("div", "form-row");
+    fMM = selectInput(Object.entries(MEM_LABEL), st.memory_model);
+    fRam = numInput(st.ram_floor_gib);
+    fVram = numInput(st.vram_floor_gib);
+    const ph = () => {
+      const d = info.defaults[fMM.value] || {};
+      fRam.placeholder = `預設 ${d.ram ?? "—"}`;
+      fVram.placeholder = `預設 ${d.vram ?? "—"}`;
+    };
+    fMM.onchange = ph;
+    ph();
+    const det = info.detect;
+    f2.append(fieldBox("記憶體架構", fMM, `偵測建議：${MEM_LABEL[det.memory_model]}。${det.why}`),
+      fieldBox("系統記憶體底線（GiB）", fRam, "載入後系統記憶體至少要剩這麼多；空白＝預設"),
+      fieldBox("顯存底線（GiB）", fVram, "多張卡時照卡的大小分到每張；空白＝預設"));
+    body.appendChild(f2);
+    if (st.memory_model !== det.memory_model) {
+      const b = el("button", "btn sm", "改成偵測建議");
+      b.onclick = () => { fMM.value = det.memory_model; ph(); };
+      body.appendChild(b);
+    }
+    body.appendChild(el("p", "small muted",
+      `這台：${det.gpus.length ? det.gpus.map((g) => `卡 ${g.id} ${g.name || ""}${g.vram_gib ? " " + g.vram_gib + " GiB" : ""}`).join("、") : "沒有偵測到 GPU"}；系統記憶體 ${det.ram_gib} GiB`));
+
+    body.appendChild(el("h4", "pick-h", "模型存放"));
+    const f3 = el("div", "form-row");
+    const rootOpts = [["", `預設（${info.effective.gguf_root}）`],
+      ...info.storage.map((x) => [x.path, `${x.path}（${x.hdd ? "機械硬碟，大模型載入會很慢" : "SSD"}・剩 ${fmt(x.free_gib, 0)} GiB）`]),
+      ["__custom", "自訂路徑…"]];
+    const curRoot = st.gguf_root || "";
+    fRoot = selectInput(rootOpts, rootOpts.some(([v]) => v === curRoot) ? curRoot : "__custom");
+    fRootC = textInput(rootOpts.some(([v]) => v === curRoot) ? "" : curRoot, "例：/media/data/models/gguf");
+    fRootC.hidden = fRoot.value !== "__custom";
+    fRoot.onchange = () => { fRootC.hidden = fRoot.value !== "__custom"; };
+    const rootBox = fieldBox("存放區", fRoot, "一顆模型一個資料夾；建議放 SSD。換了位置，舊位置的模型不會自動搬過去");
+    rootBox.appendChild(fRootC);
+    const llOpts = [["", `自動挑選（目前：${info.effective.llama_server || "找不到"}）`],
+      ...info.llama.map((x) => [x.path, `${x.path}（${x.build ? "build " + x.build + "・" : ""}${x.backend}${x.ok ? "" : "・跑不起來"}）`]),
+      ["__custom", "自訂路徑…"]];
+    const curL = st.llama_server || "";
+    fLlama = selectInput(llOpts, llOpts.some(([v]) => v === curL) ? curL : "__custom");
+    fLlamaC = textInput(llOpts.some(([v]) => v === curL) ? "" : curL, "例：/opt/llama.cpp/build/bin/llama-server");
+    fLlamaC.hidden = fLlama.value !== "__custom";
+    fLlama.onchange = () => { fLlamaC.hidden = fLlama.value !== "__custom"; };
+    const llBox = fieldBox("llama-server", fLlama, "GGUF 模型靠它跑；自動挑選會用家目錄下版本最新、有 GPU 加速的那支");
+    llBox.appendChild(fLlamaC);
+    f3.append(rootBox, llBox);
+    body.appendChild(f3);
+    if (!info.llama.length && !st.llama_server) {
+      body.appendChild(el("p", "note warn", "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。請先在這台編好 llama.cpp（放在 ~/llama.cpp*/build*/bin/），或在上面指定已經編好的位置。"));
+    }
+    body.appendChild(el("h4", "pick-h", "備註"));
+    fNote = el("textarea");
+    fNote.value = st.note || "";
+    fNote.placeholder = "給接手的人看：這台是做什麼的、有什麼要小心";
+    body.appendChild(fNote);
+  }
+  const err = el("div");
+  body.appendChild(err);
+  [fName, fGroup, fHost, fPort].forEach((i) => imeGuard(i, () => {}));
+  formButton(ov, "儲存", "primary", async () => {
+    try {
+      await api(`/api/nodes/${nid}/update`, { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), host: fHost.value.trim(), agent_port: Number(fPort.value) } });
+      if (info) {
+        await api(`/api/node/${nid}/machine`, { method: "POST", body: {
+          memory_model: fMM.value, ram_floor_gib: fRam.value, vram_floor_gib: fVram.value, note: fNote.value,
+          gguf_root: fRoot.value === "__custom" ? fRootC.value.trim() : fRoot.value,
+          llama_server: fLlama.value === "__custom" ? fLlamaC.value.trim() : fLlama.value } });
+      }
+    } catch (ex) { errNote(err, ex.message); return; }
+    ov.remove();
+    toast("已儲存", "ok");
+    if (S.minfo) delete S.minfo[nid];
+    await refresh();
+    render();
+  });
+}
+
+function removeMachine(rec) {
+  const d = el("div");
+  d.appendChild(el("p", "note warn", `${rec.name} 會從主控台移除，之後不再顯示、不再取樣。那台機器上的代理、模型與欄位都不會被動。`));
+  d.appendChild(el("p", "small muted", "之後要再加回來，按「加一台機器」在那台重跑一次安裝指令即可，欄位與模型都還在。"));
+  modal({ title: `移除 ${rec.name}`, bodyNode: d, confirmText: "移除", danger: true, onConfirm: async () => {
+    try { await api(`/api/nodes/${rec.id}/remove`, { method: "POST", body: {} }); toast(`已移除 ${rec.name}`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+    await refresh();
+    render();
+  } });
+}
+
+// 新增或修改一個欄位。欄位只收白名單欄位：記錄檔與設定檔的路徑不能從網頁改（改得到就能讀任意檔案）
+async function openSlotEditor(n, s) {
+  const isNew = !s;
+  const engine = s && (s.kind === "strata" || s.kind === "llama");
+  const body = el("div");
+  loading(body);
+  const ov = modal({ title: isNew ? `${n.name} 新增欄位` : `${s.role}・${s.tier || ""} 的設定`, bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  let units = [];
+  if (isNew) { try { units = (await machineInfo(n.id, true)).units || []; } catch (ex) { errNote(body, ex.message); return; } }
+  body.textContent = "";
+
+  let type = "empty";
+  const svcRow = el("div", "form-row");
+  const fUnit = selectInput(units.map((u) => [u, u]));
+  if (isNew) {
+    const pick = el("div", "pick-list");
+    const opt = (val, title, why, disabled) => {
+      const l = el("label", "pick");
+      const r = el("input");
+      r.type = "radio";
+      r.name = "slot-type";
+      r.checked = val === type;
+      r.disabled = disabled;
+      r.onchange = () => { type = val; svcRow.hidden = val !== "service"; portBox.hidden = val !== "service"; modelBox.hidden = val !== "service"; };
+      l.appendChild(r);
+      const t = el("div", "pick-main");
+      t.appendChild(el("div", "model", title));
+      t.appendChild(el("div", "small muted", why));
+      l.appendChild(t);
+      pick.appendChild(l);
+    };
+    opt("empty", "空欄位", "之後到模型庫挑一顆 GGUF 放進來，xConsole 會替它建服務、配埠、算記憶體");
+    opt("service", "登記這台已經在跑的服務", units.length ? "例如瀏覽器、語音、代理程式這類 systemd 使用者服務；登記後可以在這裡啟停、看記錄、算進記憶體"
+      : "這台沒有可以登記的使用者服務（已登記的、xConsole 自己的都不列）", !units.length);
+    body.appendChild(pick);
+    svcRow.appendChild(fieldBox("服務", fUnit, "systemctl --user 看得到的服務"));
+    svcRow.hidden = true;
+    body.appendChild(svcRow);
+  }
+  const f = el("div", "form-row");
+  const fRole = textInput(s?.role, "例：主腦、嵌入、語音辨識");
+  const fTier = textInput(s?.tier, "例：高、低、眼睛");
+  const fModel = textInput(s?.model, "畫面上顯示的名稱");
+  const fPort = numInput(s?.port);
+  const fCaps = textInput((s?.caps || []).join("、"), "例：文字、看圖（用頓號分開）");
+  const fV = numInput(s?.est_vram_gib, "0");
+  const fR = numInput(s?.est_ram_gib, "0");
+  const modelBox = fieldBox("顯示名稱", fModel);
+  const portBox = fieldBox("埠", fPort, "這個服務聽的埠（選填）");
+  modelBox.hidden = portBox.hidden = engine || (isNew && type !== "service") || (!isNew && !s.unit);
+  f.append(fieldBox("角色", fRole), fieldBox("等級", fTier, "選填"), modelBox, portBox, fieldBox("能力標籤", fCaps, "選填，最多 6 個"),
+    fieldBox("預估顯存（GiB）", fV, engine ? "放入模型時會自動算，通常不用改" : "准入試算用，選填"),
+    fieldBox("預估系統記憶體（GiB）", fR, "准入試算用，選填"));
+  body.appendChild(f);
+  if (engine) body.appendChild(el("p", "small muted", "這是模型引擎的欄位：埠、上下文、金鑰在「API 串接」頁改，模型用「換模型」換。"));
+  const crit = el("label", "gpu-opt");
+  const fCrit = el("input");
+  fCrit.type = "checkbox";
+  fCrit.checked = !!s?.critical;
+  crit.append(fCrit, document.createTextNode(" 關鍵服務：停止、重啟、換模型前要多確認一次；「全部停止」會略過它"));
+  body.appendChild(crit);
+  const fNote = el("textarea");
+  fNote.value = s?.note || "";
+  fNote.placeholder = "給接手的人看：這格是做什麼的、停掉會影響誰";
+  body.appendChild(fieldBox("備註", fNote));
+  const err = el("div");
+  body.appendChild(err);
+  [fRole, fTier, fModel, fCaps].forEach((i) => imeGuard(i, () => {}));
+
+  if (!isNew) {
+    const del = el("button", "btn danger", "移除這個欄位");
+    const running = s.state === "active" || s.state === "activating";
+    del.disabled = running;
+    del.title = running ? "服務還在跑，先停止再移除" : "";
+    del.onclick = () => {
+      const d = el("div");
+      d.appendChild(el("p", "note warn", s.kind === "llama"
+        ? "會一起刪掉 xConsole 替這格建的 llama.cpp 服務與它的設定、金鑰檔。模型檔留在存放區，不會被刪。"
+        : s.unit ? `只是取消登記，${s.unit} 這個服務本身不會被動。` : "這是空欄位，移除後就不會再出現。"));
+      // 疊在欄位設定窗上面的確認窗：不給點背景關（點偏了會連底下填到一半的設定窗一起誤會）
+      modal({ title: `移除 ${s.role}・${s.tier || ""}`, bodyNode: d, confirmText: "移除", danger: true, hasInput: true, onConfirm: async () => {
+        try { await api(`/api/node/${n.id}/slot/${s.id}/delete`, { method: "POST", body: {} }); toast("已移除", "ok"); ov.remove(); } catch (ex) { toast(ex.message, "bad"); }
+        await refresh();
+      } });
+    };
+    ov.querySelector(".actions").prepend(del);
+  }
+  formButton(ov, isNew ? "新增" : "儲存", "primary", async () => {
+    const payload = {
+      role: fRole.value.trim(), tier: fTier.value.trim(), note: fNote.value, critical: fCrit.checked,
+      caps: fCaps.value.split(/[、,，\s]+/).map((x) => x.trim()).filter(Boolean),
+      est_vram_gib: fV.value, est_ram_gib: fR.value,
+    };
+    if (!modelBox.hidden) payload.model = fModel.value.trim();
+    if (!portBox.hidden) payload.port = fPort.value;
+    try {
+      if (isNew) await api(`/api/node/${n.id}/slots/add`, { method: "POST", body: { type, unit: type === "service" ? fUnit.value : undefined, ...payload } });
+      else await api(`/api/node/${n.id}/slot/${s.id}/edit`, { method: "POST", body: payload });
+    } catch (ex) { errNote(err, ex.message); return; }
+    ov.remove();
+    toast(isNew ? "已新增欄位" : "已儲存", "ok");
+    await refresh();
+  });
+}
+
+function machineSteps(n, info) {
+  const st = n.state;
+  const steps = [
+    { t: "確認記憶體架構", why: "准入試算照這個算；選錯會放行一個會把整台拖死的載入",
+      done: info.settings.confirmed || info.settings.memory_model === info.detect.memory_model,
+      go: ["這台的設定", () => openMachineSettings(n.id)] },
+    { t: "確認模型存放與 llama.cpp", why: "GGUF 模型放在存放區、靠 llama.cpp 跑；要找得到編好的 llama-server",
+      done: !!info.effective.llama_server, go: ["這台的設定", () => openMachineSettings(n.id)] },
+    { t: "新增欄位", why: "一格放一個模型或服務；欄位決定角色、埠與記憶體預估",
+      done: st.slots.length > 0, go: ["新增欄位", () => openSlotEditor(n, null)] },
+    { t: "放入模型", why: "到模型庫下載或手動放入，再到空欄位按「放入」",
+      done: st.slots.some((x) => x.unit), go: ["到模型庫", () => go("lib:" + n.id)] },
+    { t: "到 API 串接實測", why: "換完模型會自動帶過去；按「實測一次」確認 IDE 連得上", done: false, optional: true,
+      go: ["到 API 串接", () => go("apis")] },
+  ];
+  const first = steps.findIndex((x) => !x.done && !x.optional);
+  steps.forEach((x, i) => { x.state = x.done ? "done" : x.optional ? "skip" : i === first ? "now" : "blocked"; });
+  return steps;
 }
 
 /* ---------------------------------------------------------------- 主迴圈 */
