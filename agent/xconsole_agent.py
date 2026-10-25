@@ -266,6 +266,12 @@ def probe_gpus():
     return probe_nvidia() or probe_amd_sysfs() or []
 
 
+def has_nvidia():
+    """這台真的有 NVIDIA 卡：nvidia-smi 要回報得出卡。只看裝了 nvidia-smi 不準——
+    .26（AMD AI 395）裝了 nvidia-smi 卻沒有 NVIDIA 驅動，以前因此被當成 NVIDIA 機器（綁卡、編譯都會走錯路）。"""
+    return bool(probe_nvidia())
+
+
 # ---- 多卡：欄位綁哪幾張卡
 # 卡號一律用 probe_gpus() 的 id：NVIDIA 是 nvidia-smi 的 index，AMD 是 /sys/class/drm/cardN 的 N。
 # 啟動時要換成引擎看得懂的序號，對不上就拒絕啟動——綁錯卡比不綁更糟（會把別的欄位的卡吃爆）。
@@ -304,7 +310,7 @@ def visible_env(gpu_ids, nvidia=None):
     if not ids:
         return {}
     if nvidia is None:
-        nvidia = bool(shutil.which("nvidia-smi"))
+        nvidia = has_nvidia()
     if nvidia:
         # CUDA 預設把最快的卡排第一，跟 nvidia-smi 的編號不同；照 PCI 匯流排排才對得上
         return {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": ",".join(ids)}
@@ -1862,7 +1868,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     gpu_ids, err = pick_gpus(slot.get("gpu_ids") if gpus is ... else gpus, cards)
     if err:
         return 400, {"error": err}
-    if gpu_ids and not shutil.which("nvidia-smi"):
+    if gpu_ids and not has_nvidia():
         try:
             visible_env(gpu_ids)
         except ValueError as ex:
@@ -2755,7 +2761,7 @@ def build_prereqs():
     apt = {"git": "git", "cmake": "cmake", "C++ 編譯器": "build-essential"}
     missing = [apt[k] for k, ok in tools.items() if not ok]
     notes, backend, flags, env = [], "cpu", [], {}
-    if shutil.which("nvidia-smi"):
+    if has_nvidia():
         nv = _nvcc()
         if nv:
             arch, why = cuda_arch(nv)
@@ -2933,13 +2939,11 @@ OWN_UNITS = ("xconsole-agent.service", "xconsole.service")
 
 
 def _apu_like():
-    """AMD 的 APU（例 Ryzen AI 395）：KFD 拓撲裡同一個節點同時有 CPU 核心與 GPU 運算單元。"""
-    for n in glob.glob(os.path.join(KFD_NODES, "*", "properties")):
-        props = load_text(n) or ""
-        cpu = re.search(r"^cpu_cores_count (\d+)", props, re.M)
-        simd = re.search(r"^simd_count (\d+)", props, re.M)
-        if cpu and simd and int(cpu.group(1)) > 0 and int(simd.group(1)) > 0:
-            return True
+    """AMD 的 APU（例 Ryzen AI 395）：CPU 型號裡帶內建顯示（「w/ Radeon 8060S」）。
+    不能看 KFD 拓撲：它把同一顆晶片的 CPU 與 GPU 分成兩個節點（.27 實測），以前這樣判斷永遠判不出 APU。"""
+    for ln in (load_text("/proc/cpuinfo") or "").splitlines():
+        if ln.startswith("model name"):
+            return "Radeon" in ln
     return False
 
 
@@ -2948,9 +2952,10 @@ def suggest_memory_model(gpus=None):
     gpus = probe_gpus() if gpus is None else gpus
     if os.path.exists("/etc/nv_tegra_release"):
         return "unified_single", "偵測到 Jetson（/etc/nv_tegra_release），GPU 與系統共用同一塊記憶體"
-    if shutil.which("nvidia-smi") and gpus and all(not g.get("vram_total") for g in gpus):
+    nvidia = has_nvidia()
+    if nvidia and gpus and all(not g.get("vram_total") for g in gpus):
         return "unified_single", "nvidia-smi 回報不出顯存總量（DGX Spark 這類統一記憶體機就是這樣）"
-    if not shutil.which("nvidia-smi") and gpus and _apu_like():
+    if not nvidia and gpus and _apu_like():
         return "unified_split", "AMD APU（例 Ryzen AI 395）：BIOS 切一塊給 GPU，系統只剩另一塊，兩塊都要盯"
     if gpus:
         return "discrete", f"偵測到 {len(gpus)} 張獨立顯示卡，各自有顯存，系統記憶體另外一塊"

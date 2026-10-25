@@ -189,13 +189,13 @@ def main():
         ok &= case("AMD：對不到的卡要拒絕", True, True)
     A.amd_hip_order = orig
     # 啟動時真的有套上：設定檔的 gpus 變成 llama-server 的環境變數，蓋過登錄檔 llama_env 裡的同名設定
-    real_which = A.shutil.which
-    A.shutil.which = lambda x: "/usr/bin/nvidia-smi" if x == "nvidia-smi" else real_which(x)
+    real_nv = A.has_nvidia
+    A.has_nvidia = lambda: True
     env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {"llama_env": {"CUDA_VISIBLE_DEVICES": "0,1"}}}, ["1"])
     ok &= case("啟動環境：只看得到卡 1", (env.get("CUDA_VISIBLE_DEVICES"), env.get("CUDA_DEVICE_ORDER")), ("1", "PCI_BUS_ID"))
     env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {}}, None)
     ok &= case("啟動環境：沒綁卡不動 CUDA_VISIBLE_DEVICES", env.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
-    A.shutil.which = real_which
+    A.has_nvidia = real_nv
 
     # 12. 指令一律不經過 shell（防命令注入）：sh() 不收字串、原始碼裡不准有 shell=True／os.system
     try:
@@ -226,6 +226,11 @@ def main():
           "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
     ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
                {100: "1" * 40, 200: "3" * 40})
+    real_lt = A.load_text
+    for cpu, want in (("AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S", True), ("AMD EPYC 7543P 32-Core Processor", False)):
+        A.load_text = lambda path, c=cpu: f"processor\t: 0\nmodel name\t: {c}\n" if path == "/proc/cpuinfo" else real_lt(path)
+        ok &= case(f"APU 判斷：{cpu[:30]}", A._apu_like(), want)
+    A.load_text = real_lt
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
