@@ -185,7 +185,8 @@ def main():
         st, mi = co("GET", "/api/node/agent-a/machine")
         check("讀機器設定：含偵測建議、存放區候選、可登記的服務", st == 200 and mi["detect"]["memory_model"] in
               ("discrete", "unified_split", "unified_single") and isinstance(mi["storage"], list) and UNIT in mi["units"], mi.get("units"))
-        for bad, why in (("/etc/xc-test", "系統目錄"), (os.path.join(ahome, ".ssh", "m"), "隱藏資料夾"), (ahome, "家目錄本身"), ("models", "相對路徑")):
+        for bad, why in (("/etc/xc-test", "系統目錄"), (os.path.join(ahome, ".ssh", "m"), "隱藏資料夾"), (ahome, "家目錄本身"), ("models", "相對路徑"),
+                         ("/tmp/xc-models", "允許位置以外（/tmp）")):
             st, d = co("POST", "/api/node/agent-a/machine", {"memory_model": "discrete", "gguf_root": bad})
             check(f"存放區指到{why} → 400", st == 400, d)
         st, d = co("POST", "/api/node/agent-a/machine", {"memory_model": "discrete", "llama_server": "/bin/sh"})

@@ -2663,18 +2663,41 @@ def machine_info():
     }
 
 
+def data_bases():
+    """存放區只准放在這些位置底下：家目錄、另外掛載的資料碟、常見的資料目錄。"""
+    mounts = [ln.split()[1].replace("\\040", " ") for ln in (load_text("/proc/mounts") or "").splitlines()
+              if len(ln.split()) > 2 and ln.split()[2] in ("ext4", "xfs", "btrfs", "f2fs")]
+    return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot")), "/data", "/models", "/srv", "/opt"]
+
+
+def contained(raw, bases):
+    """把管理者填的路徑換成「確認落在某個允許位置底下」的路徑（經 inside() 的 realpath＋前綴檢查）；不在任何一個底下回 None。"""
+    real = os.path.realpath(raw)
+    for b in bases:
+        if not os.path.isdir(b):
+            continue
+        rb = os.path.realpath(b)
+        if real.startswith(rb + os.sep):
+            try:
+                return inside(rb, os.path.relpath(real, rb))
+            except ValueError:
+                return None
+    return None
+
+
 def check_root(raw):
-    """存放區：絕對路徑、不在系統目錄與隱藏資料夾、不是家目錄本身、建得起來而且寫得進去。"""
+    """存放區：在允許的位置底下、不是隱藏資料夾、不在系統目錄、建得起來而且寫得進去。"""
     p = os.path.expanduser(str(raw or "").strip())
     if not p:
         return "", None
     if not os.path.isabs(p):
         return None, "存放區要寫完整路徑（/ 開頭，或 ~/ 開頭）"
-    real = os.path.realpath(p)
-    if real == "/" or any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
+    bases = data_bases()
+    real = contained(p, bases)
+    if real is None:
+        return None, "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）"
+    if any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
         return None, f"{real} 是系統目錄，不能當存放區"
-    if real == os.path.realpath(HOME):
-        return None, "不能直接用家目錄，請用底下的資料夾（例 ~/models/gguf）"
     if any(part.startswith(".") for part in real.split("/") if part):
         return None, "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡"
     try:
@@ -2687,10 +2710,13 @@ def check_root(raw):
 
 
 def check_llama(raw):
-    p = os.path.expanduser(str(raw or "").strip())
-    if not p:
+    """llama-server：只准家目錄、/opt、/usr/local 底下，檔名就是 llama-server，--version 跑得起來（代理會執行它）。"""
+    raw = os.path.expanduser(str(raw or "").strip())
+    if not raw:
         return "", None
-    p = os.path.realpath(p)
+    p = contained(raw, [HOME, "/opt", "/usr/local"])
+    if p is None:
+        return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下"
     if os.path.basename(p) != "llama-server" or not os.path.isfile(p) or not os.access(p, os.X_OK):
         return None, "要指到編好的 llama-server 執行檔（檔名就是 llama-server）"
     rc, o, e = sh(f"{shlex.quote(p)} --version", timeout=20)
