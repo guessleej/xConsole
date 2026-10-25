@@ -1664,7 +1664,7 @@ def llama_build_no(path, version_text):
     m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", version_text or "")
     ver = int(next(x for x in m.groups() if x)) if m else 0
     d = re.search(r"llama\.cpp-b(\d+)", path)
-    return max(ver, int(d.group(1))) if d else ver
+    return int(d.group(1)) if d and ver <= 1 else ver     # 只有淺層編譯（回 0 或 1）才看資料夾名稱
 
 
 def llama_server_exe(reg=None):
@@ -2654,7 +2654,11 @@ def save_profile(body):
     strata = {sl["id"] for sl in reg["slots"] if sl.get("kind") == "strata"}
     old = {c["slot"]: c for c in (reg["profiles"].get(key) or {}).get("changes", [])}
     changes = []
+    if not isinstance(body.get("changes") or [], list):
+        return 400, {"error": "changes 要是清單"}
     for ch in body.get("changes") or []:
+        if not isinstance(ch, dict):
+            return 400, {"error": "changes 的每一項要是物件"}
         sid = str(ch.get("slot") or "")
         if sid not in strata:
             return 400, {"error": f"{sid} 不是 Strata 欄位，情境只能調 Strata 的參數"}
@@ -2820,6 +2824,10 @@ def _build_run(st, pre, log):
     try:
         if not os.path.isdir(os.path.join(dest, ".git")):
             step("下載原始碼", ["git", "clone", "--depth", "1", "--branch", st["tag"], LLAMA_REPO, dest])
+        # 編譯之前核對原始碼就是官方那個版本：資料夾早就存在（上次中斷、或別人放的）時也一樣要對得上
+        rc, head, _ = sh(["git", "-C", dest, "rev-parse", "HEAD"], timeout=30)
+        if rc != 0 or head.strip() != st["commit"]:
+            raise RuntimeError(f"{dest} 的原始碼跟官方 {st['tag']} 對不上，不編譯。請把這個資料夾移走再按一次")
         step("設定", ["cmake", "-S", dest, "-B", os.path.join(dest, "build"), "-DCMAKE_BUILD_TYPE=Release",
                       "-DLLAMA_CURL=OFF", *pre["flags"]])
         step("編譯", ["cmake", "--build", os.path.join(dest, "build"), "--config", "Release", "-j", pre["jobs"],
@@ -2845,15 +2853,24 @@ def start_build():
         if pre["missing"]:
             return 400, {"error": f"這台缺少編譯工具，請 IT 先執行：{pre['apt']}", "missing": pre["missing"]}
         rc, out, _ = sh(["git", "ls-remote", "--tags", "--refs", LLAMA_REPO, "refs/tags/b*"], timeout=60)
-        tags = sorted({int(m) for m in re.findall(r"refs/tags/b(\d+)$", out, re.M)})
-        if rc != 0 or not tags:
+        refs = {int(n): h for h, n in re.findall(r"^([0-9a-f]{40})\s+refs/tags/b(\d+)$", out, re.M)}
+        if rc != 0 or not refs:
             return 502, {"error": "連不到 GitHub 取 llama.cpp 的版本清單；這台要能連外，或把編好的 llama-server 複製進來"}
-        tag = f"b{tags[-1]}"
+        tag, commit = f"b{max(refs)}", refs[max(refs)]
+        # 編譯很吃記憶體（每個並行約 1.5 GiB）：照系統記憶體扣掉底線後的餘裕決定並行數，連一個都放不下就不編。
+        # 統一記憶體機邊跑大模型邊編譯，可能把整台拖死，這正是這套系統要防的事
+        ram = ram_pool()
+        room = ram["free_gib"] - floors(registry()["machine"])["ram"]
+        jobs = min(pre["jobs"], int(room // 1.5))
+        if jobs < 1:
+            return 409, {"error": f"系統記憶體只剩 {ram['free_gib']:.0f} GiB，扣掉 {floors(registry()['machine'])['ram']:.0f} GiB 底線後"
+                                  "不夠編譯。請先停掉一個模型再編"}
+        pre["jobs"] = jobs
         dest = inside(HOME, f"llama.cpp-{tag}")
         os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
         log = engine_file("build", "-llama-build.log")
         open(log, "w").close()
-        st = {"state": "running", "phase": "準備", "tag": tag, "backend": pre["backend"], "dest": dest,
+        st = {"state": "running", "phase": "準備", "tag": tag, "commit": commit, "backend": pre["backend"], "dest": dest, "jobs": jobs,
               "log": log, "started": time.time()}
         save_json(BUILD_FILE, st)
         _BUILD.update(cancel=False, thread_alive=True)

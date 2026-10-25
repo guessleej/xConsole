@@ -311,12 +311,21 @@ def main():
         check("移除後可以重新加入；沒填名稱就用主機名稱、群組是未分類",
               st == 200 and n.get("name") == "agent-a" and n.get("group") == "未分類", (d, n))
         co("POST", "/api/nodes/agent-a/update", {"name": "改過的名字"})
-        st, jc3 = co("POST", "/api/nodes/join-code", {"console": f"127.0.0.1:{cport}"})
+        st, jc3 = co("POST", "/api/nodes/join-code", {"console": f"127.0.0.1:{cport}", "replace": "agent-a"})
         code3 = re.search(r"/install/([^/]+)/", jc3["command"]).group(1)
         st, d = anon("POST", "/api/join", {"code": code3, "token": token, "cert": acert, "hostname": "agent-a", "port": aport})
         ns = co("GET", "/api/nodes")[1]["nodes"]
-        check("同一台重新安裝再加入：更新原本那筆，不會多一台，名稱不變",
+        check("管理者指定「重新安裝哪一台」：更新原本那筆，不會多一台，名稱不變",
               st == 200 and len(ns) == 1 and ns[0]["name"] == "改過的名字", ns)
+        st, jc4 = co("POST", "/api/nodes/join-code", {"console": f"127.0.0.1:{cport}"})
+        code4 = re.search(r"/install/([^/]+)/", jc4["command"]).group(1)
+        st, d = anon("POST", "/api/join", {"code": code4, "token": token, "cert": acert, "hostname": "agent-a", "port": aport})
+        ns = co("GET", "/api/nodes")[1]["nodes"]
+        check("沒指定重新安裝：一律新增一台，不會自動覆寫既有那筆（防搶機器）",
+              st == 200 and len(ns) == 2 and any(x["name"] == "改過的名字" for x in ns), ns)
+        co("POST", f"/api/nodes/{d.get('id')}/remove", {})
+        st, d = co("POST", "/api/nodes/join-code", {"console": f"127.0.0.1:{cport}", "replace": "nope"})
+        check("指定重新安裝不存在的那台 → 400", st == 400, d)
         st, d = co("POST", "/api/nodes/join-code", {"console": "127.0.0.1:99999"})
         check("主控台位址的埠超過 65535 → 400", st == 400, d)
 
@@ -349,17 +358,27 @@ import xconsole_server as X
 class Big(io.RawIOBase):
     def readinto(self, b):
         b[:len(b)] = b"x" * len(b); return len(b)
-class Drip:
-    def read(self, n):
-        time.sleep(0.2); return b" "
+import socket, threading, urllib.request
+srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)
+def drip():
+    c, _ = srv.accept(); c.recv(4096)
+    c.sendall(b"HTTP/1.1 200 OK\\r\\nContent-Length: 1000\\r\\n\\r\\n")
+    for _ in range(30):
+        try: c.sendall(b" "); time.sleep(1)
+        except OSError: break
+threading.Thread(target=drip, daemon=True).start()
 try:
     X._read_capped(Big(), time.time() + 30); print("big-ok")
 except ValueError: print("big-blocked")
+t0 = time.time()
 try:
-    X._read_capped(Drip(), time.time() + 1); print("drip-ok")
-except TimeoutError: print("drip-blocked")
+    with urllib.request.urlopen(f"http://127.0.0.1:{{srv.getsockname()[1]}}/", timeout=2) as r:
+        X._read_capped(r, time.time() + 3); print("drip-ok")
+except TimeoutError: print("drip-blocked", round(time.time() - t0, 1))
 """], capture_output=True, text=True, timeout=120)
-        check("代理回超大內容 → 擋下；每次吐一點拖時間 → 到總時限就斷", "big-blocked" in r.stdout and "drip-blocked" in r.stdout, r.stdout + r.stderr[-300:])
+        secs = float(re.search(r"drip-blocked ([\d.]+)", r.stdout).group(1)) if "drip-blocked" in r.stdout else 99
+        check("代理回超大內容 → 擋下；每秒吐一個位元組拖時間（真的 socket）→ 3 秒總時限內就斷",
+              "big-blocked" in r.stdout and secs < 5, r.stdout + r.stderr[-300:])
 
         # ---- 7d. 資安審查 M2：同一來源同時送很多次錯的密碼，也只會驗前 5 次
         import concurrent.futures as cf

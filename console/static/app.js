@@ -2527,7 +2527,9 @@ function openAddMachine() {
   const fName = textInput("", "選填，不填就用那台的主機名稱");
   const [fGroup, dl] = groupInput("");
   const fHost = textInput(location.host);
-  form.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("主控台位址", fHost, "要加入的那台機器連得到的位址（IP:埠）"));
+  const fReplace = selectInput([["", "不是，這是新的一台"], ...(S.fleet?.nodes || []).map((x) => [x.id, `${x.name}（${x.host}）`])], "");
+  form.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("主控台位址", fHost, "要加入的那台機器連得到的位址（IP:埠）"),
+    fieldBox("這是哪一台重新安裝？", fReplace, "代理重裝或換了 IP 時選它，加入後會更新那一筆，名稱與群組不變；新機器不用選"));
   body.append(form, dl);
   const out = el("div");
   body.appendChild(out);
@@ -2537,7 +2539,7 @@ function openAddMachine() {
   const gen = formButton(ov, "產生安裝指令", "primary", async () => {
     let r;
     try {
-      r = await api("/api/nodes/join-code", { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), console: fHost.value.trim() } });
+      r = await api("/api/nodes/join-code", { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), console: fHost.value.trim(), replace: fReplace.value } });
     } catch (ex) { errNote(out, ex.message); return; }
     const me = ++run;                       // 重新產生時，舊指令的等待就不再更新畫面
     gen.textContent = "重新產生";

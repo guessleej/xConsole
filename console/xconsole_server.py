@@ -14,6 +14,7 @@
 import base64
 import datetime as dt
 import hashlib
+import http.client
 import hmac
 import ipaddress
 import json
@@ -189,28 +190,34 @@ def network_test(node_id, slot_id, key=""):
     if not theirs or not theirs <= mine:
         return {"ok": False, "url": base, "detail": f"對外網址的主機不是這台機器（{node['host']}），主控台不代為實測，免得把金鑰送到別處。"
                                                      "請用 IDE 所在的電腦直接測"}
-    ctx = ssl.create_default_context() if base.startswith("https://") else None   # 驗證開著，不准略過
+    # 直接連剛剛檢查過的那個 IP，原本的主機名稱只放在 Host 標頭與 TLS 的 SNI：不讓 DNS 在檢查和連線之間換位址（rebinding）
+    ip0 = sorted(theirs)[0]
+    port0 = u.port or (443 if u.scheme == "https" else 80)
+    path0 = (u.path or "").rstrip("/")
+    ctx = ssl.create_default_context() if u.scheme == "https" else None   # 驗證開著，不准略過
     t0 = time.time()
 
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        # 不跟轉址：對外網址被改成會轉到別處的位址時，金鑰不能跟著送過去
-        def redirect_request(self, *a, **k):
-            return None
-
-    opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx)) if ctx \
-        else urllib.request.build_opener(NoRedirect)
-
     def call(method, path, with_key):
-        h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if with_key else {})}
-        req = urllib.request.Request(base + path, method=method, headers=h,
-                                     data=b"{}" if method == "POST" else None)
+        h = {"Content-Type": "application/json", "Host": u.netloc.rsplit("@", 1)[-1],
+             **({"Authorization": f"Bearer {key}"} if with_key else {})}
         try:
-            with opener.open(req, timeout=10) as resp:
-                return resp.status, json.loads(resp.read(4 * 1024 * 1024) or b"{}")
-        except urllib.error.HTTPError as exc:
-            return exc.code, None
+            raw = socket.create_connection((ip0, port0), timeout=10)
+            if ctx:
+                raw = ctx.wrap_socket(raw, server_hostname=u.hostname)
+            conn = http.client.HTTPConnection(u.hostname, port0, timeout=10)
+            conn.sock = raw                                # 不跟轉址：http.client 本來就不跟
+            conn.request(method, path0 + path, body=b"{}" if method == "POST" else None, headers=h)
+            r = conn.getresponse()
+            body = r.read(4 * 1024 * 1024)
+            conn.close()
+            if r.status >= 400:
+                return r.status, None
+            try:
+                return r.status, json.loads(body or b"{}")
+            except ValueError:
+                return r.status, None
         except Exception as exc:  # noqa: BLE001
-            return 0, str(exc)[:160]
+            return 0, type(exc).__name__
 
     st, data = call("GET", "/models", bool(key))
     ms = int((time.time() - t0) * 1000)
@@ -250,10 +257,18 @@ def trust_file(node_id):
 def _read_capped(resp, deadline):
     """讀代理的回應：有大小上限與總時限。被接管的代理回幾 GB、或每 29 秒吐一個位元組，都不能拖垮主控台。"""
     chunks, total = [], 0
+    read = getattr(resp, "read1", None) or resp.read          # read1：一次 recv 就回來，不會為了湊滿 64 KB 一直等
+    sock = getattr(getattr(getattr(resp, "fp", None), "raw", None), "_sock", None)
     while True:
-        if time.time() > deadline:
+        left = deadline - time.time()
+        if left <= 0:
             raise TimeoutError("代理回應太慢")
-        b = resp.read(65536)
+        if sock is not None:
+            try:
+                sock.settimeout(max(0.1, min(left, 60)))      # 每次等待也不能超過剩下的時間
+            except OSError:
+                break                                         # 回應讀完時 http.client 已經把連線關了
+        b = read(65536)
         if not b:
             break
         total += len(b)
@@ -572,22 +587,12 @@ def _join_node(handler, body):
                         f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
         nid = None
 
-        fp = r["summary"]["fingerprint256"]
-
-        def same_agent(n):
-            # 同一台：位址與埠相同，或代理憑證相同（換了 IP 重新加入時，憑證沒變）
-            if n["host"] == good and int(n.get("agent_port", 9401)) == port:
-                return True
-            tf = trust_file(n["id"])
-            if os.path.exists(tf):
-                rr, _ = tls.inspect_trusted_ca(open(tf, "rb").read())
-                return (rr.get("summary") or {}).get("fingerprint256") == fp
-            return False
-
         def put(cfg):
             nonlocal nid
-            same = next((n for n in cfg["nodes"] if same_agent(n)), None)
-            if same:                                   # 同一台重新安裝：換新的權杖、位址與憑證，名稱群組不動
+            # 加入一律新增一台；只有管理者產碼時指定「重新安裝哪一台」才覆寫那一筆。
+            # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）
+            same = next((n for n in cfg["nodes"] if n["id"] == j.get("replace")), None)
+            if same:                                   # 指定重新安裝的那台：換新的權杖、位址與憑證，名稱群組不動
                 same.update(host=good, agent_port=port, token=tls.seal(CERTS.p, token.encode()))
                 nid = same["id"]
                 return
@@ -900,6 +905,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/nodes/join-code":
             name = str(body.get("name") or "").strip()[:40]
             group = str(body.get("group") or "").strip()[:30]
+            replace = str(body.get("replace") or "")
+            if replace and not any(n["id"] == replace for n in fleet()["nodes"]):
+                return self._json(400, {"error": "要重新安裝的那台不在納管清單裡"})
             host = str(body.get("console") or self.headers.get("Host") or "").strip()
             port_s = host.rsplit(":", 1)[1] if re.search(r":\d+$", host) else "443"
             if not HOST_RX.fullmatch(host) or not 1 <= int(port_s) <= 65535:
@@ -908,7 +916,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(500, {"error": "主控台找不到代理程式檔，請重新部署主控台"})
             code = secrets.token_urlsafe(24)
             with _JOIN_LOCK:
-                _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group,
+                _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group, "replace": replace,
                                            "console": host, "pin": console_pin(), "by": self.user}
             self._audit("node.join_code", host, True, {"name": name, "group": group})
             url = f"https://{host}/install/{code}/agent.sh"
