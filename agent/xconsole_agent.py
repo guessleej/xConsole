@@ -2824,6 +2824,10 @@ def _build_run(st, pre, log):
     try:
         if not os.path.isdir(os.path.join(dest, ".git")):
             step("下載原始碼", ["git", "clone", "--depth", "1", "--branch", st["tag"], LLAMA_REPO, dest])
+        else:
+            # 資料夾已經在（上次中斷）：先還原成乾淨的那一版，被改過的檔案與舊的 build 一律清掉，再核對 commit
+            step("還原原始碼", ["git", "-C", dest, "reset", "--hard", "--quiet", st["commit"]])
+            step("清掉舊檔", ["git", "-C", dest, "clean", "-xfdq"])
         # 編譯之前核對原始碼就是官方那個版本：資料夾早就存在（上次中斷、或別人放的）時也一樣要對得上
         rc, head, _ = sh(["git", "-C", dest, "rev-parse", "HEAD"], timeout=30)
         if rc != 0 or head.strip() != st["commit"]:
@@ -2845,6 +2849,14 @@ def _build_run(st, pre, log):
         _BUILD["thread_alive"] = False
 
 
+def parse_tag_refs(out):
+    """git ls-remote 的 b<編號> 標籤 → {編號: commit}。附註式標籤要取 ^{} 那一行（指向的 commit），不是標籤物件本身。"""
+    refs, peeled = {}, {}
+    for h, n, pe in re.findall(r"^([0-9a-f]{40})\s+refs/tags/b(\d+)(\^\{\})?$", out, re.M):
+        (peeled if pe else refs)[int(n)] = h
+    return {**refs, **peeled}
+
+
 def start_build():
     with _BUILD_LOCK:
         if _BUILD.get("thread_alive"):
@@ -2852,8 +2864,8 @@ def start_build():
         pre = build_prereqs()
         if pre["missing"]:
             return 400, {"error": f"這台缺少編譯工具，請 IT 先執行：{pre['apt']}", "missing": pre["missing"]}
-        rc, out, _ = sh(["git", "ls-remote", "--tags", "--refs", LLAMA_REPO, "refs/tags/b*"], timeout=60)
-        refs = {int(n): h for h, n in re.findall(r"^([0-9a-f]{40})\s+refs/tags/b(\d+)$", out, re.M)}
+        rc, out, _ = sh(["git", "ls-remote", "--tags", LLAMA_REPO, "refs/tags/b*"], timeout=60)
+        refs = parse_tag_refs(out)
         if rc != 0 or not refs:
             return 502, {"error": "連不到 GitHub 取 llama.cpp 的版本清單；這台要能連外，或把編好的 llama-server 複製進來"}
         tag, commit = f"b{max(refs)}", refs[max(refs)]

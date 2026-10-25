@@ -380,6 +380,21 @@ except TimeoutError: print("drip-blocked", round(time.time() - t0, 1))
         check("代理回超大內容 → 擋下；每秒吐一個位元組拖時間（真的 socket）→ 3 秒總時限內就斷",
               "big-blocked" in r.stdout and secs < 5, r.stdout + r.stderr[-300:])
 
+        # ---- 7c2. 慢速佔線：請求列與標頭 15 秒內沒送完就關（以前每 100 秒送一個位元組就能無限期佔住）
+        ctx0 = ssl.create_default_context(cafile=ccert)
+        ctx0.check_hostname = False
+        sk = ctx0.wrap_socket(socket.create_connection(("127.0.0.1", cport), timeout=40))
+        sk.sendall(b"GET /healthz HTTP/1.1\r\nHost: x\r\n")
+        t0 = time.time()
+        try:
+            got = sk.recv(10)
+        except (ConnectionError, ssl.SSLError, OSError):
+            got = b""
+        check("標頭送一半就停：15 秒左右主控台主動斷線", got == b"" and 13 <= time.time() - t0 <= 25, round(time.time() - t0, 1))
+        sk.close()
+        st, _ = co("GET", "/api/fleet")
+        check("  一般請求不受影響", st == 200, st)
+
         # ---- 7d. 資安審查 M2：同一來源同時送很多次錯的密碼，也只會驗前 5 次
         import concurrent.futures as cf
         with cf.ThreadPoolExecutor(20) as ex:

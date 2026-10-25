@@ -45,6 +45,7 @@ SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
 MAX_ANON_BODY = 64 * 1024        # 登入與加入機器不需登入：本文只要幾 KB
+HEADER_DEADLINE = 15            # 請求列＋標頭（POST 連同本文）要在幾秒內送完
 NODE_REPLY_MAX = 32 * 1024 * 1024
 NODE_DEADLINE = 300             # 跟代理的一次呼叫，連同讀完回應的總時限（秒）
 PBKDF2_ROUNDS = 200_000
@@ -727,6 +728,11 @@ class Handler(BaseHTTPRequestHandler):
         # 一定要清掉，否則登入前查到的「沒人」會跟到登入後，登出後查到的「有人」也會留著
         # （實際踩到：登入成功後 /api/me 仍回 401，畫面卡在登入頁）
         self.__dict__.pop("_user_cache", None)
+        # 請求列、標頭（POST 連同本文）要在 15 秒內送完，閒置的 keep-alive 也 15 秒就關：
+        # 以前每次 recv 各等 120 秒，每 100 秒送一個位元組就能無限期佔住一條連線，8 個來源就能佔滿上限（資安審查）
+        self._hdr_timer = threading.Timer(HEADER_DEADLINE, self._abort_slow)
+        self._hdr_timer.daemon = True
+        self._hdr_timer.start()
         try:
             super().handle_one_request()
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
@@ -739,12 +745,26 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:  # noqa: BLE001
                 pass
             self.close_connection = True
+        finally:
+            self._hdr_timer.cancel()
+
+    def _abort_slow(self):
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+    def _headers_done(self):
+        t = getattr(self, "_hdr_timer", None)
+        if t:
+            t.cancel()
 
     def version_string(self):
         return "xconsole"
 
     # ---- GET
     def do_GET(self):  # noqa: N802
+        self._headers_done()
         u = urlparse(self.path)
         path, q = u.path, parse_qs(u.query)
         if path == "/healthz":
@@ -864,8 +884,10 @@ class Handler(BaseHTTPRequestHandler):
             # TCP 會送重置，對方連 401 都收不到）；超過 64 KB 的直接關
             if self._body(MAX_ANON_BODY) is None:
                 return None
+            self._headers_done()
             return self._json(401, {"error": "請先登入"})
         body = self._body(MAX_ANON_BODY if anon else MAX_BODY)
+        self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
 
