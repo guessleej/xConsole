@@ -855,3 +855,4 @@ pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 
 td.nowrap, .nowrap { white-space: nowrap; }
 .need-list { margin: 8px 0 10px; padding-left: 18px; line-height: 1.7; }
 .modal h4.pick-h + .form-row { margin-top: 4px; }
+.check-row { display: flex; margin: 12px 0 4px; }

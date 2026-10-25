@@ -396,9 +396,14 @@ systemctl --user enable xconsole-agent.service >/dev/null
 systemctl --user restart xconsole-agent.service
 LINGER=yes
 loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
-for i in $(seq 1 30); do [ -s "$HOME/.xconsole/token" ] && [ -s "$HOME/.xconsole/agent-cert.pem" ] && break; sleep 1; done
-curl -fsS -m 10 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null \\
-  || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
+# 等健康檢查真的通過才往下：重新安裝時權杖與憑證檔本來就在，只等檔案出現會在代理重啟到一半時就去連
+UP=no
+for i in $(seq 1 30); do
+  if [ -s "$HOME/.xconsole/token" ] && [ -s "$HOME/.xconsole/agent-cert.pem" ] \\
+     && curl -fsS -m 3 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null 2>&1; then UP=yes; break; fi
+  sleep 1
+done
+[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
 echo "== 4/4 加入主控台 =="
 RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 60 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
 import json, os, socket, subprocess

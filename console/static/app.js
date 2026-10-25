@@ -1672,14 +1672,15 @@ function viewNode() {
   const mh = el("div", "card-head");
   mh.appendChild(el("h2", null, "記憶體"));
   const nCards = (st.pools.gpus || []).length;
-  mh.appendChild(el("span", "sub", st.pools.memory_model === "discrete"
-    ? `${nCards || "沒有偵測到"} 張卡，顯存與系統記憶體各一塊` : (st.pools.model_note || "")));
+  mh.appendChild(el("span", "sub", st.pools.memory_model !== "discrete" ? (st.pools.model_note || "")
+    : nCards ? `${nCards} 張卡，顯存與系統記憶體各一塊` : "沒有偵測到 GPU，只算系統記憶體"));
   memCard.appendChild(mh);
   const cards = st.pools.gpus || [];
   if (st.pools.memory_model === "unified_single") {
     memCard.appendChild(poolBar(st.pools.unified, st.slots, "統一記憶體"));
   } else {
-    memCard.appendChild(poolBar(st.pools.vram, st.slots, cards.length > 1 ? `顯存（${cards.length} 張卡合計）` : "顯存"));
+    // 沒有 GPU 的機器不畫顯存條（總量 0 會被畫成一條 1 GiB 的假長條）
+    if (cards.length) memCard.appendChild(poolBar(st.pools.vram, st.slots, cards.length > 1 ? `顯存（${cards.length} 張卡合計）` : "顯存"));
     // 多卡時每張卡一條：總量夠不代表每張都夠，llama.cpp 把模型按層拆到各張卡上，先滿的那張會先出事
     if (cards.length > 1) {
       const per = el("div", "gpu-list");
@@ -2629,8 +2630,10 @@ async function openMachineSettings(nid) {
 
     body.appendChild(el("h4", "pick-h", "模型存放"));
     const f3 = el("div", "form-row");
-    const rootOpts = [["", `預設（${info.effective.gguf_root}）`],
-      ...info.storage.map((x) => [x.path, `${x.path}（${x.hdd ? "機械硬碟，大模型載入會很慢" : "SSD"}・剩 ${fmt(x.free_gib, 0)} GiB）`]),
+    const disk = (x) => `${x.hdd ? "機械硬碟，大模型載入會很慢" : "SSD"}・剩 ${fmt(x.free_gib, 0)} GiB`;
+    const defDisk = info.storage.find((x) => x.path === info.effective.gguf_root);
+    const rootOpts = [["", `預設：${info.effective.gguf_root}${defDisk ? "（" + disk(defDisk) + "）" : ""}`],
+      ...info.storage.filter((x) => x !== defDisk).map((x) => [x.path, `${x.path}（${disk(x)}）`]),
       ["__custom", "自訂路徑…"]];
     const curRoot = st.gguf_root || "";
     fRoot = selectInput(rootOpts, rootOpts.some(([v]) => v === curRoot) ? curRoot : "__custom");
@@ -2748,7 +2751,7 @@ async function openSlotEditor(n, s) {
     fieldBox("預估系統記憶體（GiB）", fR, "准入試算用，選填"));
   body.appendChild(f);
   if (engine) body.appendChild(el("p", "small muted", "這是模型引擎的欄位：埠、上下文、金鑰在「API 串接」頁改，模型用「換模型」換。"));
-  const crit = el("label", "gpu-opt");
+  const crit = el("label", "gpu-opt check-row");
   const fCrit = el("input");
   fCrit.type = "checkbox";
   fCrit.checked = !!s?.critical;
@@ -2804,10 +2807,10 @@ function machineSteps(n, info) {
     { t: "確認記憶體架構", why: "准入試算照這個算；選錯會放行一個會把整台拖死的載入",
       done: info.settings.confirmed || info.settings.memory_model === info.detect.memory_model,
       go: ["這台的設定", () => openMachineSettings(n.id)] },
-    { t: "確認模型存放與 llama.cpp", why: "GGUF 模型放在存放區、靠 llama.cpp 跑；要找得到編好的 llama-server",
-      done: !!info.effective.llama_server, go: ["這台的設定", () => openMachineSettings(n.id)] },
     { t: "新增欄位", why: "一格放一個模型或服務；欄位決定角色、埠與記憶體預估",
       done: st.slots.length > 0, go: ["新增欄位", () => openSlotEditor(n, null)] },
+    { t: "確認模型存放與 llama.cpp", why: "GGUF 模型放在存放區、靠 llama.cpp 跑；要找得到編好的 llama-server",
+      done: !!info.effective.llama_server, go: ["這台的設定", () => openMachineSettings(n.id)] },
     { t: "放入模型", why: "到模型庫下載或手動放入，再到空欄位按「放入」",
       done: st.slots.some((x) => x.unit), go: ["到模型庫", () => go("lib:" + n.id)] },
     { t: "到 API 串接實測", why: "換完模型會自動帶過去；按「實測一次」確認 IDE 連得上", done: false, optional: true,

@@ -143,6 +143,8 @@ def main():
         check("  安裝腳本語法正確（bash -n）", r.returncode == 0, r.stderr)
         check("  腳本拒絕用 root 執行、會檢查 python3／openssl／curl",
               'id -u)" = 0' in script and "python3 openssl curl" in script)
+        check("  重新安裝時等健康檢查通過才往下（不是只等權杖檔出現）",
+              re.search(r"for i in .*\n.*\n.*healthz.*UP=yes; break", script) is not None)
         st, src = anon("GET", f"/install/{code}/xconsole_agent.py", raw=True)
         check("  代理程式下載得到，跟 repo 裡的一樣", st == 200 and src == open(os.path.join(ROOT, "agent", "xconsole_agent.py")).read())
         st, _ = anon("GET", f"/install/{'x' * 32}/agent.sh", raw=True)
