@@ -197,6 +197,31 @@ def main():
     ok &= case("啟動環境：沒綁卡不動 CUDA_VISIBLE_DEVICES", env.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
     A.shutil.which = real_which
 
+    # 12. 指令一律不經過 shell（防命令注入）：sh() 不收字串、原始碼裡不准有 shell=True／os.system
+    try:
+        A.sh("echo hi; id")
+        ok &= case("sh() 收到整條字串要拒絕", False, True)
+    except TypeError:
+        ok &= case("sh() 收到整條字串要拒絕", True, True)
+    rc, out, _ = A.sh(["echo", "a; id"])
+    ok &= case("參數裡的分號只是文字，不會被當成第二個指令", out, "a; id")
+    try:
+        A.unit_name("--user; rm -rf ~")
+        ok &= case("服務名稱格式不對要拒絕（不能被當成選項）", False, True)
+    except ValueError:
+        ok &= case("服務名稱格式不對要拒絕（不能被當成選項）", True, True)
+    ok &= case("  狀態查詢遇到怪名字回 unknown，不讓整個狀態頁出錯", A.unit_state("--user; rm -rf ~"), "unknown")
+    ok &= case("  啟停遇到怪名字回錯誤，不執行", A.sysctl("-x.service", "stop")[0], 1)
+    # 記錄檔最後 n 行：行很長也要完整（以前假設每行 400 位元組，長行會少行或截斷）
+    lp = os.path.join(tempfile.mkdtemp(), "x.log")
+    rows = [f"{i:03d}-" + "x" * (3000 if i % 7 == 0 else 20) for i in range(300)]
+    open(lp, "w").write("\n".join(rows) + "\n")
+    ok &= case("tail_lines：含 3000 字的長行，最後 50 行完整", A.tail_lines(lp, 50), rows[-50:])
+    ok &= case("tail_lines：要的行數比檔案多就回整個檔", A.tail_lines(lp, 1000), rows)
+    src = open(A.__file__, encoding="utf-8").read()
+    ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
+               [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 

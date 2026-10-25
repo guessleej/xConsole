@@ -20,7 +20,6 @@ import os
 import re
 import secrets
 import shutil
-import shlex
 import socket
 import ssl
 import struct
@@ -54,15 +53,40 @@ DEFAULT_FLOORS = {
 
 # ---------------------------------------------------------------- 工具
 
-def sh(cmd, timeout=20):
-    """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。"""
+def sh(argv, timeout=20):
+    """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。
+    一律傳參數清單、不經過 shell：服務名稱、路徑、主機名稱這些值不管長怎樣都不會被當成指令解讀
+    （以前是組字串＋shlex.quote，漏一個 quote 就是命令注入；CodeQL py/command-line-injection）。"""
+    if not isinstance(argv, (list, tuple)):
+        raise TypeError("sh() 只收參數清單，不收整條指令字串")
     try:
-        p = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, timeout=timeout)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "逾時"
     except Exception as exc:  # noqa: BLE001
         return 1, "", str(exc)
+
+
+def tail_lines(path, n, cap=8 * 1024 * 1024):
+    """檔案最後 n 行（取代 tail -n）。從檔尾往回一塊一塊讀，湊滿 n 行為止；
+    最多讀 cap 位元組，幾 GB 的記錄檔也不會整個讀進來。"""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            end = pos = fh.tell()
+            buf = b""
+            while pos > 0 and buf.count(b"\n") <= n and end - pos < cap:
+                step = min(65536, pos)
+                pos -= step
+                fh.seek(pos)
+                buf = fh.read(step) + buf
+    except OSError:
+        return []
+    lines = buf.decode("utf-8", "replace").splitlines()
+    if pos > 0 and lines:
+        lines = lines[1:]          # 沒讀到檔頭時，第一行可能只讀到後半段
+    return lines[-n:]
 
 
 def load_json(path, default):
@@ -177,9 +201,8 @@ def swap_pool():
 
 
 def probe_nvidia():
-    rc, out, _ = sh(
-        "nvidia-smi --query-gpu=index,name,temperature.gpu,power.draw,utilization.gpu,"
-        "memory.total,memory.used --format=csv,noheader,nounits", timeout=15)
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=index,name,temperature.gpu,power.draw,utilization.gpu,"
+                     "memory.total,memory.used", "--format=csv,noheader,nounits"], timeout=15)
     if rc != 0 or not out:
         return None
     gpus = []
@@ -328,7 +351,7 @@ def hardware():
         except Exception:  # noqa: BLE001
             continue
     gpus = probe_gpus()
-    rc, load_out, _ = sh("cat /proc/loadavg")
+    load_out = load_text("/proc/loadavg") or ""
     load = None
     try:
         load = float(load_out.split()[0])
@@ -411,8 +434,7 @@ def gpu_clock():
                     cur = mhz
             if mx:
                 return {"current_mhz": cur, "max_mhz": mx}
-    rc, out, _ = sh("nvidia-smi --query-gpu=clocks.sm,clocks.max.sm "
-                    "--format=csv,noheader,nounits", timeout=10)
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=clocks.sm,clocks.max.sm", "--format=csv,noheader,nounits"], timeout=10)
     if rc == 0 and out:
         f = [x.strip() for x in out.splitlines()[0].split(",")]
         try:
@@ -446,7 +468,7 @@ PORT_KIND = [
 
 
 def ports():
-    rc, out, _ = sh("ss -tlnpH 2>/dev/null")
+    rc, out, _ = sh(["ss", "-tlnpH"])
     if rc != 0 or not out:
         return []
     reg = registry()
@@ -505,16 +527,32 @@ ACTIVE_LABEL = {
 }
 
 
+UNIT_NAME_RX = re.compile(r"[A-Za-z0-9][\w@.:-]{0,120}\.(?:service|socket|target|timer)")
+
+
+def unit_name(unit):
+    """服務名稱進 systemctl／journalctl 之前一律比對格式（另外參數前也加 --）：不經過 shell 之後，
+    剩下的風險只有「名稱被當成選項」，這裡兩道都擋。"""
+    unit = str(unit or "")
+    if not UNIT_NAME_RX.fullmatch(unit):
+        raise ValueError(f"服務名稱格式不對：{unit[:60]}")
+    return unit
+
+
 def unit_state(unit):
     """回 systemd 的真實狀態字串，不要壓成開／關兩種。
 
     卡在 activating 的服務（Type=notify 但程式沒送就緒訊號，或 ExecStartPre 很久）
     壓成「關」會讓人以為它沒跑、壓成「開」又會以為它好了，兩種都會誤導。
     """
-    _, out, _ = sh(f"systemctl --user is-active {shlex.quote(unit)}")
+    try:
+        unit = unit_name(unit)
+    except ValueError:
+        return "unknown"          # 登錄檔裡的名字不合格式：當成查不到，不要讓整個狀態頁出錯
+    _, out, _ = sh(["systemctl", "--user", "is-active", "--", unit])
     st = out.strip()
     if st in ("unknown", "", "inactive"):
-        _, out2, _ = sh(f"systemctl is-active {shlex.quote(unit)}")
+        _, out2, _ = sh(["systemctl", "is-active", "--", unit])
         if out2.strip() not in ("unknown", ""):
             st = out2.strip()
     return st or "unknown"
@@ -526,14 +564,20 @@ def unit_active(unit):
 
 def unit_scope(unit):
     """這個 unit 是 user 層還是 system 層。兩層指令不一樣，猜錯就全部失敗。"""
-    _, out, _ = sh(f"systemctl --user cat {shlex.quote(unit)} >/dev/null 2>&1 && echo user")
-    return "user" if out.strip() == "user" else "system"
+    try:
+        rc, _, _ = sh(["systemctl", "--user", "cat", "--", unit_name(unit)])
+    except ValueError:
+        return "user"
+    return "user" if rc == 0 else "system"
 
 
 def sysctl(unit, verb, timeout=200):
     scope = unit_scope(unit)
     flag = "--user " if scope == "user" else ""
-    return sh(f"systemctl {flag}{verb} {shlex.quote(unit)}", timeout=timeout)
+    try:
+        return sh(["systemctl", *flag.split(), *verb.split(), "--", unit_name(unit)], timeout=timeout)
+    except ValueError as ex:
+        return 1, "", str(ex)
 
 
 def unit_enabled(unit):
@@ -547,7 +591,11 @@ def unit_rss_gib(unit):
     pid = pid.strip()
     if not pid.isdigit() or pid == "0":
         return 0.0
-    _, out, _ = sh(f"ps -o rss= -g $(ps -o pgid= -p {pid} 2>/dev/null | tr -d ' ') 2>/dev/null")
+    _, pgid, _ = sh(["ps", "-o", "pgid=", "-p", pid])
+    pgid = pgid.strip()
+    if not pgid.isdigit():
+        return 0.0
+    _, out, _ = sh(["ps", "-o", "rss=", "-g", pgid])
     total = sum(int(x) for x in out.split() if x.isdigit())
     return round(total * 1024 / GIB, 2)
 
@@ -631,8 +679,8 @@ def harvest_measurements(slot, reg):
     prev = reg["measure"].get(slot["id"])
     if not log or not os.path.exists(log):
         return prev
-    rc, out, _ = sh(f"tail -n 4000 {shlex.quote(log)} 2>/dev/null | grep -F 'serve: prompt'")
-    if rc != 0 or not out:
+    out = "\n".join(ln for ln in tail_lines(log, 4000) if "serve: prompt" in ln)
+    if not out:
         return prev
     pre, dec, ctx = [], [], 0
     for line in out.splitlines():
@@ -926,13 +974,16 @@ def wait_healthy(slot, seconds=240):
             if sub.strip() == "auto-restart":
                 st = "failed"
         if st == "failed":
-            _, tail, _ = sh(f"journalctl --user -u {shlex.quote(slot['unit'])} -n 3 --no-pager -o cat")
+            try:
+                _, tail, _ = sh(["journalctl", "--user", "-u", unit_name(slot["unit"]), "-n", "3", "--no-pager", "-o", "cat"])
+            except ValueError as ex:
+                tail = str(ex)
             return False, (tail or "服務退出").replace("\n", " ")[:200]
         if st == "active":
             if not port:
                 return True, ""
-            rc, code, _ = sh(f"curl -s -o /dev/null -m 6 -w '%{{http_code}}' "
-                             f"http://127.0.0.1:{int(port)}/v1/models")
+            rc, code, _ = sh(["curl", "-s", "-o", "/dev/null", "-m", "6", "-w", "%{http_code}",
+                              f"http://127.0.0.1:{int(port)}/v1/models"])
             # 401＝服務活著、只是設了金鑰（不帶金鑰打 /v1/models 一定 401）。
             # 只認 200 的話，開了金鑰之後每次重啟都會被判成「起不來」而自動還原
             if code.strip() in ("200", "401"):
@@ -1065,8 +1116,9 @@ def _first_key(v):
 
 
 def _local_ip():
-    rc, out, _ = sh("ip -4 route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2")
-    return out.strip() if rc == 0 and out.strip() else "127.0.0.1"
+    rc, out, _ = sh(["ip", "-4", "route", "get", "1.1.1.1"])
+    m = re.search(r"\bsrc ([0-9.]+)", out) if rc == 0 else None
+    return m.group(1) if m else "127.0.0.1"
 
 
 def _http_json(url, body=None, key="", timeout=8):
@@ -1614,7 +1666,7 @@ def llama_server_exe(reg=None):
         return os.path.expanduser(want)
     best, best_ver = None, -1
     for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
-        rc, out, err = sh(f"{shlex.quote(cand)} --version", timeout=15)
+        rc, out, err = sh([cand, "--version"], timeout=15)
         m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", out + err)
         ver = int(next(x for x in m.groups() if x)) if m else 0
         libs = os.listdir(os.path.dirname(cand))
@@ -1738,7 +1790,7 @@ def ensure_llama_unit(slot_id, cfg_path):
     if load_text(path) != body:
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(body)
-        sh("systemctl --user daemon-reload", timeout=30)
+        sh(["systemctl", "--user", "daemon-reload"], timeout=30)
     return unit
 
 
@@ -2566,11 +2618,13 @@ def do_logs(slot_id, lines=300):
         return 404, {"error": "沒有這個欄位"}
     scope = unit_scope(slot["unit"])
     flag = "--user " if scope == "user" else ""
-    _, out, err = sh(f"journalctl {flag}-u {shlex.quote(slot['unit'])} "
-                     f"-n {int(lines)} --no-pager -o short-iso")
+    try:
+        _, out, err = sh(["journalctl", *flag.split(), "-u", unit_name(slot["unit"]), "-n", int(lines), "--no-pager", "-o", "short-iso"])
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
     text = out or err
     if slot.get("log") and os.path.exists(slot["log"]):
-        _, out2, _ = sh(f"tail -n {int(lines)} {shlex.quote(slot['log'])}")
+        out2 = "\n".join(tail_lines(slot["log"], int(lines)))
         if out2:
             text = (text + "\n----- 服務自己的 log -----\n" + out2).strip()
     return 200, {"slot": slot_id, "unit": slot["unit"], "text": text[-150000:]}
@@ -2994,7 +3048,7 @@ KEY_FILE = os.path.join(STATE_DIR, "agent-key.pem")
 
 def local_names():
     names = {"localhost", "127.0.0.1", socket.gethostname()}
-    _, out, _ = sh("hostname -I")
+    _, out, _ = sh(["hostname", "-I"])
     names.update(out.split())
     return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
 
@@ -3006,11 +3060,10 @@ def ensure_cert():
         return
     san = ",".join(("IP:" if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", n) and (":" in n or n.count(".") == 3)
                     else "DNS:") + n for n in local_names())
-    rc, _, err = sh(f"openssl req -x509 -newkey rsa:2048 -nodes -days 3650 "
-                    f"-keyout {shlex.quote(KEY_FILE)} -out {shlex.quote(CERT_FILE)} "
-                    f"-subj /C=TW/O=xCloudinfo/CN=xconsole-agent-{shlex.quote(socket.gethostname())} "
-                    f"-addext {shlex.quote('subjectAltName=' + san)} "
-                    f"-addext basicConstraints=critical,CA:FALSE", timeout=60)
+    rc, _, err = sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "3650",
+                     "-keyout", KEY_FILE, "-out", CERT_FILE,
+                     "-subj", f"/C=TW/O=xCloudinfo/CN=xconsole-agent-{socket.gethostname()}",
+                     "-addext", "subjectAltName=" + san, "-addext", "basicConstraints=critical,CA:FALSE"], timeout=60)
     if rc != 0:
         raise SystemExit(f"產不出代理憑證（{err[:200]}），停止啟動，不退回明文 http")
     os.chmod(KEY_FILE, 0o600)
