@@ -845,3 +845,7 @@ pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 
   .gpu-row { grid-template-columns: 1fr auto; }
   .gpu-row .bar { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* 換模型：用哪幾張卡 */
+.gpu-pick { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 4px; }
+.gpu-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; }

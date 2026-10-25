@@ -546,12 +546,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/model", path)
         if m:
-            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "force") if k in body}
+            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "gpus", "force") if k in body}
             # 載幾十 GB 的模型加上失敗時的還原，最久可能各要十幾分鐘
             code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", want, timeout=2000)
             self._audit("model.swap", f"{m.group(1)}/{m.group(2)}", code == 200,
                         {"to": out.get("model") or body.get("model") or os.path.basename(str(body.get("pack", ""))),
                          "engine": body.get("engine") or "strata", "switched_engine": out.get("switched_engine"),
+                         "gpus": out.get("gpus") if code == 200 else body.get("gpus"),
                          "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
                          "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)

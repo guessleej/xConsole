@@ -336,6 +336,7 @@ function slotCard(node, s, unified) {
   const chips = el("div", "chips");
   (s.caps || []).forEach((cap) => chips.appendChild(el("span", "chip", cap)));
   if (s.port) chips.appendChild(el("span", "chip brand", ":" + s.port));
+  if (s.gpu_ids?.length) chips.appendChild(el("span", "chip", "卡 " + s.gpu_ids.join("、")));
   if (s.critical) chips.appendChild(el("span", "chip brand", "關鍵服務"));
   c.appendChild(chips);
 
@@ -416,24 +417,83 @@ async function openSwap(node, s, pre) {
   ctxWrap.appendChild(ctxHint);
   ctxRow.appendChild(ctxWrap);
 
+  /* 多卡（獨立顯存、兩張以上）才出現：這顆模型用哪幾張卡。預設帶建議——單張放得下就綁最空的那張，
+     少了跨卡傳輸，其他卡還能跑別的模型；放不下才用最少張數一起扛。沒勾任何一張＝全部卡都用。 */
+  const cards = node.state?.pools?.gpus || [];
+  const multi = node.state?.pools?.memory_model === "discrete" && cards.length > 1;
+  const gpuRow = el("div");
+  gpuRow.hidden = true;
+  const gpuHint = el("div", "assume");
+  const boxes = [];
+  const selfIds = (s.gpu_ids || []).map(String);
+  const selCards = cards.filter((c) => !selfIds.length || selfIds.includes(String(c.id)));
+  const selTot = selCards.reduce((a, c) => a + c.total_gib, 0) || 1;
+  const mine = s.busy ? (s.vram_gib || 0) : 0;
+  // 換的時候這個欄位會先釋放：它現在佔的量攤回它現在用的卡
+  const avail = (c) => c.free_gib + (selCards.includes(c) ? mine * c.total_gib / selTot : 0);
+  const vfloor = node.state?.pools?.floors?.vram || 0;
+  let curNeed = 0;
+  let touched = selfIds.length > 0;            // 已經綁過卡的欄位維持原本的選擇，不自動改
+  const recommend = (need) => {
+    const by = [...cards].sort((a, b) => avail(b) - avail(a));
+    for (let k = 1; k <= by.length; k++) {
+      const pick = by.slice(0, k);
+      const tot = pick.reduce((a, c) => a + c.total_gib, 0);
+      if (pick.every((c) => avail(c) - need * c.total_gib / tot >= vfloor + 1)) return pick.map((c) => String(c.id));
+    }
+    return null;
+  };
+  const updGpu = () => {
+    if (!multi) return;
+    const rec = recommend(curNeed);
+    if (!touched) boxes.forEach((b) => { b.checked = rec ? rec.includes(b.value) : true; });
+    const picked = boxes.filter((b) => b.checked).map((b) => b.value);
+    gpuHint.textContent = (!rec ? `每種組合都放不下約 ${fmt(curNeed)} GiB，套用時會被准入擋下。`
+      : rec.length === 1 ? `建議只用卡 ${rec[0]}：單張放得下，少了跨卡傳輸，其他卡可以跑別的模型。`
+        : `建議用卡 ${rec.join("、")} 一起扛：要約 ${fmt(curNeed)} GiB，${rec.length - 1} 張放不下。`)
+      + (picked.length ? "" : "　沒勾任何一張＝全部卡都用。");
+  };
+  if (multi) {
+    gpuRow.appendChild(el("label", "field", "用哪幾張卡"));
+    const g = el("div", "gpu-pick");
+    cards.forEach((c) => {
+      const l = el("label", "gpu-opt");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.value = String(c.id);
+      cb.checked = selfIds.includes(cb.value);
+      cb.onchange = () => { touched = true; updGpu(); };
+      l.appendChild(cb);
+      l.appendChild(document.createTextNode(` 卡 ${c.id}　可用 ${fmt(avail(c))} / ${fmt(c.total_gib)} GiB`));
+      g.appendChild(l);
+      boxes.push(cb);
+    });
+    gpuRow.appendChild(g);
+    gpuRow.appendChild(gpuHint);
+  }
+
   const row = (m, engine) => {
     const r = el("label", "pick");
     const radio = el("input");
     radio.type = "radio";
     radio.name = "model";
     radio.dataset.id = m.id || "";
-    const blocked = m.current || (engine === "strata" ? !m.has_tokenizer || !m.ready : false);
+    // llama.cpp 的現役模型可以再選一次：用來改上下文或改綁卡
+    const blocked = (m.current && engine !== "llama") || (engine === "strata" ? !m.has_tokenizer || !m.ready : false);
     radio.disabled = blocked;
     radio.onchange = () => {
       chosen = { ...m, engine };
       okBtn.disabled = false;
       ctxRow.hidden = engine !== "llama";
+      gpuRow.hidden = !(multi && engine === "llama");
       if (engine === "llama") {
         ctxIn.value = m.ctx_default;
         const par = m.parallel || 1;   // 滑動視窗每條序列各留一個視窗，所以兩部分都乘並行數
         const kvAt = (c) => ((m.kv_full_bpt || 0) * c + (m.kv_swa_bpt || 0) * Math.min(c, m.swa_window || c)) * par / 1073741824;
         const upd = () => {
           const c = Number(ctxIn.value) || m.ctx_default;
+          curNeed = (m.est_vram_gib || 0) + kvAt(c);
+          updGpu();
           ctxHint.textContent = `這顆最多 ${int(m.ctx_train)}；上下文 ${int(c)} 時 KV 約 ${fmt(kvAt(c))} GiB，`
             + `加權重共約 ${fmt(m.est_vram_gib + kvAt(c))} GiB。套用前還會再做一次記憶體試算。`;
         };
@@ -447,7 +507,7 @@ async function openSwap(node, s, pre) {
     const meta = engine === "llama"
       ? `${m.size_gib} GiB${m.shards > 1 ? `・${m.shards} 個分片` : ""}・${m.arch}・最長 ${int(m.ctx_train)}・預估約 ${fmt(m.est_vram_gib + m.est_kv_gib)} GiB`
       : `${m.size_gib} GiB・${m.shards} 個分片`;
-    t.appendChild(el("div", "small muted", meta + (m.current ? "・目前使用中" : "")));
+    t.appendChild(el("div", "small muted", meta + (m.current ? (engine === "llama" ? "・目前使用中（可改上下文或用哪幾張卡）" : "・目前使用中") : "")));
     r.appendChild(t);
     const chips = el("div", "chips");
     if (engine === "llama" && m.vision) chips.appendChild(el("span", "chip", "看圖"));
@@ -476,6 +536,7 @@ async function openSwap(node, s, pre) {
   }
   [...(cat.orphans || []), ...(cat.gguf_problems || [])].forEach((o) => body.appendChild(el("p", "note warn", `${o.name}：${o.missing}`)));
   body.appendChild(ctxRow);
+  body.appendChild(gpuRow);
 
   const lib = el("button", "btn sm", "到模型庫下載或管理模型");
   lib.onclick = () => { ov.remove(); go(`lib:${node.id}`); };
@@ -492,7 +553,8 @@ async function openSwap(node, s, pre) {
   okBtn.onclick = async () => {
     const m = chosen;
     const req = m.engine === "llama"
-      ? { engine: "llama", model: m.id, ctx: Number(ctxIn.value) || m.ctx_default }
+      ? { engine: "llama", model: m.id, ctx: Number(ctxIn.value) || m.ctx_default,
+        ...(multi ? { gpus: (() => { const g = boxes.filter((b) => b.checked).map((b) => b.value); return g.length && g.length < cards.length ? g : null; })() } : {}) }
       : { pack: m.pack, native: m.native };
     const go2 = async (force) => {
       ov.remove();
@@ -500,7 +562,8 @@ async function openSwap(node, s, pre) {
       S.busy.add(node.id + "/" + s.id);
       try {
         const r = await api(`/api/node/${node.id}/slot/${s.id}/model`, { method: "POST", body: { ...req, force } });
-        toast(`已換成 ${r.model}${r.switched_engine ? `（引擎改為 ${r.engine === "llama" ? "llama.cpp" : "Strata"}）` : ""}`, "ok");
+        toast(`已換成 ${r.model}${r.switched_engine ? `（引擎改為 ${r.engine === "llama" ? "llama.cpp" : "Strata"}）` : ""}`
+          + (multi && r.engine === "llama" ? (r.gpus ? `，用卡 ${r.gpus.join("、")}` : "，全部卡一起用") : ""), "ok");
         S.apiNotice = S.apiNotice || {};
         S.apiNotice[node.id + "/" + s.id] = `已換成 ${r.model}。IDE 裡的模型名稱請改成 ${r.api_model_name || "下面的模型名稱"}，`
           + "上下文與輸出上限照下面填，再按「實測一次」。";
@@ -1586,7 +1649,8 @@ function viewNode() {
       const per = el("div", "gpu-list");
       cards.forEach((g) => {
         const r = el("div", "gpu-row");
-        r.appendChild(el("span", "small", `卡 ${g.id}${g.name ? "　" + g.name.replace(/^NVIDIA /, "") : ""}`));
+        const on = st.slots.filter((x) => x.busy && (x.gpu_ids || []).map(String).includes(String(g.id))).map((x) => x.role);
+        r.appendChild(el("span", "small", `卡 ${g.id}${g.name ? "　" + g.name.replace(/^NVIDIA /, "") : ""}${on.length ? "・" + on.join("、") : ""}`));
         const bar = el("div", "bar thin");
         const seg = el("div", "seg");
         seg.style.width = (g.total_gib ? Math.min(100, g.used_gib / g.total_gib * 100) : 0) + "%";

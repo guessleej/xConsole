@@ -118,6 +118,75 @@ def main():
     ok &= case("滑動視窗 KV × 並行（4 條 32K、視窗 4K）",
                round(got, 4), round((1000 * 32768 * 4 + 2000 * 4096 * 4) / A.GIB, 4))
 
+    # 9. 多卡（例：中原 2× 48 GB）：總量夠不代表每張都夠
+    two = lambda u0, u1: fake_hw(96, u0 + u1, gpus=[
+        {"id": "0", "name": "t", "vram_total": 48 * GIB, "vram_used": u0 * GIB},
+        {"id": "1", "name": "t", "vram_total": 48 * GIB, "vram_used": u1 * GIB}])
+    # 卡 0 已被別的欄位吃掉 40，卡 1 幾乎是空的；總共剩 54。沒綁卡的 40 GiB 模型會攤成每張 20 → 卡 0 放不下
+    m9 = [{"id": "m", "role": "主腦", "unit": "x.service", "est_vram_gib": 40}]
+    r = A.admit("m", reg_for("discrete", m9, 123, 100), two(40, 2))
+    ok &= case("兩張卡、沒綁卡：總量夠但卡 0 會爆 → 擋", r["allow"], False)
+    ok &= case("  擋的理由點名卡 0", any(x.startswith("卡 0") for x in r["reasons"]), True)
+    ok &= case("  卡 1 沒有被列成理由", any(x.startswith("卡 1") for x in r["reasons"]), False)
+    m9b = [{"id": "m", "role": "主腦", "unit": "x.service", "est_vram_gib": 40, "gpu_ids": ["1"]}]
+    r = A.admit("m", reg_for("discrete", m9b, 123, 100), two(40, 2))
+    ok &= case("同一顆綁到空的卡 1 → 放行", r["allow"], True)
+    ok &= case("  逐張卡的明細只算卡 1", [c["id"] for c in r["pools"]["cards"]], ["1"])
+    # 128B 那種要兩張一起扛的：攤成每張 46，各剩 48 → 放行；再大一點就擋
+    big = [{"id": "b", "role": "主腦", "unit": "x.service", "est_vram_gib": 92}]
+    r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
+    ok &= case("92 GiB 攤到兩張 48 → 放行", r["allow"], True)
+    big[0]["est_vram_gib"] = 95
+    r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
+    ok &= case("95 GiB 攤到兩張 48 → 每張剩 0.5 低於底線 → 擋", r["allow"], False)
+    # 換綁卡：舊模型在卡 0 佔 40，要搬到卡 1；釋放量要還給卡 0，不是卡 1
+    r = A.admit("m", reg_for("discrete", m9b, 123, 100), two(46, 46), reclaim_cards={"0": 40.0})
+    ok &= case("舊模型在卡 0、改綁卡 1：卡 1 沒空間 → 擋（不能把卡 0 釋放的量算給卡 1）", r["allow"], False)
+    # 單卡機器照舊走總量
+    r = A.admit("m", reg_for("discrete", m9, 123, 100), fake_hw(48, 2))
+    ok &= case("單卡機器不出現逐張卡明細", "cards" in r["pools"], False)
+
+    # 10. 選卡檢查
+    cards = [{"id": "0", "total_gib": 48}, {"id": "1", "total_gib": 48}]
+    ok &= case("沒帶＝自動", A.pick_gpus(None, cards), (None, None))
+    ok &= case("全選也當自動（登錄檔不留多餘的綁定）", A.pick_gpus(["1", "0"], cards), (None, None))
+    ok &= case("只用卡 1", A.pick_gpus([1], cards), (["1"], None))
+    ok &= case("沒有的卡要拒絕", A.pick_gpus(["2"], cards)[1] is not None, True)
+    ok &= case("攤分照卡的大小", A.card_split(30, None, [{"id": "0", "total_gib": 16}, {"id": "1", "total_gib": 32}]),
+               {"0": 10.0, "1": 20.0})
+
+    # 11. 綁卡的環境變數
+    ok &= case("NVIDIA：照 PCI 匯流排排序再指定卡", A.visible_env(["1"], nvidia=True),
+               {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": "1"})
+    ok &= case("沒綁卡不設任何變數", A.visible_env(None, nvidia=True), {})
+    # AMD：drm card 號碼與 HIP 序號不一定相同（KFD 節點 1 是 CPU、card1 才是第一張 GPU）
+    root = tempfile.mkdtemp()
+    kfd, drm = os.path.join(root, "kfd"), os.path.join(root, "drm")
+    for n, minor, simd in ((0, 0, 0), (1, 129, 240), (2, 128, 240)):
+        os.makedirs(os.path.join(kfd, str(n)))
+        open(os.path.join(kfd, str(n), "properties"), "w").write(f"simd_count {simd}\ndrm_render_minor {minor}\n")
+    for card, minor in (("card0", 128), ("card1", 129)):
+        os.makedirs(os.path.join(drm, card, "device", "drm", f"renderD{minor}"))
+    ok &= case("AMD：drm card → HIP 序號照 KFD 節點順序", A.amd_hip_order(drm, kfd), {"1": 0, "0": 1})
+    A.DRM_DIR, A.KFD_NODES = drm, kfd
+    orig = A.amd_hip_order
+    A.amd_hip_order = lambda d=drm, k=kfd: orig(d, k)
+    ok &= case("AMD：綁 card0 → HIP_VISIBLE_DEVICES=1", A.visible_env(["0"], nvidia=False), {"HIP_VISIBLE_DEVICES": "1"})
+    try:
+        A.visible_env(["5"], nvidia=False)
+        ok &= case("AMD：對不到的卡要拒絕", False, True)
+    except ValueError:
+        ok &= case("AMD：對不到的卡要拒絕", True, True)
+    A.amd_hip_order = orig
+    # 啟動時真的有套上：設定檔的 gpus 變成 llama-server 的環境變數，蓋過登錄檔 llama_env 裡的同名設定
+    real_which = A.shutil.which
+    A.shutil.which = lambda x: "/usr/bin/nvidia-smi" if x == "nvidia-smi" else real_which(x)
+    env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {"llama_env": {"CUDA_VISIBLE_DEVICES": "0,1"}}}, ["1"])
+    ok &= case("啟動環境：只看得到卡 1", (env.get("CUDA_VISIBLE_DEVICES"), env.get("CUDA_DEVICE_ORDER")), ("1", "PCI_BUS_ID"))
+    env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {}}, None)
+    ok &= case("啟動環境：沒綁卡不動 CUDA_VISIBLE_DEVICES", env.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
+    A.shutil.which = real_which
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 
