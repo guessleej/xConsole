@@ -439,7 +439,8 @@ async function openSwap(node, s, pre) {
     for (let k = 1; k <= by.length; k++) {
       const pick = by.slice(0, k);
       const tot = pick.reduce((a, c) => a + c.total_gib, 0);
-      if (pick.every((c) => avail(c) - need * c.total_gib / tot >= vfloor + 1)) return pick.map((c) => String(c.id));
+      // 跟代理的准入同一條公式：需求與底線都照卡的大小分到每張卡（不一致的話，畫面說放不下、按下去卻放行）
+      if (pick.every((c) => avail(c) - need * c.total_gib / tot >= vfloor * c.total_gib / tot)) return pick.map((c) => String(c.id));
     }
     return null;
   };
