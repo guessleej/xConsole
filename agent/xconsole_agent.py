@@ -2367,6 +2367,9 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
             # 多卡：總量夠不代表每張都夠。模型照卡的大小攤到它用的每張卡，任何一張跌破底線就擋
             share = card_split(need_vram, slot.get("gpu_ids"), cards)
             back = reclaim_cards if reclaim_cards is not None else card_split(reclaim_vram, slot.get("gpu_ids"), cards)
+            # 底線是「這個模型總共要留的餘裕」，照卡的大小分到它用的每張卡；每張都留滿一份等於多留好幾倍，
+            # 會把本來就跑得好好的跨卡大模型擋掉（中原 2× 48 GB 的 Mistral 128B 實際踩到：重啟被擋）
+            floor_c = card_split(fl["vram"], slot.get("gpu_ids"), cards)
             detail["cards"] = []
             for c in cards:
                 cid = str(c["id"])
@@ -2375,11 +2378,11 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
                 free_c = round(c["free_gib"] + back.get(cid, 0.0), 1)
                 worst_c = round(free_c - share[cid], 1)
                 detail["cards"].append({"id": cid, "total": c["total_gib"], "free": free_c,
-                                        "need": round(share[cid], 1), "worst": worst_c})
-                if worst_c < fl["vram"]:
+                                        "need": round(share[cid], 1), "worst": worst_c, "floor": round(floor_c[cid], 2)})
+                if worst_c < floor_c[cid]:
                     reasons.append(
                         f"卡 {cid} 顯存不足：這張要放約 {share[cid]:.0f} GiB，現在只剩 {free_c:.0f} GiB，"
-                        f"載下去會剩 {worst_c} GiB（低於 {fl['vram']} GiB 底線）")
+                        f"載下去會剩 {worst_c} GiB（低於這張分到的 {floor_c[cid]:.1f} GiB 底線）")
         elif need_vram and wv < fl["vram"]:
             reasons.append(
                 f"顯存不足：需要約 {need_vram:.0f} GiB，現在只剩 {vfree:.0f} GiB，"
