@@ -613,6 +613,8 @@ def slot_state(slot, reg, hw):
         "est_vram_gib": slot.get("est_vram_gib"), "est_ram_gib": slot.get("est_ram_gib"),
         "config": cfg, "kv_worst_gib": kv_worst_gib(cfg), "measure": meas,
         "critical": slot.get("critical", False), "note": slot.get("note", ""),
+        # 換得回 Strata 的欄位：本來就是 Strata，或現在跑 llama.cpp 但還留著 Strata 的設定
+        "has_strata": slot.get("kind") == "strata" or bool((slot.get("engines") or {}).get("strata")),
     }
 
 

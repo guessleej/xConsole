@@ -712,11 +712,14 @@ function libDownloadCard(ok, only) {
     choices.textContent = "";
     choices.appendChild(el("p", "small muted", "查詢中…"));
     let r;
+    const stale = () => fNode.value !== nodeId;   // 查詢途中換了目標機器：舊結果丟掉，免得下載按鈕綁在上一台
     try { r = await api(`/api/node/${nodeId}/library/hf`, { method: "POST", body: { repo: fRepo.value.trim(), token: fTok.value } }); } catch (ex) {
+      if (stale()) return;
       choices.textContent = "";
       choices.appendChild(el("p", "note bad", ex.message));
       return;
     }
+    if (stale()) return;
     choices.textContent = "";
     if (!r.choices.length) { choices.appendChild(el("p", "note warn", "這個 repo 沒有 GGUF 檔。llama.cpp 只吃 GGUF，請找名稱帶 GGUF 的 repo。")); return; }
     if (r.choices.some((c) => c.cn_origin)) choices.appendChild(el("p", "note warn", "這是中國來源的模型：內部測試可以用，政府案不得使用。"));
@@ -743,6 +746,7 @@ function libDownloadCard(ok, only) {
       const b = el("button", "btn sm primary", "下載");
       b.disabled = !c.fits_disk;
       b.onclick = async () => {
+        if (stale()) { toast("目標機器換了，請重新列出可下載的量化", "bad"); return; }
         try {
           await api(`/api/node/${nodeId}/library/download`, { method: "POST", body: { repo: r.repo, stem: c.stem, mmproj: mm?.value || null, token: fTok.value } });
           toast(`開始下載 ${c.stem}`, "ok");
@@ -779,9 +783,11 @@ function libManualCard(ok) {
     body.appendChild(el("p", "small", "存放區底下一顆模型一個資料夾，放好之後重新整理這頁就會出現，不用重啟。"));
     body.appendChild(el("pre", "log tree",
       `${root}/\n├── gemma-4-E4B-it/\n│   ├── gemma-4-E4B-it-Q4_K_M.gguf      同一個資料夾可放多種量化\n│   └── mmproj-F16.gguf                 看圖模型的視覺檔，檔名以 mmproj 開頭\n└── gpt-oss-120b/\n    ├── gpt-oss-120b-00001-of-00002.gguf 分片放同一個資料夾，要齊才會出現\n    └── gpt-oss-120b-00002-of-00002.gguf`));
-    body.appendChild(copyRow("1. 在這台建資料夾", `mkdir -p ${root}/<資料夾>`));
-    body.appendChild(copyRow("2. 從來源機器傳過來", `rsync -avP <來源資料夾>/ <帳號>@${hostOf(cur.n)}:${root}/<資料夾>/`));
-    body.appendChild(el("p", "assume", "模型在別台機器上時，從那台直接傳給這台，不要經過自己的電腦中轉。直接丟在存放區根目錄的 .gguf 不會被認到。"));
+    // 指令要能原封不動貼上執行：<資料夾> 這種佔位在 shell 裡會被當成重新導向，改成先設變數
+    const user = (root.match(/^\/home\/([^/]+)\//) || [])[1] || "帳號";
+    body.appendChild(copyRow("1. 在這台建資料夾", `F=gemma-4-E4B-it; mkdir -p "${root}/$F"`));
+    body.appendChild(copyRow("2. 在來源機器上傳過來", `F=gemma-4-E4B-it; rsync -avP "./$F/" "${user}@${hostOf(cur.n)}:${root}/$F/"`));
+    body.appendChild(el("p", "assume", "F 換成模型的資料夾名稱。第 2 行在來源機器、模型資料夾的上一層執行，從那台直接傳給這台，不要經過自己的電腦中轉。直接丟在存放區根目錄的 .gguf 不會被認到。"));
   };
   if (ok.length > 1) {
     const sel = el("select");
@@ -799,7 +805,10 @@ function libManualCard(ok) {
 
 // 「換上」：挑這台可以換模型的欄位。只有一格就直接打開換模型，多格先問放哪一格。
 function libSwapIn(n, m) {
-  const slots = (n.state?.slots || []).filter((s) => s.kind === "strata" || s.kind === "llama" || (!s.unit && m.engine === "llama"));
+  // GGUF：Strata 與 llama.cpp 欄位都換得進去，空欄位也可以放；Strata 的模型只能進留有 Strata 設定的欄位
+  const slots = (n.state?.slots || []).filter((s) => m.engine === "llama"
+    ? s.kind === "strata" || s.kind === "llama" || !s.unit
+    : s.kind === "strata" || (s.kind === "llama" && s.has_strata));
   if (!slots.length) { toast(`${n.name} 沒有可以換模型的欄位`, "bad"); return; }
   if (slots.length === 1) { openSwap(n, slots[0], m.id); return; }
   const d = el("div");
