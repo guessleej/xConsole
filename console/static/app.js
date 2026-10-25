@@ -1590,9 +1590,10 @@ function viewNode() {
 
   // 情境切換
   const profs = Object.entries(st.profiles || {});
-  if (profs.length) {
+  const hasStrata = st.slots.some((x) => x.kind === "strata");
+  if (profs.length || hasStrata || st.slots.some((x) => x.unit)) {
     const row = el("div", "slot-actions");
-    row.appendChild(el("span", "small muted", "情境："));
+    if (profs.length) row.appendChild(el("span", "small muted", "情境："));
     profs.forEach(([key, p]) => {
       const b = el("button", "btn sm" + (st.machine.profile === key ? " primary" : ""), p.name);
       b.title = p.why || "";
@@ -1636,8 +1637,15 @@ function viewNode() {
         await refresh();
       },
     });
+    if (hasStrata) {
+      // 情境只調 Strata 欄位的參數（上下文、並行數、自動縮輸出上限），沒有 Strata 欄位的機器不顯示
+      const mp = el("button", "btn sm", profs.length ? "管理情境" : "新增情境");
+      mp.title = "一組參數一鍵切換，例如寫程式要長上下文、抓料要多並行";
+      mp.onclick = () => openProfiles(n);
+      row.appendChild(mp);
+    }
     row.appendChild(el("span", "spacer"));
-    row.appendChild(stopAll);
+    if (st.slots.some((x) => x.unit)) row.appendChild(stopAll);
     head.appendChild(row);
   }
   wrap.appendChild(head);
@@ -2654,9 +2662,15 @@ async function openMachineSettings(nid) {
     llBox.appendChild(fLlamaC);
     f3.append(rootBox, llBox);
     body.appendChild(f3);
+    const bb = el("div", "slot-actions");
     if (!info.llama.length && !st.llama_server) {
-      body.appendChild(el("p", "note warn", "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。請先在這台編好 llama.cpp（放在 ~/llama.cpp*/build*/bin/），或在上面指定已經編好的位置。"));
+      bb.appendChild(el("span", "small bad-t", "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。"));
     }
+    bb.appendChild(el("span", "spacer"));
+    const bbtn = el("button", "btn sm", info.llama.length ? "編譯新版 llama.cpp" : "在這台編譯 llama.cpp");
+    bbtn.onclick = () => openLlamaBuild(nid);
+    bb.appendChild(bbtn);
+    body.appendChild(bb);
     body.appendChild(el("h4", "pick-h", "備註"));
     fNote = el("textarea");
     fNote.value = st.note || "";
@@ -2801,6 +2815,143 @@ async function openSlotEditor(n, s) {
   });
 }
 
+
+// 情境：一組 Strata 參數一鍵切換。網頁上只開放上下文長度、並行數、自動縮輸出上限三項
+function openProfiles(n) {
+  const st = n.state;
+  const body = el("div");
+  body.appendChild(el("p", "small muted", "情境是一組參數，按一下就把 Strata 欄位切過去（會改設定並重啟，失敗自動還原）。例如寫程式要長上下文、抓料要多並行。"));
+  const list = el("div", "pick-list");
+  const profs = Object.entries(st.profiles || {});
+  if (!profs.length) list.appendChild(el("p", "note", "這台還沒有情境。"));
+  let ov;
+  profs.forEach(([key, p]) => {
+    const r = el("div", "pick");
+    const t = el("div", "pick-main");
+    t.appendChild(el("div", "model", p.name + (st.machine.profile === key ? "（目前）" : "")));
+    t.appendChild(el("div", "small muted", p.why || ""));
+    r.appendChild(t);
+    const e = el("button", "btn sm", "修改");
+    e.onclick = () => { ov.remove(); openProfileEditor(n, key, p); };
+    const d = el("button", "btn sm danger", "刪除");
+    d.onclick = () => modal({ title: `刪除情境「${p.name}」`, bodyNode: el("p", "small muted", "只刪掉這個情境，服務目前的設定不會變。"),
+      confirmText: "刪除", danger: true, hasInput: true, onConfirm: async () => {
+        try { await api(`/api/node/${n.id}/profiles/${key}/delete`, { method: "POST", body: {} }); toast("已刪除", "ok"); ov.remove(); } catch (ex) { toast(ex.message, "bad"); }
+        await refresh();
+      } });
+    const acts = el("div", "row-acts");
+    acts.append(e, d);
+    r.appendChild(acts);
+    list.appendChild(r);
+  });
+  body.appendChild(list);
+  ov = modal({ title: `${n.name} 的情境`, bodyNode: body });
+  ov.querySelector(".modal").classList.add("wide");
+  formButton(ov, "新增情境", "primary", async () => { ov.remove(); openProfileEditor(n, null, null); });
+}
+
+function openProfileEditor(n, key, p) {
+  const st = n.state;
+  const strata = st.slots.filter((x) => x.kind === "strata");
+  const body = el("div");
+  const f = el("div", "form-row");
+  const fName = textInput(p?.name, "例：寫程式後端");
+  const fWhy = textInput(p?.why, "例：Copilot 一輪會送四萬 token，上下文要夠長");
+  f.append(fieldBox("名稱", fName), fieldBox("為什麼要切到這個情境", fWhy, "給接手的人看"));
+  body.appendChild(f);
+  const rows = [];
+  strata.forEach((s) => {
+    const ch = (p?.changes || []).find((c) => c.slot === s.id) || {};
+    body.appendChild(el("h4", "pick-h", `${s.role}・${s.tier || ""}（${s.model || s.unit}）`));
+    const g = el("div", "form-row");
+    const fCtx = numInput(ch.args?.["--max-context"], `不改（目前 ${int(s.config?.max_context)}）`);
+    const fPar = numInput(ch.config?.parallel, `不改（目前 ${s.config?.parallel || 1}）`);
+    const cur = ch.config?.fit_max_tokens;
+    const fFit = selectInput([["", "不改"], ["true", "開：太長時自動縮輸出上限"], ["false", "關"]], cur === undefined ? "" : String(cur));
+    g.append(fieldBox("上下文長度（token）", fCtx, "2,048～1,048,576；套用前會做記憶體試算"), fieldBox("並行數", fPar, "1～16；並行越多，每條能用的上下文越少"),
+      fieldBox("自動縮輸出上限", fFit));
+    body.appendChild(g);
+    rows.push({ slot: s.id, fCtx, fPar, fFit });
+  });
+  const err = el("div");
+  body.appendChild(err);
+  [fName, fWhy].forEach((i) => imeGuard(i, () => {}));
+  const ov = modal({ title: key ? `修改情境「${p.name}」` : "新增情境", bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  formButton(ov, "儲存", "primary", async () => {
+    const changes = rows.map((r) => ({ slot: r.slot, max_context: r.fCtx.value, parallel: r.fPar.value,
+      fit_max_tokens: r.fFit.value === "" ? null : r.fFit.value === "true" }));
+    try { await api(`/api/node/${n.id}/profiles/save`, { method: "POST", body: { key: key || "", name: fName.value.trim(), why: fWhy.value.trim(), changes } }); }
+    catch (ex) { errNote(err, ex.message); return; }
+    ov.remove();
+    toast("已儲存情境，按情境按鈕就會套用", "ok");
+    await refresh();
+  });
+}
+
+
+// 在網頁上編譯 llama.cpp：系統套件要 IT 用 sudo 裝，這裡只檢查並列出指令；下載、設定、編譯由代理在背景做
+async function openLlamaBuild(nid) {
+  const n = S.fleet.nodes.find((x) => x.id === nid);
+  const body = el("div");
+  loading(body);
+  const ov = modal({ title: `${n?.name || ""} 編譯 llama.cpp`, bodyNode: body });
+  ov.querySelector(".modal").classList.add("wide");
+  let b;
+  try { b = await api(`/api/node/${nid}/llama/build`); } catch (ex) { errNote(body, ex.message); return; }
+  body.textContent = "";
+  const pre = b.prereqs;
+  body.appendChild(el("p", "small muted", `會下載 llama.cpp 最新的正式版、在這台編譯 llama-server。加速方式：${{ cuda: "NVIDIA CUDA", hip: "AMD ROCm", cpu: "只用 CPU" }[pre.backend]}。`));
+  pre.notes.forEach((t) => body.appendChild(el("p", "note", t)));
+  const tools = el("p", "small", "編譯工具：" + Object.entries(pre.tools).map(([k, v]) => `${k} ${v ? "有" : "缺"}`).join("、"));
+  body.appendChild(tools);
+  if (pre.missing.length) {
+    body.appendChild(el("p", "note bad", "這台缺少編譯工具，要先請 IT 用有 sudo 權限的帳號裝好（網頁不代裝系統套件）："));
+    body.appendChild(copyRow("請 IT 執行", pre.apt));
+  }
+  if (b.installed.length) body.appendChild(el("p", "small muted", "已經有的 llama-server：" + b.installed.map((x) => `${x.path}（${x.build ? "build " + x.build + "・" : ""}${x.backend}）`).join("、")));
+  const prog = el("div");
+  body.appendChild(prog);
+  const head = el("p", "note");
+  const log = el("pre", "log build-log");
+  const draw = (j, tail, running) => {
+    prog.textContent = "";
+    if (!j.state) return;
+    const label = { running: `編譯中：${j.phase}`, done: `編好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消", interrupted: j.error }[j.state] || j.state;
+    head.className = "note " + (j.state === "done" ? "ok" : j.state === "running" ? "" : "bad");
+    head.textContent = `${j.tag || ""}　${label}`;
+    prog.appendChild(head);
+    if (j.state === "done") prog.appendChild(el("p", "small muted", "到「這台的設定」的 llama-server 選它，或保留「自動挑選」（會挑版本最新、有 GPU 加速的那支）。"));
+    log.textContent = (tail || []).join("\n") || "（還沒有輸出）";
+    prog.appendChild(log);
+    log.scrollTop = log.scrollHeight;
+    startBtn.hidden = running;
+    cancelBtn.hidden = !running;
+  };
+  const startBtn = formButton(ov, "開始編譯（約 10～30 分鐘）", "primary", async () => {
+    try { await api(`/api/node/${nid}/llama/build`, { method: "POST", body: {} }); } catch (ex) { errNote(prog, ex.message); return; }
+    toast("開始編譯，可以關掉這個視窗，之後再回來看進度", "ok");
+    poll();
+  });
+  startBtn.disabled = pre.missing.length > 0;
+  startBtn.title = pre.missing.length ? "先請 IT 裝好編譯工具" : "編譯會用掉一半的 CPU 核心，正在跑的模型可能變慢";
+  const cancelBtn = formButton(ov, "取消編譯", "danger", async () => {
+    try { await api(`/api/node/${nid}/llama/build/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); }
+  });
+  draw(b.job, b.log_tail, b.running);
+  // 編譯中每 3 秒只換掉狀態與記錄的文字，不重畫整個視窗
+  async function poll() {
+    if (!ov.isConnected) return;
+    let r;
+    try { r = await api(`/api/node/${nid}/llama/build/progress`); } catch (_) { setTimeout(poll, 3000); return; }
+    if (!ov.isConnected) return;
+    draw(r.job, r.log_tail, r.running);
+    if (r.running) setTimeout(poll, 3000);
+    else if (S.minfo) delete S.minfo[nid];
+  }
+  if (b.running) setTimeout(poll, 3000);
+}
+
 function machineSteps(n, info) {
   const st = n.state;
   const steps = [
@@ -2810,7 +2961,8 @@ function machineSteps(n, info) {
     { t: "新增欄位", why: "一格放一個模型或服務；欄位決定角色、埠與記憶體預估",
       done: st.slots.length > 0, go: ["新增欄位", () => openSlotEditor(n, null)] },
     { t: "確認模型存放與 llama.cpp", why: "GGUF 模型放在存放區、靠 llama.cpp 跑；要找得到編好的 llama-server",
-      done: !!info.effective.llama_server, go: ["這台的設定", () => openMachineSettings(n.id)] },
+      done: !!info.effective.llama_server,
+      go: info.effective.llama_server ? ["這台的設定", () => openMachineSettings(n.id)] : ["編譯 llama.cpp", () => openLlamaBuild(n.id)] },
     { t: "放入模型", why: "到模型庫下載或手動放入，再到空欄位按「放入」",
       done: st.slots.some((x) => x.unit), go: ["到模型庫", () => go("lib:" + n.id)] },
     { t: "到 API 串接實測", why: "換完模型會自動帶過去；按「實測一次」確認 IDE 連得上", done: false, optional: true,

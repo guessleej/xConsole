@@ -2611,6 +2611,248 @@ def do_profile(name, force=False):
         "ok": not errors, "profile": name, "applied": results, "errors": errors}
 
 
+
+# ---- 情境：網頁上新增、修改、刪除
+# 只開放三項：上下文長度、並行數、自動縮輸出上限。引擎的其他參數可能帶檔案路徑（例如記錄檔），
+# 從網頁開放等於能寫任意檔案；情境裡原本就有的其他設定原樣保留，不會被網頁的編輯洗掉。
+PROFILE_KEY_RX = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+
+
+@_locked
+def save_profile(body):
+    reg = registry()
+    key = str(body.get("key") or "").strip()
+    if key and key not in reg["profiles"]:
+        return 404, {"error": f"沒有這個情境：{key}"}
+    name = str(body.get("name") or "").strip()
+    why = str(body.get("why") or "").strip()
+    if not 1 <= len(name) <= 20 or re.search(r"[\x00-\x1f<>]", name):
+        return 400, {"error": "情境名稱要 1～20 個字"}
+    if len(why) > 200 or re.search(r"[\x00-\x08\x0b-\x1f]", why):
+        return 400, {"error": "說明最多 200 字"}
+    strata = {sl["id"] for sl in reg["slots"] if sl.get("kind") == "strata"}
+    old = {c["slot"]: c for c in (reg["profiles"].get(key) or {}).get("changes", [])}
+    changes = []
+    for ch in body.get("changes") or []:
+        sid = str(ch.get("slot") or "")
+        if sid not in strata:
+            return 400, {"error": f"{sid} 不是 Strata 欄位，情境只能調 Strata 的參數"}
+        c = json.loads(json.dumps(old.get(sid) or {"slot": sid}))
+        c.setdefault("args", {})
+        c.setdefault("config", {})
+        for field, lo, hi in (("max_context", 2048, 1048576), ("parallel", 1, 16)):
+            v = ch.get(field)
+            if v in (None, ""):
+                (c["args"].pop("--max-context", None) if field == "max_context" else c["config"].pop("parallel", None))
+                continue
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return 400, {"error": "上下文長度與並行數要填整數"}
+            if not lo <= v <= hi:
+                return 400, {"error": f"{'上下文長度' if field == 'max_context' else '並行數'}要在 {lo}～{hi}"}
+            if field == "max_context":
+                c["args"]["--max-context"] = str(v)
+            else:
+                c["config"]["parallel"] = v
+        fm = ch.get("fit_max_tokens")
+        if fm is None:
+            c["config"].pop("fit_max_tokens", None)
+        else:
+            c["config"]["fit_max_tokens"] = bool(fm)
+        if not c["args"]:
+            c.pop("args")
+        if not c["config"]:
+            c.pop("config")
+        if len(c) > 1:
+            changes.append(c)
+    if not changes:
+        return 400, {"error": "至少要調一個欄位的一項參數，否則這個情境套用了也沒有作用"}
+    if not key:
+        base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        base = base if PROFILE_KEY_RX.fullmatch(base or "") else "profile"
+        key = base if base not in reg["profiles"] else next(f"{base}{i}" for i in range(2, 999) if f"{base}{i}" not in reg["profiles"])
+    reg["profiles"][key] = {"name": name, "why": why, "changes": changes}
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "key": key, "profile": reg["profiles"][key]}
+
+
+@_locked
+def delete_profile(key):
+    reg = registry()
+    if key not in reg["profiles"]:
+        return 404, {"error": f"沒有這個情境：{key}"}
+    reg["profiles"].pop(key)
+    if reg["machine"].get("profile") == key:
+        reg["machine"].pop("profile")      # 正在用的情境被刪了：服務照原本的設定跑，只是不再標示情境名稱
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True}
+
+
+# ---- 在網頁上編譯 llama.cpp
+# 系統套件（git、cmake、編譯器、CUDA／ROCm）要 sudo，網頁不代裝，只檢查並列出要請 IT 裝什麼；
+# 其餘（下載原始碼、設定、編譯）由代理在背景做，可以看進度、可以取消。版本釘在 llama.cpp 最新的正式版編號。
+LLAMA_REPO = "https://github.com/ggml-org/llama.cpp"
+BUILD_FILE = os.path.join(STATE_DIR, "llama-build.json")
+_BUILD = {"proc": None, "cancel": False}
+_BUILD_LOCK = threading.Lock()
+
+
+def _nvcc():
+    return shutil.which("nvcc") or next((p for p in ("/usr/local/cuda/bin/nvcc",) if os.access(p, os.X_OK)), None)
+
+
+def _hipcc():
+    return shutil.which("hipcc") or next((p for p in ("/opt/rocm/bin/hipcc",) if os.access(p, os.X_OK)), None)
+
+
+def cuda_arch(nvcc):
+    """要編給哪個 CUDA 架構：顯示卡的運算能力；編譯器不認得（例：CUDA 12.4 碰上 sm_120）就退到它支援的最高架構，
+    執行時由驅動即時轉換（中原 2× RTX PRO 5000 就是這樣跑的）。"""
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], timeout=15)
+    caps = sorted({int(x.strip().replace(".", "")) for x in out.splitlines() if re.fullmatch(r"\d+\.\d+", x.strip())}) if rc == 0 else []
+    _, o2, _ = sh([nvcc, "--list-gpu-arch"], timeout=15)
+    known = sorted({int(m) for m in re.findall(r"compute_(\d+)", o2)})
+    if not caps:
+        return "native", "讀不到顯示卡的運算能力，交給編譯器自己偵測"
+    want = caps[-1]
+    if not known or want in known:
+        return ";".join(str(c) for c in caps), f"照顯示卡編：sm_{want}"
+    best = max((k for k in known if k <= want), default=None)
+    if best is None:
+        return "native", "編譯器太舊，交給它自己偵測"
+    return str(best), f"這版 CUDA 編譯器不認得 sm_{want}，改編 sm_{best}，執行時由驅動即時轉換（第一次載入會慢一點）"
+
+
+def build_prereqs():
+    cxx = shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
+    tools = {"git": bool(shutil.which("git")), "cmake": bool(shutil.which("cmake")), "C++ 編譯器": bool(cxx)}
+    apt = {"git": "git", "cmake": "cmake", "C++ 編譯器": "build-essential"}
+    missing = [apt[k] for k, ok in tools.items() if not ok]
+    notes, backend, flags, env = [], "cpu", [], {}
+    if shutil.which("nvidia-smi"):
+        nv = _nvcc()
+        if nv:
+            arch, why = cuda_arch(nv)
+            backend, flags, env = "cuda", ["-DGGML_CUDA=ON", f"-DCMAKE_CUDA_ARCHITECTURES={arch}"], {"PATH": os.path.dirname(nv) + ":" + os.environ.get("PATH", "")}
+            notes.append(why)
+        else:
+            notes.append("有 NVIDIA 顯示卡但沒有 CUDA 編譯器（nvcc），會編成只用 CPU。要用 GPU 請 IT 安裝 CUDA Toolkit（nvidia-cuda-toolkit 或 NVIDIA 官方套件）")
+    elif probe_amd_sysfs():
+        hc = _hipcc()
+        if hc:
+            _, ri, _ = sh(["rocminfo"], timeout=30)
+            gfx = sorted(set(re.findall(r"Name:\s+(gfx\w+)", ri)))
+            rocm = os.path.dirname(os.path.dirname(hc))
+            backend = "hip"
+            flags = ["-DGGML_HIP=ON"] + ([f"-DAMDGPU_TARGETS={';'.join(gfx)}"] if gfx else [])
+            env = {"HIPCXX": os.path.join(rocm, "llvm/bin/clang"), "HIP_PATH": rocm}
+            notes.append(f"用 ROCm 編，目標 {', '.join(gfx) or '自動偵測'}")
+        else:
+            notes.append("有 AMD 顯示卡但沒有 ROCm（hipcc），會編成只用 CPU。要用 GPU 請 IT 安裝 ROCm")
+    else:
+        notes.append("沒有偵測到 GPU，編成只用 CPU")
+    return {"tools": tools, "missing": missing, "apt": ("sudo apt install " + " ".join(missing)) if missing else "",
+            "backend": backend, "flags": flags, "env": env, "notes": notes, "jobs": max(1, (os.cpu_count() or 2) // 2)}
+
+
+def build_progress():
+    """編譯進度（輪詢用，便宜）：工作狀態與記錄最後 40 行。代理重啟過的話，標成中斷。"""
+    st = load_json(BUILD_FILE, {}) or {}
+    if st.get("state") == "running" and not _BUILD.get("thread_alive"):
+        st.update(state="interrupted", error="代理重啟過，編譯中斷；再按一次會接著下載好的原始碼繼續")
+    log = st.get("log")
+    return {"job": st, "running": bool(_BUILD.get("thread_alive")),
+            "log_tail": tail_lines(log, 40) if log and os.path.exists(log) else []}
+
+
+def build_status():
+    """打開編譯視窗時看一次：工具齊不齊、會用哪種加速、已經有哪些編好的 llama-server。"""
+    pre = build_prereqs()
+    return {**build_progress(), "prereqs": {k: v for k, v in pre.items() if k != "env"}, "installed": llama_candidates()}
+
+
+def _build_run(st, pre, log):
+    def step(phase, argv, cwd=None, timeout=7200):
+        st["phase"] = phase
+        save_json(BUILD_FILE, st)
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(f"\n===== {phase} =====\n")
+            fh.flush()
+            proc = subprocess.Popen([str(a) for a in argv], cwd=cwd, stdout=fh, stderr=subprocess.STDOUT,
+                                    env={**os.environ, **pre["env"]}, start_new_session=True)
+            with _BUILD_LOCK:
+                _BUILD["proc"] = proc
+            try:
+                rc = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                rc = -9
+            with _BUILD_LOCK:
+                _BUILD["proc"] = None
+        if _BUILD["cancel"]:
+            raise RuntimeError("已取消")
+        if rc != 0:
+            raise RuntimeError(f"{phase}失敗（結束碼 {rc}），請看下面的記錄")
+
+    dest = st["dest"]
+    try:
+        if not os.path.isdir(os.path.join(dest, ".git")):
+            step("下載原始碼", ["git", "clone", "--depth", "1", "--branch", st["tag"], LLAMA_REPO, dest])
+        step("設定", ["cmake", "-S", dest, "-B", os.path.join(dest, "build"), "-DCMAKE_BUILD_TYPE=Release",
+                      "-DLLAMA_CURL=OFF", *pre["flags"]])
+        step("編譯", ["cmake", "--build", os.path.join(dest, "build"), "--config", "Release", "-j", pre["jobs"],
+                      "--target", "llama-server"])
+        exe = os.path.join(dest, "build", "bin", "llama-server")
+        rc, out, err = sh([exe, "--version"], timeout=30)
+        if rc != 0:
+            raise RuntimeError("編好了但跑不起來（--version 失敗），可能缺 GPU 函式庫")
+        st.update(state="done", phase="完成", exe=exe)
+    except Exception as ex:  # noqa: BLE001
+        st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
+    st["ended"] = time.time()
+    save_json(BUILD_FILE, st)
+    with _BUILD_LOCK:
+        _BUILD["thread_alive"] = False
+
+
+def start_build():
+    with _BUILD_LOCK:
+        if _BUILD.get("thread_alive"):
+            return 409, {"error": "已經在編譯了"}
+        pre = build_prereqs()
+        if pre["missing"]:
+            return 400, {"error": f"這台缺少編譯工具，請 IT 先執行：{pre['apt']}", "missing": pre["missing"]}
+        rc, out, _ = sh(["git", "ls-remote", "--tags", "--refs", LLAMA_REPO, "refs/tags/b*"], timeout=60)
+        tags = sorted({int(m) for m in re.findall(r"refs/tags/b(\d+)$", out, re.M)})
+        if rc != 0 or not tags:
+            return 502, {"error": "連不到 GitHub 取 llama.cpp 的版本清單；這台要能連外，或把編好的 llama-server 複製進來"}
+        tag = f"b{tags[-1]}"
+        dest = inside(HOME, f"llama.cpp-{tag}")
+        os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+        log = engine_file("build", "-llama-build.log")
+        open(log, "w").close()
+        st = {"state": "running", "phase": "準備", "tag": tag, "backend": pre["backend"], "dest": dest,
+              "log": log, "started": time.time()}
+        save_json(BUILD_FILE, st)
+        _BUILD.update(cancel=False, thread_alive=True)
+    threading.Thread(target=_build_run, args=(st, pre, log), daemon=True).start()
+    return 200, {"ok": True, "tag": tag, "backend": pre["backend"]}
+
+
+def cancel_build():
+    with _BUILD_LOCK:
+        if not _BUILD.get("thread_alive"):
+            return 409, {"error": "沒有正在進行的編譯"}
+        _BUILD["cancel"] = True
+        proc = _BUILD["proc"]
+    if proc:
+        try:
+            os.killpg(proc.pid, 15)
+        except OSError:
+            pass
+    return 200, {"ok": True}
+
 def do_logs(slot_id, lines=300):
     reg = registry()
     slot = next((s for s in reg["slots"] if s["id"] == slot_id), None)
@@ -2705,7 +2947,7 @@ def storage_choices():
 def llama_candidates():
     out = []
     for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
-        rc, o, e = sh(f"{shlex.quote(cand)} --version", timeout=15)
+        rc, o, e = sh([cand, "--version"], timeout=15)
         m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", o + e)
         libs = os.listdir(os.path.dirname(cand))
         gpu = next((b for b, pre in (("CUDA", "libggml-cuda"), ("ROCm", "libggml-hip"), ("Vulkan", "libggml-vulkan"))
@@ -2795,7 +3037,7 @@ def check_llama(raw):
         return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下"
     if os.path.basename(p) != "llama-server" or not os.path.isfile(p) or not os.access(p, os.X_OK):
         return None, "要指到編好的 llama-server 執行檔（檔名就是 llama-server）"
-    rc, o, e = sh(f"{shlex.quote(p)} --version", timeout=20)
+    rc, o, e = sh([p, "--version"], timeout=20)
     if rc != 0 or "version" not in (o + e):
         return None, "這支 llama-server 跑不起來（--version 失敗），可能缺函式庫"
     return p, None
@@ -2847,7 +3089,7 @@ def register_candidates(reg=None):
     reg = reg or registry()
     used = {s.get("unit") for s in reg["slots"]} | {e.get("unit") for s in reg["slots"]
                                                    for e in (s.get("engines") or {}).values()}
-    _, out, _ = sh("systemctl --user list-unit-files --type=service --no-legend --no-pager", timeout=20)
+    _, out, _ = sh(["systemctl", "--user", "list-unit-files", "--type=service", "--no-legend", "--no-pager"], timeout=20)
     names = []
     for line in out.splitlines():
         u = (line.split() or [""])[0]
@@ -2971,7 +3213,7 @@ def delete_slot(sid):
             if os.path.exists(f):
                 os.remove(f)
                 removed.append(os.path.basename(f))
-        sh("systemctl --user daemon-reload", timeout=30)
+        sh(["systemctl", "--user", "daemon-reload"], timeout=30)
     reg["slots"] = [s for s in reg["slots"] if s["id"] != sid]
     reg["measure"].pop(sid, None)
     save_json(REGISTRY, reg)
@@ -3146,6 +3388,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, library())
         if path == "/machine":
             return self._send(200, machine_info())
+        if path == "/llama/build":
+            return self._send(200, build_status())
+        if path == "/llama/build/progress":
+            return self._send(200, build_progress())
         m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
         if m:
             code, out = api_info(m.group(1))
@@ -3220,6 +3466,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*save_machine(body))
         if path == "/slots/add":
             return self._send(*add_slot(body))
+        if path == "/llama/build":
+            return self._send(*start_build())
+        if path == "/llama/build/cancel":
+            return self._send(*cancel_build())
+        if path == "/profiles/save":
+            return self._send(*save_profile(body))
+        m = re.fullmatch(r"/profiles/([a-z][a-z0-9_-]{0,31})/delete", path)
+        if m:
+            return self._send(*delete_profile(m.group(1)))
         m = re.fullmatch(r"/slot/([\w.-]+)/(edit|delete)", path)
         if m:
             return self._send(*(edit_slot(m.group(1), body) if m.group(2) == "edit" else delete_slot(m.group(1))))

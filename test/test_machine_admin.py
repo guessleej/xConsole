@@ -247,6 +247,47 @@ def main():
         reg = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
         check("移除空欄位", st == 200 and reg["slots"] == [], reg["slots"])
 
+        # ---- 4b. 情境：只開放上下文、並行數、自動縮輸出上限；原本的其他參數保留
+        scfg = os.path.join(ahome, "strata.json")
+        json.dump({"args": ["--max-context", "32768"], "parallel": 1}, open(scfg, "w"))
+        reg = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
+        reg["slots"].append({"id": "brain", "role": "主腦", "unit": UNIT, "kind": "strata", "config": scfg})
+        reg["slots"].append({"id": "other", "role": "其他", "unit": UNIT})
+        reg["profiles"] = {"coding": {"name": "寫程式", "why": "舊的", "changes": [
+            {"slot": "brain", "args": {"--max-context": "131072", "--kv": "int8"}, "config": {"parallel": 1}}]}}
+        reg["machine"]["profile"] = "coding"
+        json.dump(reg, open(os.path.join(ahome, ".xconsole", "registry.json"), "w"))
+        st, d = co("POST", "/api/node/agent-a/profiles/save", {"name": "抓料", "why": "多並行",
+                                                              "changes": [{"slot": "brain", "max_context": 32768, "parallel": 2, "fit_max_tokens": True}]})
+        check("新增情境", st == 200 and d["profile"]["changes"][0] == {"slot": "brain", "args": {"--max-context": "32768"},
+                                                                     "config": {"parallel": 2, "fit_max_tokens": True}}, d)
+        st, d = co("POST", "/api/node/agent-a/profiles/save", {"key": "coding", "name": "寫程式後端", "why": "Copilot",
+                                                              "changes": [{"slot": "brain", "max_context": 65536, "parallel": "", "fit_max_tokens": None}]})
+        ch = d.get("profile", {}).get("changes", [{}])[0]
+        check("修改情境：改得到上下文，原本的其他參數（--kv）保留、清空的欄位拿掉",
+              st == 200 and ch.get("args") == {"--max-context": "65536", "--kv": "int8"} and "config" not in ch, d)
+        for bad, why in (({"slot": "other", "parallel": 2}, "非 Strata 欄位"), ({"slot": "brain", "max_context": 100}, "上下文太小"),
+                         ({"slot": "brain", "parallel": 99}, "並行數太大"), ({"slot": "brain"}, "什麼都沒調")):
+            st, d = co("POST", "/api/node/agent-a/profiles/save", {"name": "壞", "changes": [bad]})
+            check(f"情境：{why} → 400", st == 400, d)
+        st, d = co("POST", "/api/node/agent-a/profiles/save", {"name": "x", "changes": [{"slot": "brain", "parallel": 2, "args": {"--log-file": "/etc/x"}}]})
+        reg = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
+        check("情境裡塞其他引擎參數（例：記錄檔路徑）會被忽略", st == 200 and "--log-file" not in json.dumps(reg["profiles"]), reg["profiles"])
+        st, d = co("POST", "/api/node/agent-a/profiles/coding/delete", {})
+        reg = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
+        check("刪除正在用的情境：情境不見、機器不再標示目前情境", st == 200 and "coding" not in reg["profiles"] and "profile" not in reg["machine"], reg["machine"])
+        reg["slots"] = [x for x in reg["slots"] if x["id"] not in ("brain", "other")]
+        json.dump(reg, open(os.path.join(ahome, ".xconsole", "registry.json"), "w"))
+
+        # ---- 4c. 編譯 llama.cpp：狀態查得到、沒在編時取消回 409（實際編譯另在有 CUDA 的機器實測）
+        st, b = co("GET", "/api/node/agent-a/llama/build")
+        check("編譯視窗讀得到工具檢查與加速方式", st == 200 and set(b["prereqs"]["tools"]) == {"git", "cmake", "C++ 編譯器"}
+              and b["prereqs"]["backend"] in ("cuda", "hip", "cpu") and "env" not in b["prereqs"], b.get("prereqs"))
+        st, d = co("GET", "/api/node/agent-a/llama/build/progress")
+        check("編譯進度查得到（還沒編過）", st == 200 and d["running"] is False, d)
+        st, d = co("POST", "/api/node/agent-a/llama/build/cancel", {})
+        check("沒在編譯時按取消 → 409", st == 409, d)
+
         # ---- 5. 移除機器
         st, d = co("POST", "/api/nodes/agent-a/remove", {})
         st2, nodes = co("GET", "/api/nodes")
@@ -279,7 +320,8 @@ def main():
         # ---- 8. 操作紀錄
         st, au = co("GET", "/api/admin/audit?limit=200")
         acts = {x["action"] for x in au.get("items", [])}
-        need = {"node.join_code", "node.join", "node.update", "node.remove", "machine.settings", "slot.add", "slot.edit", "slot.delete"}
+        need = {"node.join_code", "node.join", "node.update", "node.remove", "machine.settings", "slot.add", "slot.edit", "slot.delete",
+                "profile.save", "profile.delete", "llama.build_cancel"}
         check("每個動作都寫進操作紀錄", need <= acts, need - acts)
         check("  紀錄裡沒有代理的權杖", token not in json.dumps(au, ensure_ascii=False))
     finally:

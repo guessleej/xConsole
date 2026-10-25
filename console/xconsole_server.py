@@ -739,6 +739,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
         if m:
             return self._json(*call_node(m.group(1), "/machine", timeout=60))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/build(/progress)?", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/llama/build" + (m.group(2) or ""), timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
             return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
@@ -885,14 +888,16 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
                                                                        "agent_port": port}})
             return self._json(200, {"ok": True})
-        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete))", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel)", path)
         if m:
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
-            act = {"machine": "machine.settings", "slots/add": "slot.add"}.get(m.group(2)) or (
+            act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
+                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel"}.get(m.group(2)) or (
+                "profile.delete" if m.group(2).startswith("profiles/") else
                 "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
             self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
                         {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "gguf_root",
-                                                  "llama_server", "type", "unit", "role", "tier", "port") if k in body}
+                                                  "llama_server", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
             return self._json(code, out)
 
