@@ -87,7 +87,7 @@ jobs:
           tar xzf "$f" gitleaks
       - name: 掃全部歷史（有命中就 fail）
         run: ./gitleaks git . --redact --verbose --report-format sarif --report-path gitleaks.sarif
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with: { name: gitleaks-report, path: gitleaks.sarif, retention-days: 90 }
 
@@ -142,7 +142,7 @@ jobs:
           severity-cutoff: high
           output-format: table
       - name: 上傳證據（SBOM，保留 90 天）
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: sbom-${{ github.sha }}
