@@ -19,7 +19,7 @@ import json
 import os
 import re
 import secrets
-import shlex
+import shutil
 import socket
 import ssl
 import struct
@@ -53,15 +53,40 @@ DEFAULT_FLOORS = {
 
 # ---------------------------------------------------------------- 工具
 
-def sh(cmd, timeout=20):
-    """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。"""
+def sh(argv, timeout=20):
+    """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。
+    一律傳參數清單、不經過 shell：服務名稱、路徑、主機名稱這些值不管長怎樣都不會被當成指令解讀
+    （以前是組字串＋shlex.quote，漏一個 quote 就是命令注入；CodeQL py/command-line-injection）。"""
+    if not isinstance(argv, (list, tuple)):
+        raise TypeError("sh() 只收參數清單，不收整條指令字串")
     try:
-        p = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, timeout=timeout)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "逾時"
     except Exception as exc:  # noqa: BLE001
         return 1, "", str(exc)
+
+
+def tail_lines(path, n, cap=8 * 1024 * 1024):
+    """檔案最後 n 行（取代 tail -n）。從檔尾往回一塊一塊讀，湊滿 n 行為止；
+    最多讀 cap 位元組，幾 GB 的記錄檔也不會整個讀進來。"""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            end = pos = fh.tell()
+            buf = b""
+            while pos > 0 and buf.count(b"\n") <= n and end - pos < cap:
+                step = min(65536, pos)
+                pos -= step
+                fh.seek(pos)
+                buf = fh.read(step) + buf
+    except OSError:
+        return []
+    lines = buf.decode("utf-8", "replace").splitlines()
+    if pos > 0 and lines:
+        lines = lines[1:]          # 沒讀到檔頭時，第一行可能只讀到後半段
+    return lines[-n:]
 
 
 def load_json(path, default):
@@ -115,6 +140,19 @@ def default_registry():
     }
 
 
+# 登錄檔是「讀進來、改一部分、整份寫回」：兩個請求交錯就會有一個人的修改被蓋掉。
+# 網頁上改設定的入口與每 15 秒的狀態更新都在這把鎖裡做；狀態更新只寫回它自己量到的實測值。
+REG_LOCK = threading.RLock()
+
+
+def _locked(fn):
+    @functools.wraps(fn)
+    def run(*a, **k):
+        with REG_LOCK:
+            return fn(*a, **k)
+    return run
+
+
 def registry():
     reg = load_json(REGISTRY, None)
     if reg is None:
@@ -163,9 +201,8 @@ def swap_pool():
 
 
 def probe_nvidia():
-    rc, out, _ = sh(
-        "nvidia-smi --query-gpu=index,name,temperature.gpu,power.draw,utilization.gpu,"
-        "memory.total,memory.used --format=csv,noheader,nounits", timeout=15)
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=index,name,temperature.gpu,power.draw,utilization.gpu,"
+                     "memory.total,memory.used", "--format=csv,noheader,nounits"], timeout=15)
     if rc != 0 or not out:
         return None
     gpus = []
@@ -229,6 +266,85 @@ def probe_gpus():
     return probe_nvidia() or probe_amd_sysfs() or []
 
 
+def has_nvidia():
+    """這台真的有 NVIDIA 卡：nvidia-smi 要回報得出卡。只看裝了 nvidia-smi 不準——
+    .26（AMD AI 395）裝了 nvidia-smi 卻沒有 NVIDIA 驅動，以前因此被當成 NVIDIA 機器（綁卡、編譯都會走錯路）。"""
+    return bool(probe_nvidia())
+
+
+# ---- 多卡：欄位綁哪幾張卡
+# 卡號一律用 probe_gpus() 的 id：NVIDIA 是 nvidia-smi 的 index，AMD 是 /sys/class/drm/cardN 的 N。
+# 啟動時要換成引擎看得懂的序號，對不上就拒絕啟動——綁錯卡比不綁更糟（會把別的欄位的卡吃爆）。
+KFD_NODES = "/sys/class/kfd/kfd/topology/nodes"
+DRM_DIR = "/sys/class/drm"
+
+
+def amd_hip_order(drm=DRM_DIR, kfd=KFD_NODES):
+    """drm 的 cardN → HIP 裝置序號。HIP 依 KFD 拓撲節點順序編號（跳過 CPU 節點），兩邊用 render minor 對起來。"""
+    minors = []
+    try:
+        nodes = sorted((n for n in os.listdir(kfd) if n.isdigit()), key=int)
+    except OSError:
+        return {}
+    for n in nodes:
+        props = load_text(os.path.join(kfd, n, "properties")) or ""
+        mi = re.search(r"^drm_render_minor (\d+)", props, re.M)
+        simd = re.search(r"^simd_count (\d+)", props, re.M)
+        if mi and simd and int(simd.group(1)) > 0 and int(mi.group(1)) > 0:
+            minors.append(int(mi.group(1)))
+    order = {}
+    for card in os.listdir(drm) if os.path.isdir(drm) else []:
+        if not re.fullmatch(r"card\d+", card):
+            continue
+        rd = glob.glob(os.path.join(drm, card, "device", "drm", "renderD*"))
+        if rd:
+            minor = int(os.path.basename(rd[0])[len("renderD"):])
+            if minor in minors:
+                order[card[4:]] = minors.index(minor)
+    return order
+
+
+def visible_env(gpu_ids, nvidia=None):
+    """綁卡的環境變數。沒綁（None 或空）就不設，引擎看得到全部卡。"""
+    ids = [str(x) for x in gpu_ids or []]
+    if not ids:
+        return {}
+    if nvidia is None:
+        nvidia = has_nvidia()
+    if nvidia:
+        # CUDA 預設把最快的卡排第一，跟 nvidia-smi 的編號不同；照 PCI 匯流排排才對得上
+        return {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": ",".join(ids)}
+    order = amd_hip_order()
+    miss = [i for i in ids if i not in order]
+    if miss:
+        raise ValueError(f"對不到這些卡的 HIP 序號：{', '.join(miss)}")
+    return {"HIP_VISIBLE_DEVICES": ",".join(str(order[i]) for i in ids)}
+
+
+def pick_gpus(want, cards):
+    """檢查要綁的卡。回 (卡號清單或 None, 錯誤)。None＝自動（全部）；全選也當成自動，登錄檔不留多餘的綁定。"""
+    if want is None:
+        return None, None
+    if not isinstance(want, list):
+        return None, "gpus 要是卡號清單"
+    have = [str(c["id"]) for c in cards]
+    ids = list(dict.fromkeys(str(x) for x in want))
+    bad = [i for i in ids if i not in have]
+    if bad:
+        return None, f"這台沒有這些卡：{', '.join(bad)}（偵測到 {', '.join(have) or '沒有卡'}）"
+    if not ids or sorted(ids) == sorted(have):
+        return None, None
+    return sorted(ids, key=have.index), None
+
+
+def card_split(gib, gpu_ids, cards):
+    """把一個欄位的顯存用量攤到它用的每張卡：綁卡的照綁的卡，沒綁的攤到全部卡；照卡的大小比例分（llama.cpp 預設也是這樣分層）。"""
+    ids = {str(x) for x in gpu_ids or []}
+    sel = [c for c in cards if not ids or str(c["id"]) in ids]
+    tot = sum(c["total_gib"] for c in sel) or 1
+    return {str(c["id"]): float(gib or 0) * c["total_gib"] / tot for c in sel}
+
+
 def hardware():
     """先用同機已在跑的 node_agent，拿不到才自己量。拿不到就老實標未知，不假裝零。"""
     for url in NODE_AGENTS:
@@ -241,7 +357,7 @@ def hardware():
         except Exception:  # noqa: BLE001
             continue
     gpus = probe_gpus()
-    rc, load_out, _ = sh("cat /proc/loadavg")
+    load_out = load_text("/proc/loadavg") or ""
     load = None
     try:
         load = float(load_out.split()[0])
@@ -324,8 +440,7 @@ def gpu_clock():
                     cur = mhz
             if mx:
                 return {"current_mhz": cur, "max_mhz": mx}
-    rc, out, _ = sh("nvidia-smi --query-gpu=clocks.sm,clocks.max.sm "
-                    "--format=csv,noheader,nounits", timeout=10)
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=clocks.sm,clocks.max.sm", "--format=csv,noheader,nounits"], timeout=10)
     if rc == 0 and out:
         f = [x.strip() for x in out.splitlines()[0].split(",")]
         try:
@@ -359,7 +474,7 @@ PORT_KIND = [
 
 
 def ports():
-    rc, out, _ = sh("ss -tlnpH 2>/dev/null")
+    rc, out, _ = sh(["ss", "-tlnpH"])
     if rc != 0 or not out:
         return []
     reg = registry()
@@ -418,16 +533,32 @@ ACTIVE_LABEL = {
 }
 
 
+UNIT_NAME_RX = re.compile(r"[A-Za-z0-9][\w@.:-]{0,120}\.(?:service|socket|target|timer)")
+
+
+def unit_name(unit):
+    """服務名稱進 systemctl／journalctl 之前一律比對格式（另外參數前也加 --）：不經過 shell 之後，
+    剩下的風險只有「名稱被當成選項」，這裡兩道都擋。"""
+    unit = str(unit or "")
+    if not UNIT_NAME_RX.fullmatch(unit):
+        raise ValueError(f"服務名稱格式不對：{unit[:60]}")
+    return unit
+
+
 def unit_state(unit):
     """回 systemd 的真實狀態字串，不要壓成開／關兩種。
 
     卡在 activating 的服務（Type=notify 但程式沒送就緒訊號，或 ExecStartPre 很久）
     壓成「關」會讓人以為它沒跑、壓成「開」又會以為它好了，兩種都會誤導。
     """
-    _, out, _ = sh(f"systemctl --user is-active {shlex.quote(unit)}")
+    try:
+        unit = unit_name(unit)
+    except ValueError:
+        return "unknown"          # 登錄檔裡的名字不合格式：當成查不到，不要讓整個狀態頁出錯
+    _, out, _ = sh(["systemctl", "--user", "is-active", "--", unit])
     st = out.strip()
     if st in ("unknown", "", "inactive"):
-        _, out2, _ = sh(f"systemctl is-active {shlex.quote(unit)}")
+        _, out2, _ = sh(["systemctl", "is-active", "--", unit])
         if out2.strip() not in ("unknown", ""):
             st = out2.strip()
     return st or "unknown"
@@ -439,14 +570,20 @@ def unit_active(unit):
 
 def unit_scope(unit):
     """這個 unit 是 user 層還是 system 層。兩層指令不一樣，猜錯就全部失敗。"""
-    _, out, _ = sh(f"systemctl --user cat {shlex.quote(unit)} >/dev/null 2>&1 && echo user")
-    return "user" if out.strip() == "user" else "system"
+    try:
+        rc, _, _ = sh(["systemctl", "--user", "cat", "--", unit_name(unit)])
+    except ValueError:
+        return "user"
+    return "user" if rc == 0 else "system"
 
 
 def sysctl(unit, verb, timeout=200):
     scope = unit_scope(unit)
     flag = "--user " if scope == "user" else ""
-    return sh(f"systemctl {flag}{verb} {shlex.quote(unit)}", timeout=timeout)
+    try:
+        return sh(["systemctl", *flag.split(), *verb.split(), "--", unit_name(unit)], timeout=timeout)
+    except ValueError as ex:
+        return 1, "", str(ex)
 
 
 def unit_enabled(unit):
@@ -460,7 +597,11 @@ def unit_rss_gib(unit):
     pid = pid.strip()
     if not pid.isdigit() or pid == "0":
         return 0.0
-    _, out, _ = sh(f"ps -o rss= -g $(ps -o pgid= -p {pid} 2>/dev/null | tr -d ' ') 2>/dev/null")
+    _, pgid, _ = sh(["ps", "-o", "pgid=", "-p", pid])
+    pgid = pgid.strip()
+    if not pgid.isdigit():
+        return 0.0
+    _, out, _ = sh(["ps", "-o", "rss=", "-g", pgid])
     total = sum(int(x) for x in out.split() if x.isdigit())
     return round(total * 1024 / GIB, 2)
 
@@ -544,8 +685,8 @@ def harvest_measurements(slot, reg):
     prev = reg["measure"].get(slot["id"])
     if not log or not os.path.exists(log):
         return prev
-    rc, out, _ = sh(f"tail -n 4000 {shlex.quote(log)} 2>/dev/null | grep -F 'serve: prompt'")
-    if rc != 0 or not out:
+    out = "\n".join(ln for ln in tail_lines(log, 4000) if "serve: prompt" in ln)
+    if not out:
         return prev
     pre, dec, ctx = [], [], 0
     for line in out.splitlines():
@@ -613,6 +754,8 @@ def slot_state(slot, reg, hw):
         "est_vram_gib": slot.get("est_vram_gib"), "est_ram_gib": slot.get("est_ram_gib"),
         "config": cfg, "kv_worst_gib": kv_worst_gib(cfg), "measure": meas,
         "critical": slot.get("critical", False), "note": slot.get("note", ""),
+        # 換得回 Strata 的欄位：本來就是 Strata，或現在跑 llama.cpp 但還留著 Strata 的設定
+        "has_strata": slot.get("kind") == "strata" or bool((slot.get("engines") or {}).get("strata")),
     }
 
 
@@ -837,13 +980,16 @@ def wait_healthy(slot, seconds=240):
             if sub.strip() == "auto-restart":
                 st = "failed"
         if st == "failed":
-            _, tail, _ = sh(f"journalctl --user -u {shlex.quote(slot['unit'])} -n 3 --no-pager -o cat")
+            try:
+                _, tail, _ = sh(["journalctl", "--user", "-u", unit_name(slot["unit"]), "-n", "3", "--no-pager", "-o", "cat"])
+            except ValueError as ex:
+                tail = str(ex)
             return False, (tail or "服務退出").replace("\n", " ")[:200]
         if st == "active":
             if not port:
                 return True, ""
-            rc, code, _ = sh(f"curl -s -o /dev/null -m 6 -w '%{{http_code}}' "
-                             f"http://127.0.0.1:{int(port)}/v1/models")
+            rc, code, _ = sh(["curl", "-s", "-o", "/dev/null", "-m", "6", "-w", "%{http_code}",
+                              f"http://127.0.0.1:{int(port)}/v1/models"])
             # 401＝服務活著、只是設了金鑰（不帶金鑰打 /v1/models 一定 401）。
             # 只認 200 的話，開了金鑰之後每次重啟都會被判成「起不來」而自動還原
             if code.strip() in ("200", "401"):
@@ -976,8 +1122,9 @@ def _first_key(v):
 
 
 def _local_ip():
-    rc, out, _ = sh("ip -4 route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | cut -d' ' -f2")
-    return out.strip() if rc == 0 and out.strip() else "127.0.0.1"
+    rc, out, _ = sh(["ip", "-4", "route", "get", "1.1.1.1"])
+    m = re.search(r"\bsrc ([0-9.]+)", out) if rc == 0 else None
+    return m.group(1) if m else "127.0.0.1"
 
 
 def _http_json(url, body=None, key="", timeout=8):
@@ -1517,6 +1664,15 @@ def llama_kv_gib(prof, ctx, parallel=1):
             + prof.get("kv_swa_bpt", 0) * min(ctx, swa) * parallel) / GIB
 
 
+def llama_build_no(path, version_text):
+    """llama-server 的版本號。網頁編譯是淺層下載（只抓那一版），--version 會回 1；
+    這時改用資料夾名稱裡的正式版編號（llama.cpp-b11870 → 11870），不然自動挑選會把新編的當成最舊的。"""
+    m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", version_text or "")
+    ver = int(next(x for x in m.groups() if x)) if m else 0
+    d = re.search(r"llama\.cpp-b(\d+)", path)
+    return int(d.group(1)) if d and ver <= 1 else ver     # 只有淺層編譯（回 0 或 1）才看資料夾名稱
+
+
 def llama_server_exe(reg=None):
     """這台用哪支 llama-server：登錄檔指定的優先，否則挑家目錄下版本號最大、有 GPU 後端的那支。"""
     reg = reg or registry()
@@ -1525,9 +1681,8 @@ def llama_server_exe(reg=None):
         return os.path.expanduser(want)
     best, best_ver = None, -1
     for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
-        rc, out, err = sh(f"{shlex.quote(cand)} --version", timeout=15)
-        m = re.search(r"version: [^\n]*?build (\d+)|version: (\d+)", out + err)
-        ver = int(next(x for x in m.groups() if x)) if m else 0
+        rc, out, err = sh([cand, "--version"], timeout=15)
+        ver = llama_build_no(cand, out + err)
         libs = os.listdir(os.path.dirname(cand))
         gpu = any(x.startswith(("libggml-hip", "libggml-cuda", "libggml-vulkan")) for x in libs)
         score = ver + (10 ** 6 if gpu else 0)
@@ -1609,10 +1764,12 @@ def no_mmap_args(exe):
     return ["--load-mode", "none"] if "--load-mode" in text else ["--no-mmap"]
 
 
-def llama_launch_env(exe, reg=None):
-    """llama-server 執行時的環境：登錄檔的 llama_env，加上執行檔目錄放進 LD_LIBRARY_PATH。啟動與偵測版本共用。"""
+def llama_launch_env(exe, reg=None, gpus=None):
+    """llama-server 執行時的環境：登錄檔的 llama_env，加上執行檔目錄放進 LD_LIBRARY_PATH。啟動與偵測版本共用。
+    欄位綁了卡就再加上綁卡的變數（蓋過 llama_env 裡同名的設定）。"""
     reg = reg or registry()
     env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
+    env.update(visible_env(gpus))
     lib = os.path.dirname(exe)
     env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
     return env
@@ -1625,7 +1782,7 @@ def launch_llama(cfg_path):
         raise SystemExit(f"讀不到 {cfg_path}")
     reg = registry()
     argv = llama_argv(raw, reg)
-    os.execvpe(argv[0], argv, llama_launch_env(raw["exe"], reg))
+    os.execvpe(argv[0], argv, llama_launch_env(raw["exe"], reg, raw.get("gpus")))
 
 
 def llama_unit(slot_id):
@@ -1647,7 +1804,7 @@ def ensure_llama_unit(slot_id, cfg_path):
     if load_text(path) != body:
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(body)
-        sh("systemctl --user daemon-reload", timeout=30)
+        sh(["systemctl", "--user", "daemon-reload"], timeout=30)
     return unit
 
 
@@ -1687,7 +1844,7 @@ def _alive(slot):
     return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
 
 
-def set_llama_model(slot_id, model_id, ctx=None, force=False):
+def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。"""
     reg = registry()
     slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
@@ -1704,6 +1861,18 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     exe = llama_server_exe(reg)
     if not exe:
         return 400, {"error": "這台找不到 llama-server。請先編好 llama.cpp，或在登錄檔 machine.llama_server 指定路徑"}
+
+    hw0 = hardware()
+    cards = pools(reg, hw0)["gpus"]
+    # gpus 沒帶＝維持原本的綁定；帶 None 或空清單＝自動（全部卡）；帶清單＝只用這幾張
+    gpu_ids, err = pick_gpus(slot.get("gpu_ids") if gpus is ... else gpus, cards)
+    if err:
+        return 400, {"error": err}
+    if gpu_ids and not has_nvidia():
+        try:
+            visible_env(gpu_ids)
+        except ValueError as ex:
+            return 400, {"error": f"{ex}，不能綁卡；請改回自動"}
 
     old = json.loads(json.dumps(slot))                       # 整個欄位的原樣，還原時直接寫回
     old_unit = slot.get("unit")
@@ -1736,7 +1905,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
            "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
-           "api_key_file": keyfile}
+           "api_key_file": keyfile, "gpus": gpu_ids}
     save_json(cfg_path, raw)
     os.chmod(cfg_path, 0o600)
     unit = ensure_llama_unit(slot_id, cfg_path)
@@ -1754,7 +1923,10 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
                 sl.update(fields)
         save_json(REGISTRY, r)
 
-    put({**old, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
+    fields = {k: v for k, v in old.items() if k != "gpu_ids"}
+    if gpu_ids:
+        fields["gpu_ids"] = gpu_ids
+    put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
          "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
          # 跟模型有關的能力（看圖）每次依新模型重算，不沿用上一顆的
          "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
@@ -1790,7 +1962,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     # 同一個服務（GGUF 換 GGUF）：admit 看得到這個服務開著，會自己把它占的量算回，這裡不能再加一次。
     # 跨引擎：舊服務是另一個 unit，admit 看不到，要另外算回
     ov, orr = _usage_reclaim(old) if old_unit and old_unit != unit and old_alive else (0.0, 0.0)
-    verdict = admit(slot_id, extra_free=(ov, orr))
+    # 逐張卡試算時，舊模型釋放的量要還給它「原本」用的卡，不是新綁的卡
+    old_v = _usage_reclaim(old)[0] if old_unit and old_alive else 0.0
+    verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
     if not verdict["allow"] and not force:
         return undo("記憶體不夠", 409, {"admit": verdict})
 
@@ -1822,7 +1996,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False):
     return 200, {"ok": True, "engine": "llama", "model": m["name"], "quant": m.get("quant"),
                  "api_model_name": alias, "port": int(port), "ctx": want_ctx,
                  "switched_engine": old.get("kind") not in (None, "llama"),
-                 "kv_gib": est["kv"], "est_vram_gib": est["vram"]}
+                 "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids}
 
 
 def _usage_reclaim(old_slot):
@@ -1967,13 +2141,26 @@ def _hf_file_url(repo, path):
     return f"{HF_BASE}/{q(repo, safe='/')}/resolve/main/{q(path, safe='/')}"
 
 
+class _HFRedirect(urllib.request.HTTPRedirectHandler):
+    """Hugging Face 下載會轉到它自己的 CDN；轉到 Hugging Face 以外的網域時，權杖不跟著送過去。"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        host = (urllib.parse.urlparse(newurl).hostname or "").lower()
+        if new is not None and not (host == "huggingface.co" or host.endswith((".huggingface.co", ".hf.co")) or host == "hf.co"):
+            new.remove_header("Authorization")
+        return new
+
+
+_HF_OPENER = urllib.request.build_opener(_HFRedirect)
+
+
 def _hf_get(url, token="", rng=None, timeout=30):
     h = {"User-Agent": "xconsole-agent"}
     if token:
         h["Authorization"] = f"Bearer {token}"
     if rng:
         h["Range"] = f"bytes={rng}-"
-    return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout)
+    return _HF_OPENER.open(urllib.request.Request(url, headers=h), timeout=timeout)
 
 
 def hf_files(repo, token=""):
@@ -2141,7 +2328,7 @@ def delete_model(model_id):
     rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not f.lower().startswith("mmproj")]
     if not rest:
         for f in os.listdir(full):
-            if f.lower().startswith("mmproj"):
+            if f.lower().startswith("mmproj") and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
                 p = inside(full, f)
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -2200,7 +2387,7 @@ def pools(reg, hw):
     return out
 
 
-def admit(slot_id, reg=None, hw=None, extra_free=None):
+def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
     """這台還塞不塞得下這個欄位的模型。用「載下去之後最壞剩多少」判斷，不是「現在剩多少」。"""
     reg = reg or registry()
     hw = hw if hw is not None else hardware()
@@ -2267,7 +2454,28 @@ def admit(slot_id, reg=None, hw=None, extra_free=None):
                           "need": round(need_vram, 1), "worst": wv, "floor": fl["vram"]}
         detail["ram"] = {"total": p["ram"]["total_gib"], "free": rfree,
                          "need": round(need_ram, 1), "worst": wr, "floor": fl["ram"]}
-        if need_vram and wv < fl["vram"]:
+        cards = p["gpus"]
+        if mm == "discrete" and len(cards) > 1 and need_vram:
+            # 多卡：總量夠不代表每張都夠。模型照卡的大小攤到它用的每張卡，任何一張跌破底線就擋
+            share = card_split(need_vram, slot.get("gpu_ids"), cards)
+            back = reclaim_cards if reclaim_cards is not None else card_split(reclaim_vram, slot.get("gpu_ids"), cards)
+            # 底線是「這個模型總共要留的餘裕」，照卡的大小分到它用的每張卡；每張都留滿一份等於多留好幾倍，
+            # 會把本來就跑得好好的跨卡大模型擋掉（中原 2× 48 GB 的 Mistral 128B 實際踩到：重啟被擋）
+            floor_c = card_split(fl["vram"], slot.get("gpu_ids"), cards)
+            detail["cards"] = []
+            for c in cards:
+                cid = str(c["id"])
+                if cid not in share:
+                    continue
+                free_c = round(c["free_gib"] + back.get(cid, 0.0), 1)
+                worst_c = round(free_c - share[cid], 1)
+                detail["cards"].append({"id": cid, "total": c["total_gib"], "free": free_c,
+                                        "need": round(share[cid], 1), "worst": worst_c, "floor": round(floor_c[cid], 2)})
+                if worst_c < floor_c[cid]:
+                    reasons.append(
+                        f"卡 {cid} 顯存不足：這張要放約 {share[cid]:.0f} GiB，現在只剩 {free_c:.0f} GiB，"
+                        f"載下去會剩 {worst_c} GiB（低於這張分到的 {floor_c[cid]:.1f} GiB 底線）")
+        elif need_vram and wv < fl["vram"]:
             reasons.append(
                 f"顯存不足：需要約 {need_vram:.0f} GiB，現在只剩 {vfree:.0f} GiB，"
                 f"載下去會剩 {wv} GiB（低於 {fl['vram']} GiB 底線）")
@@ -2296,10 +2504,19 @@ def full_state():
     for sl in reg["slots"]:
         sl["_busy_cache"] = (unit_state(sl["unit"]) in ("active", "activating")
                              if sl.get("unit") else False)
+    before = json.loads(json.dumps(reg["measure"]))
     slots = [slot_state(s, reg, hw) for s in reg["slots"]]
     for sl in reg["slots"]:
         sl.pop("_busy_cache", None)
-    save_json(REGISTRY, reg)  # 把這一輪撈到的實測值寫回去
+    # 只把這一輪新撈到的實測值寫回最新的登錄檔。以前整份寫回：這一輪開始後管理者在網頁上存的設定，
+    # 會被這份舊的蓋掉（Codex 審查抓到）
+    changed = {k: v for k, v in reg["measure"].items() if before.get(k) != v}
+    if changed:
+        with REG_LOCK:
+            cur = registry()
+            live = {sl["id"] for sl in cur["slots"]}
+            cur["measure"].update({k: v for k, v in changed.items() if k in live})
+            save_json(REGISTRY, cur)
 
     p = pools(reg, hw)
     # 最壞情況：已開著、但 KV 還沒長滿的模型，若長滿還要再吃多少
@@ -2421,6 +2638,277 @@ def do_profile(name, force=False):
         "ok": not errors, "profile": name, "applied": results, "errors": errors}
 
 
+
+# ---- 情境：網頁上新增、修改、刪除
+# 只開放三項：上下文長度、並行數、自動縮輸出上限。引擎的其他參數可能帶檔案路徑（例如記錄檔），
+# 從網頁開放等於能寫任意檔案；情境裡原本就有的其他設定原樣保留，不會被網頁的編輯洗掉。
+PROFILE_KEY_RX = re.compile(r"[a-z][a-z0-9_-]{0,31}")
+
+
+@_locked
+def save_profile(body):
+    reg = registry()
+    key = str(body.get("key") or "").strip()
+    if key and key not in reg["profiles"]:
+        return 404, {"error": f"沒有這個情境：{key}"}
+    name = str(body.get("name") or "").strip()
+    why = str(body.get("why") or "").strip()
+    if not 1 <= len(name) <= 20 or re.search(r"[\x00-\x1f<>]", name):
+        return 400, {"error": "情境名稱要 1～20 個字"}
+    if len(why) > 200 or re.search(r"[\x00-\x08\x0b-\x1f]", why):
+        return 400, {"error": "說明最多 200 字"}
+    strata = {sl["id"] for sl in reg["slots"] if sl.get("kind") == "strata"}
+    old = {c["slot"]: c for c in (reg["profiles"].get(key) or {}).get("changes", [])}
+    changes = []
+    if not isinstance(body.get("changes") or [], list):
+        return 400, {"error": "changes 要是清單"}
+    for ch in body.get("changes") or []:
+        if not isinstance(ch, dict):
+            return 400, {"error": "changes 的每一項要是物件"}
+        sid = str(ch.get("slot") or "")
+        if sid not in strata:
+            return 400, {"error": f"{sid} 不是 Strata 欄位，情境只能調 Strata 的參數"}
+        c = json.loads(json.dumps(old.get(sid) or {"slot": sid}))
+        c.setdefault("args", {})
+        c.setdefault("config", {})
+        for field, lo, hi in (("max_context", 2048, 1048576), ("parallel", 1, 16)):
+            v = ch.get(field)
+            if v in (None, ""):
+                (c["args"].pop("--max-context", None) if field == "max_context" else c["config"].pop("parallel", None))
+                continue
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return 400, {"error": "上下文長度與並行數要填整數"}
+            if not lo <= v <= hi:
+                return 400, {"error": f"{'上下文長度' if field == 'max_context' else '並行數'}要在 {lo}～{hi}"}
+            if field == "max_context":
+                c["args"]["--max-context"] = str(v)
+            else:
+                c["config"]["parallel"] = v
+        fm = ch.get("fit_max_tokens")
+        if fm is None:
+            c["config"].pop("fit_max_tokens", None)
+        else:
+            c["config"]["fit_max_tokens"] = bool(fm)
+        if not c["args"]:
+            c.pop("args")
+        if not c["config"]:
+            c.pop("config")
+        if len(c) > 1:
+            changes.append(c)
+    if not changes:
+        return 400, {"error": "至少要調一個欄位的一項參數，否則這個情境套用了也沒有作用"}
+    if not key:
+        base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        base = base if PROFILE_KEY_RX.fullmatch(base or "") else "profile"
+        key = base if base not in reg["profiles"] else next(f"{base}{i}" for i in range(2, 999) if f"{base}{i}" not in reg["profiles"])
+    reg["profiles"][key] = {"name": name, "why": why, "changes": changes}
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "key": key, "profile": reg["profiles"][key]}
+
+
+@_locked
+def delete_profile(key):
+    reg = registry()
+    if key not in reg["profiles"]:
+        return 404, {"error": f"沒有這個情境：{key}"}
+    reg["profiles"].pop(key)
+    if reg["machine"].get("profile") == key:
+        reg["machine"].pop("profile")      # 正在用的情境被刪了：服務照原本的設定跑，只是不再標示情境名稱
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True}
+
+
+# ---- 在網頁上編譯 llama.cpp
+# 系統套件（git、cmake、編譯器、CUDA／ROCm）要 sudo，網頁不代裝，只檢查並列出要請 IT 裝什麼；
+# 其餘（下載原始碼、設定、編譯）由代理在背景做，可以看進度、可以取消。版本釘在 llama.cpp 最新的正式版編號。
+LLAMA_REPO = "https://github.com/ggml-org/llama.cpp"
+BUILD_FILE = os.path.join(STATE_DIR, "llama-build.json")
+_BUILD = {"proc": None, "cancel": False}
+_BUILD_LOCK = threading.Lock()
+
+
+def _nvcc():
+    return shutil.which("nvcc") or next((p for p in ("/usr/local/cuda/bin/nvcc",) if os.access(p, os.X_OK)), None)
+
+
+def _hipcc():
+    return shutil.which("hipcc") or next((p for p in ("/opt/rocm/bin/hipcc",) if os.access(p, os.X_OK)), None)
+
+
+def cuda_arch(nvcc):
+    """要編給哪個 CUDA 架構：顯示卡的運算能力；編譯器不認得（例：CUDA 12.4 碰上 sm_120）就退到它支援的最高架構，
+    執行時由驅動即時轉換（中原 2× RTX PRO 5000 就是這樣跑的）。"""
+    rc, out, _ = sh(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], timeout=15)
+    caps = sorted({int(x.strip().replace(".", "")) for x in out.splitlines() if re.fullmatch(r"\d+\.\d+", x.strip())}) if rc == 0 else []
+    _, o2, _ = sh([nvcc, "--list-gpu-arch"], timeout=15)
+    known = sorted({int(m) for m in re.findall(r"compute_(\d+)", o2)})
+    if not caps:
+        return "native", "讀不到顯示卡的運算能力，交給編譯器自己偵測"
+    want = caps[-1]
+    if not known or want in known:
+        return ";".join(str(c) for c in caps), f"照顯示卡編：sm_{want}"
+    best = max((k for k in known if k <= want), default=None)
+    if best is None:
+        return "native", "編譯器太舊，交給它自己偵測"
+    return str(best), f"這版 CUDA 編譯器不認得 sm_{want}，改編 sm_{best}，執行時由驅動即時轉換（第一次載入會慢一點）"
+
+
+def build_prereqs():
+    cxx = shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
+    tools = {"git": bool(shutil.which("git")), "cmake": bool(shutil.which("cmake")), "C++ 編譯器": bool(cxx)}
+    apt = {"git": "git", "cmake": "cmake", "C++ 編譯器": "build-essential"}
+    missing = [apt[k] for k, ok in tools.items() if not ok]
+    notes, backend, flags, env = [], "cpu", [], {}
+    if has_nvidia():
+        nv = _nvcc()
+        if nv:
+            arch, why = cuda_arch(nv)
+            backend, flags, env = "cuda", ["-DGGML_CUDA=ON", f"-DCMAKE_CUDA_ARCHITECTURES={arch}"], {"PATH": os.path.dirname(nv) + ":" + os.environ.get("PATH", "")}
+            notes.append(why)
+        else:
+            notes.append("有 NVIDIA 顯示卡但沒有 CUDA 編譯器（nvcc），會編成只用 CPU。要用 GPU 請 IT 安裝 CUDA Toolkit（nvidia-cuda-toolkit 或 NVIDIA 官方套件）")
+    elif probe_amd_sysfs():
+        hc = _hipcc()
+        if hc:
+            _, ri, _ = sh(["rocminfo"], timeout=30)
+            gfx = sorted(set(re.findall(r"Name:\s+(gfx\w+)", ri)))
+            rocm = os.path.dirname(os.path.dirname(hc))
+            backend = "hip"
+            flags = ["-DGGML_HIP=ON"] + ([f"-DAMDGPU_TARGETS={';'.join(gfx)}"] if gfx else [])
+            env = {"HIPCXX": os.path.join(rocm, "llvm/bin/clang"), "HIP_PATH": rocm}
+            notes.append(f"用 ROCm 編，目標 {', '.join(gfx) or '自動偵測'}")
+        else:
+            notes.append("有 AMD 顯示卡但沒有 ROCm（hipcc），會編成只用 CPU。要用 GPU 請 IT 安裝 ROCm")
+    else:
+        notes.append("沒有偵測到 GPU，編成只用 CPU")
+    return {"tools": tools, "missing": missing, "apt": ("sudo apt install " + " ".join(missing)) if missing else "",
+            "backend": backend, "flags": flags, "env": env, "notes": notes, "jobs": max(1, (os.cpu_count() or 2) // 2)}
+
+
+def build_progress():
+    """編譯進度（輪詢用，便宜）：工作狀態與記錄最後 40 行。代理重啟過的話，標成中斷。"""
+    st = load_json(BUILD_FILE, {}) or {}
+    if st.get("state") == "running" and not _BUILD.get("thread_alive"):
+        st.update(state="interrupted", error="代理重啟過，編譯中斷；再按一次會接著下載好的原始碼繼續")
+    log = st.get("log")
+    return {"job": st, "running": bool(_BUILD.get("thread_alive")),
+            "log_tail": tail_lines(log, 40) if log and os.path.exists(log) else []}
+
+
+def build_status():
+    """打開編譯視窗時看一次：工具齊不齊、會用哪種加速、已經有哪些編好的 llama-server。"""
+    pre = build_prereqs()
+    return {**build_progress(), "prereqs": {k: v for k, v in pre.items() if k != "env"}, "installed": llama_candidates()}
+
+
+def _build_run(st, pre, log):
+    def step(phase, argv, cwd=None, timeout=7200):
+        st["phase"] = phase
+        save_json(BUILD_FILE, st)
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(f"\n===== {phase} =====\n")
+            fh.flush()
+            proc = subprocess.Popen([str(a) for a in argv], cwd=cwd, stdout=fh, stderr=subprocess.STDOUT,
+                                    env={**os.environ, **pre["env"]}, start_new_session=True)
+            with _BUILD_LOCK:
+                _BUILD["proc"] = proc
+            try:
+                rc = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                rc = -9
+            with _BUILD_LOCK:
+                _BUILD["proc"] = None
+        if _BUILD["cancel"]:
+            raise RuntimeError("已取消")
+        if rc != 0:
+            raise RuntimeError(f"{phase}失敗（結束碼 {rc}），請看下面的記錄")
+
+    dest = st["dest"]
+    try:
+        if not os.path.isdir(os.path.join(dest, ".git")):
+            step("下載原始碼", ["git", "clone", "--depth", "1", "--branch", st["tag"], LLAMA_REPO, dest])
+        else:
+            # 資料夾已經在（上次中斷）：先還原成乾淨的那一版，被改過的檔案與舊的 build 一律清掉，再核對 commit
+            step("還原原始碼", ["git", "-C", dest, "reset", "--hard", "--quiet", st["commit"]])
+            step("清掉舊檔", ["git", "-C", dest, "clean", "-xfdq"])
+        # 編譯之前核對原始碼就是官方那個版本：資料夾早就存在（上次中斷、或別人放的）時也一樣要對得上
+        rc, head, _ = sh(["git", "-C", dest, "rev-parse", "HEAD"], timeout=30)
+        if rc != 0 or head.strip() != st["commit"]:
+            raise RuntimeError(f"{dest} 的原始碼跟官方 {st['tag']} 對不上，不編譯。請把這個資料夾移走再按一次")
+        step("設定", ["cmake", "-S", dest, "-B", os.path.join(dest, "build"), "-DCMAKE_BUILD_TYPE=Release",
+                      "-DLLAMA_CURL=OFF", *pre["flags"]])
+        step("編譯", ["cmake", "--build", os.path.join(dest, "build"), "--config", "Release", "-j", pre["jobs"],
+                      "--target", "llama-server"])
+        exe = os.path.join(dest, "build", "bin", "llama-server")
+        rc, out, err = sh([exe, "--version"], timeout=30)
+        if rc != 0:
+            raise RuntimeError("編好了但跑不起來（--version 失敗），可能缺 GPU 函式庫")
+        st.update(state="done", phase="完成", exe=exe)
+    except Exception as ex:  # noqa: BLE001
+        st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
+    st["ended"] = time.time()
+    save_json(BUILD_FILE, st)
+    with _BUILD_LOCK:
+        _BUILD["thread_alive"] = False
+
+
+def parse_tag_refs(out):
+    """git ls-remote 的 b<編號> 標籤 → {編號: commit}。附註式標籤要取 ^{} 那一行（指向的 commit），不是標籤物件本身。"""
+    refs, peeled = {}, {}
+    for h, n, pe in re.findall(r"^([0-9a-f]{40})\s+refs/tags/b(\d+)(\^\{\})?$", out, re.M):
+        (peeled if pe else refs)[int(n)] = h
+    return {**refs, **peeled}
+
+
+def start_build():
+    with _BUILD_LOCK:
+        if _BUILD.get("thread_alive"):
+            return 409, {"error": "已經在編譯了"}
+        pre = build_prereqs()
+        if pre["missing"]:
+            return 400, {"error": f"這台缺少編譯工具，請 IT 先執行：{pre['apt']}", "missing": pre["missing"]}
+        rc, out, _ = sh(["git", "ls-remote", "--tags", LLAMA_REPO, "refs/tags/b*"], timeout=60)
+        refs = parse_tag_refs(out)
+        if rc != 0 or not refs:
+            return 502, {"error": "連不到 GitHub 取 llama.cpp 的版本清單；這台要能連外，或把編好的 llama-server 複製進來"}
+        tag, commit = f"b{max(refs)}", refs[max(refs)]
+        # 編譯很吃記憶體（每個並行約 1.5 GiB）：照系統記憶體扣掉底線後的餘裕決定並行數，連一個都放不下就不編。
+        # 統一記憶體機邊跑大模型邊編譯，可能把整台拖死，這正是這套系統要防的事
+        ram = ram_pool()
+        room = ram["free_gib"] - floors(registry()["machine"])["ram"]
+        jobs = min(pre["jobs"], int(room // 1.5))
+        if jobs < 1:
+            return 409, {"error": f"系統記憶體只剩 {ram['free_gib']:.0f} GiB，扣掉 {floors(registry()['machine'])['ram']:.0f} GiB 底線後"
+                                  "不夠編譯。請先停掉一個模型再編"}
+        pre["jobs"] = jobs
+        dest = inside(HOME, f"llama.cpp-{tag}")
+        os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+        log = engine_file("build", "-llama-build.log")
+        open(log, "w").close()
+        st = {"state": "running", "phase": "準備", "tag": tag, "commit": commit, "backend": pre["backend"], "dest": dest, "jobs": jobs,
+              "log": log, "started": time.time()}
+        save_json(BUILD_FILE, st)
+        _BUILD.update(cancel=False, thread_alive=True)
+    threading.Thread(target=_build_run, args=(st, pre, log), daemon=True).start()
+    return 200, {"ok": True, "tag": tag, "backend": pre["backend"]}
+
+
+def cancel_build():
+    with _BUILD_LOCK:
+        if not _BUILD.get("thread_alive"):
+            return 409, {"error": "沒有正在進行的編譯"}
+        _BUILD["cancel"] = True
+        proc = _BUILD["proc"]
+    if proc:
+        try:
+            os.killpg(proc.pid, 15)
+        except OSError:
+            pass
+    return 200, {"ok": True}
+
 def do_logs(slot_id, lines=300):
     reg = registry()
     slot = next((s for s in reg["slots"] if s["id"] == slot_id), None)
@@ -2428,14 +2916,372 @@ def do_logs(slot_id, lines=300):
         return 404, {"error": "沒有這個欄位"}
     scope = unit_scope(slot["unit"])
     flag = "--user " if scope == "user" else ""
-    _, out, err = sh(f"journalctl {flag}-u {shlex.quote(slot['unit'])} "
-                     f"-n {int(lines)} --no-pager -o short-iso")
+    try:
+        _, out, err = sh(["journalctl", *flag.split(), "-u", unit_name(slot["unit"]), "-n", int(lines), "--no-pager", "-o", "short-iso"])
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
     text = out or err
     if slot.get("log") and os.path.exists(slot["log"]):
-        _, out2, _ = sh(f"tail -n {int(lines)} {shlex.quote(slot['log'])}")
+        out2 = "\n".join(tail_lines(slot["log"], int(lines)))
         if out2:
             text = (text + "\n----- 服務自己的 log -----\n" + out2).strip()
     return 200, {"slot": slot_id, "unit": slot["unit"], "text": text[-150000:]}
+
+
+# ---------------------------------------------------------------- 網頁上管理這台：機器設定與欄位
+# 不開放整份覆寫登錄檔：拿到權杖的人就能把欄位的記錄檔指到 ~/.ssh/id_rsa，再從 /logs 讀出來。
+# 這裡只收白名單欄位；路徑類的設定（存放區、llama-server）逐項檢查，欄位的記錄檔與設定檔路徑一律不能從網頁改。
+MEMORY_MODELS = ("unified_split", "unified_single", "discrete")
+SYSTEM_DIRS = ("/bin", "/boot", "/dev", "/etc", "/lib", "/lib32", "/lib64", "/proc", "/root",
+               "/run", "/sbin", "/sys", "/usr", "/var")
+UNIT_RX = re.compile(r"[A-Za-z0-9][\w@.-]{0,90}\.service")
+OWN_UNITS = ("xconsole-agent.service", "xconsole.service")
+
+
+def _apu_like():
+    """AMD 的 APU（例 Ryzen AI 395）：CPU 型號裡帶內建顯示（「w/ Radeon 8060S」）。
+    不能看 KFD 拓撲：它把同一顆晶片的 CPU 與 GPU 分成兩個節點（.27 實測），以前這樣判斷永遠判不出 APU。"""
+    for ln in (load_text("/proc/cpuinfo") or "").splitlines():
+        if ln.startswith("model name"):
+            return "Radeon" in ln
+    return False
+
+
+def suggest_memory_model(gpus=None):
+    """依硬體建議記憶體架構，回 (代號, 理由)。只是建議，管理者在網頁上確認後才寫入。"""
+    gpus = probe_gpus() if gpus is None else gpus
+    if os.path.exists("/etc/nv_tegra_release"):
+        return "unified_single", "偵測到 Jetson（/etc/nv_tegra_release），GPU 與系統共用同一塊記憶體"
+    nvidia = has_nvidia()
+    if nvidia and gpus and all(not g.get("vram_total") for g in gpus):
+        return "unified_single", "nvidia-smi 回報不出顯存總量（DGX Spark 這類統一記憶體機就是這樣）"
+    if not nvidia and gpus and _apu_like():
+        return "unified_split", "AMD APU（例 Ryzen AI 395）：BIOS 切一塊給 GPU，系統只剩另一塊，兩塊都要盯"
+    if gpus:
+        return "discrete", f"偵測到 {len(gpus)} 張獨立顯示卡，各自有顯存，系統記憶體另外一塊"
+    return "discrete", "沒有偵測到 GPU；先照獨立顯存算，確認後可以改"
+
+
+def _rotational(dev):
+    """裝置是不是機械硬碟。分割區要往上找到整顆碟的 queue/rotational。"""
+    name = os.path.basename(os.path.realpath(dev))
+    for cand in (name, re.sub(r"p?\d+$", "", name)):
+        v = load_text(f"/sys/block/{cand}/queue/rotational")
+        if v is not None:
+            return v.strip() == "1"
+    return None
+
+
+def storage_choices():
+    """可以當存放區的磁碟：實體檔案系統、50 GiB 以上。標出機械硬碟（大模型放上去載入要好幾分鐘）。"""
+    out, seen = [], set()
+    for line in (load_text("/proc/mounts") or "").splitlines():
+        f = line.split()
+        if len(f) < 3 or f[2] not in ("ext4", "xfs", "btrfs", "f2fs") or f[1] in seen:
+            continue
+        mnt = f[1].replace("\\040", " ")
+        if mnt.startswith(("/boot", "/snap")):
+            continue
+        try:
+            st = os.statvfs(mnt)
+        except OSError:
+            continue
+        total = st.f_blocks * st.f_frsize / GIB
+        if total < 50:
+            continue
+        seen.add(f[1])
+        path = os.path.join(HOME, "models", "gguf") if mnt == "/" or HOME.startswith(mnt.rstrip("/") + "/") \
+            else os.path.join(mnt, "models", "gguf")
+        out.append({"mount": mnt, "device": f[0], "total_gib": round(total, 1),
+                    "free_gib": round(st.f_bavail * st.f_frsize / GIB, 1),
+                    "hdd": _rotational(f[0]), "path": path,
+                    "writable": os.access(path if os.path.isdir(path) else mnt, os.W_OK)})
+    return sorted(out, key=lambda x: (x["hdd"] is True, -x["free_gib"]))
+
+
+def llama_candidates():
+    out = []
+    for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
+        rc, o, e = sh([cand, "--version"], timeout=15)
+        libs = os.listdir(os.path.dirname(cand))
+        gpu = next((b for b, pre in (("CUDA", "libggml-cuda"), ("ROCm", "libggml-hip"), ("Vulkan", "libggml-vulkan"))
+                    if any(x.startswith(pre) for x in libs)), "只有 CPU")
+        out.append({"path": cand, "ok": rc == 0, "build": llama_build_no(cand, o + e) or None,
+                    "backend": gpu})
+    return out
+
+
+def machine_info():
+    reg = registry()
+    m = reg["machine"]
+    gpus = probe_gpus()
+    sug, why = suggest_memory_model(gpus)
+    _, models, _ = scan_gguf(reg)
+    return {
+        "settings": {"memory_model": m.get("memory_model", "discrete"), "confirmed": bool(m.get("confirmed")),
+                     "ram_floor_gib": m.get("ram_floor_gib"),
+                     "vram_floor_gib": m.get("vram_floor_gib"), "note": m.get("note", ""),
+                     "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or ""},
+        "defaults": {k: DEFAULT_FLOORS[k] for k in MEMORY_MODELS},
+        "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg)},
+        "detect": {"memory_model": sug, "why": why, "hostname": socket.gethostname(),
+                   "gpus": [{"id": g["id"], "name": g.get("name"), "vram_gib": round((g.get("vram_total") or 0) / GIB, 1)}
+                            for g in gpus],
+                   "ram_gib": round(_meminfo("MemTotal") / GIB, 1)},
+        "storage": storage_choices(),
+        "llama": llama_candidates(),
+        "gguf_count": len(models),
+        "units": register_candidates(reg),
+    }
+
+
+def data_bases():
+    """存放區只准放在這些位置底下：家目錄、另外掛載的資料碟、常見的資料目錄。"""
+    mounts = [ln.split()[1].replace("\\040", " ") for ln in (load_text("/proc/mounts") or "").splitlines()
+              if len(ln.split()) > 2 and ln.split()[2] in ("ext4", "xfs", "btrfs", "f2fs")]
+    # 家目錄所在的分割區（例：/home 獨立掛載）不能整個當允許位置，否則存放區可以設到別的使用者家目錄裡
+    return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot") and not HOME.startswith(m.rstrip("/") + "/")),
+            "/data", "/models", "/srv", "/opt"]
+
+
+def contained(raw, bases):
+    """把管理者填的路徑換成「確認落在某個允許位置底下」的路徑（經 inside() 的 realpath＋前綴檢查）；不在任何一個底下回 None。"""
+    real = os.path.realpath(raw)
+    for b in bases:
+        if not os.path.isdir(b):
+            continue
+        rb = os.path.realpath(b)
+        if real.startswith(rb + os.sep):
+            try:
+                return inside(rb, os.path.relpath(real, rb))
+            except ValueError:
+                return None
+    return None
+
+
+def check_root(raw):
+    """存放區：在允許的位置底下、不是隱藏資料夾、不在系統目錄、建得起來而且寫得進去。"""
+    p = os.path.expanduser(str(raw or "").strip())
+    if not p:
+        return "", None
+    if not os.path.isabs(p):
+        return None, "存放區要寫完整路徑（/ 開頭，或 ~/ 開頭）"
+    bases = data_bases()
+    real = contained(p, bases)
+    if real is None:
+        return None, "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）"
+    if any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
+        return None, f"{real} 是系統目錄，不能當存放區"
+    if any(part.startswith(".") for part in real.split("/") if part):
+        return None, "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡"
+    try:
+        os.makedirs(real, exist_ok=True)
+    except OSError as ex:
+        return None, f"建不了 {real}：{ex.strerror}"
+    if not os.access(real, os.W_OK):
+        return None, f"代理的帳號寫不進 {real}，請先調整這個資料夾的權限"
+    return real, None
+
+
+def check_llama(raw):
+    """llama-server：只准家目錄、/opt、/usr/local 底下，檔名就是 llama-server，--version 跑得起來（代理會執行它）。"""
+    raw = os.path.expanduser(str(raw or "").strip())
+    if not raw:
+        return "", None
+    p = contained(raw, [HOME, "/opt", "/usr/local"])
+    if p is None:
+        return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下"
+    if os.path.basename(p) != "llama-server" or not os.path.isfile(p) or not os.access(p, os.X_OK):
+        return None, "要指到編好的 llama-server 執行檔（檔名就是 llama-server）"
+    rc, o, e = sh([p, "--version"], timeout=20)
+    if rc != 0 or "version" not in (o + e):
+        return None, "這支 llama-server 跑不起來（--version 失敗），可能缺函式庫"
+    return p, None
+
+
+@_locked
+def save_machine(body):
+    reg = registry()
+    m = reg["machine"]
+    mm = body.get("memory_model", m.get("memory_model"))
+    if mm not in MEMORY_MODELS:
+        return 400, {"error": "記憶體架構只能是 " + "、".join(MEMORY_MODELS)}
+    new = {"memory_model": mm}
+    for k in ("ram_floor_gib", "vram_floor_gib"):
+        v = body.get(k)
+        if v in (None, ""):
+            new[k] = None
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return 400, {"error": "底線要填數字（GiB）"}
+        if not 0 <= v <= 256:
+            return 400, {"error": "底線要在 0～256 GiB 之間"}
+        new[k] = v
+    note = str(body.get("note") or "")
+    if len(note) > 300 or re.search(r"[\x00-\x08\x0b-\x1f]", note):
+        return 400, {"error": "備註最多 300 字，不能有控制字元"}
+    new["note"] = note
+    root, err = check_root(body.get("gguf_root"))
+    if err:
+        return 400, {"error": err}
+    exe, err = check_llama(body.get("llama_server"))
+    if err:
+        return 400, {"error": err}
+    new["gguf_root"], new["llama_server"] = root, exe
+    m["confirmed"] = True             # 管理者在網頁上確認過記憶體架構（不再拿偵測建議比對）
+    for k, v in new.items():
+        if v in (None, "") and k not in ("memory_model", "note"):
+            m.pop(k, None)
+        else:
+            m[k] = v
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "settings": machine_info()["settings"]}
+
+
+def register_candidates(reg=None):
+    """這台可以登記成欄位的服務：使用者自己建立的 systemd 使用者服務（服務檔在家目錄底下），
+    扣掉 xConsole 自己的、已經登記過的。系統內建的桌面服務（GNOME、音效、印表機…）一台就上百個，全列出來管理者找不到自己的。"""
+    reg = reg or registry()
+    used = {s.get("unit") for s in reg["slots"]} | {e.get("unit") for s in reg["slots"]
+                                                   for e in (s.get("engines") or {}).values()}
+    _, out, _ = sh(["systemctl", "--user", "list-unit-files", "--type=service", "--no-legend", "--no-pager"], timeout=20)
+    names = [u for u in ((ln.split() or [""])[0] for ln in out.splitlines())
+             if UNIT_RX.fullmatch(u) and u not in OWN_UNITS and u not in used and "@" not in u
+             and not re.fullmatch(r"xc-.*-llama\.service", u)]
+    if not names:
+        return []
+    _, show, _ = sh(["systemctl", "--user", "show", "-p", "Id", "-p", "FragmentPath", "--", *names], timeout=30)
+    mine = []
+    for block in show.split("\n\n"):
+        kv = dict(ln.split("=", 1) for ln in block.splitlines() if "=" in ln)
+        frag = kv.get("FragmentPath", "")
+        if kv.get("Id") in names and frag.startswith(("/home/", os.path.realpath(HOME) + "/")):
+            mine.append(kv["Id"])
+    return sorted(mine)
+
+
+def _slot_fields(body, base):
+    """欄位的白名單欄位。沒有記錄檔、設定檔路徑：那兩個從網頁開放就能讀任意檔案。"""
+    out = {}
+    role = str(body.get("role", base.get("role", "")) or "").strip()
+    if not 1 <= len(role) <= 12 or re.search(r"[\x00-\x1f<>]", role):
+        return None, "角色名稱要 1～12 個字"
+    out["role"] = role
+    tier = str(body.get("tier", base.get("tier", "")) or "").strip()
+    if len(tier) > 12 or re.search(r"[\x00-\x1f<>]", tier):
+        return None, "等級最多 12 個字"
+    out["tier"] = tier
+    caps = body.get("caps", base.get("caps") or [])
+    if not isinstance(caps, list) or len(caps) > 6 or any(
+            not isinstance(c, str) or not 1 <= len(c.strip()) <= 12 or re.search(r"[\x00-\x1f<>]", c) for c in caps):
+        return None, "能力標籤最多 6 個，每個 1～12 個字"
+    out["caps"] = [c.strip() for c in caps]
+    for k in ("est_vram_gib", "est_ram_gib"):
+        v = body.get(k, base.get(k))
+        if v in (None, ""):
+            out[k] = None
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return None, "預估記憶體要填數字（GiB）"
+        if not 0 <= v <= 1024:
+            return None, "預估記憶體要在 0～1024 GiB 之間"
+        out[k] = v
+    if "port" in body or "port" in base:
+        v = body.get("port", base.get("port"))
+        if v in (None, ""):
+            out["port"] = None
+        else:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return None, "埠要填 1～65535 的數字"
+            if not 1 <= v <= 65535:
+                return None, "埠要填 1～65535 的數字"
+            out["port"] = v
+    out["critical"] = bool(body.get("critical", base.get("critical", False)))
+    note = str(body.get("note", base.get("note", "")) or "")
+    if len(note) > 300 or re.search(r"[\x00-\x08\x0b-\x1f]", note):
+        return None, "備註最多 300 字"
+    out["note"] = note
+    if "model" in body and base.get("kind") not in ("strata", "llama"):
+        name = str(body.get("model") or "").strip()
+        if len(name) > 60 or re.search(r"[\x00-\x1f<>]", name):
+            return None, "顯示名稱最多 60 個字"
+        out["model"] = name
+    return out, None
+
+
+@_locked
+def add_slot(body):
+    reg = registry()
+    kind = body.get("type")
+    if kind not in ("empty", "service"):
+        return 400, {"error": "type 只能是 empty（空欄位）或 service（登記已在跑的服務）"}
+    fields, err = _slot_fields(body, {})
+    if err:
+        return 400, {"error": err}
+    taken = {s["id"] for s in reg["slots"]}
+    sid = next(f"slot{i}" for i in range(1, 1000) if f"slot{i}" not in taken)
+    slot = {"id": sid, **{k: v for k, v in fields.items() if v is not None}}
+    if kind == "service":
+        unit = str(body.get("unit") or "")
+        if unit not in register_candidates(reg):
+            return 400, {"error": f"{unit or '（沒填）'} 不是這台可以登記的服務（要是使用者層、還沒登記過的 systemd 服務）"}
+        slot["unit"] = unit
+        slot.setdefault("model", unit.removesuffix(".service"))
+    reg["slots"].append(slot)
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "slot": slot}
+
+
+@_locked
+def edit_slot(sid, body):
+    reg = registry()
+    slot = next((s for s in reg["slots"] if s["id"] == sid), None)
+    if not slot:
+        return 404, {"error": f"沒有這個欄位：{sid}"}
+    fields, err = _slot_fields(body, slot)
+    if err:
+        return 400, {"error": err}
+    for k, v in fields.items():
+        if k == "port" and slot.get("kind") in ("strata", "llama"):
+            continue        # 引擎欄位的埠跟著引擎設定走（API 串接頁改），這裡改了會跟服務實際的埠對不上
+        if v is None:
+            slot.pop(k, None)
+        else:
+            slot[k] = v
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "slot": slot}
+
+
+@_locked
+def delete_slot(sid):
+    reg = registry()
+    slot = next((s for s in reg["slots"] if s["id"] == sid), None)
+    if not slot:
+        return 404, {"error": f"沒有這個欄位：{sid}"}
+    if slot.get("unit") and unit_state(slot["unit"]) in ("active", "activating"):
+        return 409, {"error": "這個欄位的服務還在跑，先停止再移除"}
+    removed = []
+    if slot.get("kind") == "llama" and slot.get("unit") == llama_unit(sid):
+        # 這支服務是 xConsole 替這個欄位建的，移除欄位就一起收掉；登記進來的既有服務不動它
+        sysctl(slot["unit"], "disable", timeout=30)
+        unit_dir = os.environ.get("XCONSOLE_UNIT_DIR") or os.path.join(HOME, ".config/systemd/user")
+        for f in (inside(unit_dir, slot["unit"]), engine_file(sid, "-llama.json"), engine_file(sid, ".key"),
+                  engine_file(sid, "-llama.log")):
+            if os.path.exists(f):
+                os.remove(f)
+                removed.append(os.path.basename(f))
+        sh(["systemctl", "--user", "daemon-reload"], timeout=30)
+    reg["slots"] = [s for s in reg["slots"] if s["id"] != sid]
+    reg["measure"].pop(sid, None)
+    save_json(REGISTRY, reg)
+    return 200, {"ok": True, "removed_files": removed,
+                 "kept_service": slot.get("unit") if slot.get("unit") and not removed else None}
 
 
 def do_all(action, force=False):
@@ -2507,7 +3353,7 @@ KEY_FILE = os.path.join(STATE_DIR, "agent-key.pem")
 
 def local_names():
     names = {"localhost", "127.0.0.1", socket.gethostname()}
-    _, out, _ = sh("hostname -I")
+    _, out, _ = sh(["hostname", "-I"])
     names.update(out.split())
     return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
 
@@ -2519,11 +3365,10 @@ def ensure_cert():
         return
     san = ",".join(("IP:" if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", n) and (":" in n or n.count(".") == 3)
                     else "DNS:") + n for n in local_names())
-    rc, _, err = sh(f"openssl req -x509 -newkey rsa:2048 -nodes -days 3650 "
-                    f"-keyout {shlex.quote(KEY_FILE)} -out {shlex.quote(CERT_FILE)} "
-                    f"-subj /C=TW/O=xCloudinfo/CN=xconsole-agent-{shlex.quote(socket.gethostname())} "
-                    f"-addext {shlex.quote('subjectAltName=' + san)} "
-                    f"-addext basicConstraints=critical,CA:FALSE", timeout=60)
+    rc, _, err = sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "3650",
+                     "-keyout", KEY_FILE, "-out", CERT_FILE,
+                     "-subj", f"/C=TW/O=xCloudinfo/CN=xconsole-agent-{socket.gethostname()}",
+                     "-addext", "subjectAltName=" + san, "-addext", "basicConstraints=critical,CA:FALSE"], timeout=60)
     if rc != 0:
         raise SystemExit(f"產不出代理憑證（{err[:200]}），停止啟動，不退回明文 http")
     os.chmod(KEY_FILE, 0o600)
@@ -2604,6 +3449,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, counters())
         if path == "/library":
             return self._send(200, library())
+        if path == "/machine":
+            return self._send(200, machine_info())
+        if path == "/llama/build":
+            return self._send(200, build_status())
+        if path == "/llama/build/progress":
+            return self._send(200, build_progress())
         m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
         if m:
             code, out = api_info(m.group(1))
@@ -2641,7 +3492,8 @@ class Handler(BaseHTTPRequestHandler):
             sid = m.group(1)
             cur = _slot(sid) or {}
             if body.get("engine") == "llama":
-                code, out = set_llama_model(sid, str(body.get("model") or ""), body.get("ctx"), force=force)
+                code, out = set_llama_model(sid, str(body.get("model") or ""), body.get("ctx"), force=force,
+                                            **({"gpus": body.get("gpus")} if "gpus" in body else {}))
             elif cur.get("kind") == "llama":
                 code, out = back_to_strata(sid, body.get("pack") or "", body.get("native") or "", force=force)
             else:
@@ -2673,8 +3525,24 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, out = do_all(m.group(1), force=force)
             return self._send(code, out)
-        # ⚠️ 不提供「經 API 覆寫登錄檔」：拿到權杖的人就能把欄位的記錄檔指到 ~/.ssh/id_rsa，
-        # 再從 /logs 讀出來。登錄檔一律由部署腳本經 SSH 寫入。
+        if path == "/machine":
+            return self._send(*save_machine(body))
+        if path == "/slots/add":
+            return self._send(*add_slot(body))
+        if path == "/llama/build":
+            return self._send(*start_build())
+        if path == "/llama/build/cancel":
+            return self._send(*cancel_build())
+        if path == "/profiles/save":
+            return self._send(*save_profile(body))
+        m = re.fullmatch(r"/profiles/([a-z][a-z0-9_-]{0,31})/delete", path)
+        if m:
+            return self._send(*delete_profile(m.group(1)))
+        m = re.fullmatch(r"/slot/([\w.-]+)/(edit|delete)", path)
+        if m:
+            return self._send(*(edit_slot(m.group(1), body) if m.group(2) == "edit" else delete_slot(m.group(1))))
+        # ⚠️ 不提供「經 API 覆寫整份登錄檔」：拿到權杖的人就能把欄位的記錄檔指到 ~/.ssh/id_rsa，
+        # 再從 /logs 讀出來。網頁上的管理只走上面幾個白名單端點（save_machine／add_slot／edit_slot）。
         return self._send(404, {"error": "找不到"})
 
 

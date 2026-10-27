@@ -36,18 +36,22 @@ def png(w, h):
             + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
 
 
-def jpeg(w, h):
+def jpeg(w, h, sos=True, eoi=True, sof_first=True):
     app0 = b"\xff\xe0" + struct.pack(">H", 16) + b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
     sof0 = b"\xff\xc0" + struct.pack(">HBHHB", 11, 8, h, w, 1) + b"\x01\x11\x00"
-    return b"\xff\xd8" + app0 + sof0 + b"\xff\xd9"
+    scan = (b"\xff\xda" + struct.pack(">HB", 8, 1) + b"\x01\x00\x00\x3f\x00" + b"\x12\x34\x56") if sos else b""
+    body = app0 + sof0 + scan if sof_first else app0 + scan + sof0
+    return b"\xff\xd8" + body + (b"\xff\xd9" if eoi else b"")
 
 
-def webp(kind, w, h):
+def webp(kind, w, h, image=True):
+    vp8l = b"VP8L" + struct.pack("<I", 5) + b"\x2f" + ((w - 1) | ((h - 1) << 14)).to_bytes(4, "little")
     if kind == "VP8X":
         body = b"VP8X" + struct.pack("<I", 10) + b"\x00\x00\x00\x00" + (w - 1).to_bytes(3, "little") + (h - 1).to_bytes(3, "little")
+        if image:
+            body += vp8l + b"\x00"                                # 奇數長度的區塊後面補一個位元組
     elif kind == "VP8L":
-        bits = (w - 1) | ((h - 1) << 14)
-        body = b"VP8L" + struct.pack("<I", 5) + b"\x2f" + bits.to_bytes(4, "little")
+        body = vp8l + b"\x00"
     else:
         body = b"VP8 " + struct.pack("<I", 10) + b"\x00\x00\x00\x9d\x01\x2a" + struct.pack("<HH", w, h)
     return b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WEBP" + body
@@ -65,6 +69,23 @@ check("隨便的位元組不認", x.image_info(os.urandom(64)) is None)
 check("截斷的 PNG 不會丟例外", x.image_info(b"\x89PNG\r\n\x1a\n\x00\x00") is None)
 check("截斷的 JPEG 不會丟例外", x.image_info(b"\xff\xd8\xff\xe0\x00\x10JFIF") is None)
 check("截斷的 WebP 不會丟例外", x.image_info(b"RIFF\x00\x00\x00\x00WEBPVP8X\x00") is None)
+
+# 只看檔頭會被騙：下面這些瀏覽器都會顯示破圖，一律擋（2026-10-27 審查意見）
+good = png(64, 16)
+forged = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + struct.pack(">II", 265, 65)
+check("只偽造 PNG 檔頭（沒有 CRC、影像資料、結尾）擋下", x.image_info(forged) is None)
+check("PNG 少了 IEND 擋下", x.image_info(good[:-12]) is None)
+bad_crc = bytearray(good); bad_crc[29] ^= 0xFF
+check("PNG 區塊 CRC 對不上擋下", x.image_info(bytes(bad_crc)) is None)
+no_idat = good[:8 + 25] + good[-12:]
+check("PNG 沒有影像資料（IDAT）擋下", x.image_info(no_idat) is None)
+check("JPEG 少了結尾 EOI 擋下", x.image_info(jpeg(300, 80, eoi=False)) is None)
+check("JPEG 沒有影像資料（SOS）擋下", x.image_info(jpeg(300, 80, sos=False)) is None)
+check("JPEG 尺寸在影像資料之後擋下", x.image_info(jpeg(300, 80, sof_first=False)) is None)
+check("WebP 宣告大小跟實際不符擋下", x.image_info(webp("VP8X", 400, 100) + b"\x00\x00") is None)
+check("WebP 只有 VP8X、沒有影像區塊擋下", x.image_info(webp("VP8X", 400, 100, image=False)) is None)
+w = bytearray(webp("VP8 ", 64, 32)); w[23] = 0
+check("WebP VP8 起始碼不對擋下", x.image_info(bytes(w)) is None)
 
 # ---- 2. 起一個隔離的主控台
 x.set_credentials("admin", "brand-test-pw")
@@ -149,6 +170,19 @@ check("舊的 PNG 檔已刪除", not os.path.exists(os.path.join(x.BRAND_DIR, "l
 st, body, hdr = req("GET", b["branding"]["logo"]["url"], raw=True)
 check("JPEG 的 Content-Type 正確", hdr.get("Content-Type") == "image/jpeg")
 
+# 兩個上傳重疊：不准回 500、不准留下暫存檔、最後的中繼資料一定指到一個真的存在的檔（2026-10-27 審查意見）
+import concurrent.futures as _cf
+payloads = [base64.b64encode(png(64 + i, 16) if i % 2 else jpeg(300 + i, 80)).decode() for i in range(12)]
+with _cf.ThreadPoolExecutor(max_workers=6) as pool:
+    codes = list(pool.map(lambda d: req("POST", "/api/branding/logo", {"data": d})[0], payloads))
+check("同時上傳 12 次全部成功", codes == [200] * 12, codes)
+left = sorted(os.listdir(x.BRAND_DIR))
+check("同時上傳後只剩一個 Logo 檔、沒有暫存檔", len(left) == 1 and left[0].startswith("logo."), left)
+meta = x.fleet()["branding"]["logo"]
+check("中繼資料指到的檔案真的存在", os.path.isfile(os.path.join(x.BRAND_DIR, meta["file"])), meta)
+st, body, hdr = req("GET", "/branding/logo", raw=True)
+check("同時上傳後 Logo 還讀得到", st == 200 and x.image_info(body) is not None)
+
 st, b, _ = req("POST", "/api/branding/logo", {"remove": True})
 check("移除 Logo", st == 200 and b["branding"]["logo"] is None)
 check("Logo 檔已刪除", not os.listdir(x.BRAND_DIR))
@@ -169,6 +203,10 @@ html = open(os.path.join(x.STATIC, "index.html"), encoding="utf-8").read()
 check("登入頁與主畫面都有 Powered by xCloudinfo", html.count('<footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>') == 2)
 js = open(os.path.join(x.STATIC, "app.js"), encoding="utf-8").read()
 check("前端沒有任何地方動頁尾", ".powered" not in js and "powered" not in js.replace("Powered by xCloudinfo", ""))
+check("退回沒自訂時整組還原預設（不是直接 return）", "if (!b.custom) { resetBranding(); return; }" in js and "function resetBranding()" in js)
+css = open(os.path.join(x.STATIC, "style.css"), encoding="utf-8").read()
+check("登入頁頁尾排在版面裡、不浮在登入鈕上", ".login-page { grid-template-rows: 1fr auto; }" in css
+      and "position: absolute" not in css.split(".login-page .powered {", 1)[1].split("}", 1)[0])
 check("品牌資料回來前先藏住品牌區，避免先閃一下預設名稱", 'class="brand-pending"' in html and 'classList.remove("brand-pending")' in js)
 
 srv.shutdown()

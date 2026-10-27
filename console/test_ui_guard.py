@@ -4,6 +4,7 @@
 1. 含輸入欄位的彈窗不准點背景關閉（欄位內拖曳選字、滑鼠在窗外放開，整張表單就蒸發）。
 2. Enter 送出要擋中文輸入法組字（注音選字的 Enter 不能被當成送出）。
 3. 自動更新不准讓畫面抖：定時重畫不播進場動畫、不整頁清空重建（2026-10-22 模型庫每 3 秒、總覽每 15 秒閃一次）。
+4. 頂層導覽最多六格，模型庫是頂層的一區：它曾經藏在某台機器的第二列，使用者要先挑機器才找得到（2026-10-25）。
 跑法：python3 test_ui_guard.py（不需要任何套件）
 """
 import os
@@ -71,6 +72,14 @@ for mm in re.finditer(r"set(?:Timeout|Interval)\(", JS):
     if re.search(r"\bview[A-Z]\w*\(|\brender\(\)", seg):
         timers.append(JS[:mm.start()].count("\n") + 1)
 check("計時器回呼裡沒有直接整頁重畫（只更新有變的那一塊）", not timers, f"第 {timers} 行")
+
+# ---- 4. 資訊架構
+nv = re.search(r"function renderNav\(\)\s*\{.*?const items = \[(.*?)\];", JS, re.S)
+keys = re.findall(r'\["(\w+)",', nv.group(1)) if nv else []
+check("頂層導覽最多六格", 0 < len(keys) <= 6, f"現在 {len(keys)} 格：{keys}")
+check("模型庫在頂層，而且排在 API 串接前面", "lib" in keys and "apis" in keys and keys.index("lib") < keys.index("apis"), str(keys))
+check("設定排在最後", keys[-1:] == ["settings"], str(keys))
+check("頂層不再逐一列出群組（群組一多就超過六格）", "group:" not in (nv.group(1) if nv else ""))
 
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)

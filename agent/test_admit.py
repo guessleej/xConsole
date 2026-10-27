@@ -118,6 +118,123 @@ def main():
     ok &= case("滑動視窗 KV × 並行（4 條 32K、視窗 4K）",
                round(got, 4), round((1000 * 32768 * 4 + 2000 * 4096 * 4) / A.GIB, 4))
 
+    # 9. 多卡（例：中原 2× 48 GB）：總量夠不代表每張都夠
+    two = lambda u0, u1: fake_hw(96, u0 + u1, gpus=[
+        {"id": "0", "name": "t", "vram_total": 48 * GIB, "vram_used": u0 * GIB},
+        {"id": "1", "name": "t", "vram_total": 48 * GIB, "vram_used": u1 * GIB}])
+    # 卡 0 已被別的欄位吃掉 40，卡 1 幾乎是空的；總共剩 54。沒綁卡的 40 GiB 模型會攤成每張 20 → 卡 0 放不下
+    m9 = [{"id": "m", "role": "主腦", "unit": "x.service", "est_vram_gib": 40}]
+    r = A.admit("m", reg_for("discrete", m9, 123, 100), two(40, 2))
+    ok &= case("兩張卡、沒綁卡：總量夠但卡 0 會爆 → 擋", r["allow"], False)
+    ok &= case("  擋的理由點名卡 0", any(x.startswith("卡 0") for x in r["reasons"]), True)
+    ok &= case("  卡 1 沒有被列成理由", any(x.startswith("卡 1") for x in r["reasons"]), False)
+    m9b = [{"id": "m", "role": "主腦", "unit": "x.service", "est_vram_gib": 40, "gpu_ids": ["1"]}]
+    r = A.admit("m", reg_for("discrete", m9b, 123, 100), two(40, 2))
+    ok &= case("同一顆綁到空的卡 1 → 放行", r["allow"], True)
+    ok &= case("  逐張卡的明細只算卡 1", [c["id"] for c in r["pools"]["cards"]], ["1"])
+    # 128B 那種要兩張一起扛的：攤成每張 46，各剩 48 → 放行；再大一點就擋
+    big = [{"id": "b", "role": "主腦", "unit": "x.service", "est_vram_gib": 92}]
+    r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
+    ok &= case("92 GiB 攤到兩張 48 → 放行", r["allow"], True)
+    big[0]["est_vram_gib"] = 96
+    r = A.admit("b", reg_for("discrete", big, 123, 100), two(0, 0))
+    ok &= case("96 GiB 攤到兩張 48 → 每張剩 0，低於分到的 0.5 底線 → 擋", r["allow"], False)
+    # 中原實況：Mistral 128B 跨兩張 48 GB 已經在跑（卡 0 剩 0.8、卡 1 剩 1.7），重啟它不能被擋。
+    # 底線 1 GiB 是總量要留的，分到兩張各 0.5；每張都要留滿 1 GiB 就會擋（2026-10-25 實際踩到）
+    cy = [{"id": "brain", "role": "主腦", "unit": "x.service", "est_vram_gib": 92.8}]
+    real_state, A.unit_state = A.unit_state, lambda u: "active"
+    cycu = fake_hw(95.6, 93.1, gpus=[      # 中原 nvidia-smi 實測：每張 47.8 GiB，已用 47.0／46.1
+        {"id": "0", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 47.0 * GIB},
+        {"id": "1", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 46.1 * GIB}])
+    r = A.admit("brain", reg_for("discrete", cy, 123, 117), cycu)
+    A.unit_state = real_state
+    ok &= case("中原 Mistral 128B 跨兩張卡在跑，重啟 → 放行", r["allow"], True)
+    # 換綁卡：舊模型在卡 0 佔 40，要搬到卡 1；釋放量要還給卡 0，不是卡 1
+    r = A.admit("m", reg_for("discrete", m9b, 123, 100), two(46, 46), reclaim_cards={"0": 40.0})
+    ok &= case("舊模型在卡 0、改綁卡 1：卡 1 沒空間 → 擋（不能把卡 0 釋放的量算給卡 1）", r["allow"], False)
+    # 單卡機器照舊走總量
+    r = A.admit("m", reg_for("discrete", m9, 123, 100), fake_hw(48, 2))
+    ok &= case("單卡機器不出現逐張卡明細", "cards" in r["pools"], False)
+
+    # 10. 選卡檢查
+    cards = [{"id": "0", "total_gib": 48}, {"id": "1", "total_gib": 48}]
+    ok &= case("沒帶＝自動", A.pick_gpus(None, cards), (None, None))
+    ok &= case("全選也當自動（登錄檔不留多餘的綁定）", A.pick_gpus(["1", "0"], cards), (None, None))
+    ok &= case("只用卡 1", A.pick_gpus([1], cards), (["1"], None))
+    ok &= case("沒有的卡要拒絕", A.pick_gpus(["2"], cards)[1] is not None, True)
+    ok &= case("攤分照卡的大小", A.card_split(30, None, [{"id": "0", "total_gib": 16}, {"id": "1", "total_gib": 32}]),
+               {"0": 10.0, "1": 20.0})
+
+    # 11. 綁卡的環境變數
+    ok &= case("NVIDIA：照 PCI 匯流排排序再指定卡", A.visible_env(["1"], nvidia=True),
+               {"CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": "1"})
+    ok &= case("沒綁卡不設任何變數", A.visible_env(None, nvidia=True), {})
+    # AMD：drm card 號碼與 HIP 序號不一定相同（KFD 節點 1 是 CPU、card1 才是第一張 GPU）
+    root = tempfile.mkdtemp()
+    kfd, drm = os.path.join(root, "kfd"), os.path.join(root, "drm")
+    for n, minor, simd in ((0, 0, 0), (1, 129, 240), (2, 128, 240)):
+        os.makedirs(os.path.join(kfd, str(n)))
+        open(os.path.join(kfd, str(n), "properties"), "w").write(f"simd_count {simd}\ndrm_render_minor {minor}\n")
+    for card, minor in (("card0", 128), ("card1", 129)):
+        os.makedirs(os.path.join(drm, card, "device", "drm", f"renderD{minor}"))
+    ok &= case("AMD：drm card → HIP 序號照 KFD 節點順序", A.amd_hip_order(drm, kfd), {"1": 0, "0": 1})
+    A.DRM_DIR, A.KFD_NODES = drm, kfd
+    orig = A.amd_hip_order
+    A.amd_hip_order = lambda d=drm, k=kfd: orig(d, k)
+    ok &= case("AMD：綁 card0 → HIP_VISIBLE_DEVICES=1", A.visible_env(["0"], nvidia=False), {"HIP_VISIBLE_DEVICES": "1"})
+    try:
+        A.visible_env(["5"], nvidia=False)
+        ok &= case("AMD：對不到的卡要拒絕", False, True)
+    except ValueError:
+        ok &= case("AMD：對不到的卡要拒絕", True, True)
+    A.amd_hip_order = orig
+    # 啟動時真的有套上：設定檔的 gpus 變成 llama-server 的環境變數，蓋過登錄檔 llama_env 裡的同名設定
+    real_nv = A.has_nvidia
+    A.has_nvidia = lambda: True
+    env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {"llama_env": {"CUDA_VISIBLE_DEVICES": "0,1"}}}, ["1"])
+    ok &= case("啟動環境：只看得到卡 1", (env.get("CUDA_VISIBLE_DEVICES"), env.get("CUDA_DEVICE_ORDER")), ("1", "PCI_BUS_ID"))
+    env = A.llama_launch_env("/opt/llama/llama-server", {"machine": {}}, None)
+    ok &= case("啟動環境：沒綁卡不動 CUDA_VISIBLE_DEVICES", env.get("CUDA_VISIBLE_DEVICES"), os.environ.get("CUDA_VISIBLE_DEVICES"))
+    A.has_nvidia = real_nv
+
+    # 12. 指令一律不經過 shell（防命令注入）：sh() 不收字串、原始碼裡不准有 shell=True／os.system
+    try:
+        A.sh("echo hi; id")
+        ok &= case("sh() 收到整條字串要拒絕", False, True)
+    except TypeError:
+        ok &= case("sh() 收到整條字串要拒絕", True, True)
+    rc, out, _ = A.sh(["echo", "a; id"])
+    ok &= case("參數裡的分號只是文字，不會被當成第二個指令", out, "a; id")
+    try:
+        A.unit_name("--user; rm -rf ~")
+        ok &= case("服務名稱格式不對要拒絕（不能被當成選項）", False, True)
+    except ValueError:
+        ok &= case("服務名稱格式不對要拒絕（不能被當成選項）", True, True)
+    ok &= case("  狀態查詢遇到怪名字回 unknown，不讓整個狀態頁出錯", A.unit_state("--user; rm -rf ~"), "unknown")
+    ok &= case("  啟停遇到怪名字回錯誤，不執行", A.sysctl("-x.service", "stop")[0], 1)
+    # 記錄檔最後 n 行：行很長也要完整（以前假設每行 400 位元組，長行會少行或截斷）
+    lp = os.path.join(tempfile.mkdtemp(), "x.log")
+    rows = [f"{i:03d}-" + "x" * (3000 if i % 7 == 0 else 20) for i in range(300)]
+    open(lp, "w").write("\n".join(rows) + "\n")
+    ok &= case("tail_lines：含 3000 字的長行，最後 50 行完整", A.tail_lines(lp, 50), rows[-50:])
+    ok &= case("tail_lines：要的行數比檔案多就回整個檔", A.tail_lines(lp, 1000), rows)
+    ok &= case("llama-server 版本號：淺層下載回 1 時用資料夾名稱的正式版編號",
+               A.llama_build_no("/h/llama.cpp-b11870/build/bin/llama-server", "version: 1 (abc)\nbuilt with"), 11870)
+    ok &= case("  一般編譯照 --version 的 build 號", A.llama_build_no("/h/llama.cpp/build/bin/llama-server", "version: 11626 (df18bee11)"), 11626)
+    lr = ("1111111111111111111111111111111111111111\trefs/tags/b100\n"
+          "2222222222222222222222222222222222222222\trefs/tags/b200\n"
+          "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
+    ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
+               {100: "1" * 40, 200: "3" * 40})
+    real_lt = A.load_text
+    for cpu, want in (("AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S", True), ("AMD EPYC 7543P 32-Core Processor", False)):
+        A.load_text = lambda path, c=cpu: f"processor\t: 0\nmodel name\t: {c}\n" if path == "/proc/cpuinfo" else real_lt(path)
+        ok &= case(f"APU 判斷：{cpu[:30]}", A._apu_like(), want)
+    A.load_text = real_lt
+    src = open(A.__file__, encoding="utf-8").read()
+    ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
+               [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
+
     print("\n全部通過" if ok else "\n有項目失敗")
     return 0 if ok else 1
 

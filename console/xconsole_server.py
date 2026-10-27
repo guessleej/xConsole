@@ -17,19 +17,23 @@
 import base64
 import datetime as dt
 import hashlib
+import http.client
 import hmac
 import ipaddress
 import json
 import os
 import re
 import secrets
+import socket
 import ssl
 import struct
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
+import zlib
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -46,13 +50,18 @@ PORT = int(os.environ.get("XCONSOLE_PORT", "9400"))
 SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
+MAX_ANON_BODY = 64 * 1024        # 登入與加入機器不需登入：本文只要幾 KB
+HEADER_DEADLINE = 15            # 請求列＋標頭（POST 連同本文）要在幾秒內送完
+NODE_REPLY_MAX = 32 * 1024 * 1024
+NODE_DEADLINE = 300             # 跟代理的一次呼叫，連同讀完回應的總時限（秒）
 PBKDF2_ROUNDS = 200_000
 # 登入節流：伺服器是多執行緒的，只在每次失敗後睡一秒擋不住並行猜測。
 # 同一來源 15 分鐘內錯 5 次就先擋；全部來源加起來錯 50 次也擋（分散猜測）。
 # 不鎖帳號：鎖帳號等於讓內網任何人都能把管理者鎖在門外。
 LOGIN_WINDOW = 900
 LOGIN_MAX_PER_IP = 5
-LOGIN_MAX_GLOBAL = 50
+_LOGIN_LOCK = threading.Lock()
+_THROTTLE_LOGGED = {}
 
 os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
 STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
@@ -100,39 +109,104 @@ BRAND_DEFAULT = {"org": "云碩科技", "product": "xConsole 模型主控台"}
 BRAND_NAME_RX = re.compile(r"[^\x00-\x1f\x7f<>]{1,40}")
 LOGO_MAX = 1024 * 1024
 LOGO_TYPES = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
+# 換 Logo 是「寫檔＋刪掉別種格式的舊檔＋改 fleet.json」三步，兩個請求交錯會刪到對方剛寫的檔：整段鎖住
+_BRAND_LOCK = threading.Lock()
+
+
+def _png_info(data):
+    """逐個區塊檢查長度與 CRC：第一塊必須是 IHDR、中間要有 IDAT、要以 IEND 收尾。"""
+    i, first, idat, size = 8, True, False, None
+    while i + 12 <= len(data):
+        n = struct.unpack(">I", data[i:i + 4])[0]
+        kind = data[i + 4:i + 8]
+        if n > len(data) or i + 12 + n > len(data):
+            return None
+        if zlib.crc32(data[i + 4:i + 8 + n]) & 0xFFFFFFFF != struct.unpack(">I", data[i + 8 + n:i + 12 + n])[0]:
+            return None
+        if first:
+            if kind != b"IHDR" or n != 13:
+                return None
+            size = struct.unpack(">II", data[i + 8:i + 16])
+            first = False
+        idat = idat or kind == b"IDAT"
+        i += 12 + n
+        if kind == b"IEND":
+            return ("png", *size) if idat else None
+    return None
+
+
+JPEG_SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+
+
+def _jpeg_info(data):
+    """逐段走到 SOS：尺寸（SOF）要在影像資料之前出現，檔尾要是 EOI。"""
+    i, size = 2, None
+    while i + 4 <= len(data):
+        if data[i] != 0xFF:
+            return None
+        marker = data[i + 1]
+        if marker == 0xFF:                       # 填充位元組
+            i += 1
+            continue
+        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        n = struct.unpack(">H", data[i + 2:i + 4])[0]
+        if n < 2 or i + 2 + n > len(data):
+            return None
+        if marker in JPEG_SOF:
+            if n < 7:
+                return None
+            h, w = struct.unpack(">HH", data[i + 5:i + 9])
+            size = (w, h)
+        if marker == 0xDA:                       # 之後是壓縮的影像資料，一路到 EOI
+            ok = size and len(data) > i + 2 + n + 2 and data.rstrip(b"\x00").endswith(b"\xff\xd9")
+            return ("jpg", *size) if ok else None
+        i += 2 + n
+    return None
+
+
+def _webp_info(data):
+    """RIFF 宣告的大小要跟實際一樣，每個區塊都不能超出檔案，而且一定要有影像區塊。"""
+    if struct.unpack("<I", data[4:8])[0] + 8 != len(data):
+        return None
+    i, size, image = 12, None, False
+    while i + 8 <= len(data):
+        kind, n = data[i:i + 4], struct.unpack("<I", data[i + 4:i + 8])[0]
+        body = data[i + 8:i + 8 + n]
+        if len(body) != n:
+            return None
+        if kind == b"VP8X" and n >= 10:
+            size = (1 + int.from_bytes(body[4:7], "little"), 1 + int.from_bytes(body[7:10], "little"))
+        elif kind == b"VP8 ":
+            if n < 10 or body[3:6] != b"\x9d\x01\x2a":
+                return None
+            w, h = struct.unpack("<HH", body[6:10])
+            size, image = size or (w & 0x3FFF, h & 0x3FFF), True
+        elif kind == b"VP8L":
+            if n < 5 or body[0] != 0x2F:
+                return None
+            bits = int.from_bytes(body[1:5], "little")
+            size, image = size or ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1), True
+        elif kind == b"ANMF":
+            image = True
+        i += 8 + n + (n & 1)                     # 區塊長度是奇數時後面補一個位元組
+    return ("webp", *size) if image and size and i == len(data) else None
 
 
 def image_info(data):
-    """只認 PNG／JPEG／WebP，回 (副檔名, 寬, 高)，認不出來回 None。
-    看檔頭不看副檔名；不收 SVG：SVG 能夾帶程式碼，被當成 Logo 顯示就是一個 XSS 入口。"""
-    if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR" and len(data) >= 24:
-        w, h = struct.unpack(">II", data[16:24])
-        return "png", w, h
-    if data[:3] == b"\xff\xd8\xff":
-        i = 2
-        while i + 9 < len(data):
-            if data[i] != 0xFF:
-                i += 1
-                continue
-            marker = data[i + 1]
-            if marker in (0xD8, 0x01, 0xFF) or 0xD0 <= marker <= 0xD7:
-                i += 1 if marker == 0xFF else 2
-                continue
-            if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
-                h, w = struct.unpack(">HH", data[i + 5:i + 9])
-                return "jpg", w, h
-            i += 2 + struct.unpack(">H", data[i + 2:i + 4])[0]
+    """只認 PNG／JPEG／WebP，回 (副檔名, 寬, 高)，認不出來或結構不完整都回 None。
+    看內容不看副檔名；不只看檔頭，整個檔案的結構都要對得上（只偽造檔頭的殘缺檔，瀏覽器會顯示破圖）。
+    不收 SVG：SVG 能夾帶程式碼，被當成 Logo 顯示就是一個 XSS 入口。"""
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return _png_info(data)
+        if data[:3] == b"\xff\xd8\xff":
+            return _jpeg_info(data)
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP" and len(data) >= 20:
+            return _webp_info(data)
+    except (struct.error, IndexError):
         return None
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        kind = data[12:16]          # 三種子格式的尺寸放在不同位置，長度各自檢查
-        if kind == b"VP8X" and len(data) >= 30:
-            return "webp", 1 + int.from_bytes(data[24:27], "little"), 1 + int.from_bytes(data[27:30], "little")
-        if kind == b"VP8 " and len(data) >= 30:
-            w, h = struct.unpack("<HH", data[26:30])
-            return "webp", w & 0x3FFF, h & 0x3FFF
-        if kind == b"VP8L" and len(data) >= 25:
-            bits = int.from_bytes(data[21:25], "little")
-            return "webp", (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
     return None
 
 
@@ -149,15 +223,22 @@ def branding():
 
 
 def save_logo(data):
-    """驗過的圖檔寫進 ~/.xconsole/branding/，舊的 Logo 一併刪掉。回寫進 fleet.json 的那筆資料。"""
+    """驗過的圖檔寫進 ~/.xconsole/branding/，舊的 Logo 一併刪掉。回寫進 fleet.json 的那筆資料。
+    呼叫端要持有 _BRAND_LOCK，連同 fleet.json 的更新一起做完才放開。"""
     ext, w, h = image_info(data)
     os.makedirs(BRAND_DIR, mode=0o700, exist_ok=True)
     name = f"logo.{ext}"
-    tmp = os.path.join(BRAND_DIR, name + ".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(data)
-    os.replace(tmp, os.path.join(BRAND_DIR, name))
+    fd, tmp = tempfile.mkstemp(dir=BRAND_DIR, prefix=".upload-")      # 每次不同的暫存檔名，0600
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, os.path.join(BRAND_DIR, name))
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
+        raise
     for other in LOGO_TYPES:
         if other != ext:
             try:
@@ -248,29 +329,52 @@ def network_test(node_id, slot_id, key=""):
     code, info = call_node(node_id, f"/apiinfo/{slot_id}", timeout=20)
     if code != 200:
         return {"ok": False, "url": None, "detail": info.get("error") or f"讀不到設定（{code}）"}
-    base = info["public_url"].rstrip("/")
-    ctx = ssl.create_default_context() if base.startswith("https://") else None   # 驗證開著，不准略過
+    base = str(info.get("public_url") or "").rstrip("/")
+    # 網址是代理回報的：代理被接管時可能塞內網位址或雲端 metadata，主控台會帶著管理者貼的金鑰去打。
+    # 只准打「這台機器自己」：網址要是 http(s)，主機解析出來的位址要全部等於這台的位址（資安審查）
+    node = next((x for x in fleet()["nodes"] if x["id"] == node_id), None)
+    u = urlparse(base)
+    if u.scheme not in ("http", "https") or not u.hostname or not node:
+        return {"ok": False, "url": base, "detail": "對外網址格式不對，主控台不代為實測"}
+    try:
+        mine = {i[4][0] for i in socket.getaddrinfo(node["host"], None)}
+        theirs = {i[4][0] for i in socket.getaddrinfo(u.hostname, None)}
+    except OSError:
+        mine, theirs = set(), set()
+    if not theirs or not theirs <= mine:
+        return {"ok": False, "url": base, "detail": f"對外網址的主機不是這台機器（{node['host']}），主控台不代為實測，免得把金鑰送到別處。"
+                                                     "請用 IDE 所在的電腦直接測"}
+    # 直接連剛剛檢查過的那個 IP，原本的主機名稱只放在 Host 標頭與 TLS 的 SNI：不讓 DNS 在檢查和連線之間換位址（rebinding）
+    ip0 = sorted(theirs)[0]
+    port0 = u.port or (443 if u.scheme == "https" else 80)
+    path0 = (u.path or "").rstrip("/")
+    ctx = None
+    if u.scheme == "https":
+        ctx = ssl.create_default_context()                                  # 驗證開著，不准略過
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2                        # 不接受 TLS 1.0／1.1
     t0 = time.time()
 
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        # 不跟轉址：對外網址被改成會轉到別處的位址時，金鑰不能跟著送過去
-        def redirect_request(self, *a, **k):
-            return None
-
-    opener = urllib.request.build_opener(NoRedirect, urllib.request.HTTPSHandler(context=ctx)) if ctx \
-        else urllib.request.build_opener(NoRedirect)
-
     def call(method, path, with_key):
-        h = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if with_key else {})}
-        req = urllib.request.Request(base + path, method=method, headers=h,
-                                     data=b"{}" if method == "POST" else None)
+        h = {"Content-Type": "application/json", "Host": u.netloc.rsplit("@", 1)[-1],
+             **({"Authorization": f"Bearer {key}"} if with_key else {})}
         try:
-            with opener.open(req, timeout=10) as resp:
-                return resp.status, json.load(resp)
-        except urllib.error.HTTPError as exc:
-            return exc.code, None
+            raw = socket.create_connection((ip0, port0), timeout=10)
+            if ctx:
+                raw = ctx.wrap_socket(raw, server_hostname=u.hostname)
+            conn = http.client.HTTPConnection(u.hostname, port0, timeout=10)
+            conn.sock = raw                                # 不跟轉址：http.client 本來就不跟
+            conn.request(method, path0 + path, body=b"{}" if method == "POST" else None, headers=h)
+            r = conn.getresponse()
+            body = r.read(4 * 1024 * 1024)
+            conn.close()
+            if r.status >= 400:
+                return r.status, None
+            try:
+                return r.status, json.loads(body or b"{}")
+            except ValueError:
+                return r.status, None
         except Exception as exc:  # noqa: BLE001
-            return 0, str(exc)[:160]
+            return 0, type(exc).__name__
 
     st, data = call("GET", "/models", bool(key))
     ms = int((time.time() - t0) * 1000)
@@ -293,7 +397,7 @@ def network_test(node_id, slot_id, key=""):
     if st == 200 and info.get("model_name") in ids:
         return {"ok": True, "url": base, "ms": ms, "detail": f"從主控台連得到，模型清單有 {info['model_name']}"}
     return {"ok": False, "url": base, "ms": ms,
-            "detail": f"回 {st}" + ("，金鑰不對" if st == 401 else f"，模型清單 {ids}")}
+            "detail": f"回 {st}" + ("，金鑰不對" if st == 401 else "，模型清單裡沒有這個欄位的模型名稱")}
 
 
 # ---------------------------------------------------------------- 代理呼叫
@@ -307,6 +411,30 @@ def trust_file(node_id):
     return full
 
 
+def _read_capped(resp, deadline):
+    """讀代理的回應：有大小上限與總時限。被接管的代理回幾 GB、或每 29 秒吐一個位元組，都不能拖垮主控台。"""
+    chunks, total = [], 0
+    read = getattr(resp, "read1", None) or resp.read          # read1：一次 recv 就回來，不會為了湊滿 64 KB 一直等
+    sock = getattr(getattr(getattr(resp, "fp", None), "raw", None), "_sock", None)
+    while True:
+        left = deadline - time.time()
+        if left <= 0:
+            raise TimeoutError("代理回應太慢")
+        if sock is not None:
+            try:
+                sock.settimeout(max(0.1, min(left, 60)))      # 每次等待也不能超過剩下的時間
+            except OSError:
+                break                                         # 回應讀完時 http.client 已經把連線關了
+        b = read(65536)
+        if not b:
+            break
+        total += len(b)
+        if total > NODE_REPLY_MAX:
+            raise ValueError("代理回應太大")
+        chunks.append(b)
+    return json.loads(b"".join(chunks) or b"{}")
+
+
 def call_node(node_id, path, method="GET", body=None, timeout=40):
     cfg = fleet()
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
@@ -317,16 +445,19 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
         return 502, {"error": f"還沒信任 {node['name']} 的代理憑證，請重新執行 deploy_console.sh "
                               f"或在「設定 → 機器」匯入該機憑證", "offline": True, "untrusted": True}
-    url = f"https://{node['host']}:{node.get('agent_port', 9401)}{path}"
+    h = node["host"]
+    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
+    deadline = time.time() + timeout + 60
     try:
+        # 單次等待用呼叫端給的時限（換模型要等好幾分鐘才回），讀完整個回應另有總時限
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
-            return resp.status, json.load(resp)
+            return resp.status, _read_capped(resp, deadline)
     except urllib.error.HTTPError as exc:
         try:
-            return exc.code, json.load(exc)
+            return exc.code, _read_capped(exc, deadline)
         except Exception:  # noqa: BLE001
             return exc.code, {"error": f"代理回 {exc.code}"}
     except Exception as exc:  # noqa: BLE001
@@ -372,6 +503,275 @@ def sampler():
             print(f"取樣失敗：{exc}", flush=True)
         time.sleep(SAMPLE_EVERY)
 
+
+
+# ---------------------------------------------------------------- 加一台機器（網頁上做完）
+# 管理者在網頁按「加一台機器」→ 主控台產一次性加入碼與一行安裝指令 → 在那台貼上執行 →
+# 腳本裝好代理、把代理的權杖與憑證送回來 → 主控台用那張憑證與權杖實際連一次成功才納管。
+# 安裝指令釘住主控台憑證的公鑰（curl --pinnedpubkey），自簽憑證也不用關驗證；加入碼 30 分鐘、只能用一次。
+JOIN_TTL = 1800
+JOIN_FAIL_MAX = 10
+_JOINS = {}                      # 加入碼雜湊 → 狀態（只放記憶體：主控台重啟就作廢，重新產一個即可）
+_JOIN_FAILS = {}
+_JOIN_LOCK = threading.Lock()
+NODE_ID_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,39}")
+HOST_RX = re.compile(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+                     r"|\[[0-9A-Fa-f:]+\])(?::\d{1,5})?")
+AGENT_UNIT = """[Unit]
+Description=xConsole 節點代理（模型欄位、准入控制、啟停）
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/xconsole_agent.py
+Restart=always
+RestartSec=5
+MemoryMax=256M
+CPUQuota=25%
+
+[Install]
+WantedBy=default.target
+"""
+
+
+def valid_host(h):
+    """機器位址：IP，或主機名稱（不含埠）。"""
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        return bool(re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*", h))
+
+
+def agent_source():
+    """安裝腳本要下載的代理程式：部署時放在主控台旁的 agent/，開發時在 repo 的 agent/，單機版在家目錄。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in (os.path.join(here, "agent", "xconsole_agent.py"), os.path.join(here, "..", "agent", "xconsole_agent.py"),
+              os.path.join(HOME, "xconsole_agent.py")):
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def console_pin():
+    """主控台目前憑證的公鑰雜湊（curl --pinnedpubkey 的格式）。換憑證後產的新指令會跟著換。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    with open(CERTS.p.live_cert, "rb") as fh:
+        cert = x509.load_pem_x509_certificates(fh.read())[0]
+    spki = cert.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return "sha256//" + base64.b64encode(hashlib.sha256(spki).digest()).decode()
+
+
+def _join_key(code):
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+def join_lookup(code, reserve=False):
+    """回這個加入碼的狀態；過期或已用過回 None。reserve=True 時同時鎖住，驗證完成前別的請求拿不到
+    （兩台同時拿同一個指令加入，不能兩台都成功）。驗證失敗要呼叫 join_release() 放回去讓它重試。"""
+    with _JOIN_LOCK:
+        now = time.time()
+        for k in [k for k, v in _JOINS.items() if v["exp"] < now - 3600]:
+            _JOINS.pop(k)
+        j = _JOINS.get(_join_key(str(code or "")))
+        if not j or j["exp"] < now or j.get("node_id") or (reserve and j.get("busy")):
+            return None
+        if reserve:
+            j["busy"] = True
+            j["busy_by"] = threading.get_ident()
+        return j
+
+
+def join_release(j):
+    with _JOIN_LOCK:
+        j["busy"] = False
+
+
+def install_script(code, j):
+    url = f"https://{j['console']}"
+    return f"""#!/usr/bin/env bash
+# xConsole 節點代理安裝：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。
+set -euo pipefail
+C='{url}'
+PIN='{j["pin"]}'
+CODE='{code}'
+get() {{ curl -fsSk --pinnedpubkey "$PIN" "$C/install/$CODE/$1"; }}
+echo "== 1/4 檢查這台 =="
+[ "$(id -u)" = 0 ] && {{ echo "請用一般帳號執行，不要用 root 或 sudo"; exit 1; }}
+for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
+systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+echo "== 2/4 下載節點代理 =="
+mkdir -p -m 700 "$HOME/.xconsole" "$HOME/.config/systemd/user"
+get xconsole_agent.py > "$HOME/xconsole_agent.py.new"
+python3 -m py_compile "$HOME/xconsole_agent.py.new"
+mv "$HOME/xconsole_agent.py.new" "$HOME/xconsole_agent.py"
+echo "== 3/4 建立服務並啟動 =="
+cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
+{AGENT_UNIT}UNIT
+systemctl --user daemon-reload
+systemctl --user enable xconsole-agent.service >/dev/null
+systemctl --user restart xconsole-agent.service
+LINGER=yes
+loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+# 等健康檢查真的通過才往下：重新安裝時權杖與憑證檔本來就在，只等檔案出現會在代理重啟到一半時就去連
+UP=no
+for i in $(seq 1 30); do
+  if [ -s "$HOME/.xconsole/token" ] && [ -s "$HOME/.xconsole/agent-cert.pem" ] \\
+     && curl -fsS -m 3 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null 2>&1; then UP=yes; break; fi
+  sleep 1
+done
+[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
+echo "== 4/4 加入主控台 =="
+RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
+import json, os, socket, subprocess
+home = os.path.expanduser("~")
+ips = subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split()[:4]
+print(json.dumps({{"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
+                  "linger": os.environ["XC_LINGER"] == "yes",
+                  "token": open(os.path.join(home, ".xconsole/token")).read().strip(),
+                  "cert": open(os.path.join(home, ".xconsole/agent-cert.pem")).read()}}))
+PY
+) || {{ echo "連不到主控台 $C"; exit 1; }}
+STATUS=$(printf '%s' "$RESP" | tail -n 1)
+printf '%s' "$RESP" | sed '$d' | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
+[ "$STATUS" = 200 ] || exit 1
+[ "$LINGER" = no ] && echo "提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER"
+exit 0
+"""
+
+
+def join_node(handler, body):
+    """包一層：預留加入碼之後不論怎麼結束（含沒預料到的例外），沒加入成功就把碼放回去，不會卡在「另一台正在用」。"""
+    try:
+        return _join_node(handler, body if isinstance(body, dict) else {})
+    finally:
+        with _JOIN_LOCK:
+            for j in _JOINS.values():
+                if j.get("busy") and j.get("busy_by") == threading.get_ident():
+                    j["busy"] = False
+
+
+def _join_node(handler, body):
+    """安裝腳本送回來的代理資訊：驗加入碼、驗憑證、用那張憑證與權杖實際連一次成功才納管。"""
+    ip = handler.ip
+    with _JOIN_LOCK:
+        fails = [t for t in _JOIN_FAILS.get(ip, []) if t > time.time() - 900]
+        _JOIN_FAILS[ip] = fails
+    if len(fails) >= JOIN_FAIL_MAX:
+        return 429, {"error": "失敗次數過多，請 15 分鐘後再試"}
+
+    def fail(msg, j=None):
+        with _JOIN_LOCK:
+            _JOIN_FAILS.setdefault(ip, []).append(time.time())
+            if j is not None:
+                j["error"] = msg
+                j["busy"] = False
+        STORE.audit("", ip, "node.join", "", False, {"message": msg})
+        return 400, {"error": msg}
+
+    j = join_lookup(body.get("code"), reserve=True)
+    if not j:
+        return fail("加入碼不對、已經用過、過期了，或另一台正在用它加入；請在主控台重新按「加一台機器」")
+    token = str(body.get("token") or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,128}", token):
+        return fail("代理的權杖格式不對", j)
+    # 只收剛好一張、不是 CA 的憑證（代理自己產的那張）。以前收整串：攻擊者把「別台代理的憑證＋自己的 CA」
+    # 串在一起送，指紋算的是第一張（別台的），連線驗證卻信整串，於是能搶走已納管的那台（資安審查重現）
+    r, pem = tls.inspect_trusted_ca(str(body.get("cert") or "").encode())
+    if not r.get("ok") or r.get("count") != 1:
+        return fail("代理的憑證要剛好一張（代理自己產生的那張）", j)
+    from cryptography import x509
+    try:
+        bc = x509.load_pem_x509_certificate(pem).extensions.get_extension_for_class(x509.BasicConstraints).value
+        if bc.ca:
+            return fail("代理的憑證不能是 CA 憑證", j)
+    except x509.ExtensionNotFound:
+        pass
+    try:
+        port = int(body.get("port") or 9401)
+    except (TypeError, ValueError):
+        port = 0
+    if not 1 <= port <= 65535:
+        return fail("代理的埠不對", j)
+    hostname = re.sub(r"[^\w.-]", "-", str(body.get("hostname") or ""))[:40].strip("-.") or "node"
+    ips = body.get("ips") if isinstance(body.get("ips"), list) else []
+    cands = [ip] + [x for x in ips[:4] if isinstance(x, str)]
+    # 這個端點不需登入：只去連「加入的那台自己的位址」，不讓請求叫主控台去連任意主機。
+    # 連線來源一定試；那台回報的位址排除群播、未指定、保留位址；主機名稱只有解析結果正好是上面這些位址之一才試。
+    hosts = []
+    for h in cands:
+        try:
+            a = ipaddress.ip_address(h)
+        except ValueError:
+            continue
+        if a.is_loopback or a.is_multicast or a.is_unspecified or a.is_reserved or a.is_link_local:
+            continue
+        if str(a) not in hosts:
+            hosts.append(str(a))
+    if ip in ("127.0.0.1", "::1"):
+        hosts.insert(0, "127.0.0.1")         # 主控台自己這台
+    if valid_host(hostname) and hostname != "node":
+        try:
+            resolved = {i[4][0] for i in socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)}
+        except OSError:
+            resolved = set()
+        if resolved and resolved <= set(hosts):
+            hosts.append(hostname)           # 重新加入時 IP 可能換了：舊憑證的 SAN 還有主機名稱
+    tmp = os.path.join(CERTS.p.trust, f".join-{secrets.token_hex(6)}.pem")
+    with open(tmp, "wb") as fh:
+        fh.write(pem)
+    os.chmod(tmp, 0o600)
+    good, why = None, ""
+    try:
+        # 跟日後 call_node 同一套驗證（含主機名稱）：這裡連得上，之後就連得上
+        ctx = tls.client_context(tmp)
+        for h in hosts:
+            url = f"https://{'[' + h + ']' if ':' in h else h}:{port}/state"
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+            try:
+                with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+                    if resp.status == 200:
+                        good = h
+                        break
+            except Exception as exc:  # noqa: BLE001
+                why = str(exc)[:160]           # 只寫進操作紀錄，不回給請求方（不讓人拿加入端點分辨埠的狀態）
+        if not good:
+            os.remove(tmp)
+            STORE.audit("", ip, "node.join_probe", "", False, {"hosts": hosts, "port": port, "why": why})
+            return fail(f"主控台連不到這台的代理（試過 {', '.join(f'{h}:{port}' for h in hosts)}）。"
+                        f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
+        nid = None
+
+        def put(cfg):
+            nonlocal nid
+            # 加入一律新增一台；只有管理者產碼時指定「重新安裝哪一台」才覆寫那一筆。
+            # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）
+            same = next((n for n in cfg["nodes"] if n["id"] == j.get("replace")), None)
+            if same:                                   # 指定重新安裝的那台：換新的權杖、位址與憑證，名稱群組不動
+                same.update(host=good, agent_port=port, token=tls.seal(CERTS.p, token.encode()))
+                nid = same["id"]
+                return
+            taken = {n["id"] for n in cfg["nodes"]}
+            base = hostname if NODE_ID_RX.fullmatch(hostname) else "node"
+            nid = base if base not in taken else next(f"{base}-{i}" for i in range(2, 999) if f"{base}-{i}" not in taken)
+            cfg["nodes"].append({"id": nid, "name": j.get("name") or hostname, "host": good,
+                                 "group": j.get("group") or "未分類", "agent_port": port,
+                                 "token": tls.seal(CERTS.p, token.encode())})
+        update_fleet(put)
+        os.replace(tmp, trust_file(nid))
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    with _JOIN_LOCK:
+        j["node_id"] = nid
+        j["linger"] = bool(body.get("linger"))
+        j["error"] = None
+    STORE.audit(j["by"], ip, "node.join", nid, True, {"host": good, "port": port,
+                                                       "fingerprint256": r["summary"]["fingerprint256"]})
+    name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
+    return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
 
 # ---------------------------------------------------------------- HTTP
 
@@ -476,13 +876,13 @@ class Handler(BaseHTTPRequestHandler):
         self._json(401, {"error": "請先登入"})
         return True
 
-    def _body(self):
+    def _body(self, limit=None):
         try:
             n = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             n = 0
         n = max(n, 0)            # 負數交給 read() 會一直讀到連線結束，執行緒就卡住
-        if n > MAX_BODY:
+        if n > (limit or MAX_BODY):
             # 不讀完就回 413 並關連線：照宣稱的長度去讀，對方宣稱 10 GB 卻不送，執行緒就被占住
             self.close_connection = True
             return None
@@ -500,6 +900,11 @@ class Handler(BaseHTTPRequestHandler):
         # 一定要清掉，否則登入前查到的「沒人」會跟到登入後，登出後查到的「有人」也會留著
         # （實際踩到：登入成功後 /api/me 仍回 401，畫面卡在登入頁）
         self.__dict__.pop("_user_cache", None)
+        # 請求列、標頭（POST 連同本文）要在 15 秒內送完，閒置的 keep-alive 也 15 秒就關：
+        # 以前每次 recv 各等 120 秒，每 100 秒送一個位元組就能無限期佔住一條連線，8 個來源就能佔滿上限（資安審查）
+        self._hdr_timer = threading.Timer(HEADER_DEADLINE, self._abort_slow)
+        self._hdr_timer.daemon = True
+        self._hdr_timer.start()
         try:
             super().handle_one_request()
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
@@ -512,12 +917,26 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:  # noqa: BLE001
                 pass
             self.close_connection = True
+        finally:
+            self._hdr_timer.cancel()
+
+    def _abort_slow(self):
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+    def _headers_done(self):
+        t = getattr(self, "_hdr_timer", None)
+        if t:
+            t.cancel()
 
     def version_string(self):
         return "xconsole"
 
     # ---- GET
     def do_GET(self):  # noqa: N802
+        self._headers_done()
         u = urlparse(self.path)
         path, q = u.path, parse_qs(u.query)
         if path == "/healthz":
@@ -531,6 +950,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, branding())
         if path == "/branding/logo":
             return self._logo()
+        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|xconsole_agent\.py)", path)
+        if m:
+            # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
+            j = join_lookup(m.group(1))
+            if not j:
+                return self._send(404, "加入碼不對、已經用過或過期了，請在主控台重新按「加一台機器」。\n".encode(),
+                                  "text/plain; charset=utf-8")
+            if m.group(2) == "agent.sh":
+                return self._send(200, install_script(m.group(1), j).encode(), "text/x-shellscript; charset=utf-8")
+            src = agent_source()
+            if not src:
+                return self._send(500, "主控台找不到代理程式檔，請重新部署主控台。\n".encode(), "text/plain; charset=utf-8")
+            with open(src, "rb") as fh:
+                return self._send(200, fh.read(), "text/x-python; charset=utf-8")
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
@@ -554,6 +987,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
             return self._json(200, fleet_state())
+        m = re.fullmatch(r"/api/nodes/join-code/([0-9a-f]{12})", path)
+        if m:
+            with _JOIN_LOCK:
+                j = next((v for k, v in _JOINS.items() if k.startswith(m.group(1))), None)
+            if not j:
+                return self._json(404, {"error": "沒有這個加入碼"})
+            state = "joined" if j.get("node_id") else "expired" if j["exp"] < time.time() else "waiting"
+            return self._json(200, {"state": state, "node_id": j.get("node_id"), "error": j.get("error"),
+                                    "linger": j.get("linger"), "expires_at": j["exp"]})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/machine", timeout=60))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/build(/progress)?", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/llama/build" + (m.group(2) or ""), timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
             return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
@@ -606,26 +1054,42 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
-        body = self._body()
+        anon = path in ("/api/login", "/api/join", "/api/logout")
+        if not anon and not self.user:
+            # 先驗登入再讀本文：沒登入的人不能讓主控台讀 6 MB。小的本文照樣讀掉再回 401（沒讀完就關連線，
+            # TCP 會送重置，對方連 401 都收不到）；超過 64 KB 的直接關
+            if self._body(MAX_ANON_BODY) is None:
+                return None
+            self._headers_done()
+            return self._json(401, {"error": "請先登入"})
+        body = self._body(MAX_ANON_BODY if anon else MAX_BODY)
+        self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
         if body is None:
-            return self._json(413, {"error": "上傳超過 6 MB"})
+            return self._json(413, {"error": "請求內容太大"})
 
         if path == "/api/login":
             user = str(body.get("username") or "")[:64]
-            since = time.time() - LOGIN_WINDOW
-            if (STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP
-                    or STORE.failed_logins(since) >= LOGIN_MAX_GLOBAL):
-                STORE.audit(user, self.ip, "auth.throttled", user, False)
-                return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
-            if not check_credentials(user, str(body.get("password") or "")):
-                time.sleep(1.0)
-                STORE.audit(user, self.ip, "auth.login", user, False)
-                return self._json(401, {"error": "帳號或密碼不對"})
+            # 一次只驗一個登入，失敗等一秒才放下一個：同時開幾百條連線也繞不過節流（以前檢查在寫入失敗紀錄之前，
+            # 平行送出全部都會通過），全網分散猜密碼的速度上限約每秒一次。
+            # 不再做「全部來源加起來錯 50 次就全部封鎖」：內網任何人都能藉此把管理者鎖在門外（資安審查）
+            with _LOGIN_LOCK:
+                since = time.time() - LOGIN_WINDOW
+                if STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP:
+                    if time.time() - _THROTTLE_LOGGED.get(self.ip, 0) > 60:     # 被擋的請求每個來源每分鐘只記一筆，免得灌爆稽核表
+                        _THROTTLE_LOGGED[self.ip] = time.time()
+                        STORE.audit(user, self.ip, "auth.throttled", user, False)
+                    return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
+                if not check_credentials(user, str(body.get("password") or "")):
+                    STORE.audit(user, self.ip, "auth.login", user, False)
+                    time.sleep(1.0)
+                    return self._json(401, {"error": "帳號或密碼不對"})
             STORE.audit(user, self.ip, "auth.login", user, True)
             sid = STORE.session_new(user, self.ip, SESSION_HOURS)
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
             return self._json(200, {"ok": True, "user": user}, cookie=cookie)
+        if path == "/api/join":
+            return self._json(*join_node(self, body))
         if path == "/api/logout":
             who = self.user                                   # 先記下是誰，作廢之後就查不到了
             STORE.session_end(self._cookie())                 # 伺服器端作廢，不只是清 cookie
@@ -634,6 +1098,85 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True}, cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
         if self._need_auth():
             return None
+
+        # ---- 納管的機器：加入、改名與位址、移除
+        if path == "/api/nodes/join-code":
+            name = str(body.get("name") or "").strip()[:40]
+            group = str(body.get("group") or "").strip()[:30]
+            replace = str(body.get("replace") or "")
+            if replace and not any(n["id"] == replace for n in fleet()["nodes"]):
+                return self._json(400, {"error": "要重新安裝的那台不在納管清單裡"})
+            host = str(body.get("console") or self.headers.get("Host") or "").strip()
+            port_s = host.rsplit(":", 1)[1] if re.search(r":\d+$", host) else "443"
+            if not HOST_RX.fullmatch(host) or not 1 <= int(port_s) <= 65535:
+                return self._json(400, {"error": "主控台位址格式不對，例：140.135.107.216:9400（埠要在 1～65535）"})
+            if not agent_source():
+                return self._json(500, {"error": "主控台找不到代理程式檔，請重新部署主控台"})
+            code = secrets.token_urlsafe(24)
+            with _JOIN_LOCK:
+                _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group, "replace": replace,
+                                           "console": host, "pin": console_pin(), "by": self.user}
+            self._audit("node.join_code", host, True, {"name": name, "group": group})
+            url = f"https://{host}/install/{code}/agent.sh"
+            return self._json(200, {"id": _join_key(code)[:12], "expires_at": time.time() + JOIN_TTL,
+                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash"})
+        m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove)", path)
+        if m:
+            nid, act = m.group(1), m.group(2)
+            node = next((n for n in fleet()["nodes"] if n["id"] == nid), None)
+            if not node:
+                return self._json(404, {"error": "沒有這台機器"})
+            if act == "remove":
+                update_fleet(lambda cfg: cfg.__setitem__("nodes", [n for n in cfg["nodes"] if n["id"] != nid]))
+                if os.path.exists(trust_file(nid)):
+                    os.remove(trust_file(nid))
+                self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"]})
+                return self._json(200, {"ok": True})
+            name = str(body.get("name", node["name"]) or "").strip()
+            group = str(body.get("group", node.get("group", "")) or "").strip() or "未分類"
+            host = str(body.get("host", node["host"]) or "").strip()
+            try:
+                port = int(body.get("agent_port", node.get("agent_port", 9401)))
+            except (TypeError, ValueError):
+                port = 0
+            if not 1 <= len(name) <= 40 or re.search(r"[\x00-\x1f<>]", name):
+                return self._json(400, {"error": "名稱要 1～40 個字"})
+            if len(group) > 30 or re.search(r"[\x00-\x1f<>]", group):
+                return self._json(400, {"error": "群組最多 30 個字"})
+            if not valid_host(host):
+                return self._json(400, {"error": "位址格式不對，填 IP 或主機名稱（不含埠）"})
+            if not 1 <= port <= 65535:
+                return self._json(400, {"error": "代理的埠要在 1～65535"})
+            moved = (host, port) != (node["host"], int(node.get("agent_port", 9401)))
+            old = {k: node.get(k) for k in ("name", "group", "host", "agent_port")}
+
+            def put(cfg):
+                for n in cfg["nodes"]:
+                    if n["id"] == nid:
+                        n.update(name=name, group=group, host=host, agent_port=port)
+            update_fleet(put)
+            if moved:
+                # 換位址先實際連一次，連不上就換回來，免得改一個字就整台失聯
+                code, out = call_node(nid, "/healthz", timeout=15)
+                if code != 200:
+                    update_fleet(lambda cfg: [n.update(old) for n in cfg["nodes"] if n["id"] == nid])
+                    self._audit("node.update", nid, False, {"message": out.get("error")})
+                    return self._json(400, {"error": f"新位址連不到這台的代理，已改回原本的位址。{out.get('error') or ''}"})
+            self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
+                                                                       "agent_port": port}})
+            return self._json(200, {"ok": True})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel)", path)
+        if m:
+            code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
+            act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
+                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel"}.get(m.group(2)) or (
+                "profile.delete" if m.group(2).startswith("profiles/") else
+                "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
+            self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "gguf_root",
+                                                  "llama_server", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
+                        | ({"message": out.get("error")} if code != 200 else {}))
+            return self._json(code, out)
 
         # ---- 各機動作：轉給代理，並記稽核
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/(start|stop|restart)", path)
@@ -645,12 +1188,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/model", path)
         if m:
-            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "force") if k in body}
+            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "gpus", "force") if k in body}
             # 載幾十 GB 的模型加上失敗時的還原，最久可能各要十幾分鐘
             code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", want, timeout=2000)
             self._audit("model.swap", f"{m.group(1)}/{m.group(2)}", code == 200,
                         {"to": out.get("model") or body.get("model") or os.path.basename(str(body.get("pack", ""))),
                          "engine": body.get("engine") or "strata", "switched_engine": out.get("switched_engine"),
+                         "gpus": out.get("gpus") if code == 200 else body.get("gpus"),
                          "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
                          "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
@@ -806,13 +1350,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "branding": branding()})
         if path == "/api/branding/logo":
             if body.get("remove"):
-                old = (fleet().get("branding") or {}).get("logo")
-                update_fleet(lambda c: c.setdefault("branding", {}).pop("logo", None))
-                if old:
-                    try:
-                        os.remove(os.path.join(BRAND_DIR, os.path.basename(old.get("file", ""))))
-                    except FileNotFoundError:
-                        pass
+                with _BRAND_LOCK:
+                    old = (fleet().get("branding") or {}).get("logo")
+                    update_fleet(lambda c: c.setdefault("branding", {}).pop("logo", None))
+                    if old:
+                        try:
+                            os.remove(os.path.join(BRAND_DIR, os.path.basename(old.get("file", ""))))
+                        except FileNotFoundError:
+                            pass
                 self._audit("branding.logo", "移除", True)
                 return self._json(200, {"ok": True, "branding": branding()})
             try:
@@ -828,8 +1373,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "只接受 PNG、JPEG、WebP 圖檔（不收 SVG）"})
             if not (16 <= info[1] <= 4096 and 16 <= info[2] <= 4096):
                 return self._json(400, {"error": f"圖片尺寸 {info[1]}×{info[2]} 不合用，寬高要在 16～4096 像素之間"})
-            meta = save_logo(data)
-            update_fleet(lambda c: c.setdefault("branding", {}).__setitem__("logo", meta))
+            with _BRAND_LOCK:
+                meta = save_logo(data)
+                update_fleet(lambda c: c.setdefault("branding", {}).__setitem__("logo", meta))
             self._audit("branding.logo", meta["file"], True, {"width": meta["w"], "height": meta["h"],
                                                                "bytes": meta["bytes"], "sha256": meta["sha"][:12]})
             return self._json(200, {"ok": True, "branding": branding()})

@@ -45,6 +45,8 @@ jobs:
         run: python test/test_api_integration.py
       - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
         run: python test/test_llama_engine.py
+      - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
+        run: python test/test_machine_admin.py
 
   # ── 1. SAST ────────────────────────────────────────────────
   codeql:

@@ -1,3 +1,8 @@
+# test/security/test_security.py　執行時間 2026/10/25 14:14（台北時間）　主機 .27
+/tmp/xc-ev/repo/test/security/test_security.py:247: DeprecationWarning: ssl.TLSVersion.TLSv1 is deprecated
+  old_ctx.minimum_version = ssl.TLSVersion.TLSv1
+/tmp/xc-ev/repo/test/security/test_security.py:248: DeprecationWarning: ssl.TLSVersion.TLSv1_1 is deprecated
+  old_ctx.maximum_version = ssl.TLSVersion.TLSv1_1
 [通過] 未登入打 23 支 API 全部回 401
 [通過] 公開的健康檢查只回狀態，不回機器清單與帳號
 [通過] 正確帳密登入

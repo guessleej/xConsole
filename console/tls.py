@@ -813,6 +813,29 @@ class TLSServer(ThreadingHTTPServer):
     """
     daemon_threads = True
     certs = None   # CertManager
+    # 連線數上限：沒登入的人開一堆連線慢慢送，每條都會佔住一個執行緒；總數與同一來源各設上限，超過的直接關
+    MAX_CONNS, MAX_PER_IP = 512, 64
+    _conns, _per_ip, _conn_lock = 0, {}, threading.Lock()
+
+    def process_request(self, request, client_address):
+        ip = client_address[0] if client_address else ""
+        with self._conn_lock:
+            if TLSServer._conns >= self.MAX_CONNS or self._per_ip.get(ip, 0) >= self.MAX_PER_IP:
+                self.shutdown_request(request)
+                return
+            TLSServer._conns += 1
+            self._per_ip[ip] = self._per_ip.get(ip, 0) + 1
+
+        def run():
+            try:
+                self.process_request_thread(request, client_address)
+            finally:
+                with self._conn_lock:
+                    TLSServer._conns -= 1
+                    self._per_ip[ip] -= 1
+                    if not self._per_ip[ip]:
+                        del self._per_ip[ip]
+        threading.Thread(target=run, daemon=True).start()
 
     def finish_request(self, request, client_address):
         try:

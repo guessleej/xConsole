@@ -361,7 +361,7 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
 .kv .k { color: var(--ink-3); }
 .kv .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.slot-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+.slot-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
 
 .btn {
   border: 1px solid transparent;
@@ -371,6 +371,7 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 13.5px;
+  white-space: nowrap;            /* 卡片窄的時候整顆換行，不要擠成一個字一行（「重／啟」） */
   transition: background .15s ease;
 }
 :root[data-theme="dark"] .btn { background: rgba(255, 255, 255, .09); }
@@ -470,6 +471,7 @@ tbody tr:hover td { background: var(--bg-hover); }
 th:first-child, td:first-child { width: 72px; }
 th:nth-child(2), td:nth-child(2) { width: 84px; }
 th:last-child, td:last-child { width: 90px; }
+th.num { text-align: right; }
 td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 pre.log {
@@ -819,6 +821,43 @@ label.pick .chips { flex: none; justify-content: flex-end; max-width: 45%; }
   label.pick .chips { max-width: none; justify-content: flex-start; }
 }
 
+/* 第二列：多個群組時的群組名（不是按鈕） */
+.subnav-label { align-self: center; padding: 0 6px 0 12px; font-size: 12px; font-weight: 700; color: var(--ink-3); white-space: nowrap; }
+.subnav-label:first-child { padding-left: 0; }
+
+/* 順序軸每步的「跳過去做」 */
+.step .btn { align-self: flex-start; margin-top: 2px; }
+
+/* 多卡：每張卡一條細長條 */
+.gpu-list { display: grid; gap: 6px; margin: 10px 0 16px; }
+.gpu-row { display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto; gap: 10px; align-items: center; }
+.bar.thin { height: 8px; border-radius: 4px; }
+.bar.thin .seg { background: var(--brand); }
+
+/* 表格列尾的按鈕群、手動放入的目錄樹 */
+td.row-acts { white-space: nowrap; }
+td.row-acts .btn + .btn { margin-left: 6px; }
+pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 12.5px; }
+
+/* 窄螢幕的表格：欄名與數字不逐字折行，寧可在框內左右捲 */
+.scrollbox th, .scrollbox td.num { white-space: nowrap; }
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+  .gpu-row { grid-template-columns: 1fr auto; }
+  .gpu-row .bar { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* 換模型：用哪幾張卡 */
+.gpu-pick { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 4px; }
+.gpu-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; }
+
+/* 機器的納管與設定 */
+td.nowrap, .nowrap { white-space: nowrap; }
+.need-list { margin: 8px 0 10px; padding-left: 18px; line-height: 1.7; }
+.modal h4.pick-h + .form-row { margin-top: 4px; }
+.check-row { display: flex; margin: 12px 0 4px; }
+pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+
 /* ---------------------------------------------------------- 客戶品牌與頁尾 */
 
 /* 品牌資料回來前先不畫品牌區：否則會先閃一下 xConsole 才換成客戶的名稱 */
@@ -858,11 +897,10 @@ html.brand-pending #login-org { visibility: hidden; }
   letter-spacing: .01em;
 }
 .powered strong { color: var(--ink-2); font-weight: 700; }
+/* 登入頁的頁尾排在版面裡（第二列），不浮在上面：矮螢幕（手機橫放）時浮動的頁尾會蓋住登入鈕、擋掉點擊 */
+.login-page { grid-template-rows: 1fr auto; }
 .login-page .powered {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   color: rgba(255, 255, 255, .55);
 }
 .login-page .powered strong { color: rgba(255, 255, 255, .82); }
