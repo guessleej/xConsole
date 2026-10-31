@@ -15,7 +15,9 @@ node_agent 沒有的那一層：角色欄位與模型、准入控制、啟停、
 """
 import functools
 import glob
+import io
 import json
+import math
 import os
 import re
 import secrets
@@ -383,6 +385,67 @@ def hardware():
         "ram": {"total": _meminfo("MemTotal")},
         "uptime": uptime,
     }
+
+
+# 每產生一個 token 都要把用到的權重從記憶體讀一遍，所以速度上限看記憶體頻寬。數字是各家規格書的標稱值（GB/s）；
+# 依序比對，越具體的放越前面。比不到就是未知，管理者可在「這台的設定」自己填。
+BANDWIDTH_GBS = (
+    ("Radeon 8060S", 256), ("Radeon 8050S", 256), ("GB10", 273), ("AGX Thor", 273), ("Thor", 273),
+    ("AGX Orin", 204.8), ("Orin NX", 102.4), ("Orin Nano", 68),
+    ("B300", 8000), ("B200", 8000), ("H200", 4800), ("H100 PCIe", 2000), ("H100", 3350),
+    ("A100 80GB", 2039), ("A100", 1555), ("A30", 933), ("L40S", 864), ("L40", 864), ("L4", 300),
+    ("RTX PRO 6000", 1792), ("RTX 6000 Ada", 960), ("RTX 5090", 1792), ("RTX 5080", 960),
+    ("RTX 4090", 1008), ("RTX 4080", 717), ("RTX 3090", 936), ("RTX A6000", 768),
+    ("P100", 732), ("P40", 347), ("V100", 900), ("T4", 320), ("GTX 1650", 128),
+    ("MI300X", 5300), ("MI250", 3277), ("MI210", 1638), ("MI100", 1229), ("MI50", 1024), ("MI60", 1024),
+    ("RX 7900 XTX", 960),
+)
+# AMD 獨立卡在 sysfs 只認得出「AMD GPU」：用 KFD 的 gfx 版本反查型號
+AMD_GFX = {"90006": "AMD Instinct MI50／MI60", "90008": "AMD Instinct MI100", "90010": "AMD Instinct MI210／MI250",
+           "90402": "AMD Instinct MI300X", "110000": "AMD Radeon RX 7900 XTX", "110501": "AMD Radeon 8060S"}
+
+
+def spec_bandwidth(hay):
+    """名稱 → 規格書頻寬。名稱是「MI210／MI250」這種認不出是哪一張的（同一個 gfx 版本），兩種頻寬不同就回未知，
+    不拿第一個比到的充數（MI250 是 MI210 的兩倍，速度估算會整個翻倍）。"""
+    def one(h):
+        return next((v for k, v in BANDWIDTH_GBS if k.lower() in h.lower()), None)
+    vals = {one(a) for a in hay.split("／")}
+    return vals.pop() if len(vals) == 1 else None
+
+
+@functools.lru_cache(maxsize=1)
+def _chip_probe():
+    cpu = next((ln.split(":", 1)[1].strip() for ln in (load_text("/proc/cpuinfo") or "").splitlines()
+                if ln.startswith("model name")), "")
+    board = (load_text("/proc/device-tree/model") or "").replace("\x00", "").strip()
+    gpus = probe_gpus()
+    names = [g["name"] for g in gpus if g.get("name") and g["name"] != "AMD GPU"]
+    if not names and gpus:
+        for props in glob.glob(os.path.join(KFD_NODES, "*", "properties")):
+            m = re.search(r"gfx_target_version (\d+)", load_text(props) or "")
+            if m and m.group(1) in AMD_GFX:
+                names.append(AMD_GFX[m.group(1)])
+                break
+    if "Radeon" in cpu and (not names or names[0].startswith("AMD Radeon 8")):
+        names = [cpu.split("w/", 1)[-1].strip()] if "w/" in cpu else names       # APU：顯示晶片寫在 CPU 型號裡
+    gpu = names[0] if names else (board if "Jetson" in board else None)
+    hay = " ".join(x for x in (gpu or "", board) if x)
+    bw = spec_bandwidth(hay)
+    sug, why = suggest_memory_model(gpus)
+    return {"cpu": cpu or None, "cores": os.cpu_count(), "board": board or None, "gpu": gpu,
+            "gpu_count": len(gpus), "bandwidth_spec_gbs": bw, "suggest": sug, "suggest_why": why}
+
+
+def chip(machine=None):
+    """這台是什麼晶片、記憶體頻寬多少（推薦清單估速度用）。管理者在網頁上填的值優先於規格表。"""
+    machine = machine if machine is not None else registry()["machine"]
+    c = dict(_chip_probe())
+    own = machine.get("bandwidth_gbs")
+    c["bandwidth_gbs"] = own or c["bandwidth_spec_gbs"]
+    c["bandwidth_src"] = "管理者設定" if own else ("規格書標稱值" if c["bandwidth_spec_gbs"] else None)
+    c["ram_bandwidth_gbs"] = machine.get("ram_bandwidth_gbs")
+    return c
 
 
 def temps():
@@ -851,8 +914,12 @@ def catalog(slot_id=None):
     cap = (p.get("unified") or p.get("vram") or {}).get("total_gib") or 0
     for m in ggufs:
         ctx = min(ctx_default, m["ctx_train"]) if m.get("ctx_train") else ctx_default
-        est = llama_est(m, reg["machine"], ctx, par)
+        # 用整台的容量（不是現在剩多少）看要不要自動分層，給換模型視窗當預覽；真正換的時候照當下的剩餘量再算一次
+        tier = auto_cpu_moe(m, reg["machine"], [{**c, "free_gib": c["total_gib"]} for c in p["gpus"]],
+                            (slot or {}).get("gpu_ids"), ctx, par, 0.0)
+        est = llama_est(m, reg["machine"], ctx, par, tier)
         m.update(est_vram_gib=est["vram"], est_ram_gib=est["ram"], est_kv_gib=est["kv"], ctx_default=ctx, parallel=par,
+                 auto_cpu_moe=tier, moved_gib=est["moved_gib"],
                  fits_total=bool(cap) and est["vram"] + est["kv"] < cap,
                  current=bool(slot and slot.get("kind") == "llama" and os.path.abspath(cur.get("_native") or "") == os.path.abspath(m["path"])))
     out.update(gguf=ggufs, gguf_problems=problems, gguf_root=root,
@@ -1507,21 +1574,28 @@ CN_ORIGIN = ("qwen", "deepseek", "glm", "chatglm", "kimi", "moonshot", "minimax"
              "internlm", "baichuan", "doubao", "ernie", "seed-oss")
 
 
+def is_mmproj(name):
+    """看圖用的投影檔：名稱裡有 mmproj 就算（有的放在前面 mmproj-F16.gguf，有的在後面 …-OCR-v1-mmproj-f16.gguf）。"""
+    return "mmproj" in os.path.basename(name).lower()
+
+
 def gguf_root(reg=None):
     reg = reg or registry()
     return os.path.expanduser(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
 
 
-def gguf_meta(path):
-    """讀 GGUF 檔頭的 key-value（不讀權重）。tokenizer 那種幾十萬筆的陣列直接跳過。"""
+def gguf_meta(path, tensors=False):
+    """讀 GGUF 檔頭的 key-value（不讀權重）。tokenizer 那種幾十萬筆的陣列直接跳過。
+    path 也可以是已開好的檔案物件（例：從 Hugging Face 用 Range 抓回來的前幾 MB）。
+    tensors=True 時再讀張量清單（名稱與 offset），放在 _tensors，權重資料起點放在 _data_start。"""
     sz = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
     fm = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
     try:
-        with open(path, "rb") as f:
+        with (open(path, "rb") if isinstance(path, str) else path) as f:
             if f.read(4) != b"GGUF":
                 return None
             f.read(4)
-            _, n_kv = struct.unpack("<QQ", f.read(16))
+            n_tensors, n_kv = struct.unpack("<QQ", f.read(16))
 
             def rstr():
                 n, = struct.unpack("<Q", f.read(8))
@@ -1553,6 +1627,17 @@ def gguf_meta(path):
                 k = rstr()
                 t, = struct.unpack("<I", f.read(4))
                 out[k] = rval(t)
+            if tensors:
+                infos = []
+                for _ in range(min(n_tensors, 200000)):
+                    name = rstr()
+                    nd, = struct.unpack("<I", f.read(4))
+                    f.read(8 * nd + 4)                       # 各維大小＋量化型別，用不到
+                    off, = struct.unpack("<Q", f.read(8))
+                    infos.append((name, off))
+                align = int(out.get("general.alignment") or 32)
+                out["_tensors"] = infos
+                out["_data_start"] = -(-f.tell() // align) * align
             return out
     except (OSError, struct.error, ValueError):
         return None
@@ -1591,16 +1676,66 @@ def gguf_profile(meta):
             "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN)}
 
 
+def weight_profile(parts):
+    """parts：每個分片一筆 (含 _tensors 的 meta, 檔案總位元組)。回：
+    active_frac   每產生一個 token 實際要從記憶體讀的權重比例（MoE 只讀被選中的專家；決定速度）
+    expert_layers 有專家張量的層數；expert_layer_frac 每層專家占整顆的比例（自動分層一次搬一層）。
+    張量大小用相鄰 offset 相減、最後一個用檔尾，不必認得每一種量化格式。"""
+    sizes = {}
+    for meta, file_bytes in parts:
+        ts = sorted((meta or {}).get("_tensors") or [], key=lambda x: x[1])
+        end = file_bytes - (meta or {}).get("_data_start", 0)
+        for i, (name, off) in enumerate(ts):
+            sizes[name] = max(0, (ts[i + 1][1] if i + 1 < len(ts) else end) - off)
+    total = sum(sizes.values())
+    if not total:
+        return None
+    meta = parts[0][0]
+    arch = meta.get("general.architecture")
+    n_exp = int(meta.get(f"{arch}.expert_count") or 0)
+    used = int(meta.get(f"{arch}.expert_used_count") or 0)
+    exps = {n: b for n, b in sizes.items() if "_exps." in n}
+    exp_b = sum(exps.values())
+    layers = len({n.split(".")[1] for n in exps if n.startswith("blk.")})
+    # token_embd 每個 token 只查一列；有獨立 output.weight 時它不算讀取量。共用權重的模型 token_embd 就是輸出層，要算
+    # Gemma 3n／4 E 系列的 per_layer_token_embd 也是查表，占了大半檔案卻不是每個 token 整個讀
+    skip = (sizes.get("token_embd.weight", 0) if "output.weight" in sizes else 0) + sizes.get("per_layer_token_embd.weight", 0)
+    active = total - exp_b - skip + (exp_b * used / n_exp if n_exp else exp_b)
+    return {"active_frac": round(active / total, 4), "moe": bool(n_exp and exp_b), "expert_layers": layers,
+            "expert_used_frac": round(used / n_exp, 4) if n_exp else None,
+            "expert_layer_frac": round(exp_b / layers / total, 6) if layers else 0.0}
+
+
+def shard_paths(path):
+    """分片模型的第一片 → 全部分片的路徑；不是分片就只有自己。"""
+    m = SHARD_RX.search(path[:-5]) if path.endswith(".gguf") else None
+    if not m:
+        return [path]
+    base, n = path[:-5][:m.start()], int(m.group(2))
+    return [f"{base}-{i:05d}-of-{n:05d}.gguf" for i in range(1, n + 1)]
+
+
 _META_CACHE = {}
 
 
 def _profile_cached(path):
+    # 鍵要涵蓋每一個分片：只看第一片的話，後面的分片換過（下載完成、修好）快取還是舊的
     try:
-        key = (path, os.path.getmtime(path))
+        key = tuple((sp, os.path.getmtime(sp), os.path.getsize(sp)) for sp in shard_paths(path))
     except OSError:
         return None
     if key not in _META_CACHE:
-        _META_CACHE[key] = gguf_profile(gguf_meta(path))
+        parts = []
+        for sp in shard_paths(path):
+            meta = gguf_meta(sp, tensors=True)
+            if meta is None or not os.path.exists(sp):
+                parts = None
+                break
+            parts.append((meta, os.path.getsize(sp)))
+        prof = gguf_profile(parts[0][0]) if parts else None
+        if prof:
+            prof.update(weight_profile(parts) or {})
+        _META_CACHE[key] = prof
     return _META_CACHE[key]
 
 
@@ -1616,10 +1751,10 @@ def scan_gguf(reg=None):
         if not os.path.isdir(full) or folder.startswith("."):
             continue
         files = sorted(f for f in os.listdir(full) if f.endswith(".gguf"))
-        mmproj = next((os.path.join(full, f) for f in files if f.lower().startswith("mmproj")), None)
+        mmproj = next((os.path.join(full, f) for f in files if is_mmproj(f)), None)
         groups = {}
         for f in files:
-            if f.lower().startswith("mmproj"):
+            if is_mmproj(f):
                 continue
             base = f[:-5]
             m = SHARD_RX.search(base)
@@ -1648,13 +1783,33 @@ def scan_gguf(reg=None):
     return root, models, problems
 
 
-def llama_est(m, machine, ctx, parallel=1):
+def llama_est(m, machine, ctx, parallel=1, cpu_moe=0):
     """llama.cpp 跑這顆要多少：權重（＋mmproj）＋1 GiB 計算緩衝放 GPU 那邊，KV 另由 kv_worst 算；
-    系統記憶體那邊只剩引擎本身（--no-mmap 不會再多一份頁快取）。"""
+    系統記憶體那邊只剩引擎本身（--no-mmap 不會再多一份頁快取）。
+    cpu_moe＝自動分層搬到系統記憶體的專家層數：那幾層從 GPU 那邊扣掉、加到系統記憶體。"""
     mm = machine.get("memory_model", "discrete")
-    vram = round(m["size_gib"] + m.get("mmproj_gib", 0) + 1.0, 1)
-    return {"vram": vram, "ram": 1.5 if mm == "unified_single" else 2.5,
-            "kv": round(llama_kv_gib(m, ctx, parallel), 2)}
+    moved = cpu_moe * (m.get("expert_layer_frac") or 0) * m["size_gib"]
+    vram = round(m["size_gib"] + m.get("mmproj_gib", 0) + 1.0 - moved, 1)
+    return {"vram": vram, "ram": round((1.5 if mm == "unified_single" else 2.5) + moved, 1),
+            "kv": round(llama_kv_gib(m, ctx, parallel), 2), "moved_gib": round(moved, 1)}
+
+
+def auto_cpu_moe(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
+    """獨立顯卡放不下 MoE 時，從第一層起把專家搬到系統記憶體，搬到放得下為止（llama.cpp 的 --n-cpu-moe）。
+    注意力與共用部分留在卡上，速度掉得比整層搬出去少。統一記憶體機只有一個池，搬了也沒用，回 0。
+    back_gib：這次換掉的舊模型會釋出的顯存。搬完全部專家還放不下也回 0，交給准入擋。"""
+    if machine.get("memory_model", "discrete") != "discrete" or not m.get("moe") or not m.get("expert_layer_frac"):
+        return 0
+    use = [c for c in cards if not gpu_ids or str(c["id"]) in gpu_ids]
+    if not use:
+        return 0
+    avail = sum(c["free_gib"] for c in use) + back_gib - floors(machine)["vram"]
+    est = llama_est(m, machine, ctx, parallel)
+    over = est["vram"] + est["kv"] - avail
+    if over <= 0:
+        return 0
+    n = math.ceil(over / (m["expert_layer_frac"] * m["size_gib"]))
+    return n if n <= m.get("expert_layers", 0) else 0
 
 
 def llama_kv_gib(prof, ctx, parallel=1):
@@ -1739,6 +1894,8 @@ def llama_argv(raw, reg=None):
             "--alias", raw["alias"], "--jinja"]
     if raw.get("mmproj"):
         argv += ["--mmproj", raw["mmproj"]]
+    if raw.get("cpu_moe"):
+        argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
     if raw.get("max_tokens"):
         argv += ["-n", str(int(raw["max_tokens"]))]
     if raw.get("api_key_file") and os.path.exists(raw["api_key_file"]):
@@ -1902,14 +2059,21 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     prev_llama_raw = load_json(cfg_path, None)
     prev_key = load_text(engine_file(slot_id, ".key"))
     keyfile = write_llama_key(slot_id, carry_key)
+    # 獨立顯卡放不下的 MoE：自動把前幾層的專家搬到系統記憶體（使用者不必自己調 --n-cpu-moe）
+    # 舊模型釋出的顯存只算新綁定也會用到的那幾張卡：從卡 0 換到卡 1，卡 0 空出來的對卡 1 沒有幫助
+    back = 0.0
+    if old_unit and old_alive and cards:
+        split = card_split(_usage_reclaim(old)[0], old.get("gpu_ids"), cards)
+        back = sum(v for cid, v in split.items() if not gpu_ids or cid in [str(g) for g in gpu_ids])
+    cpu_moe = auto_cpu_moe(m, reg["machine"], cards, gpu_ids, want_ctx, par, back)
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
            "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
-           "api_key_file": keyfile, "gpus": gpu_ids}
+           "api_key_file": keyfile, "gpus": gpu_ids, "cpu_moe": cpu_moe or None}
     save_json(cfg_path, raw)
     os.chmod(cfg_path, 0o600)
     unit = ensure_llama_unit(slot_id, cfg_path)
-    est = llama_est(m, reg["machine"], want_ctx, par)
+    est = llama_est(m, reg["machine"], want_ctx, par, cpu_moe)
 
     engines = dict(slot.get("engines") or {})
     if slot.get("kind") == "strata":
@@ -1930,7 +2094,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
          "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
          # 跟模型有關的能力（看圖）每次依新模型重算，不沿用上一顆的
          "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
-         "model": m["name"], "quant": m.get("quant")})
+         "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
 
     def undo(msg, code=500, extra=None):
         if old_unit != unit:
@@ -1996,7 +2160,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     return 200, {"ok": True, "engine": "llama", "model": m["name"], "quant": m.get("quant"),
                  "api_model_name": alias, "port": int(port), "ctx": want_ctx,
                  "switched_engine": old.get("kind") not in (None, "llama"),
-                 "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids}
+                 "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids,
+                 "cpu_moe": cpu_moe, "moved_gib": est["moved_gib"]}
 
 
 def _usage_reclaim(old_slot):
@@ -2103,7 +2268,10 @@ def library():
                            "cn_origin": True, "arch": "qwen3.8-flash-next"})
     os.makedirs(root, exist_ok=True)
     du = os.statvfs(root)
-    return {"root": root, "free_gib": round(du.f_bavail * du.f_frsize / GIB, 1),
+    real = os.path.realpath(root)
+    store = max((x for x in storage_choices() if real == x["mount"] or real.startswith(x["mount"].rstrip("/") + "/")),
+                key=lambda x: len(x["mount"]), default=None)
+    return {"root": root, "free_gib": round(du.f_bavail * du.f_frsize / GIB, 1), "hdd": (store or {}).get("hdd"),
             "total_gib": round(du.f_blocks * du.f_frsize / GIB, 1),
             "gguf": ggufs, "strata": strata, "problems": problems,
             "llama_server": llama_server_exe(reg), "downloads": jobs}
@@ -2181,7 +2349,7 @@ def hf_files(repo, token=""):
     groups, mmproj = {}, []
     for f in files:
         base = os.path.basename(f["path"])
-        if base.lower().startswith("mmproj"):
+        if is_mmproj(base):
             mmproj.append(f)
             continue
         stem = SHARD_RX.sub("", base[:-5])
@@ -2205,6 +2373,60 @@ def hf_files(repo, token=""):
     out.sort(key=lambda c: (c["aux"], c["size_gib"]))
     return 200, {"repo": repo, "choices": out, "mmproj": sorted(x["path"] for x in mmproj), "free_gib": free,
                  "mmproj_sizes": {x["path"]: round(x["size"] / GIB, 2) for x in mmproj}}
+
+
+def _remote_meta(repo, path, token=""):
+    """用 Range 只抓檔頭（含張量清單），不下載權重。大詞表模型的檔頭可到十幾 MB：先抓 16 MB，不夠再抓 64 MB。"""
+    url = _hf_file_url(repo, path)
+    for want in (16 << 20, 64 << 20):
+        with _hf_get(url, token, rng="0", timeout=60) as resp:
+            cr = resp.headers.get("Content-Range") or ""
+            total = int(cr.rsplit("/", 1)[1]) if "/" in cr and cr.rsplit("/", 1)[1].isdigit() \
+                else int(resp.headers.get("Content-Length") or 0)
+            buf = resp.read(want)
+        meta = gguf_meta(io.BytesIO(buf), tensors=True)
+        if meta is not None and total:
+            return meta, total
+        if len(buf) < want:
+            break
+    return None, 0
+
+
+def hf_profile(repo, token="", match=""):
+    """不下載就知道這顆模型的底細：各量化的大小（hf_files）＋從檔頭讀出的架構、上下文、KV 與 MoE 比例。
+    推薦清單靠這個算「放不放得下、多快」。比例各量化差不多，只讀一個 Q4 一帶的量化。"""
+    code, info = hf_files(repo, token)
+    if code != 200:
+        return code, info
+    # 一個 repo 放好幾個不同的模型時（例 xGemable 同時有 coder-v2 與 Fable），只留名稱含 match 的那一家
+    if match:
+        info["choices"] = [c for c in info["choices"] if match.lower() in c["stem"].lower()]
+    mains = [c for c in info["choices"] if not c["aux"]]
+    if not mains:
+        return 400, {"error": f"這個 repo 裡沒有{'檔名含「' + match + '」的' if match else ''} GGUF 主模型檔"}
+    pick = next((c for c in mains if (c["quant"] or "").upper().endswith("Q4_K_M")), None) or mains[len(mains) // 2]
+    parts = []
+    try:
+        for f in pick["files"]:
+            meta, total = _remote_meta(repo, f, token)
+            if not meta:
+                return 502, {"error": f"讀不到 {f} 的檔頭"}
+            parts.append((meta, total))
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"讀檔頭失敗：{str(exc)[:160]}"}
+    prof = gguf_profile(parts[0][0]) or {}
+    prof.update(weight_profile(parts) or {})
+    prof["cn_origin"] = prof.get("cn_origin") or any(c in repo.lower() for c in CN_ORIGIN)
+    card = {}
+    try:
+        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}", token, timeout=20) as resp:
+            mi = json.load(resp)
+        lic = (mi.get("cardData") or {}).get("license") or next(
+            (t.split(":", 1)[1] for t in mi.get("tags") or [] if t.startswith("license:")), None)
+        card = {"license": lic if isinstance(lic, str) else None, "released": (mi.get("createdAt") or "")[:7] or None}
+    except Exception:  # noqa: BLE001
+        pass                                    # 授權與日期只是顯示用，拿不到不影響推薦
+    return 200, {**info, "profile": prof, "profiled": pick["stem"], "card": card}
 
 
 def start_download(repo, stem, mmproj=None, token=""):
@@ -2325,10 +2547,10 @@ def delete_model(model_id):
             freed += os.path.getsize(p)
             os.remove(p)
             removed.append(f)
-    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not f.lower().startswith("mmproj")]
+    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not is_mmproj(f)]
     if not rest:
         for f in os.listdir(full):
-            if f.lower().startswith("mmproj") and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
+            if is_mmproj(f) and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
                 p = inside(full, f)
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -2532,6 +2754,12 @@ def full_state():
     return {
         "ts": time.time(),
         "machine": reg["machine"],
+        "chip": chip(reg["machine"]),
+        # 總覽的「安裝推理引擎」那一步用：只看檔案在不在，不跑 --version（每 15 秒一次太貴）
+        "engine": {"llama_server": bool((reg["machine"].get("llama_server")
+                                         and os.path.exists(os.path.expanduser(reg["machine"]["llama_server"])))
+                                        or glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server"))),
+                   "building": bool(_BUILD.get("thread_alive"))},
         "slots": slots,
         "profiles": reg["profiles"],
         "pools": p,
@@ -3021,9 +3249,11 @@ def machine_info():
         "settings": {"memory_model": m.get("memory_model", "discrete"), "confirmed": bool(m.get("confirmed")),
                      "ram_floor_gib": m.get("ram_floor_gib"),
                      "vram_floor_gib": m.get("vram_floor_gib"), "note": m.get("note", ""),
-                     "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or ""},
+                     "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or "",
+                     "bandwidth_gbs": m.get("bandwidth_gbs"), "ram_bandwidth_gbs": m.get("ram_bandwidth_gbs")},
         "defaults": {k: DEFAULT_FLOORS[k] for k in MEMORY_MODELS},
         "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg)},
+        "chip": chip(m),
         "detect": {"memory_model": sug, "why": why, "hostname": socket.gethostname(),
                    "gpus": [{"id": g["id"], "name": g.get("name"), "vram_gib": round((g.get("vram_total") or 0) / GIB, 1)}
                             for g in gpus],
@@ -3118,6 +3348,18 @@ def save_machine(body):
             return 400, {"error": "底線要填數字（GiB）"}
         if not 0 <= v <= 256:
             return 400, {"error": "底線要在 0～256 GiB 之間"}
+        new[k] = v
+    for k in ("bandwidth_gbs", "ram_bandwidth_gbs"):
+        v = body.get(k)
+        if v in (None, ""):
+            new[k] = None
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return 400, {"error": "記憶體頻寬要填數字（GB/s）"}
+        if not 1 <= v <= 20000:
+            return 400, {"error": "記憶體頻寬要在 1～20000 GB/s 之間"}
         new[k] = v
     note = str(body.get("note") or "")
     if len(note) > 300 or re.search(r"[\x00-\x08\x0b-\x1f]", note):
@@ -3501,6 +3743,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, out)
         if path == "/library/hf":
             return self._send(*hf_files(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+        if path == "/library/hf/profile":
+            return self._send(*hf_profile(str(body.get("repo") or "").strip(), str(body.get("token") or ""),
+                                          str(body.get("match") or "")[:60]))
         if path == "/library/download":
             return self._send(*start_download(str(body.get("repo") or "").strip(), str(body.get("stem") or ""),
                                               body.get("mmproj") or None, str(body.get("token") or "")))
