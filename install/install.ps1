@@ -1,4 +1,4 @@
-# xConsole 單機安裝（Windows 10／11、Windows Server 2019 以上）：主控台＋節點代理裝在這一台。
+﻿# xConsole 單機安裝（Windows 10／11、Windows Server 2019 以上）：主控台＋節點代理裝在這一台。
 # 在解開的安裝包資料夾裡，按右鍵開「Windows PowerShell（系統管理員）」執行：
 #
 #   powershell -ExecutionPolicy Bypass -File install\install.ps1              安裝或更新（資料與設定都保留）
