@@ -124,6 +124,20 @@ def main():
     case("預設清單：每一筆都湊得出至少一組完整的檔", [r["repo"] for r in rows if not R.sd_resolve(r)], [])
     case("預設清單：有畫圖也有影片", sorted({r["kind"] for r in rows}), ["image", "video"])
 
+    # ---- 代理：macOS／Windows 裝官方預編譯版（檔名照 master-1030 實際的 release）
+    dg = {"digest": "sha256:" + "a" * 64, "browser_download_url": "https://x"}
+    rels = [{"tag_name": "master-fbd42b6", "assets": []},
+            {"tag_name": "master-1030-0a06712", "assets": [
+                {"name": "sd-master-0a06712-bin-Darwin-macOS-26.6.2-arm64.zip", **dg},
+                {"name": "sd-master-0a06712-bin-win-cuda12-x64.zip", **dg},
+                {"name": "cudart-sd-bin-win-cu12-x64.zip", **dg},
+                {"name": "sd-master-0a06712-bin-win-vulkan-x64.zip", "browser_download_url": "https://x"}]}]
+    t, a, x = A.pick_release(rels, "macos-arm64", None, "sd")
+    case("預編譯：macOS 的檔名帶系統版本也認得", (t, a["name"]), ("master-1030-0a06712", "sd-master-0a06712-bin-Darwin-macOS-26.6.2-arm64.zip"))
+    t, a, x = A.pick_release(rels, "win-cuda12-x64", "cudart-sd-bin-win-cu12-x64.zip", "sd")
+    case("預編譯：Windows CUDA 連執行階段一起", (a["name"], x["name"]), ("sd-master-0a06712-bin-win-cuda12-x64.zip", "cudart-sd-bin-win-cu12-x64.zip"))
+    case("預編譯：官方沒公布 sha256 的檔不裝", A.pick_release(rels, "win-vulkan-x64", None, "sd")[0], None)
+
     # ---- 代理：規格檢查
     case("代理：絕對路徑不收", "檔名不合法" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "/etc/x.gguf"}]})[1] or ""), True)
     case("代理：不是模型檔的副檔名不收", "檔名不合法" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "x.sh"}]})[1] or ""), True)

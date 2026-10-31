@@ -330,7 +330,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
 | `agent/test_platform.py` | Linux／macOS／Windows | 32 | 硬體讀數、代理自己看管模型服務（帶起來、掛了重開、停掉、代理重開後認回、起不來停在失敗） |
 | `test/e2e_install.py` | 裝好的機器 | 16 | 經網頁 API 走完：登入 → 確認架構 → 推薦 → 裝推理引擎 → 下載模型 → 換上 → 問一句話 → 停掉 |
-| `console/test_sd.py` | 任何機器 | 56 | 畫圖與影片：挑檔與量化、元件跟著主體、三種記憶體架構的准入與 `--max-vram`、中國來源（含文字編碼器與 VAE）、`sd-cli` 參數、進度解析、共用檔刪除、看門狗中止、啟動失敗不卡住 |
+| `console/test_sd.py` | 任何機器 | 59 | 畫圖與影片：挑檔與量化、元件跟著主體、三種記憶體架構的准入與 `--max-vram`、中國來源（含文字編碼器與 VAE）、`sd-cli` 參數、進度解析、共用檔刪除、看門狗中止、啟動失敗不卡住、macOS／Windows 預編譯版挑檔 |
 | `console/test_recommend.py` | 任何機器 | 44 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源擋下、推薦清單增改刪 |
 | `console/test_branding.py` | 任何 Linux | 49 | 客戶品牌：名稱驗證、Logo 只認 PNG／JPEG／WebP 檔頭（SVG、偽裝檔、超大檔被擋）、未登入、權限 0600、稽核不記圖檔、頁尾寫死 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
