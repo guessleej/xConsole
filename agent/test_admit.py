@@ -231,6 +231,13 @@ def main():
         A.cpu_name = lambda c=cpu: c                    # 三個系統讀 CPU 型號的方法不同，這裡只測判斷本身
         ok &= case(f"APU 判斷：{cpu[:30]}", A._apu_like(), want)
     A.cpu_name = real_cpu
+    # 沒有 GPU 的機器：模型整顆算系統記憶體，不能因為顯存是 0 就永遠擋下
+    reg = reg_for("discrete", [{"id": "c", "est_vram_gib": 3, "est_ram_gib": 2.5}], 32, 20)
+    v = A.admit("c", reg=reg, hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+    ok &= case("只有 CPU：放得下就放行（權重算進系統記憶體）", (v["allow"], v["pools"]["ram"]["need"]), (True, 5.5))
+    v = A.admit("c", reg=reg_for("discrete", [{"id": "c", "est_vram_gib": 12, "est_ram_gib": 2.5}], 32, 20),
+                hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+    ok &= case("只有 CPU：系統記憶體不夠照樣擋", v["allow"], False)
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])

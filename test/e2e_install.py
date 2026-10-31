@@ -70,7 +70,10 @@ def main():
     case("讀得到記憶體架構與晶片", st["pools"]["memory_model"] and st.get("chip"), (st["pools"]["memory_model"], (st.get("chip") or {}).get("gpu")))
     case("算得出這台能跑多大", n.get("capacity") is not None, (n.get("capacity") or {}).get("max_dense_b"))
     sug = st["chip"]["suggest"]
-    case("照偵測建議確認記憶體架構", call(f"/api/node/{nid}/machine", {"memory_model": sug})[0] == 200, sug)
+    # CI 主機記憶體很小（macOS 約 7 GB），預設底線（統一記憶體 12 GiB）會擋下任何模型；
+    # 小機器的管理者也是在網頁「這台的設定」把底線調低，這裡照做
+    small = {"ram_floor_gib": 1, "vram_floor_gib": 0.5} if os.environ.get("CI") else {}
+    case("照偵測建議確認記憶體架構", call(f"/api/node/{nid}/machine", {"memory_model": sug, **small})[0] == 200, sug)
     c, rec = call(f"/api/node/{nid}/recommend")
     case("推薦清單", c == 200 and rec["items"], c == 200 and len(rec["items"]))
 
