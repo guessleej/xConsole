@@ -658,7 +658,7 @@ if [ "$OSN" = Darwin ]; then
   <key>ProgramArguments</key><array><string>$PY</string><string>$HOME/xconsole_agent.py</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Background</string>
+  <key>ProcessType</key><string>Standard</string>
   <key>StandardOutPath</key><string>$HOME/.xconsole/agent.log</string>
   <key>StandardErrorPath</key><string>$HOME/.xconsole/agent.log</string>
 </dict></plist>
@@ -1826,7 +1826,8 @@ if __name__ == "__main__":
             user = input("帳號（預設 admin）：").strip() or "admin"
             pw = getpass.getpass("密碼：")
         else:
-            lines = sys.stdin.read().splitlines()
+            # Windows PowerShell 用管線送進來、或用記事本存的帳密檔，開頭會多一個 BOM：不去掉的話帳號會變成「\ufeffadmin」，怎麼登入都不對
+            lines = sys.stdin.read().lstrip("\ufeff").splitlines()
             user = (lines[0].strip() if lines else "") or "admin"
             pw = lines[1] if len(lines) > 1 else ""
         if len(pw) < 8:
