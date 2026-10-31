@@ -143,6 +143,10 @@ def main():
     st, r = A.upload_chunk("up", "m.gguf", 1000, len(data), data[1000:])
     case("匯入：最後一塊到齊改成正式檔名", st == 200 and r.get("done") and os.path.exists(os.path.join(A.gguf_root(), "up", "m.gguf")), r)
     case("匯入：已經有同名檔不覆蓋", A.upload_chunk("up", "m.gguf", 0, 4, b"GGUF")[0] == 409)
+    import hashlib
+    st = A.upload_status("up", "m.gguf")[1]
+    case("匯入：同名檔回報大小與頭尾雜湊（畫面用來判斷是不是同一個檔）",
+         (st["size"], st["edge_sha256"]) == (len(data), hashlib.sha256(data).hexdigest()), st)
     case("匯入：不是 GGUF 的拒絕並刪掉", A.upload_chunk("up", "x.gguf", 0, 4, b"NOPE")[0] == 400
          and not os.path.exists(os.path.join(A.gguf_root(), "up", "x.gguf.part")))
     case("匯入：資料夾不能 ../", A.upload_chunk("..", "a.gguf", 0, 4, b"GGUF")[0] == 400)

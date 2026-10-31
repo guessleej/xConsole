@@ -33,6 +33,7 @@ async function api(path, opts = {}) {
     headers: { "Content-Type": "application/json" },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     credentials: "same-origin",
+    signal: opts.signal,
   });
   let data = {};
   try { data = await res.json(); } catch (_) { /* 沒有 JSON 就算了 */ }
@@ -1141,6 +1142,17 @@ function watchLibJobs(view, jc, entries) {
 
 /* ================================================================ 從瀏覽器匯入 GGUF
    分塊送（每塊 32 MB）、可以續傳：中斷後再選同一個檔案，會從主機已收到的位置接著送。 */
+// 跟代理的 edge_sha256 同一個算法：頭 4 MB ＋ 尾 4 MB（檔案小於 8 MB 時尾段從 4 MB 處開始）
+async function edgeSha256(f) {
+  const E = 4 * 1024 * 1024;
+  const parts = [await f.slice(0, E).arrayBuffer()];
+  if (f.size > E) parts.push(await f.slice(Math.max(E, f.size - E), f.size).arrayBuffer());
+  const buf = new Uint8Array(parts.reduce((a, p) => a + p.byteLength, 0));
+  let o = 0;
+  parts.forEach((p) => { buf.set(new Uint8Array(p), o); o += p.byteLength; });
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function libUploadCard(ok, only) {
   const c = card("從這台電腦匯入 GGUF", "不用轉格式；檔案直接送到那台的存放區");
   const form = el("div", "form-row");
@@ -1180,11 +1192,20 @@ function libUploadCard(ok, only) {
     const CH = 32 * 1024 * 1024;
     const total = files.reduce((a, f) => a + f.size, 0);
     let doneBytes = 0;
+    const skipped = [];
     try {
       for (const f of files) {
         const name = f.name.replace(/[^\w.+-]+/g, "-");
         const st = await api(`/api/node/${nid}/library/upload/status`, { method: "POST", body: { folder, name } });
-        if (st.exists) { doneBytes += f.size; continue; }
+        if (st.exists) {
+          // 同名檔已經在：大小與頭尾各 4 MB 的 sha256 都一樣才當成同一個（續傳時前面已送完的分片）；不一樣就停下來講清楚
+          if (st.size !== f.size || st.edge_sha256 !== await edgeSha256(f)) {
+            throw new Error(`${folder}/${name} 已經有一個不一樣的檔案。請換一個資料夾名稱，或先到「已安裝」刪掉舊的`);
+          }
+          skipped.push(name);
+          doneBytes += f.size;
+          continue;
+        }
         let off = st.received || 0;                      // 續傳：從主機已收到的位置接著送
         while (off < f.size) {
           const chunk = f.slice(off, Math.min(off + CH, f.size));
@@ -1201,7 +1222,7 @@ function libUploadCard(ok, only) {
         }
         doneBytes += f.size;
       }
-      toast(`已匯入到 ${folder}/`, "ok");
+      toast(`已匯入到 ${folder}/${skipped.length ? `（${skipped.length} 個檔案已經在、內容相同，沒有重送）` : ""}`, "ok");
       if (S.rec) delete S.rec[nid];
       S.libTab = "installed";
       viewLib();
@@ -1427,7 +1448,8 @@ function viewChat(mode) {
     const t0 = performance.now();
     try {
       if (mode === "assist") {
-        const r = await api("/api/assistant", { method: "POST", body: { node: t.n.id, slot: t.s.id, messages: history } });
+        st.ctl = new AbortController();              // 停止：放掉這次請求，畫面立刻可以再問（伺服器那邊做完這一輪就收）
+        const r = await api("/api/assistant", { method: "POST", signal: st.ctl.signal, body: { node: t.n.id, slot: t.s.id, messages: history } });
         Object.assign(reply, { content: r.content, reasoning: r.reasoning, steps: r.steps, pending: false,
           stat: `${fmt((performance.now() - t0) / 1000, 1)} 秒${r.steps?.length ? `・查了 ${r.steps.length} 次` : ""}` });
         reply._el.replaceWith(bubble(reply));

@@ -1172,19 +1172,26 @@ class Handler(BaseHTTPRequestHandler):
 
     def _chat(self, node_id, slot_id, body):
         """網頁對話：經代理轉給模型服務，串流原樣轉給瀏覽器。對話內容不寫進稽核（只記用了哪個欄位、幾則訊息）。"""
-        self._audit("chat", f"{node_id}/{slot_id}", True, {"messages": len(body.get("messages") or [])})
+        n_msg = len(body.get("messages") or [])
+
+        def done(code, out=None):
+            # 稽核在知道結果之後才寫，記真實的成敗（以前一進來就記成功，連不存在的機器都算用過）
+            self._audit("chat", f"{node_id}/{slot_id}", code == 200, {"messages": n_msg, "status": code,
+                                                                        "message": (out or {}).get("error")})
+            return None if out is None else self._json(code, out)
         req, ctx = node_request(node_id, f"/chat/{slot_id}", json.dumps(body).encode())
         if req is None:
-            return self._json(404, {"error": ctx})
+            return done(404, {"error": ctx})
         try:
             resp = agent_open(req, ctx, 600)
         except urllib.error.HTTPError as exc:
             try:
-                return self._json(exc.code, json.load(exc))
+                return done(exc.code, json.load(exc))
             except Exception:  # noqa: BLE001
-                return self._json(exc.code, {"error": f"代理回 {exc.code}"})
+                return done(exc.code, {"error": f"代理回 {exc.code}"})
         except Exception as exc:  # noqa: BLE001
-            return self._json(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+            return done(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+        done(200)
         with resp:
             if "event-stream" not in (resp.headers.get("Content-Type") or ""):
                 return self._json(resp.status, json.load(resp))
@@ -1211,7 +1218,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "沒有問題"})
         convo = [{"role": "system", "content": ASSIST_SYSTEM}] + [{"role": m["role"], "content": str(m.get("content") or "")[:8000]} for m in msgs]
         steps, seen = [], {}
-        self._audit("assist", f"{node_id}/{slot_id}", True, {"messages": len(msgs)})
+
+        def done(code, out):
+            self._audit("assist", f"{node_id}/{slot_id}", code == 200,
+                        {"messages": len(msgs), "steps": len(steps), "status": code, "message": out.get("error")})
+            return self._json(code, out)
         for rnd in range(6):
             last = rnd == 5
             req = {"messages": convo, "stream": False, "max_tokens": 2048, "temperature": 0.2}
@@ -1229,14 +1240,15 @@ class Handler(BaseHTTPRequestHandler):
                 convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
                 code, out = call_node(node_id, f"/chat/{slot_id}", "POST", req, timeout=600)
             if code != 200:
-                return self._json(code, {"error": out.get("error") or f"模型回 {code}", "steps": steps})
+                return done(code, {"error": out.get("error") or f"模型回 {code}", "steps": steps})
             msg = ((out.get("choices") or [{}])[0]).get("message") or {}
-            calls = [] if last else (msg.get("tool_calls") or [])
+            # 一次最多處理 4 個呼叫；回給模型的那則也只留這 4 個，否則下一輪會帶著沒有回覆的呼叫、被伺服器拒絕
+            calls = [] if last else (msg.get("tool_calls") or [])[:4]
             if not calls:
-                return self._json(200, {"content": msg.get("content") or "（模型沒有給出回答）", "reasoning": msg.get("reasoning_content"),
-                                        "steps": steps, "usage": out.get("usage"), "timings": out.get("timings")})
+                return done(200, {"content": msg.get("content") or "（模型沒有給出回答）", "reasoning": msg.get("reasoning_content"),
+                                  "steps": steps, "usage": out.get("usage"), "timings": out.get("timings")})
             convo.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
-            for c in calls[:4]:
+            for c in calls:
                 fn = (c.get("function") or {})
                 try:
                     args = json.loads(fn.get("arguments") or "{}")
@@ -1250,7 +1262,7 @@ class Handler(BaseHTTPRequestHandler):
                     result = seen[key] = assist_tool(fn.get("name"), args)
                     steps.append({"tool": fn.get("name"), "args": args})
                 convo.append({"role": "tool", "tool_call_id": c.get("id"), "content": json.dumps(result, ensure_ascii=False)[:12000]})
-        return self._json(200, {"content": "（沒有結論）", "steps": steps})
+        return done(200, {"content": "（沒有結論）", "steps": steps})
 
     def _body(self, limit=None):
         try:

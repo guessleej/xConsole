@@ -3040,12 +3040,31 @@ def _up_paths(folder, name):
     return d, inside(d, name), inside(d, name + ".part")
 
 
+UP_EDGE = 4 << 20
+
+
+def edge_sha256(path):
+    """檔案頭尾各 4 MB 的 sha256：同名檔已經在時，拿來比對是不是同一個檔（不必把幾十 GB 整個讀一遍）。"""
+    import hashlib
+    h = hashlib.sha256()
+    size = os.path.getsize(path)
+    with open(path, "rb") as fh:
+        h.update(fh.read(UP_EDGE))
+        if size > UP_EDGE:
+            fh.seek(max(UP_EDGE, size - UP_EDGE))
+            h.update(fh.read(UP_EDGE))
+    return h.hexdigest()
+
+
 def upload_status(folder, name):
     try:
         _, final, part = _up_paths(folder, name)
     except ValueError as ex:
         return 400, {"error": str(ex)}
-    return 200, {"exists": os.path.exists(final), "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    out = {"exists": os.path.exists(final), "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    if out["exists"]:
+        out.update(size=os.path.getsize(final), edge_sha256=edge_sha256(final))
+    return 200, out
 
 
 def upload_chunk(folder, name, offset, total, data):
@@ -3123,6 +3142,11 @@ def chat_request(slot_id, body):
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
     name = (raw or {}).get("model_name")
+    if not name:
+        # 登記進來的既有服務沒有 xConsole 管的設定檔：跟 API 實測一樣，問 /v1/models 取第一個（有些伺服器沒帶 model 會拒絕）
+        st, models, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=key, timeout=8)
+        ids = [m.get("id") for m in (models or {}).get("data") or [] if m.get("id")]
+        name = ids[0] if ids else None
     if name:
         req["model"] = name
     return int(port), key, req
