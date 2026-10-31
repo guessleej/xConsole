@@ -6,6 +6,7 @@
 速度是估算，不是實測：每產生一個 token 都要把用到的權重從記憶體讀一遍，
 所以 tok/s ≈ 記憶體頻寬 × 效率 ÷ 每個 token 讀的位元組。效率取 EFFICIENCY，畫面上一併寫出假設。
 """
+import hashlib
 import json
 import math
 import os
@@ -420,9 +421,13 @@ def sd_follow(opts, main_bits):
 
 
 def sd_model_id(repo, quant):
-    """代理端的模型代號（只准英數、底線、連字號）：同一個清單項目不同量化是不同顆。"""
-    name = repo.split("/", 1)[1]
-    return re.sub(r"[^a-z0-9_-]+", "-", f"{name}-{quant or 'full'}".lower()).strip("-")[:64]
+    """代理端的模型代號（只准英數、底線、連字號，最多 64 字）：同一個清單項目不同量化是不同顆。
+    含作者：alice/foo 與 bob/foo 不能共用一個代號（模型清單以代號為鍵，會互相蓋掉）。太長時截短，後面接完整名稱的雜湊。"""
+    full = f"{repo}-{quant or 'full'}".lower()
+    sid = re.sub(r"[^a-z0-9_-]+", "-", full).strip("-")
+    if len(sid) > 64:
+        sid = sid[:55].rstrip("-") + "-" + hashlib.sha256(full.encode()).hexdigest()[:8]
+    return sid
 
 
 def sd_resolve(entry, main_path=None):
@@ -500,6 +505,9 @@ def recommend_sd(state, sdlib, catalog):
     cap = sd_capacity(state)
     lib = sdlib or {}
     have = {m["id"]: m for m in lib.get("models") or []}
+    # 已經在這台的檔（別顆下載過的共用 t5xxl、VAE…）不會再下載，空間只算還沒有的（同代理 _sd_have 的判斷）
+    present = {(p["repo"], p["path"]) for m in have.values() for p in m.get("parts") or []
+               if p["role"] not in (m.get("missing") or [])}
     jobs = [j for j in lib.get("downloads") or [] if j.get("state") in ("running", "queued")]
     items = []
     for i, e in enumerate(catalog):
@@ -511,7 +519,8 @@ def recommend_sd(state, sdlib, catalog):
             p["installed_id"] = got["id"] if got else None
             p["ready"] = bool(got and got.get("ready"))
             p["measured"] = (got or {}).get("measured")
-            p["fits_disk"] = lib.get("free_gib") is None or p["size_gib"] + 10 < lib["free_gib"]
+            p["download_gib"] = round(sum(x["size_gib"] for x in p["parts"] if (x["repo"], x["path"]) not in present), 1)
+            p["fits_disk"] = lib.get("free_gib") is None or p["download_gib"] + 10 < lib["free_gib"]
             plans.append(p)
         best = sd_pick(plans)
         mine = next((p for p in plans if p["ready"]), None) or next((p for p in plans if p["installed_id"]), None)

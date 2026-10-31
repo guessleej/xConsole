@@ -1648,7 +1648,7 @@ function sdRow(n, rec, it, redraw, toGen) {
     } else if (it.job) {
       act.appendChild(el("span", "small muted", `下載中 ${it.job.total ? Math.floor((it.job.done / it.job.total) * 100) : 0}%`));
     } else if (p) {
-      const b = el("button", "btn sm" + (p.level === "no" ? "" : " primary"), p.installed_id ? "補齊下載" : `下載 ${fmt(p.size_gib)} GiB`);
+      const b = el("button", "btn sm" + (p.level === "no" ? "" : " primary"), p.installed_id ? "補齊下載" : `下載 ${fmt(p.download_gib)} GiB`);
       b.disabled = p.level === "no" || !p.fits_disk;
       b.title = p.level === "no" ? "這台放不下" : !p.fits_disk ? "存放區空間不夠（另需保留 10 GiB）" : "";
       b.onclick = () => sdDownload(n, it, p);
@@ -1662,7 +1662,8 @@ function sdRow(n, rec, it, redraw, toGen) {
 
 function sdDownload(n, it, p) {
   const d = el("div");
-  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""} 下載到 ${n.name}？共 ${p.parts.length} 個檔、${fmt(p.size_gib)} GiB（別顆已經有的共用檔不會重複下載）：`));
+  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""} 下載到 ${n.name}？共 ${p.parts.length} 個檔、${fmt(p.size_gib)} GiB；`
+    + (p.download_gib < p.size_gib ? `這台已經有其中幾個共用檔，實際要下載 ${fmt(p.download_gib)} GiB：` : "全部都要下載：")));
   const ul = el("ul", "small");
   p.parts.forEach((x) => ul.appendChild(el("li", null, `${x.role === "diffusion" || x.role === "model" ? "主體" : x.role}：${x.repo}/${x.path}（${fmt(x.size_gib, 2)} GiB）`)));
   d.appendChild(ul);
@@ -1773,7 +1774,9 @@ function sdGen(n, rec, redraw, toRec) {
     fSteps.value = d.steps ?? 20;
     fCfg.value = d.cfg ?? 1;
     fSampler.value = d.sampler || "euler";
-    fFrames.value = String(d.frames || 33);
+    const fr = String(d.frames || 33);
+    if (![...fFrames.options].some((o) => o.value === fr)) { const o = el("option", null, `${fr} 格`); o.value = fr; fFrames.prepend(o); }
+    fFrames.value = fr;
     fFps.value = d.fps || 24;
     framesBox.hidden = fpsBox.hidden = m.kind !== "video";
     go.textContent = m.kind === "video" ? "產生影片" : "產生圖片";
@@ -1819,6 +1822,23 @@ function sdGen(n, rec, redraw, toRec) {
   };
   if (ready.length) { applyDefaults(model()); checkAdmit(); }
 
+  // 「用同樣的設定」：模型換回去、全部參數照這件填回來（尺寸、影格數不在選單裡就補一個選項）
+  const pick = (sel, v, label) => {
+    if (![...sel.options].some((o) => o.value === v)) { const o = el("option", null, label); o.value = v; sel.prepend(o); }
+    sel.value = v;
+  };
+  const form = { fModel, apply: () => applyDefaults(model()), restore: (j) => {
+    fPrompt.value = j.prompt;
+    fNeg.value = j.negative || "";
+    fSeed.value = j.seed;
+    pick(fSize, `${j.width}x${j.height}`, `${j.width}×${j.height}`);
+    fSteps.value = j.steps;
+    fCfg.value = j.cfg;
+    fSampler.value = j.sampler;
+    if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; }
+    checkAdmit();
+  } };
+
   // 右邊：最近產出；有在產的就接著看進度
   const loadRecent = async (showFirst) => {
     let jobs = [];
@@ -1831,7 +1851,7 @@ function sdGen(n, rec, redraw, toRec) {
       r.appendChild(el("span", "sd-job-p", j.prompt));
       r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"),
         { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
-      r.onclick = () => (j.state === "running" ? watchGen(n, j.id, out, recent, go) : showJob(n, j, out, recent, { fPrompt, fNeg, fSeed, fModel, apply: () => { applyDefaults(model()); } }));
+      r.onclick = () => (j.state === "running" ? watchGen(n, j.id, out, recent, go) : showJob(n, j, out, recent, form));
       recent.appendChild(r);
     });
     return jobs;
@@ -1840,7 +1860,7 @@ function sdGen(n, rec, redraw, toRec) {
   loadRecent().then((jobs) => {
     const run = jobs.find((j) => j.state === "running");
     if (run) watchGen(n, run.id, out, recent, go);
-    else if (jobs[0]) showJob(n, jobs[0], out, recent, { fPrompt, fNeg, fSeed, fModel, apply: () => applyDefaults(model()) });
+    else if (jobs[0]) showJob(n, jobs[0], out, recent, form);
     else out.appendChild(el("p", "small muted", "左邊填好按「產生」，進度與結果會出現在這裡。"));
   });
   return wrap;
@@ -1879,6 +1899,18 @@ function watchGen(n, jid, out, recent, go) {
   tick();
 }
 
+// 刪掉一件產出（失敗、取消、中斷的也要能刪，不然會一直留在最近產出裡）
+function sdJobDelete(n, j, out, url) {
+  const del = el("button", "btn sm danger", "刪除");
+  del.onclick = async () => {
+    try { await api(`/api/node/${n.id}/sd/jobs/${j.id}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+    if (url) URL.revokeObjectURL(url);
+    out.textContent = "";
+    S.sdReload?.();
+  };
+  return del;
+}
+
 async function showJob(n, j, out, recent, form) {
   clearTimeout(S.genTimer);
   out.textContent = "";
@@ -1888,6 +1920,9 @@ async function showJob(n, j, out, recent, form) {
   if (j.state !== "done") {
     out.appendChild(el("p", "note " + (j.state === "failed" ? "bad" : "warn"), j.error || { cancelled: "已取消", interrupted: "代理重啟過，這件沒產完" }[j.state] || j.state));
     out.appendChild(info);
+    const acts = el("div", "slot-actions");
+    acts.append(el("span", "spacer"), sdJobDelete(n, j, out));
+    out.appendChild(acts);
   } else {
     const box = el("div", "sd-media");
     box.appendChild(el("p", "small muted", "讀取中…"));
@@ -1909,21 +1944,12 @@ async function showJob(n, j, out, recent, form) {
       const again = el("button", "btn sm", "用同樣的設定");
       again.onclick = () => {
         if ([...form.fModel.options].some((o) => o.value === j.model)) { form.fModel.value = j.model; S.sdModel = j.model; form.apply(); }
-        form.fPrompt.value = j.prompt;
-        form.fNeg.value = j.negative || "";
-        form.fSeed.value = j.seed;
-        toast("已帶入提示詞與種子", "ok");
+        form.restore(j);
+        toast("已帶入這件的全部設定（提示詞、尺寸、步數、引導強度、種子、取樣方法）", "ok");
       };
       acts.appendChild(again);
     }
-    const del = el("button", "btn sm danger", "刪除");
-    del.onclick = async () => {
-      try { await api(`/api/node/${n.id}/sd/jobs/${j.id}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
-      URL.revokeObjectURL(url);
-      out.textContent = "";
-      S.sdReload?.();
-    };
-    acts.append(el("span", "spacer"), del);
+    acts.append(el("span", "spacer"), sdJobDelete(n, j, out, url));
     out.appendChild(acts);
   }
   out.appendChild(el("p", "sd-prompt small", j.prompt));

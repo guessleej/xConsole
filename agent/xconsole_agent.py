@@ -4592,8 +4592,7 @@ def sd_library():
     reg = registry()
     root = sd_root(reg)
     os.makedirs(root, mode=0o700, exist_ok=True)
-    du = os.statvfs(root)
-    return {"root": root, "free_gib": round(du.f_bavail * du.f_frsize / GIB, 1), "models": sd_models(reg),
+    return {"root": root, "free_gib": disk_free(root)[0], "models": sd_models(reg),
             "sd_cli": sd_cli_exe(reg), "building": bool(_BUILD.get("thread_alive")) and _BUILD.get("kind") == "sd",
             "memory_model": reg["machine"].get("memory_model", "discrete"),
             "downloads": [j for j in downloads_list() if j.get("sd_model")]}
@@ -4664,8 +4663,9 @@ def sd_check_spec(spec):
                 raise ValueError(f"檔名不合法（只收 .gguf、.safetensors、.sft）：{path}")
             roles.add(role)
             parts.append({"role": role, "repo": repo, "path": path})
-        if not 1 <= len(parts) <= 8 or not roles & {"model", "diffusion"}:
-            raise ValueError("至少要有主體（完整模型或擴散模型）一個檔，最多 8 個檔")
+        if not 1 <= len(parts) <= 8 or len(roles & {"model", "diffusion"}) != 1:
+            # -m（完整模型）與 --diffusion-model（只有擴散模型、其餘元件另給）是兩種模式，不能同時給
+            raise ValueError("要有、而且只能有一個主體（完整模型或擴散模型），最多 8 個檔")
         defaults = sd_check_defaults(spec.get("defaults"), kind)
         desc = _clean_text(spec.get("desc"), 160, "說明")
     except ValueError as ex:
@@ -4716,8 +4716,7 @@ def sd_download(spec, token=""):
     root = sd_root(reg)
     os.makedirs(root, mode=0o700, exist_ok=True)
     need = sum(p["size"] for p in spec["parts"] if not _sd_have(root, p)) / GIB
-    du = os.statvfs(root)
-    free = du.f_bavail * du.f_frsize / GIB
+    free = disk_free(root)[0]                  # Windows 沒有 os.statvfs
     if need + 10 >= free:
         return 400, {"error": f"磁碟不夠：還要下載 {need:.1f} GiB，存放區只剩 {free:.0f} GiB（另需保留 10 GiB）"}
     if any(j["state"] in ("running", "queued") for j in _DL.values()):
@@ -4801,6 +4800,12 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
         worst = round(free - need - SD_RAM_SELF, 1)
         detail["unified"] = {"free": free, "need": round(need + SD_RAM_SELF, 1), "worst": worst, "floor": fl["ram"]}
         plan["max_vram"] = free - fl["ram"] - SD_RAM_SELF
+        lim = p["unified"].get("gpu_limit_gib")      # Apple Silicon：Metal 只准 GPU 用統一記憶體的一部分
+        if lim:
+            plan["max_vram"] = min(plan["max_vram"], lim)
+            if need > lim:
+                reasons.append(f"超過 GPU 能用的上限：產這一件要約 {need:.0f} GiB，這台 GPU 最多只能用 {lim:.0f} GiB"
+                               "（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）")
         if worst < fl["ram"]:
             reasons.append(f"統一記憶體不足：產這一件要約 {need + SD_RAM_SELF:.0f} GiB，現在只剩 {free:.0f} GiB，"
                            f"產的時候會剩 {worst} GiB（低於 {fl['ram']} GiB 底線）。統一記憶體吃爆會把整台拖死；{tip}")
@@ -4808,7 +4813,8 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
         rfree = p["ram"]["free_gib"]
         if mm == "discrete" and p["gpus"]:
             card = max(p["gpus"], key=lambda c: c["free_gib"])
-            plan["gpu"] = str(card["id"])
+            # Windows 的 AMD／Intel 走 Vulkan，沒辦法用環境變數綁卡（綁卡的對照只有 Linux 的 KFD）：只拿來算額度，不綁
+            plan["gpu"] = str(card["id"]) if p.get("bindable", True) else None
             vfree, vfl = card["free_gib"], fl["vram"]
             if vfree - need < vfl and vfree - (biggest + need - weights) >= vfl and rfree - weights - SD_RAM_SELF >= fl["ram"]:
                 plan["offload"] = True                  # 權重放系統記憶體，輪到誰算才搬進顯示卡：慢一些但放得下

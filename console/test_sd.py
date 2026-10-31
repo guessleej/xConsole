@@ -73,7 +73,10 @@ def main():
     case("FLUX：三種主體量化各湊成一組四個檔", [len(c["parts"]) for c in combos], [4, 4, 4])
     case("缺一個元件的檔就湊不出", R.sd_resolve({**FLUX, "files": {**FLUX["files"], "diffusers/FLUX.1-vae": {}}}), [])
     spec = R.sd_spec(FLUX, combos[1])
-    case("下載規格：代號只有英數連字號、帶量化", spec["id"], "flux-1-schnell-gguf-q4_k")
+    case("下載規格：代號含作者、只有英數連字號、帶量化", spec["id"], "leejet-flux-1-schnell-gguf-q4_k")
+    case("代號：不同作者的同名 repo 不會撞在一起", R.sd_model_id("alice/foo", "Q4_K") != R.sd_model_id("bob/foo", "Q4_K"), True)
+    long1, long2 = R.sd_model_id("a/" + "x" * 90 + "1", "Q8_0"), R.sd_model_id("a/" + "x" * 90 + "2", "Q8_0")
+    case("代號：太長截到 64 字，後面接雜湊所以仍然不同", (len(long1) <= 64, long1 != long2, A.SAFE_ID_RX.fullmatch(long1) is not None), (True, True, True))
     case("下載規格：代理那邊檢查得過", A.sd_check_spec(spec)[1], None)
     # ---- 放不放得下
     cap = R.sd_capacity(ADA2)
@@ -89,13 +92,18 @@ def main():
          [p["level"] for p in plans], ["ok", "no", "no"])
     case("8 GB 顯示卡：都不流暢挑能跑的最小一個", R.sd_pick(plans)["quant"], "Q2_K")
     # ---- 推薦結果：已下載、下載中
-    lib = {"free_gib": 500, "models": [{"id": "flux-1-schnell-gguf-q4_k", "ready": True, "measured": {"secs": 12}}],
-           "downloads": [{"id": "ab12cd34", "state": "running", "sd_model": "flux-1-schnell-gguf-q8_0", "done": 1, "total": 4}]}
+    lib = {"free_gib": 500, "models": [{"id": "leejet-flux-1-schnell-gguf-q4_k", "ready": True, "measured": {"secs": 12}, "missing": [],
+                                        "parts": [{"role": p["role"], "repo": p["repo"], "path": p["path"]} for p in combos[1]["parts"]]}],
+           "downloads": [{"id": "ab12cd34", "state": "running", "sd_model": "leejet-flux-1-schnell-gguf-q8_0", "done": 1, "total": 4}]}
     rec = R.recommend_sd(SPARK, lib, [FLUX])
     it = rec["items"][0]
     case("推薦：已下載的那個量化排第一個顯示", it["installed"], "flux1-schnell-q4_k.gguf")
     case("推薦：下載中的工作掛在這一列", it["job"]["id"], "ab12cd34")
     case("推薦：實測值帶到該量化", next(p for p in it["plans"] if p["ready"])["measured"], {"secs": 12})
+    q8 = next(p for p in it["plans"] if p["quant"] == "Q8_0")
+    case("推薦：已經有的共用檔（clip_l、VAE）不算進要下載的量", abs(q8["size_gib"] - q8["download_gib"] - (0.23 + 0.16)) < 0.06, True)
+    tight = R.recommend_sd(SPARK, {**lib, "free_gib": q8["download_gib"] + 10.2}, [FLUX])["items"][0]
+    case("推薦：空間只夠下載還沒有的檔時，下載鈕不會被擋", next(p for p in tight["plans"] if p["quant"] == "Q8_0")["fits_disk"], True)
     # ---- 清單欄位與中國來源
     flux_in = {k: FLUX[k] for k in ("repo", "title", "kind", "parts", "defaults")}
     case("清單欄位：FLUX 收", R.check_sd_fields(flux_in)[1], None)
@@ -140,6 +148,9 @@ def main():
 
     # ---- 代理：規格檢查
     case("代理：絕對路徑不收", "檔名不合法" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "/etc/x.gguf"}]})[1] or ""), True)
+    case("代理：完整模型與擴散模型同時給不收（-m 與 --diffusion-model 是兩種模式）",
+         "只能有一個主體" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "x.gguf"},
+                                                                {"role": "model", "repo": "a/b", "path": "y.gguf"}]})[1] or ""), True)
     case("代理：不是模型檔的副檔名不收", "檔名不合法" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "x.sh"}]})[1] or ""), True)
     case("代理：中國來源沒勾內部測試，連 Hugging Face 都不去問就擋",
          A.sd_download({**spec, "parts": [{"role": "diffusion", "repo": "Qwen/Qwen-Image", "path": "q.gguf"}]})[0], 400)
@@ -174,6 +185,16 @@ def main():
     case("獨立顯卡：挑最空的卡；放不下全部時權重放系統記憶體", (v["allow"], v["plan"]["gpu"], v["plan"]["offload"]), (True, "1", True))
     v = A.sd_admit(m, 1024, 1024, reg=reg("discrete"), hw=hw([{"id": "0", "vram_total": 4 * G, "vram_used": 0}]))
     case("獨立顯卡：連最大一個檔都放不下就擋", v["allow"], False)
+    real_pools = A.pools
+    A.pools = lambda r, h: {**real_pools(r, h), "bindable": False}
+    v = A.sd_admit(m, 1024, 1024, reg=reg("discrete"), hw=hw([{"id": "0", "vram_total": 24 * G, "vram_used": 0}]))
+    case("Windows Vulkan 卡（不能綁卡）：照卡算額度，但不綁卡", (v["allow"], v["plan"]["gpu"]), (True, None))
+    A.ram_pool = lambda: {"total_gib": 64.0, "free_gib": 50.0, "used_gib": 14.0}
+    A.pools = lambda r, h: (lambda p: {**p, "unified": {**p["unified"], "gpu_limit_gib": 10.0}})(real_pools(r, h))
+    v = A.sd_admit(m, 1024, 1024, reg=reg("unified_single"), hw=hw([]))
+    case("Apple Silicon：超過 Metal 准 GPU 用的上限就擋，額度也不超過上限",
+         (v["allow"], "GPU 能用的上限" in " ".join(v["reasons"]), v["plan"]["max_vram"]), (False, True, 10.0))
+    A.pools = real_pools
     m2 = {**m, "measured": {"peak_gib": 20.0, "w": 1024, "h": 1024}}
     case("產過一次：改用實測的最高用量（比估算大時）", A.sd_need(m2, 1024, 1024)[0], 20.0)
     case("產過一次：尺寸更大照比例加上去", A.sd_need(m2, 2048, 1024)[0], round(20 + 2 * 1.048576, 1))
