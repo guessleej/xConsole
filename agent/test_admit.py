@@ -226,11 +226,11 @@ def main():
           "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
     ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
                {100: "1" * 40, 200: "3" * 40})
-    real_lt = A.load_text
+    real_cpu = A.cpu_name
     for cpu, want in (("AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S", True), ("AMD EPYC 7543P 32-Core Processor", False)):
-        A.load_text = lambda path, c=cpu: f"processor\t: 0\nmodel name\t: {c}\n" if path == "/proc/cpuinfo" else real_lt(path)
+        A.cpu_name = lambda c=cpu: c                    # 三個系統讀 CPU 型號的方法不同，這裡只測判斷本身
         ok &= case(f"APU 判斷：{cpu[:30]}", A._apu_like(), want)
-    A.load_text = real_lt
+    A.cpu_name = real_cpu
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])

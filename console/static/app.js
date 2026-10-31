@@ -1978,7 +1978,7 @@ function fleetSteps() {
           : "加一台機器，主控台會讀出它的顯示卡、記憶體、頻寬與磁碟，算出能跑多大的模型",
       go: unsure ? ["確認記憶體架構", () => openMachineSettings(unsure.id)] : on.length ? null : ["加一台機器", openAddMachine] },
     { t: "安裝推理引擎", done: on.length > 0 && !noEng && !building,
-      why: building ? `${building.name} 正在編譯 llama.cpp…` : noEng ? `${noEng.name} 還沒有 llama.cpp：依這台的顯示卡自動選加速方式，在網頁上一鍵編譯`
+      why: building ? `${building.name} 正在安裝 llama.cpp…` : noEng ? `${noEng.name} 還沒有 llama.cpp：依這台的顯示卡自動選加速方式一鍵安裝（macOS、Windows 下載官方預編譯版，Linux 在這台編譯）`
         : "每台都有可用的 llama.cpp",
       go: building ? ["看進度", () => openLlamaBuild(building.id)] : noEng ? ["一鍵安裝", () => openLlamaBuild(noEng.id)] : null },
     { t: "下載一個模型", done: running,
@@ -2004,7 +2004,7 @@ function watchBuild(sc, n) {
     try {
       const r = await api(`/api/node/${n.id}/llama/build/progress`);
       const pct = [...(r.log_tail || [])].reverse().map((x) => /\[\s*(\d+)%\]/.exec(x)).find(Boolean);
-      line.textContent = r.running ? (pct ? `編譯中 ${pct[1]}%` : "下載原始碼與設定中…") : "已結束，按「看進度」看結果";
+      line.textContent = r.running ? (pct ? `進行中 ${pct[1]}%` : "準備中…") : "已結束，按「看進度」看結果";
       if (!r.running) { refresh(); return; }
     } catch (ex) { line.textContent = "讀不到進度：" + ex.message; }
     S.buildTimer = setTimeout(tick, 3000);
@@ -3043,14 +3043,45 @@ function openAddMachine() {
     const me = ++run;                       // 重新產生時，舊指令的等待就不再更新畫面
     gen.textContent = "重新產生";
     out.textContent = "";
-    out.appendChild(el("h4", "pick-h", "到那台機器上，用一般帳號（不要用 root）貼上執行"));
-    out.appendChild(copyRow("安裝指令", r.command));
-    const need = el("ul", "small muted need-list");
-    ["那台要有 python3、curl、openssl（Ubuntu 預設都有）",
-      `那台要連得到 ${fHost.value.trim()}；主控台要連得到那台的 9401 埠，有防火牆要先開`,
-      "指令會下載代理、建立使用者服務並設成開機自啟，最後把代理的憑證與權杖送回主控台；下載時釘住主控台憑證的公鑰，不是關掉驗證"]
-      .forEach((t) => need.appendChild(el("li", null, t)));
-    out.appendChild(need);
+    // 依那台的作業系統給指令：Linux 與 macOS 同一行 curl；Windows 是 PowerShell
+    const osBar = el("div", "tabbar");
+    const osBox = el("div");
+    const showOs = (k) => {
+      S.joinOs = k;
+      osBar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", String(b.dataset.k === k)));
+      osBox.textContent = "";
+      const need = el("ul", "small muted need-list");
+      if (k === "win") {
+        osBox.appendChild(el("h4", "pick-h", "在那台開「Windows PowerShell」，貼上執行（建議按右鍵「以系統管理員身分執行」）"));
+        osBox.appendChild(copyRow("安裝指令", r.command_windows));
+        const det = el("details", "small");
+        det.appendChild(el("summary", null, "這行指令實際做什麼（解碼後的原文）"));
+        det.appendChild(el("pre", "log", r.command_windows_text));
+        osBox.appendChild(det);
+        ["以系統管理員身分執行：裝成開機自動啟動（不必有人登入），並在防火牆開 9401（主控台連代理）與 8090～8189（模型 API）；"
+          + "一般身分執行：只在這個帳號登入後才跑，防火牆要另外請管理員開",
+        "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
+        "llama.cpp 不用自己編：加入後在「這台的設定」按一鍵安裝，會依顯示卡下載官方預編譯版（NVIDIA 用 CUDA、AMD／Intel 用 Vulkan）",
+        "下載時只接受主控台這一張憑證（比對整張憑證的 SHA-256），不是關掉驗證"].forEach((t) => need.appendChild(el("li", null, t)));
+      } else {
+        osBox.appendChild(el("h4", "pick-h", "到那台機器上，用一般帳號（不要用 root）開終端機貼上執行"));
+        osBox.appendChild(copyRow("安裝指令", r.command));
+        ["Ubuntu：要有 python3、curl、openssl（預設都有）；會建立 systemd 使用者服務並設成開機自啟",
+          "macOS（Apple Silicon）：只要有 python3（沒有的話先執行 xcode-select --install）；會建立 launchd 服務，登入後自動啟動。"
+            + "第一次會問是否允許 python3 接受傳入連線，請按允許",
+          `那台要連得到 ${fHost.value.trim()}；主控台要連得到那台的 9401 埠，有防火牆要先開`,
+          "最後把代理的憑證與權杖送回主控台；下載時釘住主控台憑證的公鑰，不是關掉驗證"].forEach((t) => need.appendChild(el("li", null, t)));
+      }
+      osBox.appendChild(need);
+    };
+    [["unix", "Linux／macOS"], ["win", "Windows"]].forEach(([k, label]) => {
+      const b = el("button", null, label);
+      b.dataset.k = k;
+      b.onclick = () => showOs(k);
+      osBar.appendChild(b);
+    });
+    out.append(osBar, osBox);
+    showOs(S.joinOs || "unix");
     const st = el("p", "note", "等待那台執行…（這個視窗開著會自動更新）");
     out.appendChild(st);
     const poll = async () => {
@@ -3408,16 +3439,20 @@ async function openLlamaBuild(nid) {
   const n = S.fleet.nodes.find((x) => x.id === nid);
   const body = el("div");
   loading(body);
-  const ov = modal({ title: `${n?.name || ""} 編譯 llama.cpp`, bodyNode: body });
+  const ov = modal({ title: `${n?.name || ""} 安裝 llama.cpp`, bodyNode: body });
   ov.querySelector(".modal").classList.add("wide");
   let b;
   try { b = await api(`/api/node/${nid}/llama/build`); } catch (ex) { errNote(body, ex.message); return; }
   body.textContent = "";
   const pre = b.prereqs;
-  body.appendChild(el("p", "small muted", `會下載 llama.cpp 最新的正式版、在這台編譯 llama-server。加速方式：${{ cuda: "NVIDIA CUDA", hip: "AMD ROCm", cpu: "只用 CPU" }[pre.backend]}。`));
+  // macOS／Windows 下載官方預編譯版（幾分鐘）；Linux 在這台編譯（CUDA／ROCm 跟著這台的驅動走）
+  const dl = pre.mode === "prebuilt";
+  const verb = dl ? "安裝" : "編譯";
+  if (!dl) {
+    body.appendChild(el("p", "small muted", `會下載 llama.cpp 最新的正式版、在這台編譯 llama-server。加速方式：${{ cuda: "NVIDIA CUDA", hip: "AMD ROCm", cpu: "只用 CPU" }[pre.backend]}。`));
+  }
   pre.notes.forEach((t) => body.appendChild(el("p", "note", t)));
-  const tools = el("p", "small", "編譯工具：" + Object.entries(pre.tools).map(([k, v]) => `${k} ${v ? "有" : "缺"}`).join("、"));
-  body.appendChild(tools);
+  if (!dl) body.appendChild(el("p", "small", "編譯工具：" + Object.entries(pre.tools).map(([k, v]) => `${k} ${v ? "有" : "缺"}`).join("、")));
   if (pre.missing.length) {
     body.appendChild(el("p", "note bad", "這台缺少編譯工具，要先請 IT 用有 sudo 權限的帳號裝好（網頁不代裝系統套件）："));
     body.appendChild(copyRow("請 IT 執行", pre.apt));
@@ -3430,7 +3465,7 @@ async function openLlamaBuild(nid) {
   const draw = (j, tail, running) => {
     prog.textContent = "";
     if (!j.state) return;
-    const label = { running: `編譯中：${j.phase}`, done: `編好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消", interrupted: j.error }[j.state] || j.state;
+    const label = { running: `${verb}中：${j.phase}`, done: `裝好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消", interrupted: j.error }[j.state] || j.state;
     head.className = "note " + (j.state === "done" ? "ok" : j.state === "running" ? "" : "bad");
     head.textContent = `${j.tag || ""}　${label}`;
     prog.appendChild(head);
@@ -3441,18 +3476,18 @@ async function openLlamaBuild(nid) {
     startBtn.hidden = running;
     cancelBtn.hidden = !running;
   };
-  const startBtn = formButton(ov, "開始編譯（約 10～30 分鐘）", "primary", async () => {
+  const startBtn = formButton(ov, dl ? "一鍵安裝（下載幾十到幾百 MB）" : "開始編譯（約 10～30 分鐘）", "primary", async () => {
     try { await api(`/api/node/${nid}/llama/build`, { method: "POST", body: {} }); } catch (ex) { errNote(prog, ex.message); return; }
-    toast("開始編譯，可以關掉這個視窗，之後再回來看進度", "ok");
+    toast(`開始${verb}，可以關掉這個視窗，之後再回來看進度`, "ok");
     poll();
   });
   startBtn.disabled = pre.missing.length > 0;
-  startBtn.title = pre.missing.length ? "先請 IT 裝好編譯工具" : "編譯會用掉一半的 CPU 核心，正在跑的模型可能變慢";
-  const cancelBtn = formButton(ov, "取消編譯", "danger", async () => {
+  startBtn.title = pre.missing.length ? "先請 IT 裝好編譯工具" : dl ? "" : "編譯會用掉一半的 CPU 核心，正在跑的模型可能變慢";
+  const cancelBtn = formButton(ov, `取消${verb}`, "danger", async () => {
     try { await api(`/api/node/${nid}/llama/build/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); }
   });
   draw(b.job, b.log_tail, b.running);
-  // 編譯中每 3 秒只換掉狀態與記錄的文字，不重畫整個視窗
+  // 進行中每 3 秒只換掉狀態與記錄的文字，不重畫整個視窗
   async function poll() {
     if (!ov.isConnected) return;
     let r;

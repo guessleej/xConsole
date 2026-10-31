@@ -1,0 +1,112 @@
+# 三個作業系統都要能裝、能跑：Ubuntu、macOS（Apple Silicon）、Windows。
+# 1. 跨平台自我檢查：硬體讀數、代理自己看管模型服務（沒有 systemd 的那條路）、推薦與准入公式、安裝腳本語法
+# 2. 實際安裝：用 install/ 底下的安裝程式裝成開機自啟，經網頁 API 走完「裝引擎 → 下載模型 → 換上 → 問一句話」
+name: platforms
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    name: 跨平台自我檢查（${{ matrix.os }}／Python ${{ matrix.py }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, py: '3.12' }
+          - { os: ubuntu-24.04, py: '3.9' }          # macOS 內建命令列工具的 Python 是 3.9，最低要支援到這裡
+          - { os: macos-15, py: '3.12' }
+          - { os: windows-2025, py: '3.12' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '${{ matrix.py }}' }
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 硬體讀數與代理自己看管模型服務
+        run: python agent/test_platform.py
+      - name: 准入試算
+        run: python agent/test_admit.py
+      - name: 推薦清單
+        run: python console/test_recommend.py
+      - name: 安裝腳本產得出來、語法正確（Linux／macOS 的 bash 與 Windows 的 PowerShell）
+        shell: bash
+        run: |
+          export XCONSOLE_HOME="$RUNNER_TEMP/render"
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, "console")
+          import xconsole_server as X
+          j = {"console": "192.0.2.10:9400", "pin": "sha256//AAAA", "fp": "AB" * 32}
+          d = os.environ["RUNNER_TEMP"]
+          open(os.path.join(d, "agent.sh"), "w", encoding="utf-8").write(X.install_script("code123", j))
+          open(os.path.join(d, "agent.ps1"), "w", encoding="utf-8-sig").write(X.install_script_ps1("code123", j))
+          open(os.path.join(d, "oneline.ps1"), "w", encoding="utf-8-sig").write(X.windows_command("https://192.0.2.10:9400/install/x/agent.ps1"))
+          PY
+          bash -n "$RUNNER_TEMP/agent.sh"
+          bash -n install/install.sh
+      - name: PowerShell 語法檢查
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          foreach ($f in @("install\install.ps1", "$env:RUNNER_TEMP\agent.ps1", "$env:RUNNER_TEMP\oneline.ps1")) {
+            $err = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$err)
+            if ($err) { $err | Format-List; throw "$f 有語法錯誤" } else { Write-Host "$f 語法正確" }
+          }
+
+  install:
+    name: 實際安裝與驗收（${{ matrix.os }}）
+    needs: selftest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - name: 帳密檔（只在這次 CI 用，權限 600）
+        shell: bash
+        run: |
+          umask 077
+          printf 'admin\n%s\n' "$(python -c 'import secrets; print(secrets.token_urlsafe(18))')" > "$RUNNER_TEMP/pw"
+      - name: 安裝（Ubuntu：systemd 使用者服務）
+        if: runner.os == 'Linux'
+        run: |
+          sudo loginctl enable-linger "$USER"
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          for i in $(seq 1 20); do systemctl --user show-environment >/dev/null 2>&1 && break; sleep 1; done
+          bash install/install.sh --password-file "$RUNNER_TEMP/pw"
+      - name: 安裝（macOS：launchd）
+        if: runner.os == 'macOS'
+        run: bash install/install.sh --password-file "$RUNNER_TEMP/pw"
+      - name: 安裝（Windows：工作排程器，系統管理員身分＝開機自啟）
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File install\install.ps1 -PasswordFile "$env:RUNNER_TEMP\pw"
+      - name: 經網頁 API 驗收（Linux 的 llama.cpp 要在這台編譯，CI 上太久，只驗到下載模型）
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then H='C:\ProgramData\xConsole'; else H="$HOME"; fi
+          SKIP=""; [ "$RUNNER_OS" = Linux ] && SKIP="--skip-engine"
+          python test/e2e_install.py --home "$H" --password-file "$RUNNER_TEMP/pw" $SKIP
+      - name: 失敗時的記錄
+        if: failure()
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then D='C:\ProgramData\xConsole\.xconsole'; else D="$HOME/.xconsole"; fi
+          for f in agent.log console.log engines/build-llama-build.log engines/slot1-llama.log; do echo "===== $f"; tail -n 80 "$D/$f" 2>/dev/null || true; done
+          [ "$RUNNER_OS" = Linux ] && { export XDG_RUNTIME_DIR="/run/user/$(id -u)"; journalctl --user -u xconsole-agent -u xconsole -n 80 --no-pager || true; }
+          true
+      - name: 移除
+        if: always()
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then powershell -NoProfile -ExecutionPolicy Bypass -File install/install.ps1 -Uninstall
+          else export XDG_RUNTIME_DIR="/run/user/$(id -u)"; bash install/install.sh --uninstall; fi
+          rm -f "$RUNNER_TEMP/pw"

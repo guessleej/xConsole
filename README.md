@@ -98,7 +98,38 @@
 
 ## 四、怎麼用
 
-### 單機模式（賣一台機器給客戶時）
+### 安裝：Ubuntu、macOS、Windows 都可以
+
+客戶拿到的安裝包（這個 repo 的壓縮檔）解開後，在那台機器上執行一行，主控台＋節點代理就裝成開機自啟：
+
+| 系統 | 指令 | 裝成什麼 |
+|---|---|---|
+| Ubuntu（含 DGX Spark、Jetson） | `bash install/install.sh` | systemd 使用者服務，開 linger（沒人登入也會跑） |
+| macOS（Apple Silicon） | `bash install/install.sh` | launchd 的 LaunchAgent（登入後自動啟動） |
+| Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／8090～8189 |
+
+需要 Python 3.9 以上（macOS 沒有的話先 `xcode-select --install`；Windows 沒有會問要不要用 winget 裝）。
+安裝時會問管理者帳號與密碼；自動化安裝用 `--password-file <檔>`（Windows `-PasswordFile`），檔案第一行帳號、第二行密碼。
+移除：`--uninstall`（Windows `-Uninstall`），資料保留。
+
+要把別台機器加進來，在網頁「加一台機器」產生指令：Linux 與 macOS 是同一行 `curl … | bash`，Windows 是一行
+`powershell -EncodedCommand …`（畫面上可以展開原文）。兩種都釘住主控台的憑證，不是關掉驗證。
+
+**三個系統哪裡不一樣：**
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| 模型服務誰看管 | systemd（`xc-<欄位>-llama.service`） | 代理自己（`Supervisor`） | 代理自己（`Supervisor`） |
+| 推理引擎 | 在這台編譯（CUDA／ROCm 跟著驅動） | 下載官方預編譯版（Metal） | 下載官方預編譯版（CUDA 12.4／13.4、Vulkan 或 CPU，依顯示卡與驅動自動選） |
+| Strata 引擎 | 有（AI 395） | 沒有 | 沒有 |
+| 記憶體架構 | 三種都有 | 統一記憶體（GPU 上限照 Metal，預設 2/3～3/4） | AI 395＝切兩塊；獨立顯示卡＝獨立顯存 |
+| 登記既有服務成欄位 | 可以 | 不行（只有 xConsole 自己建的） | 不行 |
+
+代理自己看管的行為照 systemd 那份服務檔：異常結束 10 秒後重開、一分鐘內掛五次就停在「失敗」、「啟用」＝代理啟動時帶起來；
+狀態存在 `~/.xconsole/units.json`，代理重開時照 PID 與程式名稱認回還在跑的模型，不會再帶起第二份去搶同一個埠。
+預編譯版下載後核對 GitHub 公布的 sha256，對不上就不裝；解壓縮時任何檔案會落到資料夾外面就整個拒絕。
+
+### 單機模式（內部用：從這台 Mac 經 SSH 部署）
 
 ```bash
 bash deploy_standalone.sh 20      # 代理＋主控台都裝在 .20，它只管自己
@@ -254,6 +285,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 |---|---|---|---|
 | `agent/test_admit.py` | 任何機器 | 15 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
 | `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
+| `agent/test_platform.py` | Linux／macOS／Windows | 32 | 硬體讀數、代理自己看管模型服務（帶起來、掛了重開、停掉、代理重開後認回、起不來停在失敗） |
+| `test/e2e_install.py` | 裝好的機器 | 16 | 經網頁 API 走完：登入 → 確認架構 → 推薦 → 裝推理引擎 → 下載模型 → 換上 → 問一句話 → 停掉 |
 | `console/test_recommend.py` | 任何機器 | 44 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源擋下、推薦清單增改刪 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
@@ -325,3 +358,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | 推薦畫面把 Gemma 4 E4B 算成每個 token 讀 100% 權重 | E 系列的 `per_layer_token_embd` 占大半檔案，但它是查表，每個 token 只讀一列。查表的張量不算讀取量 |
 | 確認記憶體架構之後，硬體卡還是舊的分層 | 推薦結果有 60 秒快取；改了這台的設定、下載完成、刪除模型都要清掉，否則畫面停在舊架構或「下載中 0%」 |
 | 新代理沒確認架構，AI 395 被當成獨立顯示卡推薦 | 登錄檔預設 `discrete`。代理把偵測建議放進 `chip.suggest`，沒確認又不一致時，總覽第一步與硬體卡都會要求確認 |
+| macOS 上代理重開後認不回還在跑的模型 | 認行程用「帶起來當下記的程式名稱」：macOS 的 Python 啟動半秒後會從 python3.15 換成 python（Python.app）。名稱去掉結尾版本號，並在看管迴圈裡持續更新 |
+| 代理重開後，被認回來的模型掛了不會重開 | 認回來的不是這次 Popen 的，拿不到結束碼；看管迴圈要另外逐一檢查 PID 還在不在 |
+| macOS 推薦把 M5 Max 當成基本款 M5（153 GB/s） | 型號比對「M5」吃到了「M5 Max」。基本款名稱後面不能接 Pro／Max／Ultra；沒列在表上的高階型號回未知，請管理者填，不拿基本款的數字充數 |
+| Windows 上 `print()` 什麼都沒留下 | 用 pythonw 在背景跑時 `sys.stdout` 是 None；代理與主控台啟動時改寫進 `.xconsole/agent.log`／`console.log` |

@@ -37,7 +37,9 @@ import report  # noqa: E402
 import tls  # noqa: E402
 from store import Store  # noqa: E402
 
-HOME = os.path.expanduser("~")
+# Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
+HOME = (sys.argv[sys.argv.index("--home") + 1] if "--home" in sys.argv[:-1] else None) \
+    or os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME, ".xconsole")
 FLEET = os.path.join(STATE_DIR, "fleet.json")
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -440,33 +442,68 @@ def join_release(j):
         j["busy"] = False
 
 
+LAUNCHD_LABEL = "tw.xcloudinfo.xconsole-agent"
+
+
 def install_script(code, j):
+    """Linux 與 macOS 共用的安裝腳本：Linux 建 systemd 使用者服務，macOS 建 launchd 的 LaunchAgent。"""
     url = f"https://{j['console']}"
     return f"""#!/usr/bin/env bash
-# xConsole 節點代理安裝：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+# xConsole 節點代理安裝（Linux／macOS）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
 # 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。
 set -euo pipefail
 C='{url}'
 PIN='{j["pin"]}'
 CODE='{code}'
+OSN=$(uname -s)
 get() {{ curl -fsSk --pinnedpubkey "$PIN" "$C/install/$CODE/$1"; }}
 echo "== 1/4 檢查這台 =="
 [ "$(id -u)" = 0 ] && {{ echo "請用一般帳號執行，不要用 root 或 sudo"; exit 1; }}
-for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
-systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+if [ "$OSN" = Darwin ]; then
+  python3 -c 'import ssl' 2>/dev/null || {{ echo "這台沒有 python3。請先執行 xcode-select --install 安裝命令列工具，再貼一次這行指令"; exit 1; }}
+else
+  for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
+  systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+fi
+PY=$(command -v python3)
 echo "== 2/4 下載節點代理 =="
-mkdir -p -m 700 "$HOME/.xconsole" "$HOME/.config/systemd/user"
+mkdir -p -m 700 "$HOME/.xconsole"
 get xconsole_agent.py > "$HOME/xconsole_agent.py.new"
-python3 -m py_compile "$HOME/xconsole_agent.py.new"
+"$PY" -m py_compile "$HOME/xconsole_agent.py.new"
 mv "$HOME/xconsole_agent.py.new" "$HOME/xconsole_agent.py"
 echo "== 3/4 建立服務並啟動 =="
-cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
-{AGENT_UNIT}UNIT
-systemctl --user daemon-reload
-systemctl --user enable xconsole-agent.service >/dev/null
-systemctl --user restart xconsole-agent.service
 LINGER=yes
-loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+if [ "$OSN" = Darwin ]; then
+  # launchd：登入後自動啟動、掛了自動重開。機器沒有人登入也要跑的話，到「系統設定 → 使用者與群組」開自動登入
+  PL="$HOME/Library/LaunchAgents/{LAUNCHD_LABEL}.plist"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  cat > "$PL" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{LAUNCHD_LABEL}</string>
+  <key>ProgramArguments</key><array><string>$PY</string><string>$HOME/xconsole_agent.py</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>$HOME/.xconsole/agent.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.xconsole/agent.log</string>
+</dict></plist>
+PLIST
+  launchctl bootout "gui/$(id -u)/{LAUNCHD_LABEL}" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$PL"
+  launchctl kickstart -k "gui/$(id -u)/{LAUNCHD_LABEL}"
+  LOGHINT="tail -n 50 ~/.xconsole/agent.log"
+else
+  mkdir -p "$HOME/.config/systemd/user"
+  cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
+{AGENT_UNIT}UNIT
+  systemctl --user daemon-reload
+  systemctl --user enable xconsole-agent.service >/dev/null
+  systemctl --user restart xconsole-agent.service
+  loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+  LOGHINT="journalctl --user -u xconsole-agent -n 50"
+fi
 # 等健康檢查真的通過才往下：重新安裝時權杖與憑證檔本來就在，只等檔案出現會在代理重啟到一半時就去連
 UP=no
 for i in $(seq 1 30); do
@@ -474,24 +511,142 @@ for i in $(seq 1 30); do
      && curl -fsS -m 3 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null 2>&1; then UP=yes; break; fi
   sleep 1
 done
-[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
+[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：$LOGHINT"; exit 1; }}
 echo "== 4/4 加入主控台 =="
-RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
-import json, os, socket, subprocess
-home = os.path.expanduser("~")
-ips = subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split()[:4]
-print(json.dumps({{"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
-                  "linger": os.environ["XC_LINGER"] == "yes",
-                  "token": open(os.path.join(home, ".xconsole/token")).read().strip(),
-                  "cert": open(os.path.join(home, ".xconsole/agent-cert.pem")).read()}}))
-PY
+RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" "$PY" - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
+{JOIN_PAYLOAD_PY}PY
 ) || {{ echo "連不到主控台 $C"; exit 1; }}
 STATUS=$(printf '%s' "$RESP" | tail -n 1)
-printf '%s' "$RESP" | sed '$d' | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
+printf '%s' "$RESP" | sed '$d' | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
 [ "$STATUS" = 200 ] || exit 1
 [ "$LINGER" = no ] && echo "提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER"
+[ "$OSN" = Darwin ] && echo "提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台"
 exit 0
 """
+
+
+# 送回主控台的加入資料：權杖、代理憑證、這台的 IP（UDP connect 不送封包，三個系統都能取到對外網卡的 IP）
+JOIN_PAYLOAD_PY = """import json, os, socket, sys
+home = os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
+ips = []
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("1.1.1.1", 80)); ips.append(s.getsockname()[0]); s.close()
+except OSError:
+    pass
+print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
+                  "linger": os.environ.get("XC_LINGER", "yes") == "yes",
+                  "token": open(os.path.join(home, ".xconsole", "token")).read().strip(),
+                  "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
+"""
+
+
+def install_script_ps1(code, j):
+    """Windows 的安裝腳本（Windows PowerShell 5.1，系統內建）。
+    用系統管理員身分執行：裝成開機自啟（SYSTEM 帳號，資料放 C:\\ProgramData\\xConsole，權限只給 SYSTEM 與系統管理員）並開防火牆；
+    一般身分執行：裝成這個帳號登入後自啟，防火牆要另外請系統管理員開。"""
+    url = f"https://{j['console']}"
+    return f"""# xConsole 節點代理安裝（Windows）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+$ErrorActionPreference = 'Stop'
+$C = '{url}'; $CODE = '{code}'; $FP = '{j["fp"]}'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# 只接受主控台那一張憑證（比對整張憑證的 SHA-256），不是關掉驗證
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
+  $h = [Security.Cryptography.SHA256]::Create().ComputeHash($cert.GetRawCertData())
+  ([BitConverter]::ToString($h) -replace '-', '') -eq $FP }}
+$wc = New-Object Net.WebClient
+$admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+Write-Host '== 1/5 檢查這台 =='
+$py = $null
+$probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
+# py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
+try {{ $v = & py -3 -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) {{ $py = $v.Trim() }} }} catch {{}}
+if (-not $py) {{ try {{ $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) {{ $py = $v.Trim() }} }} catch {{}} }}
+if (-not $py) {{
+  $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
+  if ($ans -match '^(n|N)') {{ Write-Host '請先安裝 Python 3（https://www.python.org），再貼一次這段指令'; exit 1 }}
+  winget install -e --id Python.Python.3.12 --scope machine --accept-package-agreements --accept-source-agreements
+  $py = (Get-ChildItem 'C:\\Program Files\\Python3*\\python.exe' | Select-Object -Last 1).FullName
+  if (-not $py) {{ Write-Host 'Python 裝好了但找不到，請重新開一個 PowerShell 視窗再貼一次'; exit 1 }}
+}}
+if ($admin) {{ $base = Join-Path $env:ProgramData 'xConsole' }} else {{ $base = $env:USERPROFILE }}
+$dir = Join-Path $base 'xconsole'
+New-Item -ItemType Directory -Force -Path (Join-Path $base '.xconsole') | Out-Null
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+if ($admin) {{
+  # ProgramData 預設一般使用者讀得到：權杖與私鑰放在這裡，只留給 SYSTEM 與系統管理員
+  icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+}}
+Write-Host '== 2/5 準備 Python 環境 =='
+& $py -m venv (Join-Path $dir '.venv')
+$vpy = Join-Path $dir '.venv\\Scripts\\python.exe'
+$vpyw = Join-Path $dir '.venv\\Scripts\\pythonw.exe'
+& $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'
+Write-Host '== 3/5 下載節點代理 =='
+$agent = Join-Path $dir 'xconsole_agent.py'
+$wc.DownloadFile("$C/install/$CODE/xconsole_agent.py", "$agent.new")
+& $vpy -m py_compile "$agent.new"; if ($LASTEXITCODE) {{ throw '代理程式檔損壞' }}
+Move-Item -Force "$agent.new" $agent
+Write-Host '== 4/5 建立開機自啟並啟動 =='
+$task = 'xConsole Agent'
+Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+$act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $agent + '" --home "' + $base + '"') -WorkingDirectory $dir
+$set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+if ($admin) {{
+  $trg = New-ScheduledTaskTrigger -AtStartup
+  $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+  New-NetFirewallRule -DisplayName 'xConsole 節點代理' -Direction Inbound -Protocol TCP -LocalPort 9401 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
+  New-NetFirewallRule -DisplayName 'xConsole 模型 API' -Direction Inbound -Protocol TCP -LocalPort 8090-8189 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
+}} else {{
+  $trg = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $pri = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+}}
+Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $pri -Settings $set | Out-Null
+Start-ScheduledTask -TaskName $task
+$tok = Join-Path $base '.xconsole\\token'; $crt = Join-Path $base '.xconsole\\agent-cert.pem'
+$up = $false
+for ($i = 0; $i -lt 40 -and -not $up; $i++) {{
+  Start-Sleep 1
+  if ((Test-Path $tok) -and (Test-Path $crt)) {{
+    $mine = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $crt
+    [Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert) $cert.GetRawCertData().Length -eq $mine.RawData.Length -and [Convert]::ToBase64String($cert.GetRawCertData()) -eq [Convert]::ToBase64String($mine.RawData) }}
+    try {{ $up = (New-Object Net.WebClient).DownloadString('https://127.0.0.1:9401/healthz') -match 'xconsole-agent' }} catch {{}}
+  }}
+}}
+if (-not $up) {{ Write-Host '代理沒有起來。請在「工作排程器」查看 xConsole Agent 的最後執行結果'; exit 1 }}
+Write-Host '== 5/5 加入主控台 =='
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
+  $h = [Security.Cryptography.SHA256]::Create().ComputeHash($cert.GetRawCertData())
+  ([BitConverter]::ToString($h) -replace '-', '') -eq $FP }}
+$env:XC_CODE = $CODE; $env:XC_LINGER = 'yes'; $env:XCONSOLE_HOME = $base
+$payload = @'
+{JOIN_PAYLOAD_PY}'@ | & $vpy -
+$req = New-Object Net.WebClient; $req.Headers.Add('Content-Type', 'application/json'); $req.Encoding = [Text.Encoding]::UTF8
+try {{ $resp = $req.UploadString("$C/api/join", $payload); $ok = $true }} catch [Net.WebException] {{
+  $resp = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd(); $ok = $false }}
+$d = $resp | ConvertFrom-Json
+if ($d.message) {{ Write-Host $d.message }} elseif ($d.error) {{ Write-Host $d.error }} else {{ Write-Host $resp }}
+if (-not $ok) {{ exit 1 }}
+if (-not $admin) {{ Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }}
+"""
+
+
+def console_fp():
+    """主控台目前憑證整張的 SHA-256（Windows PowerShell 用來釘住憑證；它拿不到 SubjectPublicKeyInfo）。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    with open(CERTS.p.live_cert, "rb") as fh:
+        cert = x509.load_pem_x509_certificates(fh.read())[0]
+    return cert.fingerprint(hashes.SHA256()).hex().upper()
+
+
+def windows_command(url):
+    """一行貼上就能跑的 Windows 指令。用 -EncodedCommand，貼進 cmd 或 PowerShell 都不會被引號、$ 弄壞；
+    內容就是：釘住主控台憑證後下載 agent.ps1 執行（畫面上另外顯示原文，可以先看再貼）。"""
+    head = re.sub(r"\s+", " ", f"""$FP='{{fp}}';[Net.ServicePointManager]::SecurityProtocol='Tls12';
+      [Net.ServicePointManager]::ServerCertificateValidationCallback={{param($s,$c)
+      ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($c.GetRawCertData())) -replace '-','') -eq $FP}};
+      iex ((New-Object Net.WebClient).DownloadString('{url}'))""")
+    return head
 
 
 def join_node(handler, body):
@@ -822,7 +977,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "service": "xconsole", "tls": {
                 "daysLeft": cur.get("daysLeft"), "validToTaipei": cur.get("validToTaipei"),
                 "source": cur.get("source"), "selfSigned": cur.get("selfSigned")}})
-        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|xconsole_agent\.py)", path)
+        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|agent\.ps1|xconsole_agent\.py)", path)
         if m:
             # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
             j = join_lookup(m.group(1))
@@ -831,6 +986,9 @@ class Handler(BaseHTTPRequestHandler):
                                   "text/plain; charset=utf-8")
             if m.group(2) == "agent.sh":
                 return self._send(200, install_script(m.group(1), j).encode(), "text/x-shellscript; charset=utf-8")
+            if m.group(2) == "agent.ps1":
+                # 加 BOM：Windows PowerShell 5.1 沒 BOM 會用 ANSI 讀，中文訊息變亂碼
+                return self._send(200, "\ufeff".encode() + install_script_ps1(m.group(1), j).encode(), "text/plain; charset=utf-8")
             src = agent_source()
             if not src:
                 return self._send(500, "主控台找不到代理程式檔，請重新部署主控台。\n".encode(), "text/plain; charset=utf-8")
@@ -999,11 +1157,15 @@ class Handler(BaseHTTPRequestHandler):
             code = secrets.token_urlsafe(24)
             with _JOIN_LOCK:
                 _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group, "replace": replace,
-                                           "console": host, "pin": console_pin(), "by": self.user}
+                                           "console": host, "pin": console_pin(), "fp": console_fp(), "by": self.user}
             self._audit("node.join_code", host, True, {"name": name, "group": group})
             url = f"https://{host}/install/{code}/agent.sh"
+            ps = windows_command(f"https://{host}/install/{code}/agent.ps1").replace("{fp}", _JOINS[_join_key(code)]["fp"])
             return self._json(200, {"id": _join_key(code)[:12], "expires_at": time.time() + JOIN_TTL,
-                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash"})
+                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash",
+                                    "command_windows": "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand "
+                                                       + base64.b64encode(ps.encode("utf-16-le")).decode(),
+                                    "command_windows_text": ps})
         m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove)", path)
         if m:
             nid, act = m.group(1), m.group(2)
@@ -1295,6 +1457,9 @@ def is_ip(text):
 
 
 def main():
+    if sys.stdout is None:
+        # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
+        sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "console.log"), "a", encoding="utf-8", buffering=1)
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)

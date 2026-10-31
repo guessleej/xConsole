@@ -81,7 +81,11 @@ def capacity(state):
            "ram_bw_assumed": not chip.get("ram_bandwidth_gbs"), "cards": len(pools.get("gpus") or [])}
     if mm == "unified_single":
         tot = (pools.get("unified") or {}).get("total_gib") or 0
-        out.update(fast=max(0.0, tot - fl.get("ram", 12) - 1.5), slow=0.0,
+        fast = tot - fl.get("ram", 12) - 1.5
+        lim = (pools.get("unified") or {}).get("gpu_limit_gib")
+        if lim:
+            fast = min(fast, lim)          # Apple Silicon：GPU 只能用到統一記憶體的一部分
+        out.update(fast=max(0.0, fast), slow=0.0,
                    tiers=[{"kind": "gpu", "label": "統一記憶體", "gib": round(tot - fl.get("ram", 12), 1)},
                           {"kind": "floor", "label": "保留給系統", "gib": fl.get("ram", 12)}],
                    note="GPU 與系統共用同一塊記憶體；載入前會先試算，不夠就擋下，不會把整台拖死")
