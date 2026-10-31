@@ -133,6 +133,34 @@ def main():
     case("連結指到別的資料夾的拒絕", extract([("b/x", "../../etc/passwd")]) == "拒絕")
     case("連結指到子資料夾外的路徑也拒絕", extract([("b/x", "sub/../../y")]) == "拒絕")
 
+    # ---- 從瀏覽器匯入 GGUF（分塊、續傳、檢查）
+    data = b"GGUF" + os.urandom(3000)
+    st, r = A.upload_chunk("up", "m.gguf", 0, len(data), data[:1000])
+    case("匯入：第一塊收下", st == 200 and r["received"] == 1000, r)
+    st, r = A.upload_chunk("up", "m.gguf", 0, len(data), data[:1000])
+    case("匯入：位置不對回 409 並告訴已收到多少（續傳用）", st == 409 and r["received"] == 1000, r)
+    case("匯入：查得到已收到多少", A.upload_status("up", "m.gguf")[1]["received"] == 1000)
+    st, r = A.upload_chunk("up", "m.gguf", 1000, len(data), data[1000:])
+    case("匯入：最後一塊到齊改成正式檔名", st == 200 and r.get("done") and os.path.exists(os.path.join(A.gguf_root(), "up", "m.gguf")), r)
+    case("匯入：已經有同名檔不覆蓋", A.upload_chunk("up", "m.gguf", 0, 4, b"GGUF")[0] == 409)
+    import hashlib
+    st = A.upload_status("up", "m.gguf")[1]
+    case("匯入：同名檔回報大小與頭尾雜湊（畫面用來判斷是不是同一個檔）",
+         (st["size"], st["edge_sha256"]) == (len(data), hashlib.sha256(data).hexdigest()), st)
+    case("匯入：不是 GGUF 的拒絕並刪掉", A.upload_chunk("up", "x.gguf", 0, 4, b"NOPE")[0] == 400
+         and not os.path.exists(os.path.join(A.gguf_root(), "up", "x.gguf.part")))
+    case("匯入：資料夾不能 ../", A.upload_chunk("..", "a.gguf", 0, 4, b"GGUF")[0] == 400)
+    case("匯入：檔名一定要 .gguf", A.upload_chunk("up", "a.sh", 0, 4, b"GGUF")[0] == 400)
+    case("搜尋 Hugging Face：關鍵字有怪字元擋下", A.hf_search("a<script>")[0] == 400)
+    real_help = A._llama_help
+    A._llama_help = lambda exe: "-rea,  --reasoning [on|off|auto]  Use reasoning"
+    case("思考模式：新版用 --reasoning", A.reasoning_args("/x", "off") == ["--reasoning", "off"])
+    A._llama_help = lambda exe: "--reasoning-budget N   token budget"
+    case("思考模式：舊版關掉用 --reasoning-budget 0、開啟不加旗標",
+         (A.reasoning_args("/x", "off"), A.reasoning_args("/x", "on")) == (["--reasoning-budget", "0"], []))
+    A._llama_help = real_help
+    case("思考模式：auto 不加旗標", A.reasoning_args("/x", "auto") == [])
+
     # ---- 代理自己看管模型服務（Supervisor）
     mod_dir = tempfile.mkdtemp()
     with open(os.path.join(mod_dir, "fakellama.py"), "w", encoding="utf-8") as fh:

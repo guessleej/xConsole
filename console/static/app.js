@@ -33,6 +33,7 @@ async function api(path, opts = {}) {
     headers: { "Content-Type": "application/json" },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     credentials: "same-origin",
+    signal: opts.signal,
   });
   let data = {};
   try { data = await res.json(); } catch (_) { /* 沒有 JSON 就算了 */ }
@@ -169,13 +170,14 @@ function modal({ title, bodyNode, confirmText, danger, onConfirm, hasInput }) {
 }
 
 /* 輸入框的 Enter 要擋中文輸入法組字（注音選字的 Enter 不能當送出） */
-function imeGuard(input, onEnter) {
+function imeGuard(input, onEnter, opts = {}) {
   let composing = false;
   input.addEventListener("compositionstart", () => { composing = true; });
   input.addEventListener("compositionend", () => { composing = false; });
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     if (composing || e.isComposing || e.keyCode === 229) return;
+    if (opts.shiftNewline && e.shiftKey) return;         // 對話框：Shift+Enter 換行
     e.preventDefault();
     onEnter();
   });
@@ -235,10 +237,10 @@ function renderNav() {
   sub.textContent = "";
 
   const items = [["overview", "總覽"], ["nodes", machinesLabel()], ["lib", "模型庫"],
-    ["apis", "API 串接"], ["logs", "記錄"], ["settings", "設定"]];
+    ["apis", "對話與 API"], ["logs", "記錄"], ["settings", "設定"]];
   const v = S.view;
   const active = v.startsWith("node:") ? "nodes" : v === "lib" || v.startsWith("lib:") ? "lib"
-    : v.startsWith("api:") ? "apis" : v;
+    : v.startsWith("api:") || v === "chat" || v === "assist" ? "apis" : v;
 
   items.forEach(([key, label]) => {
     const b = el("button", null, label);
@@ -279,8 +281,11 @@ function renderNav() {
   }
 
   // 第二列：API 串接的各個端點
-  if (v === "apis" || v.startsWith("api:")) {
-    subBtn("全部", "apis", v === "apis");
+  if (v === "apis" || v.startsWith("api:") || v === "chat" || v === "assist") {
+    // 先用（對話、助理），再看怎麼接（API 端點）
+    subBtn("對話", "chat", v === "chat");
+    subBtn("助理", "assist", v === "assist");
+    subBtn("API 端點", "apis", v === "apis");
     (S.fleet.nodes || []).forEach((n) => (n.state?.slots || []).filter(isApiSlot).forEach((s) => {
       subBtn(`${n.name} ${s.role}`, `api:${n.id}:${s.id}`, v === `api:${n.id}:${s.id}`);
     }));
@@ -455,6 +460,12 @@ function slotCard(node, s, unified) {
     const sw = el("button", "btn sm", "換模型");
     sw.onclick = () => openSwap(node, s);
     acts.appendChild(sw);
+  }
+  if (s.kind === "llama" && s.unit) {
+    const rb = el("button", "btn sm", "執行設定");
+    rb.title = "上下文長度、思考模式、區網存取；看預估速度與載入時間";
+    rb.onclick = () => openRunSettings(node, s);
+    acts.appendChild(rb);
   }
   if (isApiSlot(s)) {
     const ab = el("button", "btn sm", "API");
@@ -746,7 +757,7 @@ async function viewLib() {
     S.libTab = tab;
     tabs.textContent = "";
     stepsEl.hidden = tab === "sd";          // 上面那條是文字模型的順序；畫圖與影片有自己的一條
-    [["rec", "推薦模型"], ["installed", `已安裝（${models.length}）`], ["sd", "畫圖與影片"], ["hf", "從 Hugging Face 下載"], ["store", "存放區"]].forEach(([k, label]) => {
+    [["rec", "推薦模型"], ["installed", `已安裝（${models.length}）`], ["sd", "畫圖與影片"], ["hf", "下載或匯入"], ["store", "存放區"]].forEach(([k, label]) => {
       const b = el("button", null, label);
       if (k === tab) b.setAttribute("aria-current", "true");
       b.onclick = () => paint(k);
@@ -758,8 +769,8 @@ async function viewLib() {
     else if (tab === "installed") body.appendChild(libInstalledCard(ok, models, jobs));
     else if (tab === "hf") {
       const pair = el("div", "grid pair");
-      pair.append(libDownloadCard(ok, only), libManualCard(ok));
-      body.appendChild(pair);
+      pair.append(libDownloadCard(ok, only), libUploadCard(ok, only));
+      body.append(pair, libManualCard(ok));
       // 畫圖／影片模型是好幾個檔組成的，不在這裡一個一個下載；不在推薦清單上的（含中國來源）只限內部測試手動組
       const sdNote = el("p", "small muted");
       const sdBtn = el("button", "linkbtn", "手動組一顆畫圖／影片模型（內部測試）");
@@ -918,7 +929,34 @@ function libDownloadCard(ok, only) {
   w2.appendChild(el("div", "assume", "只在這次下載期間用，不保存、不寫紀錄"));
   form.appendChild(w1);
   form.appendChild(w2);
-  dc.appendChild(form);
+  // 不知道完整名稱時先用關鍵字找（照下載數排），點一下就帶進上面的名稱並列出量化
+  const sRow = el("div", "search-row");
+  const fQ = textInput("", "用關鍵字找 GGUF，例：gemma 4、gpt-oss、granite");
+  const sBtn = el("button", "btn sm", "搜尋");
+  sRow.append(fQ, sBtn);
+  const sOut = el("div", "hf-results");
+  sOut.hidden = true;
+  dc.append(sRow, sOut, form);
+  const search = async () => {
+    const q = fQ.value.trim();
+    if (!q) return;
+    sOut.hidden = false;
+    loading(sOut);
+    let r;
+    try { r = await api(`/api/node/${fNode.value}/library/hf/search`, { method: "POST", body: { q, token: fTok.value } }); } catch (ex) { errNote(sOut, ex.message); return; }
+    sOut.textContent = "";
+    if (!r.results.length) { sOut.appendChild(el("p", "small muted", "找不到含這個關鍵字的 GGUF。")); return; }
+    r.results.forEach((x) => {
+      const b = el("button", "hf-hit");
+      b.appendChild(el("span", "mono", x.repo));
+      if (x.cn_origin) b.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+      b.appendChild(el("span", "small muted", `下載 ${int(x.downloads)}・${x.updated || ""}`));
+      b.onclick = () => { fRepo.value = x.repo; sOut.hidden = true; listBtn.click(); };
+      sOut.appendChild(b);
+    });
+  };
+  sBtn.onclick = search;
+  imeGuard(fQ, search);
   const listBtn = el("button", "btn primary", "列出可下載的量化");
   const la = el("div", "slot-actions");
   la.appendChild(listBtn);
@@ -1099,6 +1137,374 @@ function watchLibJobs(view, jc, entries) {
     jc.replaceWith(fresh);
     watchLibJobs(view, fresh, now);
   }, 3000);
+}
+
+
+/* ================================================================ 從瀏覽器匯入 GGUF
+   分塊送（每塊 32 MB）、可以續傳：中斷後再選同一個檔案，會從主機已收到的位置接著送。 */
+// 跟代理的 edge_sha256 同一個算法：頭 4 MB ＋ 尾 4 MB（檔案小於 8 MB 時尾段從 4 MB 處開始）
+async function edgeSha256(f) {
+  const E = 4 * 1024 * 1024;
+  const parts = [await f.slice(0, E).arrayBuffer()];
+  if (f.size > E) parts.push(await f.slice(Math.max(E, f.size - E), f.size).arrayBuffer());
+  const buf = new Uint8Array(parts.reduce((a, p) => a + p.byteLength, 0));
+  let o = 0;
+  parts.forEach((p) => { buf.set(new Uint8Array(p), o); o += p.byteLength; });
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function libUploadCard(ok, only) {
+  const c = card("從這台電腦匯入 GGUF", "不用轉格式；檔案直接送到那台的存放區");
+  const form = el("div", "form-row");
+  const fNode = selectInput(ok.map(({ n, lib }) => [n.id, `${n.name}（剩 ${fmt(lib.free_gib, 0)} GiB）`]), only || ok[0]?.n.id);
+  const fFile = el("input");
+  fFile.type = "file";
+  fFile.accept = ".gguf";
+  fFile.multiple = true;
+  const fFolder = textInput("", "預設用第一個檔名");
+  if (ok.length > 1) form.appendChild(fieldBox("匯入到哪台", fNode));
+  form.append(fieldBox("GGUF 檔案", fFile, "分片模型請一次選齊所有分片；看圖模型把 mmproj 一起選"),
+    fieldBox("放進哪個資料夾", fFolder, "一顆模型一個資料夾"));
+  c.appendChild(form);
+  const prog = el("div");
+  const go_ = el("button", "btn primary", "開始匯入");
+  const stop = el("button", "btn sm", "暫停");
+  stop.hidden = true;
+  const row = el("div", "slot-actions");
+  row.append(go_, stop);
+  c.append(row, prog);
+  let ctl = null;
+  stop.onclick = () => ctl?.abort();
+  go_.onclick = async () => {
+    const files = [...fFile.files];
+    if (!files.length) { errNote(prog, "先選檔案"); return; }
+    if (files.some((f) => !/\.gguf$/i.test(f.name))) { errNote(prog, "只收 .gguf 檔"); return; }
+    const folder = (fFolder.value.trim() || files[0].name.replace(/\.gguf$/i, "").replace(/-\d{5}-of-\d{5}$/, "")).replace(/[^\w.-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "").slice(0, 80);
+    const nid = fNode.value;
+    ctl = new AbortController();
+    go_.disabled = true; stop.hidden = false;
+    prog.textContent = "";
+    const line = el("p", "small mono", "準備中…");
+    const bar = el("div", "bar thin");
+    const fill = el("div", "seg");
+    bar.appendChild(fill);
+    prog.append(line, bar);
+    const CH = 32 * 1024 * 1024;
+    const total = files.reduce((a, f) => a + f.size, 0);
+    let doneBytes = 0;
+    const skipped = [];
+    try {
+      for (const f of files) {
+        const name = f.name.replace(/[^\w.+-]+/g, "-");
+        const st = await api(`/api/node/${nid}/library/upload/status`, { method: "POST", body: { folder, name } });
+        if (st.exists) {
+          // 同名檔已經在：大小與頭尾各 4 MB 的 sha256 都一樣才當成同一個（續傳時前面已送完的分片）；不一樣就停下來講清楚
+          if (st.size !== f.size || st.edge_sha256 !== await edgeSha256(f)) {
+            throw new Error(`${folder}/${name} 已經有一個不一樣的檔案。請換一個資料夾名稱，或先到「已安裝」刪掉舊的`);
+          }
+          skipped.push(name);
+          doneBytes += f.size;
+          continue;
+        }
+        let off = st.received || 0;                      // 續傳：從主機已收到的位置接著送
+        while (off < f.size) {
+          const chunk = f.slice(off, Math.min(off + CH, f.size));
+          const res = await fetch(`/api/node/${nid}/library/upload?` + new URLSearchParams({ folder, name, offset: off, total: f.size }), {
+            method: "POST", body: chunk, signal: ctl.signal, credentials: "same-origin",
+            headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" } });
+          const r = await res.json().catch(() => ({}));
+          if (res.status === 409 && r.received !== undefined) { off = r.received; continue; }
+          if (!res.ok) throw new Error(r.error || `伺服器回 ${res.status}`);
+          off = r.received;
+          const pct = Math.floor(((doneBytes + off) / total) * 100);
+          fill.style.width = pct + "%";
+          line.textContent = `${f.name}　${fmt((doneBytes + off) / 1073741824)} / ${fmt(total / 1073741824)} GiB（${pct}%）`;
+        }
+        doneBytes += f.size;
+      }
+      toast(`已匯入到 ${folder}/${skipped.length ? `（${skipped.length} 個檔案已經在、內容相同，沒有重送）` : ""}`, "ok");
+      if (S.rec) delete S.rec[nid];
+      S.libTab = "installed";
+      viewLib();
+    } catch (ex) {
+      line.textContent = ex.name === "AbortError" ? "已暫停；再按一次「開始匯入」會從中斷的地方接著送" : "匯入失敗：" + ex.message;
+    } finally {
+      go_.disabled = false; stop.hidden = true;
+    }
+  };
+  return c;
+}
+
+/* ================================================================ 執行設定（參考 LocModel 執行模型的那一頁）
+   上下文一鍵切換（每個選項都先用准入公式試算放不放得下）、思考模式、區網存取，並顯示預估速度與載入時間。 */
+async function openRunSettings(node, s) {
+  const body = el("div");
+  loading(body);
+  const ov = modal({ title: `${s.role}・${s.model || ""}　執行設定`, bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  let info;
+  try { info = await api(`/api/node/${node.id}/apiinfo/${s.id}`); } catch (ex) { errNote(body, ex.message); return; }
+  const run = info.run;
+  body.textContent = "";
+  if (!run) { body.appendChild(el("p", "note", "這個欄位不是 llama.cpp 跑的，執行設定請到 API 串接頁。")); return; }
+  const stats = el("div", "tiles light");
+  const tile = (k, v, sub) => { const t = el("div", "tile"); t.append(el("div", "k", k), el("div", "v", v)); if (sub) t.appendChild(el("div", "s", sub)); return t; };
+  stats.append(
+    tile("預估速度", run.tok_s != null ? `約 ${fmt(run.tok_s, 0)} tok/s` : "未知", run.tok_s != null ? "依記憶體頻寬估算，實際以實測為準" : "到「這台的設定」填記憶體頻寬"),
+    tile("載入時間", run.load_sec != null ? `${run.load_sec} 秒` : run.load_est_sec != null ? `約 ${run.load_est_sec} 秒` : "—",
+      run.load_sec != null ? "上次實際載入" : "還沒實際載入過，依磁碟速度估"),
+    tile("模型", `${fmt(run.size_gib)} GiB`, run.ctx_train ? `最長上下文 ${int(run.ctx_train)}` : ""));
+  body.appendChild(stats);
+
+  let ctx = info.max_context, thinking = run.thinking, lan = run.lan;
+  body.appendChild(el("h4", "pick-h", "上下文長度"));
+  const ctxBar = el("div", "tabbar run-ctx");
+  const ctxNote = el("p", "small muted");
+  const drawCtx = () => {
+    ctxBar.textContent = "";
+    run.options.forEach((o) => {
+      const b = el("button", null, `${o.ctx / 1024}K`);
+      b.title = o.allow ? `KV 約 ${fmt(o.kv_gib)} GiB；載完最壞剩 ${fmt(o.worst_gib)} GiB` : (o.reason || "放不下");
+      if (o.ctx === ctx) b.setAttribute("aria-current", "true");
+      b.disabled = !o.allow && o.ctx !== info.max_context;
+      b.onclick = () => { ctx = o.ctx; drawCtx(); };
+      ctxBar.appendChild(b);
+    });
+    const o = run.options.find((x) => x.ctx === ctx);
+    ctxNote.textContent = o ? `${int(ctx)} 個 token：KV 約 ${fmt(o.kv_gib)} GiB，載完最壞還剩 ${fmt(o.worst_gib)} GiB。放不下的選項會反灰（游標移上去看原因）。`
+      : `目前 ${int(ctx)}（不在常用選項裡）。`;
+  };
+  drawCtx();
+  body.append(ctxBar, ctxNote);
+
+  body.appendChild(el("h4", "pick-h", "思考模式"));
+  const thBar = el("div", "tabbar");
+  const drawTh = () => {
+    thBar.textContent = "";
+    [["auto", "照模型預設"], ["on", "開：先想再答"], ["off", "關：直接回答"]].forEach(([k, label]) => {
+      const b = el("button", null, label);
+      if (k === thinking) b.setAttribute("aria-current", "true");
+      b.disabled = !run.thinking_supported && k !== "auto";
+      b.onclick = () => { thinking = k; drawTh(); };
+      thBar.appendChild(b);
+    });
+  };
+  drawTh();
+  body.append(thBar, el("p", "small muted", run.thinking_supported ? "只對會思考的模型有用（例 gpt-oss、Granite、Nemotron）；關掉回答比較快，但難題可能答得比較差。"
+    : "這支 llama.cpp 太舊，不支援切換思考模式；到「這台的設定」重新安裝推理引擎。"));
+
+  body.appendChild(el("h4", "pick-h", "區網存取"));
+  const lanBox = el("label", "check-row");
+  const cb = el("input");
+  cb.type = "checkbox";
+  cb.checked = lan;
+  cb.onchange = () => { lan = cb.checked; };
+  lanBox.append(cb, document.createTextNode(" 讓區網裡的其他電腦（IDE、手機）連得到這個模型"));
+  body.append(lanBox, el("p", "small muted", "關掉就只有這台自己連得到（127.0.0.1）；主控台的網頁對話照樣能用。"));
+  const err = el("div");
+  body.appendChild(err);
+  formButton(ov, "套用並重新載入", "primary", async () => {
+    const want = {};
+    if (ctx !== info.max_context) want.max_context = ctx;
+    if (thinking !== run.thinking) want.thinking = thinking;
+    if (lan !== run.lan) want.lan = lan;
+    if (!Object.keys(want).length) { ov.remove(); return; }
+    errNote(err, "");
+    err.appendChild(el("p", "note", "重新載入模型中，大模型要幾分鐘…"));
+    try {
+      await api(`/api/node/${node.id}/apiinfo/${s.id}/settings`, { method: "POST", body: want });
+    } catch (ex) { errNote(err, ex.message); return; }
+    ov.remove();
+    toast("已套用並重新載入", "ok");
+    await refresh();
+  });
+}
+
+/* ================================================================ 網頁對話與助理
+   對話：直接跟某個模型聊（串流，一個字一個字出來；看圖模型可以附圖）。
+   助理：模型可以呼叫唯讀工具查這個主控台管的機器，回答「哪台還放得下 30B」這類問題。
+   對話只留在這個分頁，不存到伺服器，也不寫進稽核。 */
+const CHAT = { chat: { msgs: [] }, assist: { msgs: [] } };
+const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型" };
+
+function chatTargets() {
+  const out = [];
+  (S.fleet?.nodes || []).filter((n) => n.online).forEach((n) => (n.state.slots || [])
+    .filter((s) => isApiSlot(s) && s.busy && (s.caps || []).includes("文字"))
+    .forEach((s) => out.push({ n, s, key: `${n.id}:${s.id}`, label: `${n.name}・${s.role}：${s.model || s.unit}`, vision: (s.caps || []).includes("看圖") })));
+  return out;
+}
+
+function viewChat(mode) {
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  const st = CHAT[mode];
+  const c = card(mode === "chat" ? "對話" : "助理", mode === "chat" ? "直接跟這個機群上的模型聊；對話只留在這個分頁"
+    : "用模型查機器狀態、推薦與已下載的模型；它只能查，不會替你動作");
+  wrap.appendChild(c);
+  const targets = chatTargets();
+  if (!targets.length) {
+    c.appendChild(el("p", "note", "現在沒有正在跑的文字模型。先到模型庫挑一顆換上欄位，這裡就能用。"));
+    const b = el("button", "btn primary", "到模型庫");
+    b.onclick = () => { S.libTab = "rec"; go("lib"); };
+    c.appendChild(b);
+    return;
+  }
+  if (!targets.some((t) => t.key === st.target)) st.target = targets[0].key;
+  const head = c.querySelector(".card-head");
+  head.appendChild(el("span", "spacer"));
+  const sel = selectInput(targets.map((t) => [t.key, t.label]), st.target);
+  sel.className = "chat-target";
+  const clear = el("button", "btn sm", "清除對話");
+  head.append(sel, clear);
+
+  const box = el("div", "chat-box");
+  const drawAll = () => {
+    box.textContent = "";
+    if (!st.msgs.length) box.appendChild(el("p", "small muted chat-empty", mode === "chat" ? "問點什麼。Enter 送出，Shift+Enter 換行。"
+      : "例：哪台機器還放得下 30B 的模型？／.27 現在跑什麼？／推薦這台跑哪顆寫程式的模型？"));
+    st.msgs.forEach((m) => box.appendChild(bubble(m)));
+    box.scrollTop = box.scrollHeight;
+  };
+  const bubble = (m) => {
+    const b = el("div", "msg " + m.role);
+    if (m.image) { const im = el("img", "msg-img"); im.src = m.image; im.alt = "附加的圖片"; b.appendChild(im); }
+    if (m.steps?.length) {
+      const sp = el("div", "chips");
+      m.steps.forEach((x) => sp.appendChild(el("span", "chip", `查了：${TOOL_LABEL[x.tool] || x.tool}${x.args?.machine_id ? "（" + x.args.machine_id + "）" : ""}`)));
+      b.appendChild(sp);
+    }
+    if (m.reasoning) {
+      const d = el("details", "msg-think");
+      d.appendChild(el("summary", null, "思考過程"));
+      const t = el("div", "small muted");
+      t.textContent = m.reasoning;
+      d.appendChild(t);
+      b.appendChild(d);
+      m._think = t;
+    }
+    const t = el("div", "msg-text");
+    t.textContent = m.content || (m.pending ? "…" : "");
+    b.appendChild(t);
+    m._text = t;
+    if (m.stat) b.appendChild(el("div", "msg-stat small muted", m.stat));
+    if (m.error) b.appendChild(el("p", "note bad", m.error));
+    m._el = b;
+    return b;
+  };
+
+  const inputRow = el("div", "chat-input");
+  const ta = el("textarea");
+  ta.rows = 2;
+  ta.placeholder = "輸入訊息…";
+  ta.value = st.draft || "";
+  ta.oninput = () => { st.draft = ta.value; };
+  const tgt = () => targets.find((t) => t.key === sel.value);
+  const attach = el("input");
+  attach.type = "file";
+  attach.accept = "image/png,image/jpeg,image/webp";
+  attach.hidden = true;
+  const attBtn = el("button", "btn sm", "附圖");
+  attBtn.onclick = () => attach.click();
+  attach.onchange = async () => {
+    const f = attach.files[0];
+    if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { toast("圖片最大 4 MB", "bad"); return; }
+    st.image = "data:" + f.type + ";base64," + await readB64(f);
+    attBtn.textContent = "已附圖（再按換一張）";
+  };
+  const send = el("button", "btn primary", "送出");
+  const stopB = el("button", "btn sm danger", "停止");
+  stopB.hidden = true;
+  const syncVision = () => { attBtn.hidden = mode !== "chat" || !tgt()?.vision; };
+  sel.onchange = () => { st.target = sel.value; syncVision(); };
+  syncVision();
+  inputRow.append(ta, attach, attBtn, send, stopB);
+  c.append(box, inputRow);
+  drawAll();
+  clear.onclick = () => { st.msgs = []; st.image = null; attBtn.textContent = "附圖"; drawAll(); };
+
+  const submit = async () => {
+    const text = ta.value.trim();
+    if (!text || st.busy) return;
+    const t = tgt();
+    const user = { role: "user", content: text, image: st.image || null };
+    st.msgs.push(user);
+    const reply = { role: "assistant", content: "", pending: true };
+    st.msgs.push(reply);
+    ta.value = ""; st.draft = ""; st.image = null; attBtn.textContent = "附圖";
+    if (box.querySelector(".chat-empty")) box.textContent = "";
+    box.append(bubble(user), bubble(reply));
+    box.scrollTop = box.scrollHeight;
+    st.busy = true; send.disabled = true; stopB.hidden = false;
+    // 圖片只帶最近附的那一張（每張好幾 MB，舊的都帶上，幾輪之後就超過主控台收請求的上限）
+    const sent = st.msgs.filter((m) => !m.pending && !m.error);
+    const lastImg = sent.map((m) => !!m.image).lastIndexOf(true);
+    const history = sent.map((m, i) => ({ role: m.role,
+      content: m.image && i === lastImg ? [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: m.image } }]
+        : m.image ? `（先前附了一張圖）${m.content}` : m.content }));
+    const t0 = performance.now();
+    try {
+      if (mode === "assist") {
+        st.ctl = new AbortController();              // 停止：放掉這次請求，畫面立刻可以再問（伺服器那邊做完這一輪就收）
+        const r = await api("/api/assistant", { method: "POST", signal: st.ctl.signal, body: { node: t.n.id, slot: t.s.id, messages: history } });
+        Object.assign(reply, { content: r.content, reasoning: r.reasoning, steps: r.steps, pending: false,
+          stat: `${fmt((performance.now() - t0) / 1000, 1)} 秒${r.steps?.length ? `・查了 ${r.steps.length} 次` : ""}` });
+        reply._el.replaceWith(bubble(reply));
+      } else {
+        st.ctl = new AbortController();
+        const res = await fetch(`/api/node/${t.n.id}/chat/${t.s.id}`, { method: "POST", credentials: "same-origin", signal: st.ctl.signal,
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: history, stream: true, max_tokens: 4096 }) });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `伺服器回 ${res.status}`); }
+        const rd = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "", timings = null, usage = null;
+        reply.pending = false;
+        for (;;) {
+          const { value, done } = await rd.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n")) >= 0) {
+            const ln = buf.slice(0, i).trim();
+            buf = buf.slice(i + 1);
+            if (!ln.startsWith("data:")) continue;
+            const d = ln.slice(5).trim();
+            if (d === "[DONE]") continue;
+            let j;
+            try { j = JSON.parse(d); } catch (_) { continue; }
+            if (j.timings) timings = j.timings;
+            if (j.usage) usage = j.usage;
+            const delta = j.choices?.[0]?.delta || {};
+            if (delta.reasoning_content) {
+              reply.reasoning = (reply.reasoning || "") + delta.reasoning_content;
+              if (!reply._think) reply._el.replaceWith(bubble(reply)); else reply._think.textContent = reply.reasoning;
+            }
+            if (delta.content) { reply.content += delta.content; reply._text.textContent = reply.content; }
+            // 只換掉這一則的文字，不重畫整個對話；使用者往上捲在看舊訊息時不把他拉回底部
+            if (box.scrollHeight - box.scrollTop - box.clientHeight < 80) box.scrollTop = box.scrollHeight;
+          }
+        }
+        const sp = timings?.predicted_per_second;
+        reply.stat = [sp ? `${fmt(sp, 1)} tok/s（實測）` : null, usage?.completion_tokens ? `${usage.completion_tokens} tokens` : null,
+          `${fmt((performance.now() - t0) / 1000, 1)} 秒`].filter(Boolean).join("・");
+        reply._el.appendChild(el("div", "msg-stat small muted", reply.stat));
+      }
+    } catch (ex) {
+      reply.pending = false;
+      if (ex.name === "AbortError") { reply.stat = "已停止"; reply._el.appendChild(el("div", "msg-stat small muted", "已停止")); }
+      else { reply.error = ex.message; reply._el.replaceWith(bubble(reply)); }
+    } finally {
+      st.busy = false; send.disabled = false; stopB.hidden = true; st.ctl = null;
+      if (!reply.content && !reply.error && reply._text) reply._text.textContent = "（沒有回答）";
+    }
+  };
+  send.onclick = submit;
+  stopB.onclick = () => st.ctl?.abort();
+  imeGuard(ta, submit, { shiftNewline: true });
+  ta.focus();
 }
 
 /* ================================================================ 推薦模型
@@ -3837,6 +4243,8 @@ function render() {
   if (S.view === "overview") viewOverview();
   else if (S.view.startsWith("node:")) viewNode();
   else if (S.view === "apis") viewApis();
+  else if (S.view === "chat") viewChat("chat");
+  else if (S.view === "assist") viewChat("assist");
   else if (S.view.startsWith("api:")) viewApi();
   else if (S.view === "lib" || S.view.startsWith("lib:")) viewLib();
   else if (S.view === "logs") viewLogs();
@@ -4436,7 +4844,7 @@ async function refresh() {
     $("#live-text").textContent = "即時";
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
     // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
-    if (S.view === "settings" || S.view === "logs" || S.view === "apis" || S.view.startsWith("api:")
+    if (S.view === "settings" || S.view === "logs" || S.view === "apis" || S.view.startsWith("api:") || S.view === "chat" || S.view === "assist"
       || S.view === "lib" || S.view.startsWith("lib:")) renderNav(); else quietRender();
   } catch (ex) {
     $("#live").classList.add("stale");

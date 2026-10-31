@@ -32,6 +32,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from http.server import BaseHTTPRequestHandler
@@ -448,6 +449,76 @@ def agent_open(req, ctx, timeout):
     單機版連自己的 127.0.0.1 也會被送去代理而連不上。"""
     op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
     return op.open(req, timeout=timeout)
+
+
+def node_request(node_id, path, data, ctype="application/json"):
+    """組一個送給某台代理的請求（主機只取自 fleet.json、用部署時取回的憑證驗證）。回 (請求, TLS 設定) 或 (None, 錯誤)。"""
+    node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
+    if not node:
+        return None, "沒有這台機器"
+    ctx = tls.client_context(trust_file(node_id))
+    if ctx is None:
+        return None, f"還沒信任 {node['name']} 的代理憑證"
+    h = node["host"]
+    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
+    return urllib.request.Request(url, data=data, method="POST", headers={
+        "Authorization": f"Bearer {node_token(node)}", "Content-Type": ctype}), ctx
+
+
+# ---- 助理（Agent）：讓模型用唯讀的工具查這個主控台管的機器，回答管理者的問題
+ASSIST_TOOLS = [
+    {"type": "function", "function": {"name": "list_machines", "description": "列出所有納管的機器：是否在線、記憶體架構、可用記憶體、正在跑的模型",
+                                      "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "machine_detail", "description": "某一台機器的詳細狀態：晶片、記憶體、各欄位跑什麼模型、能跑多大",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+    {"type": "function", "function": {"name": "recommend_models", "description": "依某台機器的記憶體與頻寬推薦模型，含預估速度與放不放得下",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+    {"type": "function", "function": {"name": "installed_models", "description": "某台機器存放區裡已下載的模型與剩餘磁碟",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+]
+ASSIST_SYSTEM = ("你是 xConsole 模型主控台的助理，用繁體中文（台灣用語）回答管理者的問題。"
+                 "需要機器或模型的資料時一律呼叫工具查，不要猜；工具查不到就說查不到。"
+                 "你只能查，不能替管理者啟動、停止或下載任何東西；需要動作時，告訴他在網頁哪裡按。回答簡短、條列重點。")
+
+
+def assist_tool(name, args):
+    """唯讀工具。回給模型的資料不含權杖、金鑰、路徑以外的機密。"""
+    fs = fleet_state()
+    nodes = {n["id"]: n for n in fs["nodes"]}
+    if name == "list_machines":
+        return [{"machine_id": n["id"], "name": n["name"], "online": n["online"],
+                 "memory_model": (n["state"] or {}).get("pools", {}).get("memory_model") if n["online"] else None,
+                 "running": [f"{s.get('role')}：{s.get('model')}" for s in ((n["state"] or {}).get("slots") or []) if s.get("busy")]}
+                for n in fs["nodes"]]
+    n = nodes.get(str(args.get("machine_id") or ""))
+    if not n:
+        return {"error": "沒有這台機器", "machines": [{"machine_id": k, "name": v["name"]} for k, v in nodes.items()]}
+    if not n["online"]:
+        return {"error": f"{n['name']} 現在連不上"}
+    st = n["state"]
+    if name == "machine_detail":
+        p = st["pools"]
+        return {"name": n["name"], "chip": st.get("chip"), "memory_model": p["memory_model"],
+                "pools": {k: p.get(k) for k in ("unified", "vram", "ram") if p.get(k)}, "capacity": n.get("capacity"),
+                "slots": [{k: s.get(k) for k in ("role", "tier", "model", "quant", "active", "port", "kind")} for s in st["slots"]]}
+    if name == "recommend_models":
+        lc, lib = call_node(n["id"], "/library", timeout=90)
+        r = recommend.recommend(st, lib if lc == 200 else {}, CATALOG.load())
+        rows = []
+        for it in r["items"]:
+            p = next((x for x in it["plans"] if x["stem"] == (it.get("installed") or it.get("pick"))), None)
+            if p:
+                rows.append({"model": it["title"], "level": {"smooth": "流暢", "ok": "能跑", "no": "放不下"}.get(p["level"]),
+                             "quant": p["quant"], "size_gib": p["size_gib"], "place": p["place"], "tok_s": p["tok_s"],
+                             "installed": bool(it.get("installed"))})
+        return {"capacity": r["capacity"], "models": rows}
+    if name == "installed_models":
+        lc, lib = call_node(n["id"], "/library", timeout=90)
+        if lc != 200:
+            return {"error": lib.get("error")}
+        return {"free_gib": lib.get("free_gib"), "models": [{k: m.get(k) for k in ("name", "quant", "size_gib", "arch", "in_use", "cn_origin")}
+                                                           for m in lib.get("gguf") or []]}
+    return {"error": "沒有這個工具"}
 
 
 def call_node(node_id, path, method="GET", body=None, timeout=40):
@@ -1060,6 +1131,139 @@ class Handler(BaseHTTPRequestHandler):
         self._json(401, {"error": "請先登入"})
         return True
 
+    def _upload(self, node_id, ctype):
+        """上傳 GGUF 的一塊：本文是檔案的位元組。不是 JSON，所以另外擋跨站：要登入、要 octet-stream、
+        要帶自訂標頭 X-XConsole-Upload（跨站的表單送不出自訂標頭，fetch 送的話會先被 CORS 預檢擋下）。"""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if not self.user or ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1" \
+                or not 0 < n <= 64 * 1024 * 1024:
+            # 小的本文照樣讀掉再回錯誤（沒讀完就關連線，對方收到的是連線重置、看不到原因）；大的不讀直接關：
+            # 沒登入的人不能讓主控台收 64 MB
+            if 0 <= n <= MAX_ANON_BODY:
+                self.rfile.read(n)
+            else:
+                self.close_connection = True
+            self._headers_done()
+            return self._json(401 if not self.user else 400, {"error": "請先登入" if not self.user else "上傳的請求格式不對"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        q = parse_qs(urlparse(self.path).query)
+        g = lambda k: (q.get(k) or [""])[0]  # noqa: E731
+        if not re.fullmatch(r"\d{1,15}", g("offset")) or not re.fullmatch(r"\d{1,15}", g("total")):
+            return self._json(400, {"error": "分塊的位置或大小不對"})
+        qs = urllib.parse.urlencode({k: g(k) for k in ("folder", "name", "offset", "total")})
+        req, ctx = node_request(node_id, "/library/upload?" + qs, data, "application/octet-stream")
+        if req is None:
+            return self._json(404, {"error": ctx})
+        try:
+            with agent_open(req, ctx, 300) as resp:
+                code, out = resp.status, json.load(resp)
+        except urllib.error.HTTPError as exc:
+            code, out = exc.code, json.load(exc)
+        except Exception as exc:  # noqa: BLE001
+            return self._json(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+        if g("offset") == "0" or out.get("done"):
+            self._audit("library.upload", f"{node_id}/{g('folder')}/{g('name')}", code == 200,
+                        {"total": int(g("total")), "done": bool(out.get("done")), "message": out.get("error")})
+        return self._json(code, out)
+
+    def _chat(self, node_id, slot_id, body):
+        """網頁對話：經代理轉給模型服務，串流原樣轉給瀏覽器。對話內容不寫進稽核（只記用了哪個欄位、幾則訊息）。"""
+        n_msg = len(body.get("messages") or [])
+
+        def done(code, out=None):
+            # 稽核在知道結果之後才寫，記真實的成敗（以前一進來就記成功，連不存在的機器都算用過）
+            self._audit("chat", f"{node_id}/{slot_id}", code == 200, {"messages": n_msg, "status": code,
+                                                                        "message": (out or {}).get("error")})
+            return None if out is None else self._json(code, out)
+        req, ctx = node_request(node_id, f"/chat/{slot_id}", json.dumps(body).encode())
+        if req is None:
+            return done(404, {"error": ctx})
+        try:
+            resp = agent_open(req, ctx, 600)
+        except urllib.error.HTTPError as exc:
+            try:
+                return done(exc.code, json.load(exc))
+            except Exception:  # noqa: BLE001
+                return done(exc.code, {"error": f"代理回 {exc.code}"})
+        except Exception as exc:  # noqa: BLE001
+            return done(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+        done(200)
+        with resp:
+            if "event-stream" not in (resp.headers.get("Content-Type") or ""):
+                return self._json(resp.status, json.load(resp))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self._sec_headers()
+            self.end_headers()
+            self.close_connection = True
+            try:
+                for line in resp:
+                    self.wfile.write(line)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        return None
+
+    def _assist(self, body):
+        """助理：模型要查資料就呼叫唯讀工具，最多來回 6 次。每一步（查了什麼）也回給畫面看。"""
+        node_id, slot_id = str(body.get("node") or ""), str(body.get("slot") or "")
+        msgs = [m for m in (body.get("messages") or []) if isinstance(m, dict) and m.get("role") in ("user", "assistant")][-20:]
+        if not msgs:
+            return self._json(400, {"error": "沒有問題"})
+        convo = [{"role": "system", "content": ASSIST_SYSTEM}] + [{"role": m["role"], "content": str(m.get("content") or "")[:8000]} for m in msgs]
+        steps, seen = [], {}
+
+        def done(code, out):
+            self._audit("assist", f"{node_id}/{slot_id}", code == 200,
+                        {"messages": len(msgs), "steps": len(steps), "status": code, "message": out.get("error")})
+            return self._json(code, out)
+        for rnd in range(6):
+            last = rnd == 5
+            req = {"messages": convo, "stream": False, "max_tokens": 2048, "temperature": 0.2}
+            if not last:
+                req["tools"] = ASSIST_TOOLS
+            else:
+                # 最後一輪不給工具：小模型會一直重複查同一個工具、不肯作答，這一輪逼它用查到的資料回答
+                convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
+            code, out = call_node(node_id, f"/chat/{slot_id}", "POST", req, timeout=600)
+            if code != 200 and "tools" in req:
+                # 帶工具時 llama.cpp 會用文法限制輸出格式，小模型偶爾產出不合格式的東西就整個 500：
+                # 這一輪改成不帶工具、請它用已經查到的資料回答
+                last = True
+                req.pop("tools")
+                convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
+                code, out = call_node(node_id, f"/chat/{slot_id}", "POST", req, timeout=600)
+            if code != 200:
+                return done(code, {"error": out.get("error") or f"模型回 {code}", "steps": steps})
+            msg = ((out.get("choices") or [{}])[0]).get("message") or {}
+            # 一次最多處理 4 個呼叫；回給模型的那則也只留這 4 個，否則下一輪會帶著沒有回覆的呼叫、被伺服器拒絕
+            calls = [] if last else (msg.get("tool_calls") or [])[:4]
+            if not calls:
+                return done(200, {"content": msg.get("content") or "（模型沒有給出回答）", "reasoning": msg.get("reasoning_content"),
+                                  "steps": steps, "usage": out.get("usage"), "timings": out.get("timings")})
+            convo.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+            for c in calls:
+                fn = (c.get("function") or {})
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except ValueError:
+                    args = {}
+                args = args if isinstance(args, dict) else {}
+                key = json.dumps([fn.get("name"), args], sort_keys=True, ensure_ascii=False)
+                if key in seen:
+                    result = {"note": "這個剛剛已經查過了，結果在前面；請直接回答"}
+                else:
+                    result = seen[key] = assist_tool(fn.get("name"), args)
+                    steps.append({"tool": fn.get("name"), "args": args})
+                convo.append({"role": "tool", "tool_call_id": c.get("id"), "content": json.dumps(result, ensure_ascii=False)[:12000]})
+        return done(200, {"content": "（沒有結論）", "steps": steps})
+
     def _body(self, limit=None):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -1269,7 +1473,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/build{m.group(3) or ''}", timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
-            return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
+            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=60)
+            run = out.get("run") if code == 200 else None
+            if run:
+                # 預估速度與推薦清單同一條公式（recommend.decode_speed），畫面不自己算
+                run["tok_s"] = recommend.decode_speed(run.get("size_gib"), run.get("profile") or {}, run.get("bandwidth_gbs"))
+                run["load_est_sec"] = recommend.load_seconds(run.get("size_gib"), run.get("hdd"))
+            return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)
         if m:
             return self._json(*call_node(m.group(1), "/library", timeout=90))
@@ -1344,6 +1554,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/upload", path)
+        if m:
+            return self._upload(m.group(1), ctype)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -1499,7 +1712,7 @@ class Handler(BaseHTTPRequestHandler):
         # ---- API 串接：網址、模型名稱、上下文、金鑰（改完重啟並驗證，失敗自動換回）
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/settings", path)
         if m:
-            want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key")
+            want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key", "thinking", "lan")
                     if k in body}
             # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
@@ -1588,6 +1801,18 @@ class Handler(BaseHTTPRequestHandler):
             ok = CATALOG.delete(repo) if path.endswith("delete") else CATALOG.move(repo, -1 if body.get("step") == -1 else 1)
             self._audit("catalog." + path.rsplit("/", 1)[1], repo, ok)
             return self._json(200 if ok else 404, {"ok": ok} if ok else {"error": "推薦清單裡沒有這個模型"})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf/search|upload/status|upload/cancel)", path)
+        if m:
+            want = {k: body.get(k) for k in ("q", "token", "folder", "name") if k in body}
+            code, out = call_node(m.group(1), f"/library/{m.group(2)}", "POST", want, timeout=60)
+            if m.group(2) == "upload/cancel":
+                self._audit("library.upload_cancel", f"{m.group(1)}/{want.get('folder')}/{want.get('name')}", code == 200)
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/chat/([\w.-]+)", path)
+        if m:
+            return self._chat(m.group(1), m.group(2), body)
+        if path == "/api/assistant":
+            return self._assist(body)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/download/([0-9a-f]{8})/cancel", path)
         if m:
             code, out = call_node(m.group(1), f"/library/download/{m.group(2)}/cancel", "POST", {})

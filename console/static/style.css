@@ -901,7 +901,7 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
 }
 
 .rec-for { align-items: center; margin-bottom: 12px; }
-.rec-list { max-height: 480px; overflow-y: auto; margin: 6px -4px 10px; padding: 0 4px; overscroll-behavior: contain; }
+.rec-list { max-height: 400px; overflow-y: auto; margin: 6px -4px 10px; padding: 0 4px; overscroll-behavior: contain; }
 .rec-row {
   display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(150px, 1fr) minmax(160px, 1.1fr) 132px;
   gap: 16px; align-items: center; padding: 13px 14px; border-radius: var(--radius-sm);
@@ -1027,4 +1027,41 @@ textarea.short { min-height: 48px; }
   .grid.sd-gen .form-row { grid-template-columns: 1fr 1fr; }       /* 尺寸、步數這些短欄位兩個一排，手機上不會拉成一長條 */
   .sd-media img, .sd-media video { max-height: 240px; }
   .sd-part, .sd-parts.exact .sd-part { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---- 搜尋 Hugging Face、匯入 GGUF、執行設定 */
+.search-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.search-row input { flex: 1 1 auto; min-width: 0; }
+.hf-results { max-height: 240px; overflow-y: auto; margin: 0 -4px 12px; padding: 0 4px; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
+.hf-hit {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; text-align: left;
+  background: var(--panel); border: 0; border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; font: inherit; color: var(--ink);
+}
+.hf-hit:hover, .hf-hit:focus-visible { background: var(--bg-hover); outline: none; }
+.hf-hit .mono { font-weight: 600; overflow-wrap: anywhere; }
+.run-ctx button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---- 網頁對話與助理：對話在區塊裡捲動，頁面本身不會越來越長 */
+.chat-target { max-width: 360px; }
+.chat-box {
+  height: clamp(320px, calc(100vh - 360px), 640px); overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 10px; padding: 4px 4px 8px; margin-bottom: 12px;
+}
+.chat-empty { margin: auto; text-align: center; max-width: 46ch; }
+.msg { max-width: min(78ch, 88%); padding: 10px 14px; border-radius: 14px; line-height: 1.6; }
+.msg.user { align-self: flex-end; background: rgba(191, 24, 31, .08); }
+:root[data-theme="dark"] .msg.user { background: rgba(224, 72, 79, .16); }
+.msg.assistant { align-self: flex-start; background: var(--panel); }
+.msg-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-img { display: block; max-width: 220px; max-height: 160px; border-radius: 8px; margin-bottom: 6px; }
+.msg-think { margin-bottom: 6px; }
+.msg-think summary { cursor: pointer; font-size: 12.5px; color: var(--ink-3); }
+.msg-think > div { white-space: pre-wrap; max-height: 180px; overflow-y: auto; }
+.msg-stat { margin-top: 4px; }
+.msg .chips { margin-bottom: 6px; }
+.chat-input { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.chat-input textarea { flex: 1 1 320px; min-height: 52px; max-height: 180px; resize: vertical; }
+@media (max-width: 860px) {
+  .chat-box { height: clamp(300px, calc(100vh - 300px), 560px); }
+  .msg { max-width: 94%; }
 }

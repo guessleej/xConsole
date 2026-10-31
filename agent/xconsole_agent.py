@@ -1740,7 +1740,46 @@ def api_info(slot_id):
         "tools": True if strata else None,
         "vision": any(m["vision"] for m in served),
         "last_test": slot.get("api_last_test"),
+        "run": run_options(slot, raw) if llama else None,
     }
+
+
+RUN_CTX = (8192, 16384, 32768, 65536, 131072)
+
+
+def run_options(slot, raw):
+    """執行設定頁：每一種上下文長度載下去放不放得下（用准入同一條公式試算，不動真的設定）。"""
+    cfg = slot_config(slot) or {}
+    prof = _profile_cached(raw.get("model", "")) or {}
+    par = int(cfg.get("parallel") or 1)
+    top = prof.get("ctx_train") or max(RUN_CTX)
+    out = []
+    for ctx in [c for c in RUN_CTX if c <= top] or [min(RUN_CTX)]:
+        per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or ctx) / ctx)) if prof else None
+        what = {**cfg, "max_context": ctx, **({"kv_bytes_per_cell": int(per)} if per else {})}
+        v = admit(slot["id"], cfg_override=what)
+        worst = min([d.get("worst") for d in (v.get("pools") or {}).values() if isinstance(d, dict) and "worst" in d] or [None],
+                    key=lambda x: x if x is not None else 1e9)
+        out.append({"ctx": ctx, "kv_gib": round(llama_kv_gib(prof, ctx, par), 2) if prof else None, "allow": v["allow"],
+                    "worst_gib": worst, "reason": (v.get("reasons") or [None])[0]})
+    size = sum(os.path.getsize(x) for x in shard_paths(raw["model"]) if os.path.exists(x)) / GIB if raw.get("model") else 0
+    load = (registry().get("load_sec") or {}).get(os.path.abspath(raw.get("model") or ""))
+    real = os.path.realpath(raw.get("model") or "")
+    store = max((x for x in storage_choices() if real.startswith(x["mount"].rstrip("/\\") + os.sep) or real == x["mount"]),
+                key=lambda x: len(x["mount"]), default=None)
+    return {"options": out, "ctx_train": prof.get("ctx_train"), "size_gib": round(size, 1), "load_sec": load,
+            "bandwidth_gbs": chip().get("bandwidth_gbs"), "hdd": (store or {}).get("hdd"),
+            "profile": {k: prof.get(k) for k in ("active_frac", "layers", "moe", "arch")},
+            "thinking": raw.get("reasoning") or "auto", "lan": (raw.get("host") or "0.0.0.0") != "127.0.0.1",
+            "thinking_supported": bool(reasoning_args(raw["exe"], "off")) if raw.get("exe") else False}
+
+
+def record_load(model_path, seconds):
+    """記下這顆模型實際載入花了幾秒（執行設定頁顯示「上次載入 N 秒」，是實測不是估的）。"""
+    with REG_LOCK:
+        r = registry()
+        r.setdefault("load_sec", {})[os.path.abspath(model_path)] = round(seconds)
+        save_json(REGISTRY, r)
 
 
 def _set_slot_fields(slot_id, **fields):
@@ -1805,6 +1844,20 @@ def api_settings(slot_id, body, force=False):
                     errors.append("單次輸出上限要在 256～131,072 之間，而且要小於上下文長度")
                 elif mt != raw.get("max_tokens"):
                     want["max_tokens"] = mt
+        if "thinking" in body or "lan" in body:
+            if slot.get("kind") != "llama":
+                errors.append("思考模式與區網存取只有 llama.cpp 的欄位能在這裡改")
+            else:
+                th = body.get("thinking")
+                if th is not None:
+                    if th not in ("on", "off", "auto"):
+                        errors.append("思考模式只能是 on、off、auto")
+                    elif th != (raw.get("reasoning") or "auto"):
+                        want["thinking"] = th
+                if "lan" in body:
+                    host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
+                    if host != (raw.get("host") or "0.0.0.0"):
+                        want["lan"] = host
         k = body.get("key")
         if k not in (None, "keep"):
             if k == "none":
@@ -1903,6 +1956,10 @@ def _api_apply_llama(slot, raw, port, want, force):
             new["max_tokens"] = v
         elif k == "api_key":
             new["api_key_file"] = write_llama_key(slot_id, v)
+        elif k == "thinking":
+            new["reasoning"] = v
+        elif k == "lan":
+            new["host"] = v                    # 0.0.0.0＝區網連得到；127.0.0.1＝只有這台自己
     save_json(cfg_path, new)
     os.chmod(cfg_path, 0o600)
 
@@ -1927,9 +1984,11 @@ def _api_apply_llama(slot, raw, port, want, force):
             return 409, {"error": "上下文調大之後記憶體不夠，設定已還原", "admit": verdict}
     sysctl(slot["unit"], "reset-failed", timeout=20)
     sysctl(slot["unit"], "restart")
+    t0 = time.time()
     ok, why = wait_healthy(slot, seconds=900)
     if not ok:
         return revert(f"套用後服務起不來（{why}）")
+    record_load(new.get("model") or "", time.time() - t0)
     nkey = llama_key(new)
     st, models, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=nkey, timeout=8)
     ids = [m.get("id") for m in (models or {}).get("data") or []]
@@ -2378,6 +2437,7 @@ def llama_argv(raw, reg=None):
         argv += ["--mmproj", raw["mmproj"]]
     if raw.get("cpu_moe"):
         argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
+    argv += reasoning_args(raw["exe"], raw.get("reasoning"))
     if raw.get("max_tokens"):
         argv += ["-n", str(int(raw["max_tokens"]))]
     if raw.get("api_key_file") and os.path.exists(raw["api_key_file"]):
@@ -2387,6 +2447,27 @@ def llama_argv(raw, reg=None):
         argv += no_mmap_args(raw["exe"])
     extra = reg["machine"].get("llama_args") or []
     return argv + [str(x) for x in extra if isinstance(x, (str, int))]
+
+
+@functools.lru_cache(maxsize=8)
+def _llama_help(exe):
+    try:
+        p = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=20, env=llama_launch_env(exe))
+        return p.stdout + p.stderr
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def reasoning_args(exe, mode):
+    """思考模式（on／off／auto）的寫法跟著 llama.cpp 版本走：新版有 --reasoning，舊版只能用 --reasoning-budget 0 關掉。"""
+    if mode not in ("on", "off"):
+        return []
+    text = _llama_help(exe)
+    if "--reasoning [" in text or re.search(r"--reasoning\s+\[", text):
+        return ["--reasoning", mode]
+    if mode == "off" and "--reasoning-budget" in text:
+        return ["--reasoning-budget", "0"]
+    return []
 
 
 @functools.lru_cache(maxsize=8)
@@ -2633,7 +2714,10 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     sysctl(unit, "enable", timeout=30)
     sysctl(unit, "restart")
     new_slot = next(x for x in registry()["slots"] if x["id"] == slot_id)
+    t0 = time.time()
     ok, why = wait_healthy(new_slot, seconds=900)        # 幾十 GB 的權重從 NVMe 讀要幾分鐘
+    if ok:
+        record_load(m["path"], time.time() - t0)
     if ok:
         st, data, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=carry_key, timeout=10)
         ids = [x.get("id") for x in (data or {}).get("data") or []]
@@ -2921,6 +3005,153 @@ def hf_profile(repo, token="", match=""):
     return 200, {**info, "profile": prof, "profiled": pick["stem"], "card": card}
 
 
+HF_SEARCH_RX = re.compile(r"[\w .+/-]{1,80}")
+
+
+def hf_search(q, token=""):
+    """用關鍵字找 Hugging Face 上的 GGUF（照下載數排）。中國來源標出來，選不選由人決定（內部測試可以用）。"""
+    q = (q or "").strip()
+    if not HF_SEARCH_RX.fullmatch(q):
+        return 400, {"error": "關鍵字 1～80 字，只能有英數、空白與 . _ + - /"}
+    url = (f"{HF_BASE}/api/models?search={urllib.parse.quote(q)}&filter=gguf&sort=downloads&direction=-1&limit=24")
+    try:
+        with _hf_get(url, token, timeout=20) as resp:
+            rows = json.load(resp)
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"連不到 Hugging Face：{str(exc)[:120]}"}
+    out = [{"repo": r.get("id") or r.get("modelId"), "downloads": r.get("downloads"), "likes": r.get("likes"),
+            "updated": (r.get("lastModified") or r.get("createdAt") or "")[:10],
+            "cn_origin": any(c in str(r.get("id") or "").lower() for c in CN_ORIGIN)}
+           for r in rows if isinstance(r, dict) and HF_REPO_RX.fullmatch(str(r.get("id") or r.get("modelId") or ""))]
+    return 200, {"q": q, "results": out}
+
+
+# ---- 從瀏覽器上傳 GGUF：分塊送、可以續傳；最後一塊到齊才核對檔頭、改成正式檔名
+UP_FOLDER_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,79}")
+UP_NAME_RX = re.compile(r"[A-Za-z0-9][\w.+-]{0,150}\.gguf")
+UP_CHUNK_MAX = 64 << 20
+_UP_LOCK = threading.Lock()
+
+
+def _up_paths(folder, name):
+    if not UP_FOLDER_RX.fullmatch(folder or "") or not UP_NAME_RX.fullmatch(name or ""):
+        raise ValueError("資料夾只能用英數、底線、點、連字號；檔名要以 .gguf 結尾")
+    d = inside(gguf_root(), folder)
+    return d, inside(d, name), inside(d, name + ".part")
+
+
+UP_EDGE = 4 << 20
+
+
+def edge_sha256(path):
+    """檔案頭尾各 4 MB 的 sha256：同名檔已經在時，拿來比對是不是同一個檔（不必把幾十 GB 整個讀一遍）。"""
+    import hashlib
+    h = hashlib.sha256()
+    size = os.path.getsize(path)
+    with open(path, "rb") as fh:
+        h.update(fh.read(UP_EDGE))
+        if size > UP_EDGE:
+            fh.seek(max(UP_EDGE, size - UP_EDGE))
+            h.update(fh.read(UP_EDGE))
+    return h.hexdigest()
+
+
+def upload_status(folder, name):
+    try:
+        _, final, part = _up_paths(folder, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    out = {"exists": os.path.exists(final), "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    if out["exists"]:
+        out.update(size=os.path.getsize(final), edge_sha256=edge_sha256(final))
+    return 200, out
+
+
+def upload_chunk(folder, name, offset, total, data):
+    try:
+        d, final, part = _up_paths(folder, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    if os.path.exists(final):
+        return 409, {"error": f"{folder}/{name} 已經在了，要換掉請先在已安裝的清單刪除"}
+    if not (0 <= offset < total) or offset + len(data) > total or not data:
+        return 400, {"error": "分塊的位置或大小不對"}
+    with _UP_LOCK:
+        have = os.path.getsize(part) if os.path.exists(part) else 0
+        if offset != have:
+            return 409, {"error": "要從已收到的位置接著送", "received": have}
+        if offset == 0:
+            os.makedirs(d, exist_ok=True)
+            free = disk_free(d)[0]
+            if total / GIB + 10 >= free:
+                return 400, {"error": f"磁碟不夠：檔案 {total / GIB:.1f} GiB，存放區只剩 {free} GiB（另需保留 10 GiB）"}
+        with open(part, "ab") as fh:
+            fh.write(data)
+        have += len(data)
+        if have < total:
+            return 200, {"received": have}
+        with open(part, "rb") as fh:
+            ok = fh.read(4) == b"GGUF"
+        if not ok:
+            os.remove(part)
+            return 400, {"error": "上傳完了，但這不是 GGUF 檔（檔頭不對），已刪除"}
+        os.replace(part, final)
+    return 200, {"received": have, "done": True, "id": f"{folder}/{name[:-5]}"}
+
+
+def upload_cancel(folder, name):
+    try:
+        _, _, part = _up_paths(folder, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    if os.path.exists(part):
+        os.remove(part)
+    return 200, {"ok": True}
+
+
+# ---- 網頁對話：主控台經代理轉給這台的模型服務（金鑰留在代理這邊，不給瀏覽器）
+CHAT_ROLES = ("system", "user", "assistant", "tool")
+
+
+def chat_request(slot_id, body):
+    """檢查並組好要送給模型的請求。回 (錯誤碼, 錯誤訊息) 或 (埠, 金鑰, 請求本文)。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, "沒有這個欄位"
+    raw, port, key = _api_parts(slot)
+    if not port:
+        return 400, "這個欄位沒有 API 埠"
+    msgs = body.get("messages")
+    if not isinstance(msgs, list) or not 1 <= len(msgs) <= 200:
+        return 400, "對話內容不對"
+    for m in msgs:
+        if not isinstance(m, dict) or m.get("role") not in CHAT_ROLES:
+            return 400, "對話內容不對"
+    req = {"messages": msgs, "stream": bool(body.get("stream", True))}
+    if body.get("stream", True):
+        req["stream_options"] = {"include_usage": True}
+    for k, lo, hi in (("max_tokens", 1, 131072), ("temperature", 0, 2)):
+        if body.get(k) is not None:
+            try:
+                v = float(body[k])
+            except (TypeError, ValueError):
+                return 400, f"{k} 要是數字"
+            if not lo <= v <= hi:
+                return 400, f"{k} 要在 {lo}～{hi} 之間"
+            req[k] = int(v) if k == "max_tokens" else v
+    if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
+        req["tools"] = body["tools"]
+    name = (raw or {}).get("model_name")
+    if not name:
+        # 登記進來的既有服務沒有 xConsole 管的設定檔：跟 API 實測一樣，問 /v1/models 取第一個（有些伺服器沒帶 model 會拒絕）
+        st, models, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/models", key=key, timeout=8)
+        ids = [m.get("id") for m in (models or {}).get("data") or [] if m.get("id")]
+        name = ids[0] if ids else None
+    if name:
+        req["model"] = name
+    return int(port), key, req
+
+
 def start_download(repo, stem, mmproj=None, token=""):
     code, info = hf_files(repo, token)
     if code != 200:
@@ -3121,7 +3352,7 @@ def pools(reg, hw):
     return out
 
 
-def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
+def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None, cfg_override=None):
     """這台還塞不塞得下這個欄位的模型。用「載下去之後最壞剩多少」判斷，不是「現在剩多少」。"""
     reg = reg or registry()
     hw = hw if hw is not None else hardware()
@@ -3132,7 +3363,7 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
     p = pools(reg, hw)
     mm = p["memory_model"]
     fl = p["floors"]
-    cfg = slot_config(slot)
+    cfg = cfg_override or slot_config(slot)          # cfg_override：試算「改成這樣放不放得下」，不動真的設定
     need_vram = float(slot.get("est_vram_gib") or 0)
     need_ram = float(slot.get("est_ram_gib") or 0)
 
@@ -5122,6 +5353,43 @@ class Handler(BaseHTTPRequestHandler):
         self._send(401, {"error": "需要 Bearer 權杖"})
         return False
 
+    def _chat(self, slot_id, body):
+        """轉給模型服務。串流（SSE）一行一行原樣轉回去，不整包收完：長回答要邊產邊看得到。"""
+        r = chat_request(slot_id, body)
+        if len(r) == 2:
+            return self._send(r[0], {"error": r[1]})
+        port, key, req = r
+        hreq = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", data=json.dumps(req).encode(),
+                                      headers={"Content-Type": "application/json",
+                                               **({"Authorization": f"Bearer {key}"} if key else {})})
+        try:
+            resp = LOCAL.open(hreq, timeout=600)
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = json.load(exc)
+            except Exception:  # noqa: BLE001
+                detail = {}
+            return self._send(exc.code, {"error": (detail.get("error") or {}).get("message") if isinstance(detail.get("error"), dict)
+                                         else detail.get("error") or f"模型服務回 {exc.code}"})
+        except Exception as exc:  # noqa: BLE001
+            return self._send(502, {"error": f"連不到模型服務：{str(exc)[:120]}"})
+        with resp:
+            if not req["stream"]:
+                return self._send(200, json.load(resp))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            try:
+                for line in resp:
+                    self.wfile.write(line)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass                                   # 使用者按了停止：模型那邊也跟著斷
+        return None
+
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -5172,7 +5440,22 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0].rstrip("/") or "/"
         if not self._auth():
             return None
+        if path == "/library/upload":
+            # 上傳的本文是檔案的位元組，不是 JSON：參數放在網址上（都只是名稱與位置，沒有機密）
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            g = lambda k: (qs.get(k) or [""])[0]  # noqa: E731
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                offset, total = int(g("offset")), int(g("total"))
+            except ValueError:
+                return self._send(400, {"error": "分塊的位置或大小不對"})
+            if not 0 < n <= UP_CHUNK_MAX:
+                return self._send(413, {"error": "一次最多送 64 MB"})
+            return self._send(*upload_chunk(g("folder"), g("name"), offset, total, self.rfile.read(n)))
         body = self._body()
+        m = re.fullmatch(r"/chat/([\w.-]+)", path)
+        if m:
+            return self._chat(m.group(1), body)
         force = bool(body.get("force"))
         m = re.fullmatch(r"/slot/([\w.-]+)/(start|stop|restart)", path)
         if m:
@@ -5205,6 +5488,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, out)
         if path == "/library/hf":
             return self._send(*hf_files(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+        if path == "/library/hf/search":
+            return self._send(*hf_search(str(body.get("q") or ""), str(body.get("token") or "")))
+        if path == "/library/upload/status":
+            return self._send(*upload_status(str(body.get("folder") or ""), str(body.get("name") or "")))
+        if path == "/library/upload/cancel":
+            return self._send(*upload_cancel(str(body.get("folder") or ""), str(body.get("name") or "")))
         if path == "/library/hf/profile":
             return self._send(*hf_profile(str(body.get("repo") or "").strip(), str(body.get("token") or ""),
                                           str(body.get("match") or "")[:60]))
