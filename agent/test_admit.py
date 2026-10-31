@@ -225,7 +225,14 @@ def main():
           "2222222222222222222222222222222222222222\trefs/tags/b200\n"
           "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
     ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
-               {100: "1" * 40, 200: "3" * 40})
+               {100: ("b100", "1" * 40), 200: ("b200", "3" * 40)})
+    sr = ("4444444444444444444444444444444444444444\trefs/tags/master-1028-37bc88b\n"
+          "5555555555555555555555555555555555555555\trefs/tags/master-1030-0a06712\n"
+          "6666666666666666666666666666666666666666\trefs/tags/master-fbd42b6\n"
+          "7777777777777777777777777777777777777777\trefs/tags/workflow-302-fad6178\n")
+    got = A.parse_tag_refs(sr, A.ENGINES["sd"]["tag_rx"])
+    ok &= case("stable-diffusion.cpp 標籤：只認 master-<編號>-<commit>，取編號最大的", got[max(got)],
+               ("master-1030-0a06712", "5" * 40))
     real_cpu = A.cpu_name
     for cpu, want in (("AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S", True), ("AMD EPYC 7543P 32-Core Processor", False)):
         A.cpu_name = lambda c=cpu: c                    # 三個系統讀 CPU 型號的方法不同，這裡只測判斷本身

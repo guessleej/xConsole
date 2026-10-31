@@ -245,8 +245,8 @@ def _public(e):
 class Catalog:
     """推薦清單：存在主控台（~/.xconsole/catalog.json），第一次用時從隨附的預設清單複製。"""
 
-    def __init__(self, path, default_path):
-        self.path, self.default_path = path, default_path
+    def __init__(self, path, default_path, keys=("title", "use", "desc", "tags", "vendor", "match")):
+        self.path, self.default_path, self.keys = path, default_path, keys
         self.lock = threading.Lock()
 
     def load(self):
@@ -266,8 +266,9 @@ class Catalog:
             json.dump(rows, fh, ensure_ascii=False, indent=1)
         os.replace(tmp, self.path)
 
-    def upsert(self, fields, hf=None):
-        """fields：管理者在網頁上填的（名稱、用途、說明、標籤、廠商）。hf：代理 hf_profile 的回應，有就一起更新。"""
+    def upsert(self, fields, hf=None, extra=None):
+        """fields：管理者在網頁上填的（名稱、用途、說明、標籤、廠商）。hf：代理 hf_profile 的回應，有就一起更新。
+        extra：直接併進去的欄位（畫圖清單從 Hugging Face 讀到的檔案大小）。"""
         repo = fields["repo"]
         with self.lock:
             rows = self.load()
@@ -275,11 +276,13 @@ class Catalog:
             if cur is None:
                 cur = {"repo": repo}
                 rows.append(cur)
-            for k in ("title", "use", "desc", "tags", "vendor", "match"):
+            for k in self.keys:
                 if k in fields:
                     cur[k] = fields[k]
             if hf:
                 cur.update(hf_fields(hf))
+            if extra:
+                cur.update(extra)
             self._save(rows)
             return cur
 
@@ -345,4 +348,258 @@ def check_fields(body):
     if len(match) > 60 or not re.fullmatch(r"[\w.+-]*", match):
         return None, "「檔名要含」只能填英數、底線、點、加號與連字號，最多 60 字"
     out["match"] = match
+    return out, None
+
+
+# ---------------------------------------------------------------- 畫圖與影片（stable-diffusion.cpp）
+# 一顆＝主體＋文字編碼器＋VAE 等好幾個檔。清單上每個元件寫 repo 與檔名（path），或寫檔名開頭（match）讓這台挑量化：
+# 主體的每個量化就是一個選項，其他寫 match 的元件跟著主體的位元數挑（主體 Q8 配 Q8 的 t5xxl，主體 Q4 配 Q4）。
+# 擴散模型吃的是算力不是頻寬，速度估不準：不寫估算，產過一次後顯示這台的實測。
+SD_KINDS = {"image": "畫圖", "video": "影片"}
+SD_ROLES = {"model": "完整模型", "diffusion": "擴散模型", "clip_l": "CLIP-L", "clip_g": "CLIP-G", "t5xxl": "T5-XXL",
+            "llm": "文字編碼器（LLM）", "vae": "VAE", "audio_vae": "音訊 VAE", "connectors": "嵌入連接器"}
+SD_MAIN = ("model", "diffusion")
+SD_SAMPLERS = ("euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m", "dpm++2mv2", "ipndm", "ipndm_v", "lcm",
+               "ddim_trailing", "tcd")
+# 與代理 xconsole_agent.SD_CN_RX、SD_COMPUTE、SD_RAM_SELF 相同（test_sd 會拿兩邊對照）
+SD_CN_RX = re.compile(r"(?<![a-z0-9])(qwen|wan|z[-_ ]?image|hunyuan|minimax|hidream|ernie|longcat|ovis|moss|kolors|"
+                      r"cogview|lumina|omnigen|bagel|seedream|seedance|sensenova|llada|ming[-_]|deepseek|glm|kimi|"
+                      r"moonshot|baichuan|internlm|doubao)(?![a-z])", re.I)
+SD_COMPUTE = {"image": 2.0, "video": 0.3}
+SD_RAM_SELF = 2.0
+SD_QUANT_RX = re.compile(r"[-_.]((?:UD-)?I?Q\d\w*?|BF16|F16|F32|FP16|FP8\w*)\.(?:gguf|safetensors|sft)$", re.I)
+SAFE_PATH_RX = re.compile(r"[\w.+-]+(?:/[\w.+-]+)*")
+
+
+def sd_quant(path):
+    m = SD_QUANT_RX.search(os.path.basename(path))
+    return m.group(1).upper() if m else ""
+
+
+def sd_bits(q):
+    """量化 → 位元數；safetensors 沒標的當 16 位元。"""
+    q = (q or "").upper()
+    if not q or q.startswith(("BF16", "F16", "FP16")):
+        return 16
+    if q.startswith("F32"):
+        return 32
+    if q.startswith("FP8"):
+        return 8
+    m = re.search(r"Q(\d)", q)
+    return int(m.group(1)) if m else 16
+
+
+def sd_options(part, files):
+    """一個元件在 repo 裡可選的檔：寫死 path 的只有那一個；寫 match 的是開頭相符的 .gguf（mmproj 不算）。"""
+    if part.get("path"):
+        size = files.get(part["path"])
+        return [{"path": part["path"], "quant": sd_quant(part["path"]), "size_gib": round(size / GIB, 2)}] if size else []
+    pre = part.get("match") or ""
+    return sorted(({"path": p, "quant": sd_quant(p), "size_gib": round(s / GIB, 2)} for p, s in files.items()
+                   if p.startswith(pre) and "/" not in p[len(pre):] and p.endswith(".gguf")
+                   and not os.path.basename(p).lower().startswith("mmproj")),
+                  key=lambda o: o["size_gib"])
+
+
+def sd_files(parts, trees):
+    """從 Hugging Face 的檔案清單（{repo: [{path, size}]}）留下清單項目用得到的檔：{repo: {path: 位元組}}。"""
+    out = {}
+    for p in parts:
+        files = {f["path"]: f["size"] for f in trees.get(p["repo"]) or []}
+        keep = {o["path"] for o in sd_options(p, files)}
+        out.setdefault(p["repo"], {}).update({k: v for k, v in files.items() if k in keep})
+    return out
+
+
+def sd_follow(opts, main_bits):
+    """非主體的元件跟著主體的位元數挑：4～8 位元之間取最接近的，同位元偏好 K 系列。"""
+    if len(opts) <= 1:
+        return opts[0] if opts else None
+    want = min(max(main_bits, 4), 8)
+    return min(opts, key=lambda o: (abs(sd_bits(o["quant"]) - want), -quant_pref(o["quant"]), o["size_gib"]))
+
+
+def sd_model_id(repo, quant):
+    """代理端的模型代號（只准英數、底線、連字號）：同一個清單項目不同量化是不同顆。"""
+    name = repo.split("/", 1)[1]
+    return re.sub(r"[^a-z0-9_-]+", "-", f"{name}-{quant or 'full'}".lower()).strip("-")[:64]
+
+
+def sd_resolve(entry, main_path=None):
+    """清單上的一顆 → 每個主體量化各一組完整的檔案（[{"main": 選項, "parts": [...]}]）。"""
+    files = entry.get("files") or {}
+    parts = entry.get("parts") or []
+    main = next((p for p in parts if p["role"] in SD_MAIN), None)
+    if not main:
+        return []
+    out = []
+    for mo in sd_options(main, files.get(main["repo"]) or {}):
+        if main_path and mo["path"] != main_path:
+            continue
+        chosen, ok = [], True
+        for p in parts:
+            o = mo if p is main else sd_follow(sd_options(p, files.get(p["repo"]) or {}), sd_bits(mo["quant"]))
+            if not o:
+                ok = False
+                break
+            chosen.append({"role": p["role"], "repo": p["repo"], **o})
+        if ok:
+            out.append({"main": mo, "parts": chosen})
+    return out
+
+
+def sd_spec(entry, combo):
+    """要交給代理下載的規格。"""
+    q = combo["main"]["quant"]
+    return {"id": sd_model_id(entry["repo"], q), "title": f"{entry['title']}{' ' + q if q else ''}", "kind": entry["kind"],
+            "parts": [{"role": p["role"], "repo": p["repo"], "path": p["path"]} for p in combo["parts"]],
+            "defaults": entry.get("defaults") or {}, "desc": entry.get("desc") or "", "quant": q, "catalog": entry["repo"]}
+
+
+def sd_capacity(state):
+    """畫圖的快速層：sd-cli 只用一張卡，獨立顯卡機取最大那張；統一記憶體機同文字模型。備援層＝系統記憶體（權重放 RAM、輪流搬進卡）。"""
+    cap = capacity(state)
+    pools = state.get("pools") or {}
+    if cap["memory_model"] == "discrete":
+        cards = [c.get("total_gib") or 0 for c in pools.get("gpus") or []]
+        fl = (pools.get("floors") or {}).get("vram", 2)
+        cap = {**cap, "fast": round(max(0.0, max(cards) - fl), 1) if cards else 0.0}
+    return cap
+
+
+def sd_plan(cap, kind, defaults, combo):
+    d = defaults or {}
+    mp = (d.get("width") or 1024) * (d.get("height") or 1024) / 1e6 * ((d.get("frames") or 33) if kind == "video" else 1)
+    weights = sum(p["size_gib"] for p in combo["parts"])
+    compute = 1.0 + SD_COMPUTE[kind] * mp
+    need = weights + compute
+    biggest = max(p["size_gib"] for p in combo["parts"])
+    out = {"path": combo["main"]["path"], "quant": combo["main"]["quant"], "bits": sd_bits(combo["main"]["quant"]),
+           "size_gib": round(weights, 1), "need_gib": round(need, 1), "parts": combo["parts"]}
+    if need <= cap["fast"]:
+        place = {"unified_single": "全部放進統一記憶體", "unified_split": "全部放進 GPU 那一塊"}.get(cap["memory_model"], "全部放進顯示卡")
+        out.update(level="smooth", place=place)
+    elif cap["memory_model"] == "discrete" and cap["fast"] and biggest + compute <= cap["fast"] and weights + SD_RAM_SELF <= cap["slow"]:
+        out.update(level="ok", place="權重放系統記憶體，輪流搬進顯示卡算（慢一些）")
+    else:
+        out.update(level="no", place=f"要約 {need:.0f} GiB，這台最多 {cap['fast']:.0f} GiB")
+    return out
+
+
+def sd_pick(plans):
+    """建議的量化：流暢的裡面取 4～8 位元最高的（擴散模型低於 4 位元畫質掉很多，Q8 與原始幾乎一樣）；
+    都不流暢取能跑的最小一個；全放不下回 None。"""
+    smooth = [p for p in plans if p["level"] == "smooth" and 4 <= p["bits"] <= 8]
+    if smooth:
+        return max(smooth, key=lambda p: (p["bits"], quant_pref(p["quant"]), p["size_gib"]))
+    rest = [p for p in plans if p["level"] != "no"]
+    return min(rest, key=lambda p: (p["level"] != "smooth", p["size_gib"])) if rest else None
+
+
+def recommend_sd(state, sdlib, catalog):
+    cap = sd_capacity(state)
+    lib = sdlib or {}
+    have = {m["id"]: m for m in lib.get("models") or []}
+    jobs = [j for j in lib.get("downloads") or [] if j.get("state") in ("running", "queued")]
+    items = []
+    for i, e in enumerate(catalog):
+        combos = sd_resolve(e)
+        plans = []
+        for c in combos:
+            p = sd_plan(cap, e["kind"], e.get("defaults"), c)
+            got = have.get(sd_model_id(e["repo"], p["quant"]))
+            p["installed_id"] = got["id"] if got else None
+            p["ready"] = bool(got and got.get("ready"))
+            p["measured"] = (got or {}).get("measured")
+            p["fits_disk"] = lib.get("free_gib") is None or p["size_gib"] + 10 < lib["free_gib"]
+            plans.append(p)
+        best = sd_pick(plans)
+        mine = next((p for p in plans if p["ready"]), None) or next((p for p in plans if p["installed_id"]), None)
+        job = next((j for j in jobs if j.get("sd_model") in {sd_model_id(e["repo"], p["quant"]) for p in plans}), None)
+        items.append({**{k: e.get(k) for k in ("repo", "title", "kind", "desc", "tags", "vendor", "license", "defaults", "refreshed")},
+                      "order": i, "plans": plans, "pick": best["path"] if best else None,
+                      "installed": mine["path"] if mine else None,
+                      "level": (mine or best or {"level": "no" if plans else "unknown"})["level"],
+                      "job": {"id": job["id"], "done": job.get("done"), "total": job.get("total")} if job else None})
+    rank = {"smooth": 0, "ok": 1, "no": 2, "unknown": 3}
+    order = sorted(items, key=lambda x: (rank[x["level"]], x["order"]))
+    return {"capacity": cap, "items": items, "featured": next((x["repo"] for x in order if x["level"] == "smooth"), None),
+            "models": lib.get("models") or [], "root": lib.get("root"), "free_gib": lib.get("free_gib"),
+            "sd_cli": lib.get("sd_cli"), "building": lib.get("building")}
+
+
+def check_sd_defaults(d, kind):
+    d = d or {}
+    try:
+        out = {"width": int(d.get("width") or 1024), "height": int(d.get("height") or 1024),
+               "steps": int(d.get("steps") or 20), "cfg": float(d.get("cfg") if d.get("cfg") not in (None, "") else 1.0),
+               "sampler": d.get("sampler") or "euler"}
+        if kind == "video":
+            out.update(frames=int(d.get("frames") or 33), fps=int(d.get("fps") or 24))
+    except (TypeError, ValueError):
+        return None, "尺寸、步數、引導強度要是數字"
+    if not all(64 <= out[k] <= 2048 and out[k] % 16 == 0 for k in ("width", "height")):
+        return None, "寬與高要在 64～2048 之間，而且是 16 的倍數"
+    if not 1 <= out["steps"] <= 150 or not 0 <= out["cfg"] <= 30:
+        return None, "步數 1～150、引導強度 0～30"
+    if out["sampler"] not in SD_SAMPLERS:
+        return None, "取樣方法只能是：" + "、".join(SD_SAMPLERS)
+    if kind == "video" and not (1 <= out["frames"] <= 241 and out["frames"] % 8 == 1 and 1 <= out["fps"] <= 60):
+        return None, "影格數 1～241 且是 8 的倍數加 1，每秒格數 1～60"
+    return out, None
+
+
+def check_sd_fields(body):
+    """管理者在網頁上填的畫圖／影片清單項目。中國來源（含文字編碼器與 VAE）一律不收。"""
+    repo = str(body.get("repo") or "").strip()
+    if not REPO_RX.fullmatch(repo):
+        return None, "主體的 Hugging Face 名稱格式是「作者/模型」，例：leejet/FLUX.1-schnell-gguf"
+    title = str(body.get("title") or "").strip()
+    if not 1 <= len(title) <= 60:
+        return None, "顯示名稱要 1～60 字"
+    kind = body.get("kind") or "image"
+    if kind not in SD_KINDS:
+        return None, "種類只能是畫圖或影片"
+    out = {"repo": repo, "title": title, "kind": kind}
+    for k, lim, name in (("desc", 160, "說明"), ("vendor", 40, "來源"), ("license", 40, "授權")):
+        v = str(body.get(k) or "").strip()
+        if len(v) > lim or re.search(r"[\x00-\x1f]", v):
+            return None, f"{name}最多 {lim} 字，不能有控制字元"
+        out[k] = v
+    tags = body.get("tags") or []
+    if isinstance(tags, str):
+        tags = [t for t in re.split(r"[,，、\s]+", tags) if t]
+    if not isinstance(tags, list) or len(tags) > 6 or any(not isinstance(t, str) or len(t) > 12 for t in tags):
+        return None, "標籤最多 6 個、每個 12 字以內"
+    out["tags"] = tags
+    parts, roles = [], set()
+    for p in body.get("parts") or []:
+        role, prepo = p.get("role"), str(p.get("repo") or "").strip()
+        path, match = str(p.get("path") or "").strip(), str(p.get("match") or "").strip()
+        if role not in SD_ROLES or role in roles:
+            return None, f"元件種類不合法或重複：{role}"
+        if not REPO_RX.fullmatch(prepo):
+            return None, f"{SD_ROLES[role]}的 Hugging Face 名稱格式是「作者/模型」"
+        if bool(path) == bool(match) or not SAFE_PATH_RX.fullmatch(path or match) or ".." in (path or match) or len(path or match) > 160:
+            return None, f"{SD_ROLES[role]}要填「檔名」或「檔名開頭」其中一個（只能有英數與 . _ - / +）"
+        if path and not path.lower().endswith((".gguf", ".safetensors", ".sft")):
+            return None, f"{SD_ROLES[role]}的檔名只收 .gguf、.safetensors、.sft"
+        roles.add(role)
+        parts.append({"role": role, "repo": prepo, **({"path": path} if path else {"match": match})})
+    if len([p for p in parts if p["role"] in SD_MAIN]) != 1:
+        return None, "要有、而且只能有一個主體（完整模型或擴散模型）"
+    if next(p for p in parts if p["role"] in SD_MAIN)["repo"] != repo:
+        return None, "主體的 repo 要跟清單項目的 Hugging Face 名稱一樣"
+    if len(parts) > 8:
+        return None, "最多 8 個元件"
+    words = " ".join([title, repo] + [f"{p['repo']} {p.get('path') or p.get('match')}" for p in parts])
+    cn = SD_CN_RX.search(words)
+    if cn:
+        return None, (f"含中國來源的元件（{cn.group(1)}），政府案不得使用，不列入推薦清單"
+                      "（內部測試可以到「從 Hugging Face 下載」手動組一顆）")
+    out["parts"] = parts
+    d, err = check_sd_defaults(body.get("defaults"), kind)
+    if err:
+        return None, err
+    out["defaults"] = d
     return out, None
