@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant" data-theme="light">
+<html lang="zh-Hant" data-theme="light" class="brand-pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,8 +14,9 @@
 <div id="login" class="login-page" hidden>
   <div class="hero-glow"></div>
   <form class="login-card" id="login-form">
-    <h1>xConsole 模型主控台</h1>
-    <p>云碩科技地端 AI 機群</p>
+    <img id="login-logo" class="login-logo" alt="" hidden>
+    <h1 id="login-title">xConsole 模型主控台</h1>
+    <p id="login-org">云碩科技地端 AI 機群</p>
     <label class="field" for="un">帳號</label>
     <input type="text" id="un" autocomplete="username" required value="admin">
     <label class="field" for="pw">密碼</label>
@@ -25,12 +26,13 @@
     </div>
     <p id="login-err" class="small login-err" hidden></p>
   </form>
+  <footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>
 </div>
 
 <div id="app" hidden>
   <header class="topbar" id="topbar">
     <div class="topbar-row one">
-      <div class="brand"><span class="brand-mark">x</span><span>xConsole</span></div>
+      <div class="brand"><span class="brand-mark" id="brand-mark">x</span><img id="brand-logo" class="brand-logo" alt="" hidden><span id="brand-name">xConsole</span></div>
       <nav class="nav" id="nav"></nav>
       <span class="spacer"></span>
       <span class="livedot" id="live"><i></i><span id="live-text">連線中</span></span>
@@ -55,6 +57,7 @@
 
   <div id="tls-banner" class="banner" hidden></div>
   <main id="main"></main>
+  <footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>
 </div>
 
 <div class="toasts" id="toasts"></div>

@@ -10,6 +10,9 @@
   連各機代理時用部署時取回的對方憑證驗證，不關驗證。
 服務使用報告（照 service-usage-report）：
   GET /api/admin/usage-report?days=30，六塊數字全由稽核與取樣算出。
+客戶品牌：
+  賣給客戶時，管理者在「設定 → 品牌與外觀」換單位名稱、系統名稱與 Logo；
+  頁尾的「Powered by xCloudinfo 云碩科技」寫死在頁面裡，不開放關掉。
 """
 import base64
 import datetime as dt
@@ -23,11 +26,14 @@ import re
 import secrets
 import socket
 import ssl
+import struct
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
+import zlib
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -97,6 +103,153 @@ def fleet():
     cfg.setdefault("tls", {})
     cfg.setdefault("report", {})
     return cfg
+
+
+# ---------------------------------------------------------------- 客戶品牌
+
+BRAND_DIR = os.path.join(STATE_DIR, "branding")
+BRAND_DEFAULT = {"org": "云碩科技", "product": "xConsole 模型主控台"}
+BRAND_NAME_RX = re.compile(r"[^\x00-\x1f\x7f<>]{1,40}")
+LOGO_MAX = 1024 * 1024
+LOGO_TYPES = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
+# 換 Logo 是「寫檔＋刪掉別種格式的舊檔＋改 fleet.json」三步，兩個請求交錯會刪到對方剛寫的檔：整段鎖住
+_BRAND_LOCK = threading.Lock()
+
+
+def _png_info(data):
+    """逐個區塊檢查長度與 CRC：第一塊必須是 IHDR、中間要有 IDAT、要以 IEND 收尾。"""
+    i, first, idat, size = 8, True, False, None
+    while i + 12 <= len(data):
+        n = struct.unpack(">I", data[i:i + 4])[0]
+        kind = data[i + 4:i + 8]
+        if n > len(data) or i + 12 + n > len(data):
+            return None
+        if zlib.crc32(data[i + 4:i + 8 + n]) & 0xFFFFFFFF != struct.unpack(">I", data[i + 8 + n:i + 12 + n])[0]:
+            return None
+        if first:
+            if kind != b"IHDR" or n != 13:
+                return None
+            size = struct.unpack(">II", data[i + 8:i + 16])
+            first = False
+        idat = idat or kind == b"IDAT"
+        i += 12 + n
+        if kind == b"IEND":
+            return ("png", *size) if idat else None
+    return None
+
+
+JPEG_SOF = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+
+
+def _jpeg_info(data):
+    """逐段走到 SOS：尺寸（SOF）要在影像資料之前出現，檔尾要是 EOI。"""
+    i, size = 2, None
+    while i + 4 <= len(data):
+        if data[i] != 0xFF:
+            return None
+        marker = data[i + 1]
+        if marker == 0xFF:                       # 填充位元組
+            i += 1
+            continue
+        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            i += 2
+            continue
+        n = struct.unpack(">H", data[i + 2:i + 4])[0]
+        if n < 2 or i + 2 + n > len(data):
+            return None
+        if marker in JPEG_SOF:
+            if n < 7:
+                return None
+            h, w = struct.unpack(">HH", data[i + 5:i + 9])
+            size = (w, h)
+        if marker == 0xDA:                       # 之後是壓縮的影像資料，一路到 EOI
+            ok = size and len(data) > i + 2 + n + 2 and data.rstrip(b"\x00").endswith(b"\xff\xd9")
+            return ("jpg", *size) if ok else None
+        i += 2 + n
+    return None
+
+
+def _webp_info(data):
+    """RIFF 宣告的大小要跟實際一樣，每個區塊都不能超出檔案，而且一定要有影像區塊。"""
+    if struct.unpack("<I", data[4:8])[0] + 8 != len(data):
+        return None
+    i, size, image = 12, None, False
+    while i + 8 <= len(data):
+        kind, n = data[i:i + 4], struct.unpack("<I", data[i + 4:i + 8])[0]
+        body = data[i + 8:i + 8 + n]
+        if len(body) != n:
+            return None
+        if kind == b"VP8X" and n >= 10:
+            size = (1 + int.from_bytes(body[4:7], "little"), 1 + int.from_bytes(body[7:10], "little"))
+        elif kind == b"VP8 ":
+            if n < 10 or body[3:6] != b"\x9d\x01\x2a":
+                return None
+            w, h = struct.unpack("<HH", body[6:10])
+            size, image = size or (w & 0x3FFF, h & 0x3FFF), True
+        elif kind == b"VP8L":
+            if n < 5 or body[0] != 0x2F:
+                return None
+            bits = int.from_bytes(body[1:5], "little")
+            size, image = size or ((bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1), True
+        elif kind == b"ANMF":
+            image = True
+        i += 8 + n + (n & 1)                     # 區塊長度是奇數時後面補一個位元組
+    return ("webp", *size) if image and size and i == len(data) else None
+
+
+def image_info(data):
+    """只認 PNG／JPEG／WebP，回 (副檔名, 寬, 高)，認不出來或結構不完整都回 None。
+    看內容不看副檔名；不只看檔頭，整個檔案的結構都要對得上（只偽造檔頭的殘缺檔，瀏覽器會顯示破圖）。
+    不收 SVG：SVG 能夾帶程式碼，被當成 Logo 顯示就是一個 XSS 入口。"""
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return _png_info(data)
+        if data[:3] == b"\xff\xd8\xff":
+            return _jpeg_info(data)
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP" and len(data) >= 20:
+            return _webp_info(data)
+    except (struct.error, IndexError):
+        return None
+    return None
+
+
+def branding():
+    """畫面要的品牌資料：沒設定過就回預設（custom=false，前端照原樣不動）。"""
+    b = fleet().get("branding") or {}
+    out = {"custom": bool(b.get("org") or b.get("product") or b.get("logo")),
+           "org": b.get("org") or BRAND_DEFAULT["org"],
+           "product": b.get("product") or BRAND_DEFAULT["product"], "logo": None}
+    lg = b.get("logo")
+    if lg and os.path.isfile(os.path.join(BRAND_DIR, lg.get("file", ""))):
+        out["logo"] = {"url": f"/branding/logo?v={lg['sha'][:12]}", "width": lg["w"], "height": lg["h"]}
+    return out
+
+
+def save_logo(data):
+    """驗過的圖檔寫進 ~/.xconsole/branding/，舊的 Logo 一併刪掉。回寫進 fleet.json 的那筆資料。
+    呼叫端要持有 _BRAND_LOCK，連同 fleet.json 的更新一起做完才放開。"""
+    ext, w, h = image_info(data)
+    os.makedirs(BRAND_DIR, mode=0o700, exist_ok=True)
+    name = f"logo.{ext}"
+    fd, tmp = tempfile.mkstemp(dir=BRAND_DIR, prefix=".upload-")      # 每次不同的暫存檔名，0600
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, os.path.join(BRAND_DIR, name))
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
+        raise
+    for other in LOGO_TYPES:
+        if other != ext:
+            try:
+                os.remove(os.path.join(BRAND_DIR, f"logo.{other}"))
+            except FileNotFoundError:
+                pass
+    return {"file": name, "type": LOGO_TYPES[ext], "w": w, "h": h,
+            "sha": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
 
 
 def node_token(node):
@@ -688,6 +841,22 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         return None
 
+    def _logo(self):
+        lg = (fleet().get("branding") or {}).get("logo")
+        full = os.path.join(BRAND_DIR, lg["file"]) if lg else ""
+        if not lg or lg.get("type") not in LOGO_TYPES.values() or not os.path.isfile(full):
+            return self._json(404, {"error": "還沒有上傳 Logo"})
+        with open(full, "rb") as fh:
+            body = fh.read()
+        self.send_response(200)
+        self.send_header("Content-Type", lg["type"])
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        self._sec_headers()
+        self.end_headers()
+        self.wfile.write(body)
+        return None
+
     # ---- 工具
     def _cookie(self):
         for part in (self.headers.get("Cookie") or "").split(";"):
@@ -822,6 +991,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "service": "xconsole", "tls": {
                 "daysLeft": cur.get("daysLeft"), "validToTaipei": cur.get("validToTaipei"),
                 "source": cur.get("source"), "selfSigned": cur.get("selfSigned")}})
+        if path == "/api/branding":
+            return self._json(200, branding())
+        if path == "/branding/logo":
+            return self._logo()
         m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|xconsole_agent\.py)", path)
         if m:
             # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
@@ -1230,6 +1403,47 @@ class Handler(BaseHTTPRequestHandler):
                 if not ok:
                     return self._json(409, {"error": msg})
             return self._json(200, {"ok": True, "hostnames": hostnames(), "current": CERTS.current()})
+
+        # ---- 客戶品牌
+        if path == "/api/branding":
+            org, product = (str(body.get(k) or "").strip() for k in ("org", "product"))
+            for label, v in (("單位名稱", org), ("系統名稱", product)):
+                if not BRAND_NAME_RX.fullmatch(v):
+                    return self._json(400, {"error": f"{label}要 1～40 個字，不能有 < > 或控制字元"})
+            update_fleet(lambda c: c.setdefault("branding", {}).update({"org": org, "product": product}))
+            self._audit("branding.update", "", True, {"org": org, "product": product})
+            return self._json(200, {"ok": True, "branding": branding()})
+        if path == "/api/branding/logo":
+            if body.get("remove"):
+                with _BRAND_LOCK:
+                    old = (fleet().get("branding") or {}).get("logo")
+                    update_fleet(lambda c: c.setdefault("branding", {}).pop("logo", None))
+                    if old:
+                        try:
+                            os.remove(os.path.join(BRAND_DIR, os.path.basename(old.get("file", ""))))
+                        except FileNotFoundError:
+                            pass
+                self._audit("branding.logo", "移除", True)
+                return self._json(200, {"ok": True, "branding": branding()})
+            try:
+                data = base64.b64decode(str(body.get("data") or ""), validate=True)
+            except (ValueError, TypeError):
+                return self._json(400, {"error": "檔案內容讀不到"})
+            if not data:
+                return self._json(400, {"error": "沒有收到檔案"})
+            if len(data) > LOGO_MAX:
+                return self._json(400, {"error": "Logo 要在 1 MB 以內"})
+            info = image_info(data)
+            if not info:
+                return self._json(400, {"error": "只接受 PNG、JPEG、WebP 圖檔（不收 SVG）"})
+            if not (16 <= info[1] <= 4096 and 16 <= info[2] <= 4096):
+                return self._json(400, {"error": f"圖片尺寸 {info[1]}×{info[2]} 不合用，寬高要在 16～4096 像素之間"})
+            with _BRAND_LOCK:
+                meta = save_logo(data)
+                update_fleet(lambda c: c.setdefault("branding", {}).__setitem__("logo", meta))
+            self._audit("branding.logo", meta["file"], True, {"width": meta["w"], "height": meta["h"],
+                                                               "bytes": meta["bytes"], "sha256": meta["sha"][:12]})
+            return self._json(200, {"ok": True, "branding": branding()})
 
         # ---- 帳號與報表設定
         if path == "/api/account/password":

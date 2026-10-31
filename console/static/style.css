@@ -197,7 +197,7 @@ button { font-family: inherit; font-size: inherit; cursor: pointer; }
 
 /* ---------------------------------------------------------- 內容 */
 
-main { min-height: calc(100vh - 98px); }
+main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不用捲就看得到頁尾 */
 .wrap { max-width: 1440px; margin: 0 auto; padding: 22px 24px 48px; }
 
 .hero {
@@ -926,3 +926,74 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
 .cat-box { max-height: 46vh; overflow: auto; }
 .cat-box td.cat-name { min-width: 150px; font-weight: 600; }
 .cat-box td.mono { overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------- 客戶品牌與頁尾 */
+
+/* 品牌資料回來前先不畫品牌區：否則會先閃一下 xConsole 才換成客戶的名稱 */
+html.brand-pending .brand,
+html.brand-pending #login-title,
+html.brand-pending #login-org { visibility: hidden; }
+
+/* 客戶 Logo 多半是深色字、透明底，深色模式下會看不見：一律放在白底上 */
+.brand-logo {
+  height: 30px;
+  width: auto;
+  max-width: 190px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 7px;
+  padding: 3px 7px;
+}
+.login-logo {
+  display: block;
+  height: 54px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin: 0 0 16px;
+}
+:root[data-theme="dark"] .login-logo { box-shadow: 0 6px 18px rgba(0, 0, 0, .25); }
+
+/* 頁尾：每一頁最下方，寫死在 index.html，不隨畫面重畫 */
+.powered {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  padding: 16px 16px 22px;
+  letter-spacing: .01em;
+}
+.powered strong { color: var(--ink-2); font-weight: 700; }
+/* 登入頁的頁尾排在版面裡（第二列），不浮在上面：矮螢幕（手機橫放）時浮動的頁尾會蓋住登入鈕、擋掉點擊 */
+.login-page { grid-template-rows: 1fr auto; }
+.login-page .powered {
+  position: relative;
+  color: rgba(255, 255, 255, .55);
+}
+.login-page .powered strong { color: rgba(255, 255, 255, .82); }
+
+.brand-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg);
+  font-weight: 700;
+  font-size: 16px;
+}
+.brand-preview img { height: 34px; width: auto; max-width: 220px; object-fit: contain; background: #fff; border-radius: 7px; padding: 3px 7px; }
+
+/* 品牌區不准被導覽列擠壓：客戶名稱多半是中文長字串，被壓縮就變成一字一行 */
+.brand { flex: none; white-space: nowrap; }
+.livedot { white-space: nowrap; }
+
+@media (max-width: 860px) {
+  .brand-logo { height: 26px; max-width: 120px; padding: 2px 5px; }
+  /* 手機上有 Logo 就只放 Logo（它已經表明是誰）；沒有 Logo 時名稱太長用省略號收尾 */
+  .brand-logo:not([hidden]) ~ #brand-name { display: none; }
+  #brand-name { font-size: 15px; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; }
+}

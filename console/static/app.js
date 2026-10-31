@@ -41,6 +41,79 @@ async function api(path, opts = {}) {
   return data;
 }
 
+/* ---------------------------------------------------------------- 客戶品牌
+   賣給客戶時換單位名稱、系統名稱與 Logo。登入頁也要換，所以走不用登入的 /api/branding。
+   頁尾的 Powered by xCloudinfo 寫死在 index.html，不在這裡處理、也不開放關掉。 */
+
+function letterIcon(ch) {
+  const esc = String(ch).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#bf181f"/>` +
+    `<text x="16" y="22" font-family="sans-serif" font-size="17" font-weight="bold" fill="white" text-anchor="middle">${esc}</text></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+// 頁面原本寫的就是預設品牌。先記下來：從「有自訂」退回「沒自訂」時（例如只上傳過 Logo 又移除）要整組還原，
+// 不能直接 return，否則 Logo 還掛著、標題還是客戶的
+const BRAND_DEFAULT = {
+  title: document.title,
+  name: $("#brand-name").textContent,
+  loginTitle: $("#login-title").textContent,
+  loginOrg: $("#login-org").textContent,
+  mark: $("#brand-mark").textContent,
+  icon: document.querySelector("link[rel=icon]")?.getAttribute("href"),
+};
+
+function resetBranding() {
+  document.title = BRAND_DEFAULT.title;
+  $("#brand-name").textContent = BRAND_DEFAULT.name;
+  $("#login-title").textContent = BRAND_DEFAULT.loginTitle;
+  $("#login-org").textContent = BRAND_DEFAULT.loginOrg;
+  $("#brand-mark").textContent = BRAND_DEFAULT.mark;
+  $("#brand-mark").hidden = false;
+  for (const id of ["#brand-logo", "#login-logo"]) {
+    const img = $(id);
+    img.hidden = true;
+    img.removeAttribute("src");
+    img.alt = "";
+  }
+  const icon = document.querySelector("link[rel=icon]");
+  if (icon && BRAND_DEFAULT.icon) icon.setAttribute("href", BRAND_DEFAULT.icon);
+}
+
+function applyBranding(b) {
+  document.documentElement.classList.remove("brand-pending");
+  if (!b) return;
+  S.brand = b;
+  if (!b.custom) { resetBranding(); return; }
+  const first = [...b.org][0] || "x";
+  document.title = `${b.product}｜${b.org}`;
+  $("#brand-name").textContent = b.product;
+  $("#login-title").textContent = b.product;
+  $("#login-org").textContent = b.org;
+  $("#brand-mark").textContent = first;
+  for (const id of ["#brand-logo", "#login-logo"]) {
+    const img = $(id);
+    if (b.logo) {
+      if (img.getAttribute("src") !== b.logo.url) img.src = b.logo.url;   // 同一張不重設，避免重新載入閃一下
+      img.alt = b.org;
+    }
+    img.hidden = !b.logo;
+  }
+  $("#brand-mark").hidden = !!b.logo;
+  // 橫式 Logo 縮成分頁小圖示會擠成一團：用單位名稱第一個字產生
+  const icon = document.querySelector("link[rel=icon]");
+  if (icon) icon.href = letterIcon(first);
+}
+
+async function loadBranding() {
+  try {
+    const res = await fetch("/api/branding", { credentials: "same-origin" });
+    applyBranding(res.ok ? await res.json() : null);
+  } catch (_) {
+    applyBranding(null);                  // 拿不到就維持預設，但一定要把品牌區顯示出來
+  }
+}
+
 /* ---------------------------------------------------------------- 登入 */
 
 function showLogin() {
@@ -2343,11 +2416,13 @@ function viewLogs() {
   main.appendChild(wrap);
 }
 
-/* ================================================================ 設定頁（四個分頁）
-   分頁順序照管理者實際的先後：先確認機器都連得上 → 處理憑證 → 看使用報告 → 帳號。 */
+/* ================================================================ 設定頁（五個分頁）
+   分頁順序照管理者實際的先後：先確認機器都連得上 → 處理憑證 → 看使用報告 → 帳號；
+   品牌只在交機時設一次，放最後。 */
 
 const SETTINGS_TABS = [
   ["machines", "1 機器"], ["tls", "2 HTTPS 與憑證"], ["report", "3 使用報告"], ["account", "4 帳號與安全"],
+  ["brand", "5 品牌與外觀"],
 ];
 
 function viewSettings() {
@@ -2356,7 +2431,8 @@ function viewSettings() {
   main.textContent = "";
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
-  ({ machines: settingsMachines, tls: settingsTls, report: settingsReport, account: settingsAccount }[tab])(wrap);
+  ({ machines: settingsMachines, tls: settingsTls, report: settingsReport, account: settingsAccount,
+     brand: settingsBrand }[tab])(wrap);
 }
 
 function card(title, sub) {
@@ -2934,7 +3010,8 @@ async function settingsAccount(wrap) {
       "model.swap": "換模型", "profile.apply": "切換情境", "all.stop": "全部停止", "tls.inspect": "檢查憑證",
       "tls.apply": "套用憑證", "tls.rollback": "還原憑證", "tls.csr": "產生 CSR", "tls.hsts": "HSTS 開關",
       "tls.hostnames": "修改網址", "tls.bootstrap": "重產自簽", "tls.expiry_notice": "憑證到期提醒",
-      "trust.import": "信任代理憑證", "account.password": "變更密碼", "settings.report": "修改報告假設" };
+      "trust.import": "信任代理憑證", "account.password": "變更密碼", "settings.report": "修改報告假設",
+      "branding.update": "修改品牌名稱", "branding.logo": "更換 Logo" };
     const sb = el("div", "scrollbox");
     const tb = el("table");
     tb.innerHTML = "<thead><tr><th>時間（台北）</th><th>帳號</th><th>來源</th><th>動作</th><th>對象</th><th>結果</th></tr></thead>";
@@ -2950,6 +3027,101 @@ async function settingsAccount(wrap) {
     tb.appendChild(body); sb.appendChild(tb);
     box.textContent = ""; box.appendChild(sb);
   } catch (ex) { box.textContent = ex.message; }
+}
+
+/* ---------------------------------------------------------------- 5 品牌與外觀 */
+
+function settingsBrand(wrap) {
+  const b = S.brand || { org: "", product: "", logo: null, custom: false };
+
+  const c = card("品牌與外觀", "賣給客戶時換成客戶的名稱與 Logo；頁尾固定顯示 Powered by xCloudinfo 云碩科技");
+  const pv = el("div", "brand-preview");
+  const pvImg = el("img");
+  const pvMark = el("span", "brand-mark");
+  const pvName = el("span");
+  pv.append(pvMark, pvImg, pvName);
+  const showPreview = (org, product, logo) => {
+    pvName.textContent = product || "（系統名稱）";
+    pvMark.textContent = [...(org || "x")][0];
+    pvImg.hidden = !logo;
+    pvMark.hidden = !!logo;
+    if (logo && pvImg.getAttribute("src") !== logo.url) { pvImg.src = logo.url; pvImg.alt = org; }
+  };
+  c.appendChild(el("p", "small muted", "預覽（頁首會長這樣）"));
+  c.appendChild(pv);
+
+  const fr = el("div", "form-row");
+  const mk = (label, value, hint) => {
+    const d = el("div");
+    d.appendChild(el("label", null, label));
+    const i = Object.assign(el("input"), { type: "text", maxLength: 40, value });
+    d.appendChild(i);
+    if (hint) d.appendChild(el("p", "small muted", hint));
+    fr.appendChild(d);
+    return i;
+  };
+  const org = mk("單位名稱", b.custom ? b.org : "", "例：中原大學。用在 Logo 的替代文字、分頁標題與登入頁");
+  const product = mk("系統名稱", b.custom ? b.product : "", "例：AI 模型主控台。顯示在頁首與登入頁大標");
+  c.appendChild(fr);
+  const live = () => showPreview(org.value.trim(), product.value.trim(), S.brand && S.brand.logo);
+  org.addEventListener("input", live);
+  product.addEventListener("input", live);
+  live();
+
+  const save = async () => {
+    try {
+      const r = await api("/api/branding", { method: "POST", body: { org: org.value.trim(), product: product.value.trim() } });
+      applyBranding(r.branding);
+      live();
+      toast("已套用，所有頁面與登入頁都換成新的名稱", "ok");
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  [org, product].forEach((x) => imeGuard(x, save));
+  const sr = el("div", "slot-actions");
+  const sb = el("button", "btn sm primary", "儲存名稱");
+  sb.onclick = save;
+  sr.appendChild(sb);
+  c.appendChild(sr);
+  wrap.appendChild(c);
+
+  const lc = card("Logo", "PNG、JPEG、WebP，1 MB 以內；不收 SVG");
+  const now = el("div", "small muted");
+  const paint = () => {
+    now.textContent = S.brand && S.brand.logo
+      ? `目前使用 ${S.brand.logo.width}×${S.brand.logo.height} 像素的 Logo`
+      : "還沒有上傳 Logo，頁首用單位名稱的第一個字代替";
+    rm.hidden = !(S.brand && S.brand.logo);
+  };
+  const file = Object.assign(el("input"), { type: "file", accept: "image/png,image/jpeg,image/webp" });
+  file.hidden = true;
+  const pick = el("button", "btn sm primary", "選擇圖檔上傳");
+  pick.onclick = () => file.click();
+  const rm = el("button", "btn sm", "移除 Logo");
+  file.onchange = async () => {
+    const f = file.files && file.files[0];
+    file.value = "";
+    if (!f) return;
+    if (f.size > 1024 * 1024) { toast("Logo 要在 1 MB 以內", "bad"); return; }
+    try {
+      const r = await api("/api/branding/logo", { method: "POST", body: { data: await readB64(f) } });
+      applyBranding(r.branding); live(); paint();
+      toast("Logo 已更換", "ok");
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  rm.onclick = async () => {
+    try {
+      const r = await api("/api/branding/logo", { method: "POST", body: { remove: true } });
+      applyBranding(r.branding); live(); paint();
+      toast("已移除 Logo", "ok");
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  lc.appendChild(now);
+  const lr = el("div", "slot-actions");
+  lr.append(pick, rm, file);
+  lc.appendChild(lr);
+  lc.appendChild(el("p", "small muted", "建議用橫式、透明背景、高度 64 像素以上的圖。Logo 一律放在白底上顯示，深色模式也看得清楚。瀏覽器分頁的小圖示用單位名稱第一個字產生。"));
+  paint();
+  wrap.appendChild(lc);
 }
 
 function render() {
@@ -3520,6 +3692,8 @@ function start() {
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!S.busy.size) refresh(); }, 15000);
 }
+
+loadBranding();
 
 $("#refresh").addEventListener("click", refresh);
 
