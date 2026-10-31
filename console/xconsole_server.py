@@ -440,6 +440,13 @@ def _read_capped(resp, deadline):
     return json.loads(b"".join(chunks) or b"{}")
 
 
+def agent_open(req, ctx, timeout):
+    """連各機代理：一律不走代理伺服器。代理都在內網；macOS 的 urllib 會讀系統的代理設定，
+    單機版連自己的 127.0.0.1 也會被送去代理而連不上。"""
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
+    return op.open(req, timeout=timeout)
+
+
 def call_node(node_id, path, method="GET", body=None, timeout=40):
     cfg = fleet()
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
@@ -458,7 +465,7 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     deadline = time.time() + timeout + 60
     try:
         # 單次等待用呼叫端給的時限（換模型要等好幾分鐘才回），讀完整個回應另有總時限
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        with agent_open(req, ctx, timeout) as resp:
             return resp.status, _read_capped(resp, deadline)
     except urllib.error.HTTPError as exc:
         try:
@@ -902,7 +909,7 @@ def _join_node(handler, body):
             url = f"https://{'[' + h + ']' if ':' in h else h}:{port}/state"
             req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             try:
-                with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+                with agent_open(req, ctx, 10) as resp:
                     if resp.status == 200:
                         good = h
                         break

@@ -36,7 +36,10 @@ def main():
     ctx = ssl.create_default_context(cafile=os.path.join(a.home, ".xconsole", "tls", "cert.pem"))
     ctx.check_hostname = False          # 憑證本身照樣驗：只接受主控台那一張，主機名稱交給下一行比對
     jar = http.cookiejar.CookieJar()
-    op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx), urllib.request.HTTPCookieProcessor(jar))
+    # 連本機不走代理（macOS 的 urllib 會讀系統代理設定）
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx),
+                                     urllib.request.HTTPCookieProcessor(jar))
+    local = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def call(path, body=None, timeout=60):
         req = urllib.request.Request("https://127.0.0.1:9400" + path, method="POST" if body is not None else "GET",
@@ -95,7 +98,7 @@ def main():
         req = urllib.request.Request(f"http://127.0.0.1:{r['port']}/v1/chat/completions", headers={"Content-Type": "application/json"},
                                      data=json.dumps({"messages": [{"role": "user", "content": "Say hi."}], "max_tokens": 12}).encode())
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with local.open(req, timeout=120) as resp:
                 text = json.load(resp)["choices"][0]["message"]["content"]
             case("模型真的回答了", bool(text.strip()), text)
         except Exception as ex:  # noqa: BLE001

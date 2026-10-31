@@ -510,11 +510,16 @@ def card_split(gib, gpu_ids, cards):
     return {str(c["id"]): float(gib or 0) * c["total_gib"] / tot for c in sel}
 
 
+# 連本機（模型服務、node_agent）一律不走代理：macOS 的 urllib 會讀系統的代理設定，連 127.0.0.1 也送去代理，
+# 結果健康檢查永遠不通（GitHub 的 macOS 主機就是這樣）。
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def hardware():
     """先用同機已在跑的 node_agent，拿不到才自己量。拿不到就老實標未知，不假裝零。"""
     for url in NODE_AGENTS:
         try:
-            with urllib.request.urlopen(url, timeout=4) as resp:
+            with LOCAL.open(url, timeout=4) as resp:
                 data = json.load(resp)
             if data.get("gpu") or data.get("cpu"):
                 data["_source"] = url
@@ -1652,7 +1657,7 @@ def _http_json(url, body=None, key="", timeout=8):
                                           **({"Authorization": f"Bearer {key}"} if key else {})})
     t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with LOCAL.open(req, timeout=timeout) as resp:
             return resp.status, json.load(resp), int((time.time() - t0) * 1000)
     except urllib.error.HTTPError as exc:
         try:

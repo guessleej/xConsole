@@ -47,7 +47,7 @@ def free_port():
 
 def models_ok(port):
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/models", timeout=3) as r:
+        with A.LOCAL.open(f"http://127.0.0.1:{port}/v1/models", timeout=3) as r:
             return r.status == 200
     except Exception:  # noqa: BLE001
         return False
@@ -142,7 +142,12 @@ def main():
     A.sysctl(unit, "enable")
     rc, _, err = A.sysctl(unit, "start")
     case("啟動", rc == 0, err)
-    case("埠回得出 /v1/models", wait(lambda: models_ok(port), 20))
+    if not case("埠回得出 /v1/models", wait(lambda: models_ok(port), 20)):
+        diag(unit)
+        try:
+            urllib.request.build_opener(urllib.request.ProxyHandler({})).open(f"http://127.0.0.1:{port}/v1/models", timeout=3)
+        except Exception as ex:  # noqa: BLE001
+            print("    連線錯誤：", repr(ex), "代理設定：", urllib.request.getproxies())
     case("狀態 active", A.unit_state(unit) == "active")
     case("is-enabled", A.unit_enabled(unit))
     case("記憶體用量讀得到", A.unit_rss_gib(unit) > 0, A.unit_rss_gib(unit))
