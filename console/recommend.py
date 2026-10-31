@@ -161,6 +161,24 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0):
     return out
 
 
+def decode_speed(size_gib, prof, bw):
+    """已經裝好的模型大概多快（執行設定頁）：跟推薦清單同一條公式。頻寬不知道回 None。"""
+    if not size_gib or not bw:
+        return None
+    read = size_gib * (prof.get("active_frac") or 1.0) * GIB
+    return round(1 / (read / (EFFICIENCY * bw * 1e9) + (prof.get("layers") or 0) * LAYER_MS / 1000), 1)
+
+
+# 第一次載入大概幾秒：權重從磁碟讀進記憶體。實際載入過一次之後畫面改顯示實測秒數，這個只在還沒有實測時用
+DISK_GBS = {False: 1.2, None: 1.2, True: 0.12}      # .70 實測：24 GB 的 GGUF 從 NVMe 不 mmap 讀入 20 秒（約 1.2 GB/s），放機械硬碟要好幾分鐘
+
+
+def load_seconds(size_gib, hdd):
+    if not size_gib:
+        return None
+    return round(size_gib * GIB / 1e9 / DISK_GBS[hdd] + 3)
+
+
 def pick(plans):
     """建議下載哪個量化：
     1. 4～6 位元裡流暢的，挑位元數最高、同位元偏好 K 系列（Q6 以上品質差異已很小，卻要多一倍下載與慢一倍）；
