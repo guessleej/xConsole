@@ -15,13 +15,16 @@ DST="$HOME/xconsole"
 ST="$HOME/.xconsole"
 LA="tw.xcloudinfo.xconsole-agent"
 LC="tw.xcloudinfo.xconsole"
+# launchd：有人在桌面登入就放 gui 網域；只有 SSH、沒有桌面登入的 Mac（含 CI）沒有 gui 網域，改放 user 網域
+LDOM="gui/$(id -u)"
+[ "$OSN" = Darwin ] && { launchctl print "$LDOM" >/dev/null 2>&1 || LDOM="user/$(id -u)"; }
 
 say() { printf '\n== %s ==\n' "$1"; }
 die() { printf '\n安裝停止：%s\n' "$1" >&2; exit 1; }
 
 svc_stop() {   # 名稱（不含副檔名）
   if [ "$OSN" = Darwin ]; then
-    launchctl bootout "gui/$(id -u)/tw.xcloudinfo.$1" 2>/dev/null || true
+    launchctl bootout "$LDOM/tw.xcloudinfo.$1" 2>/dev/null || true
   else
     systemctl --user disable --now "$1.service" 2>/dev/null || true
   fi
@@ -34,7 +37,7 @@ if [ "${1:-}" = "--uninstall" ]; then
   svc_stop xconsole; svc_stop xconsole-agent
   if [ "$OSN" = Darwin ]; then rm -f "$HOME/Library/LaunchAgents/$LC.plist" "$HOME/Library/LaunchAgents/$LA.plist"
   else rm -f "$HOME/.config/systemd/user/xconsole.service" "$HOME/.config/systemd/user/xconsole-agent.service"; systemctl --user daemon-reload; fi
-  echo "已移除主控台與節點代理的服務。資料保留在 $ST，要整個刪掉請自行刪除該資料夾與 $DST。"
+  echo "已移除主控台與節點代理的服務。資料保留在 ${ST}，要整個刪掉請自行刪除該資料夾與 ${DST}。"
   echo "注意：代理帶起來的模型服務（llama-server）在 Linux 是另外的 systemd 服務 xc-*-llama，請先在網頁上停掉。"
   exit 0
 fi
@@ -47,7 +50,7 @@ case "$OSN" in
     python3 -c 'import ssl' 2>/dev/null || die "這台沒有 python3。請先執行 xcode-select --install 安裝命令列工具，再跑一次"
     [ "$(uname -m)" = arm64 ] || echo "提醒：這是 Intel Mac，模型只能用 CPU 跑，速度會很慢" ;;
   Linux)
-    for c in python3 curl; do command -v $c >/dev/null || die "這台沒有 $c（Ubuntu：sudo apt install $c）"; done
+    for c in python3 curl; do command -v $c >/dev/null || die "這台沒有 ${c}（Ubuntu：sudo apt install ${c}）"; done
     python3 -c 'import venv, ensurepip' 2>/dev/null || die "Python 缺少 venv（Ubuntu：sudo apt install python3-venv）"
     systemctl --user show-environment >/dev/null 2>&1 || die "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行" ;;
   *) die "這支只給 Linux 與 macOS；Windows 請用 install\\install.ps1" ;;
@@ -100,12 +103,12 @@ if [ "$OSN" = Darwin ]; then
   <key>StandardErrorPath</key><string>$4</string>
 </dict></plist>
 PLIST
-    launchctl bootout "gui/$(id -u)/$1" 2>/dev/null || true
-    launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$1.plist"
-    launchctl kickstart -k "gui/$(id -u)/$1"
+    launchctl bootout "$LDOM/$1" 2>/dev/null || true
+    launchctl bootstrap "$LDOM" "$HOME/Library/LaunchAgents/$1.plist"
+    launchctl kickstart -k "$LDOM/$1"
   }
   plist "$LA" "$HOME" "$HOME/xconsole_agent.py" "$ST/agent.log"
-  AGENT_LOG="tail -n 50 $ST/agent.log"
+  AGENT_LOG="tail -n 50 $ST/agent.log；launchd 的狀態：launchctl print $LDOM/$LA"
 else
   mkdir -p "$HOME/.config/systemd/user"
   cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<UNIT
@@ -135,7 +138,10 @@ for i in $(seq 1 30); do
      && curl -fsS -m 3 --cacert "$ST/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null 2>&1; then UP=yes; break; fi
   sleep 1
 done
-[ "$UP" = yes ] || die "節點代理沒有起來，請看記錄：$AGENT_LOG"
+if [ "$UP" != yes ]; then
+  [ "$OSN" = Darwin ] && launchctl print "$LDOM/$LA" 2>&1 | grep -E "state|last exit|pid|program|domain" | head -8
+  die "節點代理沒有起來，請看記錄：${AGENT_LOG}"
+fi
 "$PY" "$SRC/install/setup_local.py" --home "$HOME"
 
 if [ "$OSN" = Darwin ]; then

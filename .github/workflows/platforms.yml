@@ -104,6 +104,9 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then D='C:\ProgramData\xConsole\.xconsole'; else D="$HOME/.xconsole"; fi
           for f in agent.log console.log engines/build-llama-build.log engines/slot1-llama.log; do echo "===== $f"; tail -n 80 "$D/$f" 2>/dev/null || true; done
           [ "$RUNNER_OS" = Linux ] && { export XDG_RUNTIME_DIR="/run/user/$(id -u)"; journalctl --user -u xconsole-agent -u xconsole -n 80 --no-pager || true; }
+          if [ "$RUNNER_OS" = macOS ]; then
+            for d in "gui/$(id -u)" "user/$(id -u)"; do echo "===== launchctl print $d/tw.xcloudinfo.xconsole-agent"; launchctl print "$d/tw.xcloudinfo.xconsole-agent" 2>&1 | head -40 || true; done
+          fi
           true
       - name: 移除
         if: always()
