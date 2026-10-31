@@ -1114,6 +1114,11 @@ function capHeadline(cap) {
 }
 
 function capNote(cap) {
+  if (cap && !cap.speed_known && cap.fast) return "還不知道這台的記憶體頻寬，速度算不出來：這裡只照記憶體容量估。到「這台的設定」填頻寬，推薦會標出預估速度。";
+  if (cap?.max_fit_b > cap?.max_dense_b) {
+    return `記憶體放得下約 ${cap.max_fit_b}B 的稠密模型，但超過 ${cap.max_dense_b}B 會低於每秒 10 個 token；`
+      + "MoE 模型每次只動用一部分參數，更大的也跑得順。";
+  }
   if (cap?.max_moe_b && cap.max_moe_b > cap.max_dense_b) {
     return `顯示卡放不下時，MoE 模型會自動把部分專家層放到系統記憶體繼續跑——最大約 ${cap.max_moe_b}B（4 位元量化），只是比較慢。`;
   }
@@ -1207,7 +1212,8 @@ function hwCard(n, rec) {
   return c;
 }
 
-const recMmproj = (it) => (it.mmproj || []).find((x) => /f16/i.test(x.path)) || (it.mmproj || [])[0] || null;
+// 看圖用的投影檔由主控台挑（recommend.pick_mmproj），記憶體試算、磁碟檢查與實際下載用同一個
+const recMmproj = (it) => it.mmproj_pick || null;
 
 // 一列推薦：名稱與說明 ｜ 量化（可改） ｜ 適配程度、放在哪、預估速度 ｜ 下載／換上
 function recRow(n, it, lib, ctx) {
@@ -1430,8 +1436,10 @@ function catalogEditor(e, uses, done) {
   const fUse = selectInput(Object.entries(uses), e?.use || "chat");
   const fVendor = textInput(e?.vendor, "例：Google、云碩 xVITA");
   const fTags = textInput((e?.tags || []).join("、"), "例：繁中、看圖（最多 6 個）");
+  const fMatch = textInput(e?.match, "選填，例：coder-v2");
   f.append(fieldBox("Hugging Face 名稱", fRepo, "GGUF 的 repo；新增時會讀它的檔頭，約 5 秒"), fieldBox("顯示名稱", fTitle),
-    fieldBox("用途", fUse), fieldBox("來源", fVendor), fieldBox("標籤", fTags));
+    fieldBox("用途", fUse), fieldBox("來源", fVendor), fieldBox("標籤", fTags),
+    fieldBox("檔名要含", fMatch, "同一個 repo 放了好幾個不同模型時，只列檔名含這段字的量化；改了要勾下面的重新讀取"));
   body.appendChild(f);
   const fDesc = el("textarea");
   fDesc.value = e?.desc || "";
@@ -1445,14 +1453,15 @@ function catalogEditor(e, uses, done) {
   if (e) body.appendChild(again);
   const err = el("div");
   body.appendChild(err);
-  [fRepo, fTitle, fVendor, fTags].forEach((i) => imeGuard(i, () => {}));
+  [fRepo, fTitle, fVendor, fTags, fMatch].forEach((i) => imeGuard(i, () => {}));
   const ov = modal({ title: e ? `編輯 ${e.title || e.repo}` : "新增推薦模型", bodyNode: body, hasInput: true });
   ov.querySelector(".modal").classList.add("wide");
   const b = formButton(ov, "儲存", "primary", async () => {
     b.textContent = "儲存中…";
     try {
       await api("/api/catalog/save", { method: "POST", body: { repo: fRepo.value.trim(), title: fTitle.value.trim(), use: fUse.value,
-        vendor: fVendor.value.trim(), tags: fTags.value, desc: fDesc.value.trim(), refresh: !e || cb.checked } });
+        vendor: fVendor.value.trim(), tags: fTags.value, desc: fDesc.value.trim(), match: fMatch.value.trim(),
+        refresh: !e || cb.checked } });
     } catch (ex) { b.textContent = "儲存"; errNote(err, ex.message); return; }
     ov.remove();
     toast("已儲存", "ok");

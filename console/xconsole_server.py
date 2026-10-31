@@ -917,7 +917,8 @@ class Handler(BaseHTTPRequestHandler):
             if need_hf:
                 last = None
                 for nid in self._hf_node(body.get("node")):
-                    code, hf = call_node(nid, "/library/hf/profile", "POST", {"repo": fields["repo"]}, timeout=180)
+                    code, hf = call_node(nid, "/library/hf/profile", "POST",
+                                         {"repo": fields["repo"], "match": fields.get("match") or ""}, timeout=180)
                     if code == 200:
                         break
                     last, hf = hf.get("error") or f"代理回 {code}", None
