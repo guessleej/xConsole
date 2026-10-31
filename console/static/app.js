@@ -1483,6 +1483,8 @@ function catalogEditor(e, uses, done) {
    一次下載齊 → 產圖。產圖前一律先照三種記憶體架構試算，不夠就擋；數字全由主控台 recommend.py 與代理算。 */
 
 const SD_KIND = { image: "畫圖", video: "影片" };
+const SD_ROLE = { model: "完整模型", diffusion: "擴散模型", clip_l: "CLIP-L", clip_g: "CLIP-G", t5xxl: "T5-XXL",
+  llm: "文字編碼器", vae: "VAE", audio_vae: "音訊 VAE", connectors: "嵌入連接器" };
 const SD_SIZES = {
   image: [[512, 512], [768, 768], [1024, 1024], [1024, 768], [768, 1024], [1280, 720]],
   video: [[512, 320], [768, 512], [1024, 576], [1280, 720]],
@@ -1561,7 +1563,15 @@ function sdHead(n, rec, redraw, setSub) {
   ];
   const first = steps.findIndex((x) => !x.done);
   steps.forEach((x, i) => { x.state = x.done ? "done" : i === first ? "now" : "blocked"; });
-  c.appendChild(renderSteps(steps));
+  const box = c.appendChild(renderSteps(steps));
+  // 三步都完成就收起來，只留「3/3 步完成」一行（每天來產圖的人不需要每次看一遍安裝步驟，頁面也不會拉長）
+  if (first < 0) {
+    const g = box.querySelector(".steps");
+    g.hidden = true;
+    const t = el("button", "linkbtn", "看步驟");
+    t.onclick = () => { g.hidden = !g.hidden; t.textContent = g.hidden ? "看步驟" : "收起步驟"; };
+    box.querySelector(".steps-head").appendChild(t);
+  }
   return c;
 }
 
@@ -1648,7 +1658,7 @@ function sdRow(n, rec, it, redraw, toGen) {
     } else if (it.job) {
       act.appendChild(el("span", "small muted", `下載中 ${it.job.total ? Math.floor((it.job.done / it.job.total) * 100) : 0}%`));
     } else if (p) {
-      const b = el("button", "btn sm" + (p.level === "no" ? "" : " primary"), p.installed_id ? "補齊下載" : `下載 ${fmt(p.download_gib)} GiB`);
+      const b = el("button", "btn sm" + (p.level === "no" ? "" : " primary"), p.installed_id ? "補齊下載" : p.download_gib ? `下載 ${fmt(p.download_gib)} GiB` : "加入（檔案都在了）");
       b.disabled = p.level === "no" || !p.fits_disk;
       b.title = p.level === "no" ? "這台放不下" : !p.fits_disk ? "存放區空間不夠（另需保留 10 GiB）" : "";
       b.onclick = () => sdDownload(n, it, p);
@@ -1665,7 +1675,7 @@ function sdDownload(n, it, p) {
   d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""} 下載到 ${n.name}？共 ${p.parts.length} 個檔、${fmt(p.size_gib)} GiB；`
     + (p.download_gib < p.size_gib ? `這台已經有其中幾個共用檔，實際要下載 ${fmt(p.download_gib)} GiB：` : "全部都要下載：")));
   const ul = el("ul", "small");
-  p.parts.forEach((x) => ul.appendChild(el("li", null, `${x.role === "diffusion" || x.role === "model" ? "主體" : x.role}：${x.repo}/${x.path}（${fmt(x.size_gib, 2)} GiB）`)));
+  p.parts.forEach((x) => ul.appendChild(el("li", null, `${SD_ROLE[x.role] || x.role}：${x.repo}/${x.path}（${fmt(x.size_gib, 2)} GiB）`)));
   d.appendChild(ul);
   d.appendChild(el("p", "small muted", `${p.place}，產圖時要約 ${fmt(p.need_gib, 0)} GiB。下載在背景進行，中斷了再按一次會接續；完成後到「產生圖片與影片」。`));
   modal({ title: "下載畫圖／影片模型", bodyNode: d, confirmText: "開始下載", onConfirm: async () => {
@@ -1694,7 +1704,7 @@ function sdMine(n, rec, redraw) {
     tr.appendChild(el("td", "small nowrap", SD_KIND[m.kind]));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
     tr.appendChild(el("td", "small", m.job ? `下載中 ${m.job.total ? Math.floor((m.job.done / m.job.total) * 100) : 0}%`
-      : m.ready ? "可以用" : `缺：${m.missing.join("、")}（到推薦模型按「補齊下載」）`));
+      : m.ready ? "可以用" : `缺：${m.missing.map((r) => SD_ROLE[r] || r).join("、")}（到推薦模型按「補齊下載」）`));
     tr.appendChild(el("td", "small muted", m.measured ? sdMeasured(m.measured) : "還沒產過"));
     const td = el("td", "row-acts");
     const del = el("button", "btn sm danger", "刪除");
@@ -1960,7 +1970,7 @@ async function openSdCatalog(after) {
   const body = el("div");
   loading(body);
   const ov = modal({ title: "管理畫圖與影片清單", bodyNode: body, hasInput: true });
-  ov.querySelector(".modal").classList.add("wide");
+  ov.querySelector(".modal").classList.add("wide", "xwide");
   const changed = () => { S.sdRec = {}; };
   const draw = async () => {
     let data;
@@ -2033,7 +2043,7 @@ function sdPartsEditor(parts, roles, allowMatch) {
     const r = el("div", "sd-part");
     const fRole = selectInput(Object.entries(roles), p.role || (rows.length ? "vae" : "diffusion"));
     const fRepo = textInput(p.repo, "作者/模型");
-    const fHow = selectInput([["path", "檔名"], ["match", "檔名開頭（機器挑量化）"]], p.match ? "match" : "path");
+    const fHow = selectInput([["path", "檔名"], ["match", "檔名開頭"]], p.match ? "match" : "path");
     fHow.hidden = !allowMatch;
     const fVal = textInput(p.path || p.match, "例：vae/ae.safetensors");
     [fRepo, fVal].forEach((i) => imeGuard(i, () => {}));
@@ -2093,7 +2103,7 @@ function sdCatalogEditor(e, meta, done) {
   body.appendChild(err);
   [fRepo, fTitle, fVendor, fLic, fTags].forEach((i) => imeGuard(i, () => {}));
   const ov = modal({ title: e ? `編輯 ${e.title}` : "新增畫圖／影片模型", bodyNode: body, hasInput: true });
-  ov.querySelector(".modal").classList.add("wide");
+  ov.querySelector(".modal").classList.add("wide", "xwide");
   const b = formButton(ov, "儲存", "primary", async () => {
     b.textContent = "讀取 Hugging Face 中…";
     try {
@@ -2138,7 +2148,7 @@ async function openSdManual(n) {
   body.appendChild(err);
   imeGuard(fTitle, () => {});
   const ov = modal({ title: `手動組一顆（${n.name}）`, bodyNode: body, hasInput: true });
-  ov.querySelector(".modal").classList.add("wide");
+  ov.querySelector(".modal").classList.add("wide", "xwide");
   const b = formButton(ov, "開始下載", "primary", async () => {
     if (!cb.checked) { errNote(err, "要勾「只做內部測試」才能下載"); return; }
     const title = fTitle.value.trim();
