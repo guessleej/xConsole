@@ -3165,6 +3165,11 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
             kv_note = (f"上下文 {cfg['max_context']:,}×{cfg['parallel']}、KV {cfg['kv']} "
                        f"要先預留 {kv} GiB（沒有 --kv-grow）")
 
+    if mm == "discrete" and not p["gpus"]:
+        # 沒有 GPU 的機器（例：只用 CPU 的 Windows）：權重與 KV 全在系統記憶體，照顯存算的話永遠載不進去
+        need_ram += need_vram
+        need_vram = 0.0
+
     detail = {}
     if mm == "unified_single":
         free = round(p["unified"]["free_gib"] + max(reclaim_vram, reclaim_ram), 1)
