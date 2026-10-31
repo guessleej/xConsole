@@ -576,6 +576,15 @@ def apple_bandwidth(cpu, cores=None):
                  if re.search(rf"\b{name}\b" + ("" if " " in name else tail), cpu) and cores >= need), None)
 
 
+def spec_bandwidth(hay):
+    """名稱 → 規格書頻寬。名稱是「MI210／MI250」這種認不出是哪一張的（同一個 gfx 版本），兩種頻寬不同就回未知，
+    不拿第一個比到的充數（MI250 是 MI210 的兩倍，速度估算會整個翻倍）。"""
+    def one(h):
+        return next((v for k, v in BANDWIDTH_GBS if k.lower() in h.lower()), None)
+    vals = {one(a) for a in hay.split("／")}
+    return vals.pop() if len(vals) == 1 else None
+
+
 @functools.lru_cache(maxsize=1)
 def _chip_probe():
     cpu = cpu_name()
@@ -592,7 +601,7 @@ def _chip_probe():
         names = [cpu.split("w/", 1)[-1].strip()] if "w/" in cpu else names       # APU：顯示晶片寫在 CPU 型號裡
     gpu = names[0] if names else (board if "Jetson" in board else None)
     hay = " ".join(x for x in (gpu or "", board) if x)
-    bw = apple_bandwidth(cpu) if OS == "darwin" else next((v for k, v in BANDWIDTH_GBS if k.lower() in hay.lower()), None)
+    bw = apple_bandwidth(cpu) if OS == "darwin" else spec_bandwidth(hay)
     sug, why = suggest_memory_model(gpus)
     return {"cpu": cpu or None, "cores": os.cpu_count(), "board": board or None, "gpu": gpu,
             "gpu_count": len(gpus), "bandwidth_spec_gbs": bw, "suggest": sug, "suggest_why": why}
@@ -2015,6 +2024,11 @@ CN_ORIGIN = ("qwen", "deepseek", "glm", "chatglm", "kimi", "moonshot", "minimax"
              "internlm", "baichuan", "doubao", "ernie", "seed-oss")
 
 
+def is_mmproj(name):
+    """看圖用的投影檔：名稱裡有 mmproj 就算（有的放在前面 mmproj-F16.gguf，有的在後面 …-OCR-v1-mmproj-f16.gguf）。"""
+    return "mmproj" in os.path.basename(name).lower()
+
+
 def gguf_root(reg=None):
     reg = reg or registry()
     return expand(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
@@ -2155,8 +2169,9 @@ _META_CACHE = {}
 
 
 def _profile_cached(path):
+    # 鍵要涵蓋每一個分片：只看第一片的話，後面的分片換過（下載完成、修好）快取還是舊的
     try:
-        key = (path, os.path.getmtime(path))
+        key = tuple((sp, os.path.getmtime(sp), os.path.getsize(sp)) for sp in shard_paths(path))
     except OSError:
         return None
     if key not in _META_CACHE:
@@ -2186,10 +2201,10 @@ def scan_gguf(reg=None):
         if not os.path.isdir(full) or folder.startswith("."):
             continue
         files = sorted(f for f in os.listdir(full) if f.endswith(".gguf"))
-        mmproj = next((os.path.join(full, f) for f in files if f.lower().startswith("mmproj")), None)
+        mmproj = next((os.path.join(full, f) for f in files if is_mmproj(f)), None)
         groups = {}
         for f in files:
-            if f.lower().startswith("mmproj"):
+            if is_mmproj(f):
                 continue
             base = f[:-5]
             m = SHARD_RX.search(base)
@@ -2519,8 +2534,12 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     prev_key = load_text(engine_file(slot_id, ".key"))
     keyfile = write_llama_key(slot_id, carry_key)
     # 獨立顯卡放不下的 MoE：自動把前幾層的專家搬到系統記憶體（使用者不必自己調 --n-cpu-moe）
-    cpu_moe = auto_cpu_moe(m, reg["machine"], cards, gpu_ids, want_ctx, par,
-                           _usage_reclaim(old)[0] if old_unit and old_alive else 0.0)
+    # 舊模型釋出的顯存只算新綁定也會用到的那幾張卡：從卡 0 換到卡 1，卡 0 空出來的對卡 1 沒有幫助
+    back = 0.0
+    if old_unit and old_alive and cards:
+        split = card_split(_usage_reclaim(old)[0], old.get("gpu_ids"), cards)
+        back = sum(v for cid, v in split.items() if not gpu_ids or cid in [str(g) for g in gpu_ids])
+    cpu_moe = auto_cpu_moe(m, reg["machine"], cards, gpu_ids, want_ctx, par, back)
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
            "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
@@ -2804,7 +2823,7 @@ def hf_files(repo, token=""):
     groups, mmproj = {}, []
     for f in files:
         base = os.path.basename(f["path"])
-        if base.lower().startswith("mmproj"):
+        if is_mmproj(base):
             mmproj.append(f)
             continue
         stem = SHARD_RX.sub("", base[:-5])
@@ -2846,15 +2865,18 @@ def _remote_meta(repo, path, token=""):
     return None, 0
 
 
-def hf_profile(repo, token=""):
+def hf_profile(repo, token="", match=""):
     """不下載就知道這顆模型的底細：各量化的大小（hf_files）＋從檔頭讀出的架構、上下文、KV 與 MoE 比例。
     推薦清單靠這個算「放不放得下、多快」。比例各量化差不多，只讀一個 Q4 一帶的量化。"""
     code, info = hf_files(repo, token)
     if code != 200:
         return code, info
+    # 一個 repo 放好幾個不同的模型時（例 xGemable 同時有 coder-v2 與 Fable），只留名稱含 match 的那一家
+    if match:
+        info["choices"] = [c for c in info["choices"] if match.lower() in c["stem"].lower()]
     mains = [c for c in info["choices"] if not c["aux"]]
     if not mains:
-        return 400, {"error": "這個 repo 裡沒有 GGUF 主模型檔"}
+        return 400, {"error": f"這個 repo 裡沒有{'檔名含「' + match + '」的' if match else ''} GGUF 主模型檔"}
     pick = next((c for c in mains if (c["quant"] or "").upper().endswith("Q4_K_M")), None) or mains[len(mains) // 2]
     parts = []
     try:
@@ -2998,10 +3020,10 @@ def delete_model(model_id):
             freed += os.path.getsize(p)
             os.remove(p)
             removed.append(f)
-    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not f.lower().startswith("mmproj")]
+    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not is_mmproj(f)]
     if not rest:
         for f in os.listdir(full):
-            if f.lower().startswith("mmproj") and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
+            if is_mmproj(f) and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
                 p = inside(full, f)
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -4433,7 +4455,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/library/hf":
             return self._send(*hf_files(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
         if path == "/library/hf/profile":
-            return self._send(*hf_profile(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+            return self._send(*hf_profile(str(body.get("repo") or "").strip(), str(body.get("token") or ""),
+                                          str(body.get("match") or "")[:60]))
         if path == "/library/download":
             return self._send(*start_download(str(body.get("repo") or "").strip(), str(body.get("stem") or ""),
                                               body.get("mmproj") or None, str(body.get("token") or "")))

@@ -44,7 +44,7 @@ SEED = [
      "Meta 稠密 70B，通用能力完整；需要大記憶體與高頻寬", ["大模型"]),
     # 寫程式
     ("xCloudinfo/xGemable-12B-coder-v2-fullft-GGUF", "xGemable 12B Coder v2", "code", "云碩 xCloudinfo",
-     "以 Gemma 4 12B 全參數微調的寫程式模型，給 IDE 補全與改程式用", ["寫程式", "自家"]),
+     "以 Gemma 4 12B 全參數微調的寫程式模型，給 IDE 補全與改程式用", ["寫程式", "自家"], "coder-v2"),
     ("xCloudinfo/gpt-oss-20b-Code-xCloud-GGUF", "gpt-oss 20B Code", "code", "云碩 xCloudinfo",
      "以 gpt-oss-20b 微調的寫程式模型，回應快，適合接 Copilot 類工具", ["寫程式", "MoE", "自家"]),
     # 看圖與 OCR
@@ -55,13 +55,14 @@ SEED = [
 
 def main():
     rows = []
-    for repo, title, use, vendor, desc, tags in SEED:
-        code, hf = agent.hf_profile(repo)
+    for repo, title, use, vendor, desc, tags, *rest in SEED:
+        match = rest[0] if rest else ""                  # 同一個 repo 放了好幾個模型時，只取檔名含這段的
+        code, hf = agent.hf_profile(repo, match=match)
         if code != 200:
             sys.exit(f"{repo}：{hf.get('error')}")
         if hf["profile"].get("cn_origin"):
             sys.exit(f"{repo}：檔頭判定為中國來源，不能放進推薦清單")
-        row = {"repo": repo, "title": title, "use": use, "vendor": vendor, "desc": desc, "tags": tags,
+        row = {"repo": repo, "title": title, "use": use, "vendor": vendor, "desc": desc, "tags": tags, "match": match,
                **recommend.hf_fields(hf)}
         rows.append(row)
         p = hf["profile"]

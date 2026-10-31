@@ -110,7 +110,13 @@ def capacity(state):
     fast = out["fast"]
     out["fast"] = round(fast, 1)
     out["slow"] = round(out["slow"], 1)
-    out["max_dense_b"] = _nice((fast - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B) if fast > 6 else 0
+    # 「放得下」只看記憶體；「流暢」還要夠快：稠密模型每個 token 讀整顆，頻寬 × 效率 ÷ 10 tok/s 就是流暢的大小上限
+    fit_b = (fast - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B if fast > 6 else 0
+    bw = out["bandwidth_gbs"]
+    speed_b = EFFICIENCY * bw * 1e9 / SMOOTH_TOKS / GIB / Q4_GIB_PER_B if bw else None
+    out["max_fit_b"] = _nice(fit_b)
+    out["max_dense_b"] = _nice(min(fit_b, speed_b)) if speed_b is not None else _nice(fit_b)
+    out["speed_known"] = speed_b is not None
     out["max_moe_b"] = _nice((fast + out["slow"] - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B) if out["slow"] and fast > 6 else 0
     return out
 
@@ -132,7 +138,8 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0):
             cap["memory_model"], f"分到 {cap['cards']} 張卡" if cap["cards"] > 1 else "全部放進顯示卡")
         # 多張卡是一層接一層輪流算（llama.cpp 預設依層切），頻寬不會相加，照單張卡算
         tok = 1 / (read / (EFFICIENCY * bw * 1e9) + fixed) if bw else None
-        out.update(level="smooth", place=place, tok_s=tok)
+        # 速度不知道就不說流暢（頻寬沒填的機器），先標「能跑」
+        out.update(level="smooth" if tok is not None else "ok", place=place, tok_s=tok)
     elif cap["memory_model"] == "discrete" and cap["fast"] and prof.get("moe") and prof.get("expert_layer_frac"):
         per = prof["expert_layer_frac"] * size
         n = math.ceil((need - cap["fast"]) / per)
@@ -171,7 +178,19 @@ def pick(plans):
     four = [p for p in usable if p["bits"] == 4]
     if four:
         return min(four, key=lambda p: (-quant_pref(p["quant"]), p["size_gib"]))
-    return max(usable, key=lambda p: p["size_gib"]) if usable else None
+    if usable:
+        return max(usable, key=lambda p: p["size_gib"])
+    # repo 只放了 F16／BF16（沒有任何量化）：放得下就推它，不要整顆標成放不下
+    wide = [p for p in plans if p["level"] != "no"]
+    return min(wide, key=lambda p: p["size_gib"]) if wide else None
+
+
+def pick_mmproj(mmproj):
+    """看圖要下載哪一個投影檔：有 F16 就用 F16（品質與大小的折衷，各家都提供），沒有才挑最小的。
+    推薦算記憶體、磁碟檢查、實際下載都用這一個，數字才對得起來。"""
+    rows = mmproj or []
+    return next((x for x in rows if re.search(r"f16", x["path"], re.I) and not re.search(r"bf16", x["path"], re.I)), None) \
+        or (min(rows, key=lambda x: x["gib"]) if rows else None)
 
 
 def recommend(state, library, catalog):
@@ -186,7 +205,8 @@ def recommend(state, library, catalog):
         if not prof or not e.get("quants"):
             items.append({**_public(e), "order": i, "plans": [], "pick": None, "level": "unknown"})
             continue
-        mm = min((x["gib"] for x in e.get("mmproj") or []), default=0.0)
+        proj = pick_mmproj(e.get("mmproj"))
+        mm = proj["gib"] if proj else 0.0
         folder = repo_folder(e["repo"])
         plans = []
         for q in e["quants"]:
@@ -199,9 +219,11 @@ def recommend(state, library, catalog):
         best = pick(plans)
         mine = next((p for p in plans if p["installed_id"]), None)
         job = next((j for j in jobs if j.get("repo") == e["repo"] and j.get("state") in ("running", "queued")), None)
+        # 等級：裝好的那個量化放得下就照它；裝了一個放不下的大量化，不能把另一個放得下的小量化一起藏起來
+        lv = mine["level"] if mine and mine["level"] != "no" else (best or mine or {"level": "no"})["level"]
         items.append({**_public(e), "order": i, "plans": plans, "pick": best["stem"] if best else None,
-                      "installed": mine["stem"] if mine else None,
-                      "level": (mine or best or {"level": "no"})["level"],
+                      "installed": mine["stem"] if mine else None, "mmproj_pick": proj,
+                      "level": lv,
                       "job": {"id": job["id"], "done": job.get("done"), "total": job.get("total"),
                               "stem": job.get("stem")} if job else None})
     rank = {"smooth": 0, "ok": 1, "no": 2, "unknown": 3}
@@ -214,7 +236,7 @@ def recommend(state, library, catalog):
 
 def _public(e):
     return {k: e.get(k) for k in ("repo", "title", "use", "desc", "tags", "vendor", "license", "released",
-                                  "mmproj", "refreshed")} | {"vision": bool(e.get("mmproj")),
+                                  "mmproj", "refreshed", "match")} | {"vision": bool(e.get("mmproj")),
                                                              "profile": e.get("profile")}
 
 
@@ -253,7 +275,7 @@ class Catalog:
             if cur is None:
                 cur = {"repo": repo}
                 rows.append(cur)
-            for k in ("title", "use", "desc", "tags", "vendor"):
+            for k in ("title", "use", "desc", "tags", "vendor", "match"):
                 if k in fields:
                     cur[k] = fields[k]
             if hf:
@@ -319,4 +341,8 @@ def check_fields(body):
     if not isinstance(tags, list) or len(tags) > 6 or any(not isinstance(t, str) or len(t) > 12 for t in tags):
         return None, "標籤最多 6 個、每個 12 字以內"
     out["tags"] = tags
+    match = str(body.get("match") or "").strip()
+    if len(match) > 60 or not re.fullmatch(r"[\w.+-]*", match):
+        return None, "「檔名要含」只能填英數、底線、點、加號與連字號，最多 60 字"
+    out["match"] = match
     return out, None

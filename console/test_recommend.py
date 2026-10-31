@@ -136,6 +136,39 @@ def main():
     case("檔頭被截斷：回 None 讓呼叫端抓更多，不是給錯數字", A.gguf_meta(io.BytesIO(raw[:len(raw) - 5]), tensors=True), None)
     case("分片路徑展開", A.shard_paths("/m/x-00001-of-00003.gguf")[-1], "/m/x-00003-of-00003.gguf")
 
+    # ---- Codex 審查抓到的情況（PR #20）
+    case("頻寬未知：放得下也不標流暢", R.plan_quant(R.capacity(state("unified_single", None, floors={"ram": 12}, unified={"total_gib": 120})),
+                                          DENSE, q("Q4_K_M", 17))["level"], "ok")
+    c = R.capacity(AI395)
+    case("流暢上限把頻寬算進去：AI 395 放得下 120B，但流暢只到 24B", (c["max_fit_b"], c["max_dense_b"]), (120, 24))
+    case("頻寬未知：上限只照容量、標明速度未知", R.capacity(state("unified_single", None, floors={"ram": 12}, unified={"total_gib": 120}))["speed_known"], False)
+    only16 = [R.plan_quant(R.capacity(ADA2), DENSE, x) for x in (q("BF16", 16), q("F32", 32))]
+    case("repo 只有 16 位元：放得下就推它", (R.pick(only16) or {}).get("quant"), "BF16")
+    cat2 = [{"repo": "d/two-GGUF", "title": "兩種", "use": "chat", "profile": DENSE,
+             "quants": [q("Q4_K_M", 17), q("Q8_0", 200)]}]
+    r2 = R.recommend(ADA2, {"free_gib": 900, "gguf": [{"id": "d--two/m-Q8_0", "in_use": None}]}, cat2)
+    case("裝了放不下的大量化，不會把放得下的小量化一起藏起來", r2["items"][0]["level"], "smooth")
+    mm = [{"path": "mmproj-F32.gguf", "gib": 2.1}, {"path": "mmproj-BF16.gguf", "gib": 1.1}, {"path": "x-mmproj-f16.gguf", "gib": 1.1},
+          {"path": "mmproj-Q8_0.gguf", "gib": 0.6}]
+    case("投影檔：有 F16 用 F16（不是 BF16、也不是最小的）", R.pick_mmproj(mm)["path"], "x-mmproj-f16.gguf")
+    case("投影檔：沒有 F16 才挑最小的", R.pick_mmproj(mm[:2] + mm[3:])["path"], "mmproj-Q8_0.gguf")
+    vis = [{"repo": "v/vis-GGUF", "title": "看圖", "use": "vision", "profile": DENSE, "quants": [q("Q4_K_M", 5)], "mmproj": mm}]
+    rv = R.recommend(ADA2, {"free_gib": 900}, vis)["items"][0]
+    case("推薦算記憶體用的就是要下載的那個投影檔", (rv["mmproj_pick"]["path"], rv["plans"][0]["need_gib"] > 5 + 1.1), ("x-mmproj-f16.gguf", True))
+    case("檔名後面才有 mmproj 也認得是投影檔", (A.is_mmproj("X-OCR-v1-mmproj-f16.gguf"), A.is_mmproj("model-Q4_K_M.gguf")), (True, False))
+    case("MI210／MI250 認不出是哪一張：頻寬回未知", (A.spec_bandwidth("AMD Instinct MI210／MI250"), A.spec_bandwidth("AMD Instinct MI50／MI60")), (None, 1024))
+    case("「檔名要含」只收安全字元", R.check_fields({"repo": "a/b-GGUF", "title": "x", "match": "../x"})[1] is not None, True)
+    d2 = tempfile.mkdtemp()
+    first = os.path.join(d2, "m-00001-of-00002.gguf")
+    second = os.path.join(d2, "m-00002-of-00002.gguf")
+    for pth in (first, second):
+        open(pth, "wb").write(b"not gguf")
+    A._profile_cached(first)
+    before = len(A._META_CACHE)
+    open(second, "wb").write(b"changed, longer")
+    A._profile_cached(first)
+    case("分片模型：後面的分片換過，快取跟著失效", len(A._META_CACHE), before + 1)
+
     # ---- 管理者送來的欄位
     case("中國來源不能加入推薦清單", R.check_fields({"repo": "unsloth/Qwen3-8B-GGUF", "title": "x"})[1] is not None, True)
     case("名稱格式要對", R.check_fields({"repo": "../../etc", "title": "x"})[1] is not None, True)
