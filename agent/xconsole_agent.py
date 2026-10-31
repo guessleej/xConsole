@@ -44,6 +44,15 @@ STATE_DIR = os.path.join(HOME, ".xconsole")
 # 測試可以設 XCONSOLE_SUPERVISOR=1，在 Linux 上也走代理自己看管的那條路
 SYSTEMD = OS == "linux" and os.environ.get("XCONSOLE_SUPERVISOR") != "1"
 EXE = ".exe" if OS == "windows" else ""
+
+if OS == "windows":
+    class _NoWindowPopen(subprocess.Popen):
+        """Windows 用 pythonw 在背景跑時，每帶起一支主控台程式（nvidia-smi、tasklist、typeperf…）就會閃一個黑色視窗。
+        整支代理的子行程一律加 CREATE_NO_WINDOW，不必每個呼叫點各自記得帶。"""
+        def __init__(self, *a, **kw):
+            kw.setdefault("creationflags", 0x08000000)
+            super().__init__(*a, **kw)
+    subprocess.Popen = _NoWindowPopen
 REGISTRY = os.path.join(STATE_DIR, "registry.json")
 TOKEN_FILE = os.path.join(STATE_DIR, "token")
 PORT = int(os.environ.get("XCONSOLE_AGENT_PORT", "9401"))
@@ -63,15 +72,14 @@ DEFAULT_FLOORS = {
 
 # ---------------------------------------------------------------- 工具
 
-def sh(argv, timeout=20, env=None):
+def sh(argv, timeout=20):
     """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。
     一律傳參數清單、不經過 shell：服務名稱、路徑、主機名稱這些值不管長怎樣都不會被當成指令解讀
     （以前是組字串＋shlex.quote，漏一個 quote 就是命令注入；CodeQL py/command-line-injection）。"""
     if not isinstance(argv, (list, tuple)):
         raise TypeError("sh() 只收參數清單，不收整條指令字串")
     try:
-        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, timeout=timeout, env=env,
-                           creationflags=0x08000000 if OS == "windows" else 0)       # Windows：不要每條指令閃一個主控台視窗
+        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, timeout=timeout)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "逾時"
@@ -3771,7 +3779,12 @@ def _prebuilt_run(st, log, kind="llama"):
         if OS != "windows":
             os.chmod(exe, 0o700)               # 只有代理自己（同一個使用者）要執行它
         flag = "--version" if kind == "llama" else "--help"
-        rc, out, err = sh([exe, flag], timeout=60, env=llama_launch_env(exe) if kind == "llama" else None)
+        try:
+            vp = subprocess.run([exe, flag], capture_output=True, text=True, timeout=60,
+                                env=llama_launch_env(exe) if kind == "llama" else None)
+            rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            rc, out, err = 1, "", str(ex)
         if rc != 0:
             raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗）：{(err or out)[-200:]}")
         note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else exe}")
@@ -4084,7 +4097,7 @@ def check_llama(raw):
         return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下" if OS != "windows" else "llama-server.exe 要在代理的家目錄底下"
     if os.path.basename(p) != "llama-server" + EXE or not os.path.isfile(p) or not os.access(p, os.X_OK):
         return None, f"要指到編好的 llama-server{EXE} 執行檔"
-    rc, o, e = sh([p, "--version"], timeout=20, env=llama_launch_env(p))
+    rc, o, e = sh([p, "--version"], timeout=20)
     if rc != 0 or "version" not in (o + e):
         return None, "這支 llama-server 跑不起來（--version 失敗），可能缺函式庫"
     return p, None
