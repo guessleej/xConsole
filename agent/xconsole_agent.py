@@ -3769,7 +3769,7 @@ def _prebuilt_run(st, log, kind="llama"):
         if not os.path.isfile(exe):
             raise RuntimeError(f"壓縮檔裡找不到 {eng['target']}，官方的檔案結構可能改了")
         if OS != "windows":
-            os.chmod(exe, 0o755)
+            os.chmod(exe, 0o700)               # 只有代理自己（同一個使用者）要執行它
         flag = "--version" if kind == "llama" else "--help"
         rc, out, err = sh([exe, flag], timeout=60, env=llama_launch_env(exe) if kind == "llama" else None)
         if rc != 0:
