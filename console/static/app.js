@@ -527,6 +527,7 @@ async function openSwap(node, s, pre) {
     if (engine === "llama" && m.vision) chips.appendChild(el("span", "chip", "看圖"));
     if (m.cn_origin) chips.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
     if (engine === "llama" && m.fits_total === false) chips.appendChild(el("span", "chip bad", "這台放不下"));
+    if (engine === "llama" && m.auto_cpu_moe) chips.appendChild(el("span", "chip warn", `自動分層：${m.auto_cpu_moe} 層專家放系統記憶體`));
     if (engine === "strata" && !m.has_tokenizer) chips.appendChild(el("span", "chip", "缺 tokenizer"));
     r.appendChild(chips);
     return r;
@@ -643,13 +644,14 @@ async function viewLib() {
   if (!ok.length) return;
 
   const models = ok.flatMap(({ n, lib }) => [...(lib.strata || []), ...(lib.gguf || [])].map((m) => ({ ...m, node: n })));
+  const body = el("div", "stack");
   const steps = [
     { t: "確認存放區", why: "每台一個存放區，一顆模型一個資料夾；剩餘空間要夠放模型",
-      done: ok.every(({ lib }) => lib.free_gib > 20), go: ["到存放區", () => $("#lib-store")?.scrollIntoView({ behavior: "smooth" })] },
-    { t: "下載或放入模型", why: "貼 Hugging Face 名稱下載，或自己複製 GGUF 進存放區",
-      done: models.length > 0, go: ["到下載", () => $("#lib-dl")?.scrollIntoView({ behavior: "smooth" })] },
-    { t: "換上欄位", why: "在下面清單按「換上」；跨引擎會自動接手同一個埠，IDE 的網址不用改",
-      done: models.some((m) => m.in_use), go: ["到清單", () => $("#lib-installed")?.scrollIntoView({ behavior: "smooth" })] },
+      done: ok.every(({ lib }) => lib.free_gib > 20), go: ["到存放區", () => paint("store")] },
+    { t: "挑一顆下載", why: "照這台的記憶體推薦、標好速度與放不放得下；也可以貼 Hugging Face 名稱或自己放 GGUF",
+      done: models.length > 0, go: ["看推薦", () => paint("rec")] },
+    { t: "換上欄位", why: "在已安裝的清單按「換上」；跨引擎會自動接手同一個埠，IDE 的網址不用改",
+      done: models.some((m) => m.in_use), go: ["到已安裝", () => paint("installed")] },
     { t: "到 API 串接實測", why: "換完會自動帶過去；按「實測一次」確認 IDE 連得上", done: false, optional: true,
       go: ["到 API 串接", () => go("apis")] },
   ];
@@ -657,7 +659,65 @@ async function viewLib() {
   steps.forEach((x, i) => { x.state = x.done ? "done" : x.optional ? "skip" : i === first ? "now" : "blocked"; });
   head.appendChild(renderSteps(steps));
 
-  /* ---- 已安裝 */
+  const jobs = ok.map(({ n, lib }) => ({ n, jobs: lib.downloads || [] })).filter((x) => x.jobs.length);
+  if (jobs.some((x) => x.jobs.some(jobActive))) {
+    const jc = libJobsCard(jobs);
+    wrap.appendChild(jc);
+    watchLibJobs(v, jc, jobs);
+  }
+  const tabs = el("div", "tabbar lib-tabs");
+  wrap.append(tabs, body);
+
+  // 分頁只重畫下面那一塊，不重新向各機要資料
+  function paint(tab) {
+    S.libTab = tab;
+    tabs.textContent = "";
+    [["rec", "推薦模型"], ["installed", `已安裝（${models.length}）`], ["hf", "從 Hugging Face 下載"], ["store", "存放區"]].forEach(([k, label]) => {
+      const b = el("button", null, label);
+      if (k === tab) b.setAttribute("aria-current", "true");
+      b.onclick = () => paint(k);
+      tabs.appendChild(b);
+    });
+    body.textContent = "";
+    if (tab === "rec") libRec(body, ok, only, v);
+    else if (tab === "installed") body.appendChild(libInstalledCard(ok, models, jobs));
+    else if (tab === "hf") {
+      const pair = el("div", "grid pair");
+      pair.append(libDownloadCard(ok, only), libManualCard(ok));
+      body.appendChild(pair);
+    } else body.appendChild(libStoreCard(ok));
+    reveal(body);
+  }
+  paint(["rec", "installed", "hf", "store"].includes(S.libTab) ? S.libTab : "rec");
+  reveal(main);
+}
+
+async function libRec(body, ok, only, v) {
+  const pickN = only ? ok[0] : ok.find((x) => x.n.id === S.recNode) || ok[0];
+  if (ok.length > 1 && !only) {
+    const sel = el("div", "tabbar rec-for");
+    sel.appendChild(el("span", "small muted", "推薦給："));
+    ok.forEach(({ n }) => {
+      const b = el("button", null, n.name);
+      if (n.id === pickN.n.id) b.setAttribute("aria-current", "true");
+      b.onclick = () => { S.recNode = n.id; body.textContent = ""; libRec(body, ok, only, v); };
+      sel.appendChild(b);
+    });
+    body.appendChild(sel);
+  }
+  const holder = el("div", "stack");
+  body.appendChild(holder);
+  loading(holder);
+  let rec;
+  try { rec = await getRec(pickN.n.id); } catch (ex) { errNote(holder, ex.message); return; }
+  if (S.view !== v || !holder.isConnected) return;
+  holder.textContent = "";
+  const n = S.fleet.nodes.find((x) => x.id === pickN.n.id) || pickN.n;
+  holder.append(hwCard(n, rec), recList(n, rec, pickN.lib, { after: viewLib }));
+  reveal(holder);
+}
+
+function libInstalledCard(ok, models, jobs) {
   const ic = card("已安裝的模型", `${models.length} 顆`);
   ic.id = "lib-installed";
   const sb = el("div", "scrollbox");
@@ -672,7 +732,7 @@ async function viewLib() {
     if (ok.length > 1) tr.appendChild(el("td", null, n.name));
     tr.appendChild(el("td", null, m.engine === "llama" ? "llama.cpp" : "Strata"));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
-    tr.appendChild(el("td", "small", m.engine === "llama" ? `${m.arch}／${int(m.ctx_train)}${m.vision ? "・看圖" : ""}` : "Qwen3.8-Flash-Next"));
+    tr.appendChild(el("td", "small", m.engine === "llama" ? `${m.arch}／${int(m.ctx_train)}${m.vision ? "・看圖" : ""}${m.moe ? "・MoE" : ""}` : "Qwen3.8-Flash-Next"));
     tr.appendChild(el("td", "small", m.cn_origin ? "中國來源・政府案不可用" : "—"));
     const slot = (n.state?.slots || []).find((x) => x.id === m.in_use);
     tr.appendChild(el("td", "small", m.in_use ? (slot ? `${slot.role}・${slot.tier || ""}` : m.in_use) : "—"));
@@ -691,6 +751,7 @@ async function viewLib() {
         d.appendChild(el("p", "note bad", `會從 ${n.name} 的磁碟永久刪除 ${m.folder}/ 裡這顆模型的檔案（約 ${fmt(m.size_gib)} GiB），無法復原。`));
         modal({ title: `刪除 ${m.name}${m.quant ? " " + m.quant : ""}`, bodyNode: d, confirmText: "永久刪除", danger: true, onConfirm: async () => {
           try { const r = await api(`/api/node/${n.id}/library/delete`, { method: "POST", body: { id: m.id } }); toast(`已刪除，釋出 ${r.freed_gib} GiB`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          if (S.rec) delete S.rec[n.id];
           viewLib();
         } });
       };
@@ -701,7 +762,7 @@ async function viewLib() {
   });
   if (!models.length) {
     const tr = el("tr");
-    const td = el("td", null, "還沒有模型。用上面的下載，或照「手動放入」把 GGUF 複製進存放區。");
+    const td = el("td", null, "還沒有模型。到「推薦模型」挑一顆下載，或照「從 Hugging Face 下載」的手動放入把 GGUF 複製進存放區。");
     td.colSpan = cols.length;
     tr.appendChild(td);
     tbody.appendChild(tr);
@@ -710,32 +771,35 @@ async function viewLib() {
   sb.appendChild(tb);
   ic.appendChild(sb);
   ok.forEach(({ n, lib }) => (lib.problems || []).forEach((x) => ic.appendChild(el("p", "note warn", `${n.name}　${x.name}：${x.missing}`))));
-  wrap.appendChild(ic);
+  // 已結束的下載紀錄（失敗的原因）放在這裡看；進行中的在頁首另有一張即時更新的卡
+  if (jobs.length && !jobs.some((x) => x.jobs.some(jobActive))) ic.appendChild(libJobsCard(jobs));
+  return ic;
+}
 
-  const jobs = ok.map(({ n, lib }) => ({ n, jobs: lib.downloads || [] })).filter((x) => x.jobs.length);
-  if (jobs.length) {
-    const jc = libJobsCard(jobs);
-    wrap.appendChild(jc);
-    watchLibJobs(v, jc, jobs);
-  }
-  /* ---- 下載 ｜ 手動放入 */
-  const pair = el("div", "grid pair");
-  wrap.appendChild(pair);
-  pair.appendChild(libDownloadCard(ok, only));
-  pair.appendChild(libManualCard(ok));
-
-  /* ---- 存放區（每台一列） */
+function libStoreCard(ok) {
   const sc = card("存放區", ok.length > 1 ? `${ok.length} 台` : "");
   sc.id = "lib-store";
   const stb = el("table", "api-table");
-  stb.innerHTML = "<thead><tr><th>機器</th><th>存放區</th><th class='num'>剩餘空間</th><th>llama.cpp</th></tr></thead>";
+  stb.innerHTML = "<thead><tr><th>機器</th><th>存放區</th><th class='num'>剩餘空間</th><th>硬碟</th><th>llama.cpp</th><th></th></tr></thead>";
   const sbody = el("tbody");
   ok.forEach(({ n, lib }) => {
     const tr = el("tr");
     tr.appendChild(el("td", null, n.name));
     tr.appendChild(el("td", "mono", lib.root));
     tr.appendChild(el("td", "num", `${fmt(lib.free_gib, 0)} / ${fmt(lib.total_gib, 0)} GiB`));
-    tr.appendChild(el("td", lib.llama_server ? "small" : "small bad-t", lib.llama_server ? "找得到" : "找不到 llama-server，GGUF 還不能啟動"));
+    tr.appendChild(el("td", "small" + (lib.hdd ? " bad-t" : ""), lib.hdd === true ? "機械硬碟（載入慢）" : lib.hdd === false ? "固態硬碟" : "—"));
+    const tdl = el("td", lib.llama_server ? "small" : "small bad-t", lib.llama_server ? "找得到" : "找不到 llama-server，GGUF 還不能啟動");
+    if (!lib.llama_server) {
+      const b = el("button", "btn sm primary", "一鍵安裝");
+      b.onclick = () => openLlamaBuild(n.id);
+      tdl.appendChild(b);
+    }
+    tr.appendChild(tdl);
+    const set = el("td", "row-acts");
+    const sb = el("button", "btn sm", "更改");
+    sb.onclick = () => openMachineSettings(n.id);
+    set.appendChild(sb);
+    tr.appendChild(set);
     sbody.appendChild(tr);
   });
   stb.appendChild(sbody);
@@ -743,9 +807,7 @@ async function viewLib() {
   ssb.appendChild(stb);
   sc.appendChild(ssb);
   sc.appendChild(el("p", "small muted", "Strata 引擎只跑 Qwen3.8-Flash-Next 家族，由 Strata 的 setup.sh 安裝；其他模型都是 GGUF，走 llama.cpp。"));
-  wrap.appendChild(sc);
-
-  reveal(main);
+  return sc;
 }
 
 function libDownloadCard(ok, only) {
@@ -947,6 +1009,7 @@ function watchLibJobs(view, jc, entries) {
     if (S.view !== view || !jc.isConnected) return;
     if (!now.some((x) => x.jobs.some(jobActive))) {
       if (document.querySelector(".overlay")) { watchLibJobs(view, jc, entries); return; }   // 有彈窗開著就晚點再重畫
+      S.rec = {};                          // 推薦列上的「下載中」要變成「換上」
       viewLib();
       return;
     }
@@ -954,6 +1017,374 @@ function watchLibJobs(view, jc, entries) {
     jc.replaceWith(fresh);
     watchLibJobs(view, fresh, now);
   }, 3000);
+}
+
+/* ================================================================ 推薦模型
+   參考 LocModel 的做法：先讀懂這台（晶片、記憶體、頻寬、存放區）→ 依記憶體算出每顆模型放不放得下、
+   放在哪、大概多快、該下載哪個量化 → 一鍵下載 → 換上欄位。數字全由主控台 recommend.py 算，畫面不自己算。 */
+
+const LEVEL = { smooth: ["流暢", "ok"], ok: ["能跑", "warn"], no: ["放不下", "idle"], unknown: ["待更新", "idle"] };
+
+async function getRec(nid, fresh) {
+  S.rec = S.rec || {};
+  const c = S.rec[nid];
+  if (!fresh && c && Date.now() - c.at < 60000) return c.data;
+  const data = await api(`/api/node/${nid}/recommend`);
+  S.rec[nid] = { at: Date.now(), data };
+  return data;
+}
+
+function capHeadline(cap) {
+  if (!cap) return "還讀不到這台的記憶體";
+  if (!cap.fast) return cap.memory_model === "discrete" && !cap.cards ? "這台沒有 GPU" : "記憶體扣掉底線後放不下推薦的模型";
+  return cap.max_dense_b ? `流暢執行 ${cap.max_dense_b}B 以內的模型` : "適合跑 4B 以下的小模型";
+}
+
+function capNote(cap) {
+  if (cap?.max_moe_b && cap.max_moe_b > cap.max_dense_b) {
+    return `顯示卡放不下時，MoE 模型會自動把部分專家層放到系統記憶體繼續跑——最大約 ${cap.max_moe_b}B（4 位元量化），只是比較慢。`;
+  }
+  return cap?.note || "";
+}
+
+// 一條橫向分層長條：越左越快。marker＝推薦模型要占多少，標在長條上
+function tierBar(cap, marker) {
+  const box = el("div", "tier");
+  const total = cap.tiers.reduce((a, t) => a + Math.max(t.gib, 0), 0) || 1;
+  if (marker) {
+    const pos = Math.min(100, (marker.gib / total) * 100);
+    const m = el("div", "tier-mark");
+    m.style.left = `clamp(0px, calc(${pos}% - 1px), calc(100% - 2px))`;
+    m.appendChild(el("span", "tier-tag", `${marker.label}・${fmt(marker.gib, 0)} GiB`));
+    box.appendChild(m);
+  }
+  const bar = el("div", "tier-bar");
+  cap.tiers.forEach((t) => {
+    const seg = el("div", "tier-seg " + t.kind);
+    seg.style.flex = `${Math.max(t.gib, total * 0.08)} 1 0`;
+    seg.appendChild(el("b", null, t.label));
+    seg.appendChild(el("span", null, `${fmt(t.gib, 0)} GiB`));
+    bar.appendChild(seg);
+  });
+  box.appendChild(bar);
+  box.appendChild(el("div", "small muted", cap.memory_model === "discrete" && cap.slow
+    ? "模型先放進顯示卡，放不下的專家層依序放到系統記憶體。越靠左越快。"
+    : cap.memory_model === "unified_split" ? "模型放 GPU 那一塊；系統那一塊只給引擎，吃爆會拖死整台，載入前一律先試算。"
+      : "載入前先試算載完最壞剩多少，低於保留量就擋下，不會把整台拖死。"));
+  return box;
+}
+
+// 這台的硬體卡：左邊「能跑多大」＋分層長條，右邊硬體摘要
+function hwCard(n, rec) {
+  const st = n.state;
+  const cap = rec.capacity;
+  const c = el("section", "card hw rv");
+  const left = el("div", "hw-main");
+  left.appendChild(el("h2", null, capHeadline(cap)));
+  left.appendChild(el("p", "small muted", capNote(cap)));
+  if (mmUnsure(n)) {
+    const w = el("div", "note warn");
+    w.appendChild(document.createTextNode(`記憶體架構還沒確認：現在照「${MEM_LABEL[st.pools.memory_model]}」算，`
+      + `偵測建議是「${MEM_LABEL[st.chip.suggest]}」。架構不對，推薦與載入前的試算都會不準。`));
+    const b = el("button", "btn sm primary", "確認記憶體架構");
+    b.onclick = () => openMachineSettings(n.id);
+    w.appendChild(b);
+    left.appendChild(w);
+  }
+  const feat = rec.items.find((x) => x.repo === rec.featured);
+  const fp = feat?.plans.find((p) => p.stem === (feat.installed || feat.pick));
+  if (cap.tiers.length) left.appendChild(tierBar(cap, fp ? { label: feat.title, gib: fp.need_gib } : null));
+  c.appendChild(left);
+
+  const right = el("div", "hw-side");
+  const ch = rec.chip || {};
+  const p = st.pools;
+  const row = (k, v, sub, act) => {
+    const r = el("div", "hw-row");
+    r.appendChild(el("span", "k", k));
+    const d = el("div", "v");
+    d.appendChild(el("div", null, v));
+    if (sub || act) {
+      const sd = el("div", "small muted", sub || "");
+      if (act) { sd.append("　"); sd.appendChild(act); }       // 「更改」跟說明同一行，右欄不要比左欄高一截
+      d.appendChild(sd);
+    }
+    r.appendChild(d);
+    right.appendChild(r);
+  };
+  const link = (t, fn) => { const a = el("button", "linkbtn", t); a.onclick = fn; return a; };
+  const g = p.unified || p.vram;
+  row(p.memory_model === "discrete" ? "顯示卡" : "晶片", ch.gpu || "認不出型號",
+    g ? `${p.memory_model === "unified_single" ? "統一記憶體" : "顯示記憶體"} ${fmt(g.total_gib, 0)} GiB，已用 ${fmt(g.used_gib, 1)} GiB` +
+      (cap.cards > 1 ? `（${cap.cards} 張）` : "") : "");
+  row("處理器", ch.cpu || "—", ch.cores ? `${ch.cores} 執行緒` : "");
+  if (p.memory_model !== "unified_single") row("系統記憶體", `${fmt(p.ram.total_gib, 0)} GiB`, `可用 ${fmt(p.ram.free_gib, 1)} GiB`);
+  row("記憶體頻寬", ch.bandwidth_gbs ? `${ch.bandwidth_gbs} GB/s` : "未知",
+    ch.bandwidth_gbs ? ch.bandwidth_src : "估不出速度，請到這台的設定填", link("更改", () => openMachineSettings(n.id)));
+  if (rec.store) {
+    row("模型存放區", rec.store.root, `剩 ${fmt(rec.store.free_gib, 0)} GiB${rec.store.hdd === true ? "，機械硬碟（大模型載入會很慢）" : rec.store.hdd === false ? "，固態硬碟" : ""}`,
+      link("更改", () => openMachineSettings(n.id)));
+  }
+  const again = link("重新偵測", async () => {
+    try { await getRec(n.id, true); toast("已重新讀取", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+    render();
+  });
+  right.appendChild(again);
+  c.appendChild(right);
+  return c;
+}
+
+const recMmproj = (it) => (it.mmproj || []).find((x) => /f16/i.test(x.path)) || (it.mmproj || [])[0] || null;
+
+// 一列推薦：名稱與說明 ｜ 量化（可改） ｜ 適配程度、放在哪、預估速度 ｜ 下載／換上
+function recRow(n, it, lib, ctx) {
+  const row = el("div", "rec-row");
+  const draw = (stem) => {
+    row.textContent = "";
+    const p = it.plans.find((x) => x.stem === stem);
+    const main = el("div", "rec-main");
+    const t = el("div", "rec-title");
+    t.appendChild(el("b", null, it.title));
+    (it.tags || []).slice(0, 3).forEach((x) => t.appendChild(el("span", "chip" + (x === "自家" ? " brand" : ""), x)));
+    if (it.released) {
+      const [y, mo] = it.released.split("-");
+      t.appendChild(el("span", "small muted", mo ? `${y} 年 ${Number(mo)} 月發布` : `${y} 年發布`));
+    }
+    main.appendChild(t);
+    main.appendChild(el("div", "small muted", [it.vendor, it.license && `授權 ${it.license}`, it.desc].filter(Boolean).join("・")));
+    row.appendChild(main);
+
+    const q = el("div", "rec-quant");
+    if (!it.plans.length) {
+      q.appendChild(el("span", "small muted", "還沒從 Hugging Face 讀到大小"));
+    } else if (ctx.compact) {
+      q.appendChild(el("b", "mono", p?.quant || "單一檔案"));
+      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib)} GiB` : ""));
+    } else {
+      const sel = el("select");
+      it.plans.forEach((x) => {
+        const tag = [x.stem === it.pick && "推薦", x.installed_id && "已下載", x.level === "no" && "放不下"].filter(Boolean).join("・");
+        const o = el("option", null, `${x.quant || "單一檔案"}${tag ? "（" + tag + "）" : ""}`);
+        o.value = x.stem;
+        sel.appendChild(o);
+      });
+      sel.value = stem;
+      sel.onchange = () => draw(sel.value);
+      q.appendChild(sel);
+      q.appendChild(el("span", "small muted", p ? `共 ${fmt(p.size_gib + (it.vision ? recMmproj(it)?.gib || 0 : 0))} GiB` : ""));
+    }
+    row.appendChild(q);
+
+    const fit = el("div", "rec-fit");
+    const [lbl, cls] = LEVEL[p?.level || it.level] || LEVEL.unknown;
+    fit.appendChild(el("span", "chip " + cls, lbl));
+    if (p) {
+      fit.appendChild(el("span", "small", p.place));
+      fit.appendChild(el("span", "small muted mono", p.tok_s != null ? `約 ${fmt(p.tok_s, 0)} tok/s` : "速度未知"));
+    }
+    row.appendChild(fit);
+
+    const act = el("div", "rec-act");
+    const libM = p?.installed_id && (lib?.gguf || []).find((m) => m.id === p.installed_id);
+    if (p?.in_use) {
+      act.appendChild(el("span", "chip ok", "使用中"));
+    } else if (libM) {
+      const b = el("button", "btn sm primary", "換上");
+      b.onclick = () => libSwapIn(n, libM);
+      act.appendChild(b);
+    } else if (it.job) {
+      act.appendChild(el("span", "small muted", `下載中 ${it.job.total ? Math.floor((it.job.done / it.job.total) * 100) : 0}%`));
+    } else if (p) {
+      const mm = it.vision ? recMmproj(it) : null;
+      const total = p.size_gib + (mm?.gib || 0);
+      const b = el("button", "btn sm" + (p.level === "no" ? "" : " primary"), `下載 ${fmt(total)} GiB`);
+      b.disabled = p.level === "no" || !p.fits_disk;
+      b.title = p.level === "no" ? "這台放不下" : !p.fits_disk ? "存放區空間不夠（另需保留 10 GiB）" : "";
+      b.onclick = () => recDownload(n, it, p, mm, ctx);
+      act.appendChild(b);
+    }
+    row.appendChild(act);
+  };
+  draw(it.installed || it.pick || it.plans[0]?.stem);
+  return row;
+}
+
+function recDownload(n, it, p, mm, ctx) {
+  const d = el("div");
+  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""}（${fmt(p.size_gib)} GiB${mm ? `，含看圖用的 mmproj ${fmt(mm.gib)} GiB` : ""}）下載到 ${n.name}？`));
+  d.appendChild(el("p", "small muted", `${p.place}，預估約 ${p.tok_s != null ? fmt(p.tok_s, 0) + " tok/s" : "（速度未知）"}。下載在背景進行，中斷了再按一次會接續；完成後在清單上按「換上」。`));
+  modal({ title: "下載模型", bodyNode: d, confirmText: "開始下載", onConfirm: async () => {
+    try {
+      await api(`/api/node/${n.id}/library/download`, { method: "POST", body: { repo: it.repo, stem: p.stem, mmproj: mm?.path || null } });
+      toast("已開始下載", "ok");
+    } catch (ex) { toast(ex.message, "bad"); return; }
+    if (S.rec) delete S.rec[n.id];
+    ctx.after?.();
+  } });
+}
+
+// 推薦清單（模型庫的「推薦模型」分頁）：用途篩選、預設藏起放不下的，清單在區塊內捲動
+function recList(n, rec, lib, ctx) {
+  const c = card(`為 ${n.name} 推薦`, `${rec.items.length} 顆`);
+  c.classList.add("rv");
+  const head = c.querySelector(".card-head");
+  head.appendChild(el("span", "spacer"));
+  const mg = el("button", "btn sm", "管理推薦清單");
+  mg.onclick = openCatalog;
+  head.appendChild(mg);
+
+  const bar = el("div", "tabbar");
+  const list = el("div", "rec-list");
+  const uses = [["all", "全部"], ["chat", "對話與知識"], ["code", "寫程式"], ["vision", "看圖與 OCR"]];
+  const fill = () => {
+    bar.textContent = "";
+    uses.forEach(([k, label]) => {
+      const b = el("button", null, label);
+      if ((S.recUse || "all") === k) b.setAttribute("aria-current", "true");
+      b.onclick = () => { S.recUse = k; fill(); };
+      bar.appendChild(b);
+    });
+    const tg = el("button", null, S.recAll ? "隱藏放不下的" : "也顯示放不下的");
+    tg.onclick = () => { S.recAll = !S.recAll; fill(); };
+    bar.appendChild(tg);
+    list.textContent = "";
+    const rank = { smooth: 0, ok: 1, no: 2, unknown: 3 };
+    const rows = rec.items.filter((x) => (S.recUse || "all") === "all" || x.use === S.recUse)
+      .filter((x) => S.recAll || x.level !== "no")
+      .sort((a, b) => rank[a.level] - rank[b.level] || a.order - b.order);
+    rows.forEach((it) => list.appendChild(recRow(n, it, lib, ctx)));
+    if (!rows.length) list.appendChild(el("p", "small muted", S.recAll ? "推薦清單是空的，按「管理推薦清單」新增。" : "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。"));
+  };
+  fill();
+  c.append(bar, list);
+  const a = rec.assumptions;
+  c.appendChild(el("p", "small muted", `速度是估算：記憶體頻寬 × ${Math.round(a.efficiency * 100)}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），`
+    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；實際以 API 串接的實測為準。推薦清單不含中國來源模型（政府案不得使用）。`));
+  return c;
+}
+
+// 精簡版（總覽）：硬體卡＋前三名
+function recTop(n, rec, lib, ctx) {
+  const c = card("為這台機器推薦");
+  c.classList.add("rv");
+  const head = c.querySelector(".card-head");
+  head.appendChild(el("span", "spacer"));
+  const all = el("button", "btn sm", "全部模型");
+  all.onclick = () => { S.libTab = "rec"; go("lib:" + n.id); };
+  head.appendChild(all);
+  const top = rec.top.map((r) => rec.items.find((x) => x.repo === r)).filter(Boolean);
+  top.forEach((it) => c.appendChild(recRow(n, it, lib, { ...ctx, compact: true })));
+  if (!top.length) c.appendChild(el("p", "small muted", "推薦清單裡沒有這台放得下的模型。"));
+  return c;
+}
+
+// 推薦清單的管理（管理者在網頁上增改刪；大小與架構由代理讀 Hugging Face 檔頭）
+async function openCatalog() {
+  const body = el("div");
+  loading(body);
+  const ov = modal({ title: "管理推薦清單", bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  const after = () => { S.rec = {}; };
+  const draw = async () => {
+    let data;
+    try { data = await api("/api/catalog"); } catch (ex) { errNote(body, ex.message); return; }
+    body.textContent = "";
+    body.appendChild(el("p", "small muted", "這份清單決定每台機器的「推薦模型」列出哪些；順序就是同等級時的排列先後。"
+      + "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型不能加入。"));
+    const sb = el("div", "scrollbox cat-box");
+    const tb = el("table", "api-table");
+    tb.innerHTML = "<thead><tr><th>名稱</th><th>Hugging Face</th><th>用途</th><th>量化</th><th>更新於</th><th></th></tr></thead>";
+    const tbody = el("tbody");
+    data.items.forEach((e, i) => {
+      const tr = el("tr");
+      tr.appendChild(el("td", "cat-name", e.title || e.repo));
+      tr.appendChild(el("td", "mono small", e.repo));
+      tr.appendChild(el("td", "small nowrap", data.uses[e.use] || "—"));
+      tr.appendChild(el("td", "small nowrap", e.quants?.length ? `${e.quants.length} 種` : "還沒讀到"));
+      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString("zh-TW") : "—"));
+      const td = el("td", "row-acts");
+      const mv = (t, step, dis) => {
+        const b = el("button", "btn sm", t);
+        b.disabled = dis;
+        b.onclick = async () => {
+          try { await api("/api/catalog/move", { method: "POST", body: { repo: e.repo, step } }); } catch (ex) { toast(ex.message, "bad"); }
+          after(); draw();
+        };
+        return b;
+      };
+      const ed = el("button", "btn sm", "編輯");
+      ed.onclick = () => catalogEditor(e, data.uses, () => { after(); draw(); });
+      const del = el("button", "btn sm danger", "移除");
+      del.onclick = () => modal({ title: `移除 ${e.title || e.repo}`, bodyNode: el("p", null, "只從推薦清單拿掉；已經下載到各台的模型不受影響。"),
+        confirmText: "移除", danger: true, onConfirm: async () => {
+          try { await api("/api/catalog/delete", { method: "POST", body: { repo: e.repo } }); toast("已移除", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          after(); draw();
+        } });
+      td.append(mv("上移", -1, i === 0), mv("下移", 1, i === data.items.length - 1), ed, del);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    tb.appendChild(tbody);
+    sb.appendChild(tb);
+    body.appendChild(sb);
+    const row = el("div", "slot-actions");
+    const add = el("button", "btn sm primary", "新增模型");
+    add.onclick = () => catalogEditor(null, data.uses, () => { after(); draw(); });
+    const all = el("button", "btn sm", "全部從 Hugging Face 重新讀取");
+    all.onclick = async () => {
+      all.disabled = true;
+      all.textContent = "讀取中，一顆約 5 秒…";
+      try {
+        const r = await api("/api/catalog/refresh-all", { method: "POST", body: {} });
+        toast(r.errors?.length ? `更新 ${r.updated.length} 顆；${r.errors.join("；")}` : `已更新 ${r.updated.length} 顆`, r.errors?.length ? "bad" : "ok");
+      } catch (ex) { toast(ex.message, "bad"); }
+      after(); draw();
+    };
+    row.append(add, el("span", "spacer"), all);
+    body.appendChild(row);
+  };
+  ov.querySelector(".actions .btn").textContent = "關閉";
+  ov.querySelector(".actions .btn").addEventListener("click", () => render());
+  draw();
+}
+
+function catalogEditor(e, uses, done) {
+  const body = el("div");
+  const f = el("div", "form-row");
+  const fRepo = textInput(e?.repo, "例：unsloth/gemma-4-E4B-it-GGUF");
+  fRepo.disabled = !!e;
+  const fTitle = textInput(e?.title, "畫面上顯示的名稱，例：Gemma 4 E4B");
+  const fUse = selectInput(Object.entries(uses), e?.use || "chat");
+  const fVendor = textInput(e?.vendor, "例：Google、云碩 xVITA");
+  const fTags = textInput((e?.tags || []).join("、"), "例：繁中、看圖（最多 6 個）");
+  f.append(fieldBox("Hugging Face 名稱", fRepo, "GGUF 的 repo；新增時會讀它的檔頭，約 5 秒"), fieldBox("顯示名稱", fTitle),
+    fieldBox("用途", fUse), fieldBox("來源", fVendor), fieldBox("標籤", fTags));
+  body.appendChild(f);
+  const fDesc = el("textarea");
+  fDesc.value = e?.desc || "";
+  fDesc.placeholder = "一句話：這顆擅長什麼、適合誰用（最多 160 字）";
+  body.appendChild(fieldBox("說明", fDesc));
+  const again = el("label", "check-row");
+  const cb = el("input");
+  cb.type = "checkbox";
+  cb.checked = !e;
+  again.append(cb, document.createTextNode(" 儲存時重新從 Hugging Face 讀大小與架構"));
+  if (e) body.appendChild(again);
+  const err = el("div");
+  body.appendChild(err);
+  [fRepo, fTitle, fVendor, fTags].forEach((i) => imeGuard(i, () => {}));
+  const ov = modal({ title: e ? `編輯 ${e.title || e.repo}` : "新增推薦模型", bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  const b = formButton(ov, "儲存", "primary", async () => {
+    b.textContent = "儲存中…";
+    try {
+      await api("/api/catalog/save", { method: "POST", body: { repo: fRepo.value.trim(), title: fTitle.value.trim(), use: fUse.value,
+        vendor: fVendor.value.trim(), tags: fTags.value, desc: fDesc.value.trim(), refresh: !e || cb.checked } });
+    } catch (ex) { b.textContent = "儲存"; errNote(err, ex.message); return; }
+    ov.remove();
+    toast("已儲存", "ok");
+    done();
+  });
 }
 
 async function doAction(node, s, action) {
@@ -1489,12 +1920,27 @@ function viewOverview() {
   hero.appendChild(hw);
 
   const wrap = el("div", "wrap");
-  if (!nodes.length) {
-    const c = card("還沒有納管任何機器", "加一台機器之後，這裡會列出每台的記憶體與正在跑的模型");
-    const b = el("button", "btn primary", "加一台機器");
-    b.onclick = openAddMachine;
-    c.appendChild(b);
-    wrap.appendChild(c);
+  // 從零到跑起來的三步（LocModel 的開場）：全部完成就收起來，已經設好的機群不佔版面
+  const steps = fleetSteps();
+  if (steps.some((x) => !x.done)) {
+    const sc = el("section", "card rv");
+    sc.appendChild(renderSteps(steps));
+    wrap.appendChild(sc);
+    const b = online.find((n) => n.state.engine?.building);
+    if (b) watchBuild(sc, b);
+  }
+  // 只有一台（單機版交機的情況）：直接在總覽讀懂這台、看推薦
+  if (online.length === 1) {
+    const n = online[0];
+    const cached = S.rec?.[n.id];
+    if (cached) {
+      wrap.appendChild(hwCard(n, cached.data));
+      wrap.appendChild(recTop(n, cached.data, cached.lib, { after: () => { S.libTab = "rec"; go("lib:" + n.id); } }));
+    }
+    if (!cached || Date.now() - cached.at > 60000) {
+      Promise.all([getRec(n.id, true), api(`/api/node/${n.id}/library`).catch(() => null)])
+        .then(([, lib]) => { S.rec[n.id].lib = lib; if (S.view === "overview") quietRender(); }).catch(() => {});
+    }
   }
   for (const [gname, gnodes] of groups()) {
     const card = el("section", "card rv");
@@ -1512,6 +1958,58 @@ function viewOverview() {
   main.appendChild(hero);
   main.appendChild(wrap);
   reveal(main);
+}
+
+// 記憶體架構沒確認、又跟偵測建議不同：推薦與准入都照錯的架構在算
+const mmUnsure = (n) => !n.state.machine.confirmed && n.state.chip?.suggest && n.state.chip.suggest !== n.state.pools.memory_model;
+
+function fleetSteps() {
+  const nodes = S.fleet.nodes;
+  const on = nodes.filter((n) => n.online);
+  const unsure = on.find(mmUnsure);
+  const noEng = on.find((n) => n.state.engine && !n.state.engine.llama_server);
+  const building = on.find((n) => n.state.engine?.building);
+  const running = on.some((n) => n.state.slots.some((s) => s.busy && (s.kind === "llama" || s.kind === "strata")));
+  const chipOf = (n) => n.state.chip?.gpu || n.name;
+  const steps = [
+    { t: "檢測硬體", done: on.length > 0 && !unsure,
+      why: unsure ? `${unsure.name} 偵測到 ${chipOf(unsure)}，建議記憶體架構是「${MEM_LABEL[unsure.state.chip.suggest]}」；確認後推薦與試算才準`
+        : on.length ? `${on.map(chipOf).slice(0, 3).join("、")}${on.length > 3 ? ` 等 ${on.length} 台` : ""}：顯示卡、記憶體、頻寬與存放區都讀到了`
+          : "加一台機器，主控台會讀出它的顯示卡、記憶體、頻寬與磁碟，算出能跑多大的模型",
+      go: unsure ? ["確認記憶體架構", () => openMachineSettings(unsure.id)] : on.length ? null : ["加一台機器", openAddMachine] },
+    { t: "安裝推理引擎", done: on.length > 0 && !noEng && !building,
+      why: building ? `${building.name} 正在編譯 llama.cpp…` : noEng ? `${noEng.name} 還沒有 llama.cpp：依這台的顯示卡自動選加速方式，在網頁上一鍵編譯`
+        : "每台都有可用的 llama.cpp",
+      go: building ? ["看進度", () => openLlamaBuild(building.id)] : noEng ? ["一鍵安裝", () => openLlamaBuild(noEng.id)] : null },
+    { t: "下載一個模型", done: running,
+      why: "照這台的記憶體推薦、標好速度與放不放得下；點一下下載，再換上欄位",
+      go: ["看推薦", () => { S.libTab = "rec"; go(on.length === 1 ? "lib:" + on[0].id : "lib"); }] },
+  ];
+  const first = steps.findIndex((x) => !x.done);
+  steps.forEach((x, i) => { x.state = x.done ? "done" : i === first ? "now" : "blocked"; });
+  // 第一步沒做完以外，引擎與模型兩步彼此不互卡：模型可以先下載，引擎編好再換上
+  if (steps[0].done) steps.forEach((x) => { if (x.state === "blocked") x.state = "now"; });
+  return steps;
+}
+
+// 引擎編譯中：只更新順序軸第二步裡的那一行進度（cmake 的 [ 42%]），不整頁重畫
+function watchBuild(sc, n) {
+  clearTimeout(S.buildTimer);
+  const stepEl = sc.querySelectorAll(".step")[1];
+  if (!stepEl) return;
+  const line = el("div", "small mono", "讀取進度…");
+  stepEl.appendChild(line);
+  const tick = async () => {
+    if (!line.isConnected) return;
+    try {
+      const r = await api(`/api/node/${n.id}/llama/build/progress`);
+      const pct = [...(r.log_tail || [])].reverse().map((x) => /\[\s*(\d+)%\]/.exec(x)).find(Boolean);
+      line.textContent = r.running ? (pct ? `編譯中 ${pct[1]}%` : "下載原始碼與設定中…") : "已結束，按「看進度」看結果";
+      if (!r.running) { refresh(); return; }
+    } catch (ex) { line.textContent = "讀不到進度：" + ex.message; }
+    S.buildTimer = setTimeout(tick, 3000);
+  };
+  tick();
 }
 
 function nodeSummary(n) {
@@ -1538,6 +2036,7 @@ function nodeSummary(n) {
     }
     const on = st.slots.filter((s) => s.busy).map((s) => s.role);
     c.appendChild(kvRow("運作中", on.length ? on.join("、") : "無"));
+    if (n.capacity) c.appendChild(kvRow("能跑多大", n.capacity.max_dense_b ? `流暢 ${n.capacity.max_dense_b}B 以內` : "小模型"));
     if (st.machine.profile) {
       const prof = st.profiles?.[st.machine.profile];
       c.appendChild(kvRow("情境", prof?.name || st.machine.profile));
@@ -2608,7 +3107,7 @@ async function openMachineSettings(nid) {
   tr.appendChild(tb);
   body.appendChild(tr);
 
-  let fMM, fRam, fVram, fRoot, fRootC, fLlama, fLlamaC, fNote;
+  let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fNote;
   if (!info) {
     body.appendChild(el("p", "note warn", `這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定。${infoErr}`));
   } else {
@@ -2637,6 +3136,16 @@ async function openMachineSettings(nid) {
     }
     body.appendChild(el("p", "small muted",
       `這台：${det.gpus.length ? det.gpus.map((g) => `卡 ${g.id} ${g.name || ""}${g.vram_gib ? " " + g.vram_gib + " GiB" : ""}`).join("、") : "沒有偵測到 GPU"}；系統記憶體 ${det.ram_gib} GiB`));
+
+    // 推薦清單估速度用：每產生一個 token 都要把權重從記憶體讀一遍，速度上限看頻寬
+    const ch = info.chip || {};
+    const f2b = el("div", "form-row");
+    fBw = numInput(st.bandwidth_gbs, ch.bandwidth_spec_gbs ? `規格書 ${ch.bandwidth_spec_gbs}` : "認不出晶片，請填");
+    fRbw = numInput(st.ram_bandwidth_gbs, "沒填時假設 50");
+    f2b.append(fieldBox("記憶體頻寬（GB/s）", fBw,
+      `${ch.gpu ? "偵測到：" + ch.gpu + "。" : ""}推薦模型的預估速度照這個算；空白＝用規格書標稱值`),
+    fieldBox("系統記憶體頻寬（GB/s）", fRbw, "只有獨立顯示卡機會用到：放不下的 MoE 專家搬到系統記憶體時，那部分照這個算"));
+    body.appendChild(f2b);
 
     body.appendChild(el("h4", "pick-h", "模型存放"));
     const f3 = el("div", "form-row");
@@ -2688,6 +3197,7 @@ async function openMachineSettings(nid) {
       if (info) {
         await api(`/api/node/${nid}/machine`, { method: "POST", body: {
           memory_model: fMM.value, ram_floor_gib: fRam.value, vram_floor_gib: fVram.value, note: fNote.value,
+          bandwidth_gbs: fBw.value, ram_bandwidth_gbs: fRbw.value,
           gguf_root: fRoot.value === "__custom" ? fRootC.value.trim() : fRoot.value,
           llama_server: fLlama.value === "__custom" ? fLlamaC.value.trim() : fLlama.value } });
       }
@@ -2695,6 +3205,7 @@ async function openMachineSettings(nid) {
     ov.remove();
     toast("已儲存", "ok");
     if (S.minfo) delete S.minfo[nid];
+    if (S.rec) delete S.rec[nid];          // 架構、頻寬、存放區都會改變推薦結果
     await refresh();
     render();
   });
