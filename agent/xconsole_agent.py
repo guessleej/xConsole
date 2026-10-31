@@ -4887,8 +4887,14 @@ def _gen_run(j, argv, env, mm, fl):
     killed = None
     started = time.time()
     with open(log, "w", encoding="utf-8") as fh:
-        proc = subprocess.Popen(argv, stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env},
-                                start_new_session=True)
+        try:
+            kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
+                  else {"start_new_session": True})
+            proc = subprocess.Popen(argv, stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env}, **kw)
+        except OSError as ex:                  # 執行檔被刪掉、沒有執行權限：不能讓這件一直停在「產生中」擋住後面
+            j.update(state="failed", error=f"sd-cli 啟動失敗：{ex}"[:240], ended=int(time.time()))
+            _sd_jobs_save()
+            return
         with _GEN_LOCK:
             _GEN["proc"] = proc
         last_save = 0

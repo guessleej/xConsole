@@ -211,6 +211,11 @@ def main():
     case("系統記憶體只剩 5（底線 12）：中止、講清楚原因，不等它跑完",
          (j2["state"], "已中止" in (j2["error"] or ""), time.time() - t0 < 2.5), ("failed", True, True))
 
+    j3 = {**j, "id": "aaaa0003", "out": "w3.png", "state": "running"}
+    A._GEN["jobs"].append(j3)
+    A._gen_run(j3, ["/nonexistent/sd-cli"], {}, "unified_single", {"ram": 12})
+    case("sd-cli 啟動不了：這件標失敗，不會一直卡在產生中擋住後面", (j3["state"], "啟動失敗" in j3["error"]), ("failed", True))
+
     print("\n全部通過" if OK else "\n有項目失敗")
     return 0 if OK else 1
 
