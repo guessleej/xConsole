@@ -98,7 +98,7 @@ if [ "$OSN" = Darwin ]; then
   <key>ProgramArguments</key><array><string>$PY</string><string>$3</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>ProcessType</key><string>Background</string>
+  <key>ProcessType</key><string>Standard</string>
   <key>StandardOutPath</key><string>$4</string>
   <key>StandardErrorPath</key><string>$4</string>
 </dict></plist>

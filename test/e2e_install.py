@@ -60,7 +60,8 @@ def main():
             time.sleep(every)
         return None
 
-    case("登入", call("/api/login", {"username": user, "password": pw})[0] == 200)
+    c, r = call("/api/login", {"username": user, "password": pw})
+    case("登入", c == 200, "" if c == 200 else (c, r))
     fleet = poll(lambda: (lambda c, f: f if c == 200 and f["nodes"] and f["nodes"][0]["online"] else None)(*call("/api/fleet")), 60)
     if not case("本機的節點代理已納管而且連得上", fleet, fleet and [n["id"] for n in fleet["nodes"]]):
         return 1

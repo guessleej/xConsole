@@ -4298,11 +4298,8 @@ def local_names():
         _, out, _ = sh(["hostname", "-I"])
         names.update(out.split())
     else:
+        # 不用 gethostbyname_ex 反查自己的主機名稱：沒有對應 DNS 的 Mac 會卡在這裡很久，代理一直起不來
         names.add(_local_ip())
-        try:
-            names.update(socket.gethostbyname_ex(socket.gethostname())[2])
-        except OSError:
-            pass
     return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
 
 
