@@ -1,4 +1,4 @@
-# xConsole 單機安裝（Windows 10／11、Windows Server 2019 以上）：主控台＋節點代理裝在這一台。
+﻿# xConsole 單機安裝（Windows 10／11、Windows Server 2019 以上）：主控台＋節點代理裝在這一台。
 # 在解開的安裝包資料夾裡，按右鍵開「Windows PowerShell（系統管理員）」執行：
 #
 #   powershell -ExecutionPolicy Bypass -File install\install.ps1              安裝或更新（資料與設定都保留）
@@ -9,7 +9,9 @@
 #                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、8090～8289（模型 API）。
 # 一般身分：裝在自己的家目錄，登入後才啟動，防火牆要另外請管理員開。
 param([switch]$Uninstall, [string]$PasswordFile)
-$ErrorActionPreference = 'Stop'
+# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷。
+# 原生程式看 $LASTEXITCODE，cmdlet 個別加 -ErrorAction Stop
+$ErrorActionPreference = 'Continue'
 $SRC = Split-Path -Parent $PSScriptRoot
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $base = if ($admin) { Join-Path $env:ProgramData 'xConsole' } else { $env:USERPROFILE }
@@ -63,13 +65,17 @@ Copy-Item -Force (Join-Path $SRC 'requirements.txt') (Join-Path $dir 'requiremen
 Say '3/6 準備 Python 環境（主控台與代理都需要 cryptography）'
 $vpy = Join-Path $dir '.venv\Scripts\python.exe'
 $vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
-if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv') }
+if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了 Python 虛擬環境' } }
 & $vpy -m pip install -q --disable-pip-version-check -r (Join-Path $dir 'requirements.txt')
 if ($LASTEXITCODE) { Die '裝不了相依套件；這台要能連 pypi.org，或請 IT 先放行' }
 
 Say '4/6 管理者帳號'
 $env:XCONSOLE_HOME = $base
-$has = & $vpy -c "import json,os,sys; c=json.load(open(os.path.join(os.environ['XCONSOLE_HOME'],'.xconsole','fleet.json'),encoding='utf-8')); print('yes' if c.get('auth',{}).get('hash') else '')" 2>$null
+$has = & $vpy -c "import json,os
+try:
+    c=json.load(open(os.path.join(os.environ['XCONSOLE_HOME'],'.xconsole','fleet.json'),encoding='utf-8')); print('yes' if c.get('auth',{}).get('hash') else '')
+except Exception:
+    print('')"
 if ($has -eq 'yes') { Write-Host '已經設過帳號，保留原本的（要改請到網頁「設定 → 帳號」）' }
 else {
   Push-Location $dir
@@ -101,7 +107,7 @@ function Task($name, $script, $wd) {
   Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
   $act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $script + '" --home "' + $base + '"') -WorkingDirectory $wd
-  Register-ScheduledTask -TaskName $name -Action $act -Trigger $trg -Principal $pri -Settings $set | Out-Null
+  Register-ScheduledTask -TaskName $name -Action $act -Trigger $trg -Principal $pri -Settings $set -ErrorAction Stop | Out-Null
   Start-ScheduledTask -TaskName $name
 }
 Task 'xConsole Agent' (Join-Path $dir 'xconsole_agent.py') $dir

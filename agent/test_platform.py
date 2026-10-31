@@ -35,7 +35,13 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         b = json.dumps({"data": [{"id": "fake"}]}).encode()
         self.send_response(200); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
-HTTPServer(("127.0.0.1", port), H).serve_forever()
+class S(HTTPServer):
+    def server_bind(self):
+        # 不呼叫 HTTPServer 的 getfqdn：沒有反解的 macOS 主機（CI）會卡在這裡、埠開了卻一直不回
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = "localhost", port
+S(("127.0.0.1", port), H).serve_forever()
 '''
 
 
@@ -94,6 +100,10 @@ def main():
     root, err = A.check_root(os.path.join(A.HOME, "models", "gguf"))
     case("家目錄底下可以當存放區", err is None, err or root)
     case("系統以外的路徑擋下", A.check_root(os.path.join(tempfile.gettempdir(), "..", "..", "x"))[1] is not None)
+
+    ps1 = os.path.join(os.path.dirname(HERE), "install", "install.ps1")
+    case("install.ps1 存成有 BOM 的 UTF-8（Windows PowerShell 5.1 沒 BOM 會用 ANSI 讀，中文弄壞引號）",
+         open(ps1, "rb").read(3) == b"\xef\xbb\xbf")
 
     # ---- 預編譯版解壓縮：落到資料夾外面的一律拒絕
     import io as _io

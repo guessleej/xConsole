@@ -4448,6 +4448,12 @@ class AgentTLSServer(ThreadingHTTPServer):
     daemon_threads = True
     ctx = None
 
+    def server_bind(self):
+        # 不做 HTTPServer 的 getfqdn 反解：沒有反解的機器（實際遇到：macOS 主機）會卡在這裡幾十秒才開始聽
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = socket.gethostname(), self.server_address[1]
+
     def finish_request(self, request, client_address):
         try:
             request.settimeout(15)

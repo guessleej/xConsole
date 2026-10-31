@@ -625,7 +625,7 @@ echo "== 1/4 檢查這台 =="
 if [ "$OSN" = Darwin ]; then
   python3 -c 'import ssl' 2>/dev/null || {{ echo "這台沒有 python3。請先執行 xcode-select --install 安裝命令列工具，再貼一次這行指令"; exit 1; }}
 else
-  for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
+  for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 ${{c}}，請先安裝（Ubuntu：sudo apt install ${{c}}）"; exit 1; }}; done
   systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
 fi
 PY=$(command -v python3)
@@ -663,10 +663,12 @@ if [ "$OSN" = Darwin ]; then
   <key>StandardErrorPath</key><string>$HOME/.xconsole/agent.log</string>
 </dict></plist>
 PLIST
-  launchctl bootout "gui/$(id -u)/{LAUNCHD_LABEL}" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "$PL"
-  launchctl kickstart -k "gui/$(id -u)/{LAUNCHD_LABEL}"
-  LOGHINT="tail -n 50 ~/.xconsole/agent.log"
+  # 有人在桌面登入就放 gui 網域；只有 SSH、沒有桌面登入的 Mac 沒有 gui 網域，改放 user 網域
+  LDOM="gui/$(id -u)"; launchctl print "$LDOM" >/dev/null 2>&1 || LDOM="user/$(id -u)"
+  launchctl bootout "$LDOM/{LAUNCHD_LABEL}" 2>/dev/null || true
+  launchctl bootstrap "$LDOM" "$PL"
+  launchctl kickstart -k "$LDOM/{LAUNCHD_LABEL}"
+  LOGHINT="tail -n 50 ~/.xconsole/agent.log；launchd 的狀態：launchctl print $LDOM/{LAUNCHD_LABEL}"
 else
   mkdir -p "$HOME/.config/systemd/user"
   cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
@@ -719,7 +721,8 @@ def install_script_ps1(code, j):
     一般身分執行：裝成這個帳號登入後自啟，防火牆要另外請系統管理員開。"""
     url = f"https://{j['console']}"
     return f"""# xConsole 節點代理安裝（Windows）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
-$ErrorActionPreference = 'Stop'
+# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷
+$ErrorActionPreference = 'Continue'
 $C = '{url}'; $CODE = '{code}'; $FP = '{j["fp"]}'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 # 只接受主控台那一張憑證（比對整張憑證的 SHA-256），不是關掉驗證
@@ -751,10 +754,10 @@ if ($admin) {{
   icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 }}
 Write-Host '== 2/5 準備 Python 環境 =='
-& $py -m venv (Join-Path $dir '.venv')
+& $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) {{ Write-Host '建不了 Python 虛擬環境'; exit 1 }}
 $vpy = Join-Path $dir '.venv\\Scripts\\python.exe'
 $vpyw = Join-Path $dir '.venv\\Scripts\\pythonw.exe'
-& $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'
+& $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'; if ($LASTEXITCODE) {{ Write-Host '裝不了 cryptography；這台要能連 pypi.org'; exit 1 }}
 Write-Host '== 3/5 下載節點代理 =='
 $agent = Join-Path $dir 'xconsole_agent.py'
 $wc.DownloadFile("$C/install/$CODE/xconsole_agent.py", "$agent.new")
@@ -774,7 +777,7 @@ if ($admin) {{
   $trg = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
   $pri = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
 }}
-Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $pri -Settings $set | Out-Null
+Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $pri -Settings $set -ErrorAction Stop | Out-Null
 Start-ScheduledTask -TaskName $task
 $tok = Join-Path $base '.xconsole\\token'; $crt = Join-Path $base '.xconsole\\agent-cert.pem'
 $up = $false
