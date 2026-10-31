@@ -225,7 +225,7 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 
 | 步驟 | 在哪 | 做什麼 |
 |---|---|---|
-| 1. 安裝畫圖引擎 | 畫圖與影片 › 第一步「一鍵安裝」 | 跟編譯 llama.cpp 同一套：依顯示卡選 CUDA／ROCm，下載 stable-diffusion.cpp 最新正式版（`master-<編號>-<commit>`）連同子模組，編出 `sd-cli`；進度與記錄看得到、可取消。兩種引擎共用一把鎖，同時只編一個 |
+| 1. 安裝畫圖引擎 | 畫圖與影片 › 第一步「一鍵安裝」 | 跟安裝 llama.cpp 同一套：Linux 依顯示卡選 CUDA／ROCm，下載 stable-diffusion.cpp 最新正式版（`master-<編號>-<commit>`）連同子模組，在這台編出 `sd-cli`；macOS（Apple Silicon）與 Windows x64 下載官方預編譯版（CPU／CUDA 12／Vulkan），核對官方公布的 sha256。進度與記錄看得到、可取消。兩種引擎共用一把鎖，同時只裝一個 |
 | 2. 下載一顆模型 | 畫圖與影片 › 推薦模型 | 每顆＝主體＋文字編碼器＋VAE（影片再加音訊 VAE、嵌入連接器），一鍵全部下載；別顆已經有的共用檔（例 FLUX 系列同一份 t5xxl）不重複下載。依這台記憶體建議量化，標「流暢／能跑／放不下」與放在哪 |
 | 3. 產生 | 畫圖與影片 › 產生圖片與影片 | 左邊填提示詞、尺寸、步數、種子，右邊看進度與結果；最近 30 件在區塊內捲動，可下載、帶入同樣設定、刪除 |
 
@@ -248,6 +248,9 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 
 隨附清單（`scripts/build_sd_catalog.py` 產生，`console/sd_catalog_default.json`）：FLUX.1 schnell、Chroma1 HD、Stable Diffusion 3.5 Medium、
 Stable Diffusion 1.5、LTX-2.3 影片（蒸餾版，文字編碼器是 Google Gemma 3 12B）。
+
+實測（.27 AI 395，網頁編譯的 sd-cli master-1030／ROCm）：FLUX.1 schnell Q8_0 1024×1024 四步 53 秒，試算 20.1 GiB、實測最高 20.9 GiB；
+LTX-2.3 蒸餾 Q2_K 512×320、17 格、八步 48 秒（webm，含聲音），試算 19.9 GiB、實測最高 19.3 GiB。
 
 ### 加一個情境
 
