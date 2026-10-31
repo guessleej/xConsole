@@ -34,8 +34,24 @@ import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-HOME = os.path.expanduser("~")
+OS = "windows" if os.name == "nt" else ("darwin" if sys.platform == "darwin" else "linux")
+# Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 XCONSOLE_HOME 指到 C:\ProgramData\xConsole
+HOME = (sys.argv[sys.argv.index("--home") + 1] if "--home" in sys.argv[:-1] else None) \
+    or os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME, ".xconsole")
+# Linux 用 systemd --user 管模型服務；macOS、Windows 沒有，改由代理自己帶起來、看著（Supervisor）。
+# 測試可以設 XCONSOLE_SUPERVISOR=1，在 Linux 上也走代理自己看管的那條路
+SYSTEMD = OS == "linux" and os.environ.get("XCONSOLE_SUPERVISOR") != "1"
+EXE = ".exe" if OS == "windows" else ""
+
+if OS == "windows":
+    class _NoWindowPopen(subprocess.Popen):
+        """Windows 用 pythonw 在背景跑時，每帶起一支主控台程式（nvidia-smi、tasklist、typeperf…）就會閃一個黑色視窗。
+        整支代理的子行程一律加 CREATE_NO_WINDOW，不必每個呼叫點各自記得帶。"""
+        def __init__(self, *a, **kw):
+            kw.setdefault("creationflags", 0x08000000)
+            super().__init__(*a, **kw)
+    subprocess.Popen = _NoWindowPopen
 REGISTRY = os.path.join(STATE_DIR, "registry.json")
 TOKEN_FILE = os.path.join(STATE_DIR, "token")
 PORT = int(os.environ.get("XCONSOLE_AGENT_PORT", "9401"))
@@ -178,7 +194,18 @@ def floors(machine):
 
 # ---------------------------------------------------------------- 硬體量測
 
+def expand(p):
+    """~ 開頭換成代理的家目錄（Windows 以 SYSTEM 執行時不是 os.path.expanduser 看到的那個）。"""
+    p = str(p or "")
+    return HOME + p[1:] if p == "~" or p.startswith(("~/", "~\\")) else p
+
+
 def _meminfo(key):
+    """Linux：/proc/meminfo 的一項（位元組）。其他系統走 mem_stats()。"""
+    if OS != "linux":
+        m = mem_stats()
+        return {"MemTotal": m["total"], "MemAvailable": m["avail"], "SwapTotal": m["swap_total"],
+                "SwapFree": m["swap_free"]}.get(key, 0)
     try:
         with open("/proc/meminfo", encoding="utf-8") as fh:
             for line in fh:
@@ -189,17 +216,91 @@ def _meminfo(key):
     return 0
 
 
+def _sysctl_n(name):
+    """macOS 的 sysctl -n。"""
+    rc, out, _ = sh(["sysctl", "-n", name], timeout=5)
+    return out.strip() if rc == 0 else ""
+
+
+def mem_stats():
+    """系統記憶體（位元組）：total、avail（還能給新程式用的）、swap_total、swap_free。三個系統各自讀。"""
+    if OS == "linux":
+        return {"total": _meminfo("MemTotal"), "avail": _meminfo("MemAvailable"),
+                "swap_total": _meminfo("SwapTotal"), "swap_free": _meminfo("SwapFree")}
+    if OS == "darwin":
+        total = int(_sysctl_n("hw.memsize") or 0)
+        _, out, _ = sh(["vm_stat"], timeout=5)
+        m = re.search(r"page size of (\d+)", out)
+        page = int(m.group(1)) if m else 16384
+        pages = {k.lower(): int(v) for k, v in re.findall(r"^Pages ([\w ]+):\s+(\d+)\.?$", out, re.M)}
+        # 跟「活動監視器」的可用記憶體同一個算法：空閒＋非使用中＋推測快取＋可清除
+        avail = sum(pages.get(k, 0) for k in ("free", "inactive", "speculative", "purgeable")) * page
+        sw = _sysctl_n("vm.swapusage")
+
+        def mb(key):
+            mm = re.search(key + r" = ([\d.]+)([MG])", sw)
+            return float(mm.group(1)) * (1024 ** 2 if mm.group(2) == "M" else GIB) if mm else 0
+        return {"total": total, "avail": min(avail, total), "swap_total": mb("total"), "swap_free": mb("free")}
+    import ctypes
+
+    class MS(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong)] + \
+                   [(n, ctypes.c_ulonglong) for n in ("tp", "ap", "tf", "af", "tv", "av", "ae")]
+    ms = MS()
+    ms.dwLength = ctypes.sizeof(MS)
+    ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+    # 分頁檔總量含實體記憶體，扣掉才是「虛擬記憶體」那一塊
+    return {"total": ms.tp, "avail": ms.ap, "swap_total": max(0, ms.tf - ms.tp), "swap_free": max(0, ms.af - ms.ap)}
+
+
+def cpu_name():
+    if OS == "darwin":
+        return _sysctl_n("machdep.cpu.brand_string")
+    if OS == "windows":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as k:
+                return str(winreg.QueryValueEx(k, "ProcessorNameString")[0]).strip()
+        except OSError:
+            return ""
+    return next((ln.split(":", 1)[1].strip() for ln in (load_text("/proc/cpuinfo") or "").splitlines()
+                 if ln.startswith("model name")), "")
+
+
+def load_and_uptime():
+    """(一分鐘負載, 開機秒數)。Windows 沒有負載平均，回 None。"""
+    load = os.getloadavg()[0] if hasattr(os, "getloadavg") else None
+    up = None
+    try:
+        if OS == "linux":
+            up = float(open("/proc/uptime", encoding="utf-8").read().split()[0])
+        elif OS == "darwin":
+            m = re.search(r"sec = (\d+)", _sysctl_n("kern.boottime"))
+            up = time.time() - int(m.group(1)) if m else None
+        else:
+            import ctypes
+            ctypes.windll.kernel32.GetTickCount64.restype = ctypes.c_ulonglong
+            up = ctypes.windll.kernel32.GetTickCount64() / 1000.0
+    except Exception:  # noqa: BLE001
+        pass
+    return load, up
+
+
+def disk_free(path):
+    """(剩餘, 總量) GiB。os.statvfs Windows 沒有，用 shutil.disk_usage。"""
+    du = shutil.disk_usage(path)
+    return round(du.free / GIB, 1), round(du.total / GIB, 1)
+
+
 def ram_pool():
-    total = _meminfo("MemTotal")
-    avail = _meminfo("MemAvailable")
-    return {"total_gib": round(total / GIB, 1), "free_gib": round(avail / GIB, 1),
-            "used_gib": round((total - avail) / GIB, 1)}
+    m = mem_stats()
+    return {"total_gib": round(m["total"] / GIB, 1), "free_gib": round(m["avail"] / GIB, 1),
+            "used_gib": round((m["total"] - m["avail"]) / GIB, 1)}
 
 
 def swap_pool():
-    total = _meminfo("SwapTotal")
-    free = _meminfo("SwapFree")
-    return {"total_gib": round(total / GIB, 1), "used_gib": round((total - free) / GIB, 1)}
+    m = mem_stats()
+    return {"total_gib": round(m["swap_total"] / GIB, 1), "used_gib": round((m["swap_total"] - m["swap_free"]) / GIB, 1)}
 
 
 def probe_nvidia():
@@ -264,8 +365,78 @@ def probe_amd_sysfs():
     return gpus or None
 
 
+def apple_gpu_limit(total):
+    """Apple Silicon 的 GPU 最多能用多少統一記憶體（Metal 的 recommendedMaxWorkingSetSize）。
+    管理者用 sysctl iogpu.wired_limit_mb 調過就照那個；沒調過是系統預設：36 GB 以下約 2/3，以上約 3/4。"""
+    lim = int(_sysctl_n("iogpu.wired_limit_mb") or 0)
+    if lim:
+        return lim * 1024 * 1024
+    return int(total * (0.75 if total > 36 * GIB else 2 / 3))
+
+
+def probe_apple():
+    """Apple Silicon：一顆晶片、一個統一記憶體池。GPU 已用量讀 IOAccelerator 的統計（ioreg）。"""
+    if OS != "darwin" or platform_machine() != "arm64":
+        return None
+    total = int(_sysctl_n("hw.memsize") or 0)
+    _, out, _ = sh(["ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"], timeout=10)
+    used = re.search(r'"In use system memory"=(\d+)', out)
+    use = re.search(r'"Device Utilization %"=(\d+)', out)
+    return [{"id": "0", "name": _sysctl_n("machdep.cpu.brand_string") + " GPU", "temp": None, "power": None,
+             "use": float(use.group(1)) if use else None,
+             "vram_total": apple_gpu_limit(total), "vram_used": int(used.group(1)) if used else 0}]
+
+
+def platform_machine():
+    import platform
+    return platform.machine().lower()
+
+
+GPU_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+
+
+def probe_win_adapters():
+    """Windows 的 AMD／Intel 顯示卡（NVIDIA 交給 nvidia-smi）：名稱與專用記憶體讀登錄檔，
+    已用量讀效能計數器 GPU Adapter Memory（typeperf，Windows 內建）。AI 395 在 BIOS 切給 GPU 的那塊就是專用記憶體。"""
+    if OS != "windows":
+        return None
+    import winreg
+    cards = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, GPU_CLASS) as cls:
+            for i in range(64):
+                try:
+                    sub = winreg.EnumKey(cls, i)
+                except OSError:
+                    break
+                if not sub.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(cls, sub) as k:
+                        name = str(winreg.QueryValueEx(k, "DriverDesc")[0])
+                        try:
+                            mem = int(winreg.QueryValueEx(k, "HardwareInformation.qwMemorySize")[0])
+                        except OSError:
+                            raw = winreg.QueryValueEx(k, "HardwareInformation.MemorySize")[0]
+                            mem = int.from_bytes(raw, "little") if isinstance(raw, bytes) else int(raw)
+                except OSError:
+                    continue
+                if re.search(r"AMD|Radeon|Intel|Arc", name, re.I) and mem:
+                    cards.append({"id": str(len(cards)), "name": name, "temp": None, "power": None, "use": None,
+                                  "vram_total": mem, "vram_used": 0})
+    except OSError:
+        return None
+    if cards:
+        _, out, _ = sh(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"], timeout=15)
+        rows = [ln for ln in out.splitlines() if ln.startswith('"') and "/" in ln[:15]]
+        if rows:
+            vals = [float(x.strip('"')) for x in rows[-1].split(",")[1:] if re.fullmatch(r'"[\d.]+"', x.strip())]
+            cards[0]["vram_used"] = int(max(vals)) if vals else 0     # 計數器以 LUID 命名對不回登錄檔，取最大那張
+    return cards or None
+
+
 def probe_gpus():
-    return probe_nvidia() or probe_amd_sysfs() or []
+    return probe_nvidia() or probe_amd_sysfs() or probe_apple() or probe_win_adapters() or []
 
 
 def has_nvidia():
@@ -347,11 +518,16 @@ def card_split(gib, gpu_ids, cards):
     return {str(c["id"]): float(gib or 0) * c["total_gib"] / tot for c in sel}
 
 
+# 連本機（模型服務、node_agent）一律不走代理：macOS 的 urllib 會讀系統的代理設定，連 127.0.0.1 也送去代理，
+# 結果健康檢查永遠不通（GitHub 的 macOS 主機就是這樣）。
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def hardware():
     """先用同機已在跑的 node_agent，拿不到才自己量。拿不到就老實標未知，不假裝零。"""
     for url in NODE_AGENTS:
         try:
-            with urllib.request.urlopen(url, timeout=4) as resp:
+            with LOCAL.open(url, timeout=4) as resp:
                 data = json.load(resp)
             if data.get("gpu") or data.get("cpu"):
                 data["_source"] = url
@@ -359,17 +535,7 @@ def hardware():
         except Exception:  # noqa: BLE001
             continue
     gpus = probe_gpus()
-    load_out = load_text("/proc/loadavg") or ""
-    load = None
-    try:
-        load = float(load_out.split()[0])
-    except Exception:  # noqa: BLE001
-        pass
-    uptime = None
-    try:
-        uptime = float(open("/proc/uptime", encoding="utf-8").read().split()[0])
-    except Exception:  # noqa: BLE001
-        pass
+    load, uptime = load_and_uptime()
     total_t = sum(g.get("vram_total") or 0 for g in gpus)
     total_u = sum(g.get("vram_used") or 0 for g in gpus)
     return {
@@ -382,7 +548,7 @@ def hardware():
             "use": max((g.get("use") or 0) for g in gpus) if gpus else None,
         },
         "cpu": {"load": load, "cores": os.cpu_count()},
-        "ram": {"total": _meminfo("MemTotal")},
+        "ram": {"total": mem_stats()["total"]},
         "uptime": uptime,
     }
 
@@ -405,6 +571,24 @@ AMD_GFX = {"90006": "AMD Instinct MI50／MI60", "90008": "AMD Instinct MI100", "
            "90402": "AMD Instinct MI300X", "110000": "AMD Radeon RX 7900 XTX", "110501": "AMD Radeon 8060S"}
 
 
+# Apple Silicon：同一型號依 GPU 核心數有兩種頻寬（例 M4 Max 32 核 410、40 核 546 GB/s）。(型號, GPU 核心數下限, GB/s)，越具體越前面
+APPLE_BW = (("M4 Max", 40, 546), ("M4 Max", 0, 410), ("M3 Max", 40, 400), ("M3 Max", 0, 300), ("M3 Ultra", 0, 819),
+            ("M2 Ultra", 0, 800), ("M1 Ultra", 0, 800), ("M2 Max", 0, 400), ("M1 Max", 0, 400), ("M4 Pro", 0, 273),
+            ("M3 Pro", 0, 150), ("M2 Pro", 0, 200), ("M1 Pro", 0, 200), ("M5", 0, 153), ("M4", 0, 120),
+            ("M3", 0, 100), ("M2", 0, 100), ("M1", 0, 68))
+
+
+def apple_bandwidth(cpu, cores=None):
+    if cores is None:
+        _, out, _ = sh(["system_profiler", "SPDisplaysDataType"], timeout=20)
+        m = re.search(r"Total Number of Cores:\s*(\d+)", out)
+        cores = int(m.group(1)) if m else 0
+    # 「M5」不能吃到「M5 Max」：沒列在表上的高階型號回未知，請管理者自己填，不拿基本款的數字充數
+    tail = r"(?! (?:Pro|Max|Ultra)\b)"
+    return next((bw for name, need, bw in APPLE_BW
+                 if re.search(rf"\b{name}\b" + ("" if " " in name else tail), cpu) and cores >= need), None)
+
+
 def spec_bandwidth(hay):
     """名稱 → 規格書頻寬。名稱是「MI210／MI250」這種認不出是哪一張的（同一個 gfx 版本），兩種頻寬不同就回未知，
     不拿第一個比到的充數（MI250 是 MI210 的兩倍，速度估算會整個翻倍）。"""
@@ -416,9 +600,8 @@ def spec_bandwidth(hay):
 
 @functools.lru_cache(maxsize=1)
 def _chip_probe():
-    cpu = next((ln.split(":", 1)[1].strip() for ln in (load_text("/proc/cpuinfo") or "").splitlines()
-                if ln.startswith("model name")), "")
-    board = (load_text("/proc/device-tree/model") or "").replace("\x00", "").strip()
+    cpu = cpu_name()
+    board = (load_text("/proc/device-tree/model") or "").replace("\x00", "").strip() if OS == "linux" else ""
     gpus = probe_gpus()
     names = [g["name"] for g in gpus if g.get("name") and g["name"] != "AMD GPU"]
     if not names and gpus:
@@ -431,7 +614,7 @@ def _chip_probe():
         names = [cpu.split("w/", 1)[-1].strip()] if "w/" in cpu else names       # APU：顯示晶片寫在 CPU 型號裡
     gpu = names[0] if names else (board if "Jetson" in board else None)
     hay = " ".join(x for x in (gpu or "", board) if x)
-    bw = spec_bandwidth(hay)
+    bw = apple_bandwidth(cpu) if OS == "darwin" else spec_bandwidth(hay)
     sug, why = suggest_memory_model(gpus)
     return {"cpu": cpu or None, "cores": os.cpu_count(), "board": board or None, "gpu": gpu,
             "gpu_count": len(gpus), "bandwidth_spec_gbs": bw, "suggest": sug, "suggest_why": why}
@@ -536,9 +719,34 @@ PORT_KIND = [
 ]
 
 
+def _listen_lines():
+    """各系統列出正在聽的 TCP 埠，換成跟 Linux ss 一樣的一行一筆：「 位址:埠 … users:((\"行程\"」。"""
+    if OS == "linux":
+        rc, out, _ = sh(["ss", "-tlnpH"])
+        return out if rc == 0 else ""
+    rows = []
+    if OS == "darwin":
+        _, out, _ = sh(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fcn"], timeout=15)
+        proc = ""
+        for ln in out.splitlines():
+            if ln.startswith("c"):
+                proc = ln[1:]
+            elif ln.startswith("n") and ":" in ln:
+                addr, port = ln[1:].rsplit(":", 1)
+                rows.append(f' {addr.replace("*", "0.0.0.0")}:{port} x users:(("{proc}"')
+    else:
+        _, out, _ = sh(["netstat", "-ano", "-p", "TCP"], timeout=15)
+        for ln in out.splitlines():
+            f = ln.split()
+            if len(f) >= 5 and f[3] == "LISTENING":
+                addr, port = f[1].rsplit(":", 1)
+                rows.append(f" {addr}:{port} x pid={f[4]}")
+    return "\n".join(rows)
+
+
 def ports():
-    rc, out, _ = sh(["ss", "-tlnpH"])
-    if rc != 0 or not out:
+    out = _listen_lines()
+    if not out:
         return []
     reg = registry()
     by_port = {}
@@ -570,7 +778,7 @@ def ports():
         else:
             cmdline = ""
             mm = re.search(r"pid=(\d+)", line)
-            if mm:
+            if mm and OS == "linux":
                 try:
                     with open(f"/proc/{mm.group(1)}/cmdline", "rb") as fh:
                         cmdline = fh.read().replace(b"\0", b" ").decode("utf-8", "replace")
@@ -608,6 +816,244 @@ def unit_name(unit):
     return unit
 
 
+# ---------------------------------------------------------------- 沒有 systemd 的系統：代理自己看管模型服務
+
+UNITS_FILE = os.path.join(STATE_DIR, "units.json")
+
+
+def proc_image(pid):
+    """這個 PID 的程式名稱（不含路徑、小寫）；不存在回空字串。"""
+    if not pid:
+        return ""
+    if OS == "windows":
+        _, out, _ = sh(["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"], timeout=10)
+        return out.split(",")[0].strip('"').lower() if out.startswith('"') else ""
+    try:
+        os.kill(int(pid), 0)
+    except OSError:
+        return ""
+    _, comm, _ = sh(["ps", "-o", "comm=", "-p", str(int(pid))], timeout=10)
+    # 去掉結尾的版本號：python3.15 帶起來不久會變成 python（macOS 的 Python.app），要當成同一支
+    return re.sub(r"[\d.]+$", "", os.path.basename(comm.strip()).lower()) or "?"
+
+
+def pid_alive(pid, image=None):
+    """這個 PID 還在、而且還是當初帶起來的那支程式（PID 會被重複使用，只看活著會把別的程式當成模型服務）。
+    image 是帶起來當下記下的程式名稱，不用設定檔裡的路徑比：包裝過的程式（例 macOS 的 Python.app）名稱跟路徑對不上。"""
+    now = proc_image(pid)
+    return bool(now) and (not image or now == image)
+
+
+def proc_rss_gib(pid):
+    if not pid:
+        return 0.0
+    if OS == "windows":
+        _, out, _ = sh(["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"], timeout=10)
+        m = re.search(r'"([\d,.]+) K"', out)
+        return round(int(re.sub(r"[,.]", "", m.group(1))) * 1024 / GIB, 2) if m else 0.0
+    _, out, _ = sh(["ps", "-o", "rss=", "-p", str(int(pid))], timeout=10)
+    return round(int(out.strip()) * 1024 / GIB, 2) if out.strip().isdigit() else 0.0
+
+
+def kill_tree(pid):
+    if OS == "windows":
+        sh(["taskkill", "/PID", str(int(pid)), "/T", "/F"], timeout=30)
+        return
+    try:
+        os.killpg(int(pid), 15)                # 用自己的行程群組帶起來的，連子行程一起收
+    except OSError:
+        try:
+            os.kill(int(pid), 15)
+        except OSError:
+            pass
+
+
+class Supervisor:
+    """macOS／Windows 沒有 systemd --user：模型服務（llama-server）由代理自己帶起來、看著。
+    行為照 systemd 那份服務檔：Restart=on-failure、RestartSec=10、一分鐘內掛五次就停（失敗）、enable＝代理開機時帶起來。
+    狀態（定義、啟用、PID）存在 units.json；代理重開時照 PID 認回還在跑的服務，不重複帶起第二份去搶同一個埠。
+    代理本身由 launchd（macOS）或工作排程器（Windows）開機自啟。"""
+    RESTART_SEC, BURST, WINDOW = 10, 5, 60
+
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.procs = {}           # unit → Popen（這次帶起來的）
+        self.st = {}              # unit → {"want", "failed", "restart_at", "fails"}
+        self.thread = None
+        self.running = True
+
+    def _meta(self):
+        return load_json(UNITS_FILE, {}) or {}
+
+    def _put(self, unit, **kw):
+        m = self._meta()
+        m.setdefault(unit, {}).update(kw)
+        save_json(UNITS_FILE, m)
+
+    def define(self, unit, cfg, log):
+        with self.lock:
+            self._put(unit, cfg=cfg, log=log)
+
+    def _pid(self, unit):
+        p = self.procs.get(unit)
+        if p is not None:
+            return p.pid if p.poll() is None else None
+        m = self._meta().get(unit) or {}
+        return m.get("pid") if pid_alive(m.get("pid"), m.get("image")) else None
+
+    def _spawn(self, unit):
+        m = self._meta().get(unit)
+        if not m:
+            raise ValueError(f"沒有這個服務：{unit}")
+        raw = load_json(m["cfg"], None)
+        if not raw:
+            raise ValueError(f"讀不到 {m['cfg']}")
+        reg = registry()
+        argv = llama_argv(raw, reg)
+        env = llama_launch_env(raw["exe"], reg, raw.get("gpus"))
+        kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
+              else {"start_new_session": True})
+        with open(m["log"], "ab") as log:
+            p = subprocess.Popen([str(a) for a in argv], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                 env=env, cwd=os.path.dirname(raw["exe"]) or None, **kw)
+        self.procs[unit] = p
+        self._put(unit, pid=p.pid, image=proc_image(p.pid) or None)
+        self.st.setdefault(unit, {}).update(want=True, failed=False, restart_at=None)
+
+    def _stop(self, unit):
+        pid = self._pid(unit)
+        p = self.procs.pop(unit, None)
+        if pid:
+            kill_tree(pid)
+            for _ in range(40):
+                if (p.poll() is not None) if p else not pid_alive(pid):
+                    break
+                time.sleep(0.5)
+            else:
+                if OS != "windows":
+                    try:
+                        os.killpg(int(pid), 9)
+                    except OSError:
+                        pass
+        self._put(unit, pid=None)
+
+    def state(self, unit):
+        with self.lock:
+            if self._pid(unit):
+                return "active"
+            st = self.st.get(unit) or {}
+            if st.get("restart_at"):
+                return "activating"
+            return "failed" if st.get("failed") else "inactive"
+
+    def ctl(self, unit, verb):
+        v = verb.split()
+        with self.lock:
+            self._ensure_thread()
+            st = self.st.setdefault(unit, {})
+            try:
+                if v[0] == "start":
+                    if not self._pid(unit):
+                        self._spawn(unit)
+                elif v[0] == "stop":
+                    st.update(want=False, restart_at=None)
+                    self._stop(unit)
+                elif v[0] == "restart":
+                    st.update(restart_at=None)
+                    self._stop(unit)
+                    self._spawn(unit)
+                elif v[0] in ("enable", "disable"):
+                    self._put(unit, enabled=v[0] == "enable")
+                elif v[0] == "is-enabled":
+                    on = bool((self._meta().get(unit) or {}).get("enabled"))
+                    return (0 if on else 1), "enabled" if on else "disabled", ""
+                elif v[0] == "reset-failed":
+                    st.update(failed=False, fails=[])
+                elif v[0] == "show":
+                    prop = v[v.index("-p") + 1] if "-p" in v else ""
+                    if prop == "MainPID":
+                        return 0, str(self._pid(unit) or 0), ""
+                    if prop == "SubState":
+                        s_ = self.state(unit)
+                        return 0, {"active": "running", "activating": "auto-restart", "failed": "failed"}.get(s_, "dead"), ""
+                    return 0, "", ""
+            except (OSError, ValueError) as ex:
+                st.update(failed=True, want=False)
+                return 1, "", str(ex)
+        return 0, "", ""
+
+    def _ensure_thread(self):
+        if self.thread is None:
+            self.thread = threading.Thread(target=self._watch, daemon=True)
+            self.thread.start()
+
+    def _crashed(self, unit, st, now):
+        st["fails"] = [t for t in st.get("fails", []) if now - t < self.WINDOW] + [now]
+        if len(st["fails"]) >= self.BURST:
+            st.update(failed=True, want=False, restart_at=None)
+        else:
+            st["restart_at"] = now + self.RESTART_SEC
+
+    def _watch(self):
+        while self.running:
+            time.sleep(3)
+            now = time.time()
+            with self.lock:
+                for unit, p in list(self.procs.items()):
+                    st = self.st.setdefault(unit, {})
+                    if p.poll() is None:
+                        # 帶起來之後才換掉自己的程式（例 macOS 的 python 轉成 Python.app）會讓名稱變掉：
+                        # 跟著更新，代理重開時才認得回來
+                        img = proc_image(p.pid)
+                        if img and img != (self._meta().get(unit) or {}).get("image"):
+                            self._put(unit, image=img)
+                        continue
+                    if not st.get("want"):
+                        continue
+                    del self.procs[unit]
+                    self._put(unit, pid=None)
+                    if p.returncode == 0:
+                        st["want"] = False                     # Restart=on-failure：正常結束不重開
+                        continue
+                    self._crashed(unit, st, now)
+                # 代理重開後認回來的（不是這次帶起來的，拿不到結束碼）：不見了就當成異常結束
+                for unit, m in self._meta().items():
+                    st = self.st.get(unit) or {}
+                    if unit in self.procs or not m.get("pid") or not st.get("want"):
+                        continue
+                    if not pid_alive(m["pid"], m.get("image")):
+                        self._put(unit, pid=None)
+                        self._crashed(unit, st, now)
+                for unit, st in self.st.items():
+                    if st.get("restart_at") and now >= st["restart_at"]:
+                        st["restart_at"] = None
+                        try:
+                            self._spawn(unit)
+                        except (OSError, ValueError):
+                            st.update(failed=True, want=False)
+
+    def boot(self):
+        """代理啟動時：還在跑的認回來，該開機自啟但沒在跑的帶起來。"""
+        with self.lock:
+            self._ensure_thread()
+            for unit, m in self._meta().items():
+                if pid_alive(m.get("pid"), m.get("image")):
+                    self.st.setdefault(unit, {})["want"] = True  # 代理重開，模型服務還在：不動它，但要接著看管
+                    continue
+                self._put(unit, pid=None)
+                if m.get("enabled"):
+                    try:
+                        self._spawn(unit)
+                    except (OSError, ValueError):
+                        self.st.setdefault(unit, {}).update(failed=True)
+
+    def log_path(self, unit):
+        return (self._meta().get(unit) or {}).get("log")
+
+
+SUP = Supervisor()
+
+
 def unit_state(unit):
     """回 systemd 的真實狀態字串，不要壓成開／關兩種。
 
@@ -618,6 +1064,8 @@ def unit_state(unit):
         unit = unit_name(unit)
     except ValueError:
         return "unknown"          # 登錄檔裡的名字不合格式：當成查不到，不要讓整個狀態頁出錯
+    if not SYSTEMD:
+        return SUP.state(unit)
     _, out, _ = sh(["systemctl", "--user", "is-active", "--", unit])
     st = out.strip()
     if st in ("unknown", "", "inactive"):
@@ -633,6 +1081,8 @@ def unit_active(unit):
 
 def unit_scope(unit):
     """這個 unit 是 user 層還是 system 層。兩層指令不一樣，猜錯就全部失敗。"""
+    if not SYSTEMD:
+        return "user"
     try:
         rc, _, _ = sh(["systemctl", "--user", "cat", "--", unit_name(unit)])
     except ValueError:
@@ -641,6 +1091,11 @@ def unit_scope(unit):
 
 
 def sysctl(unit, verb, timeout=200):
+    if not SYSTEMD:
+        try:
+            return SUP.ctl(unit_name(unit), verb)
+        except ValueError as ex:
+            return 1, "", str(ex)
     scope = unit_scope(unit)
     flag = "--user " if scope == "user" else ""
     try:
@@ -660,6 +1115,8 @@ def unit_rss_gib(unit):
     pid = pid.strip()
     if not pid.isdigit() or pid == "0":
         return 0.0
+    if not SYSTEMD:
+        return proc_rss_gib(int(pid))
     _, pgid, _ = sh(["ps", "-o", "pgid=", "-p", pid])
     pgid = pgid.strip()
     if not pgid.isdigit():
@@ -1048,15 +1505,17 @@ def wait_healthy(slot, seconds=240):
                 st = "failed"
         if st == "failed":
             try:
-                _, tail, _ = sh(["journalctl", "--user", "-u", unit_name(slot["unit"]), "-n", "3", "--no-pager", "-o", "cat"])
+                if SYSTEMD:
+                    _, tail, _ = sh(["journalctl", "--user", "-u", unit_name(slot["unit"]), "-n", "3", "--no-pager", "-o", "cat"])
+                else:
+                    tail = "\n".join(tail_lines(SUP.log_path(unit_name(slot["unit"])) or "", 3))
             except ValueError as ex:
                 tail = str(ex)
             return False, (tail or "服務退出").replace("\n", " ")[:200]
         if st == "active":
             if not port:
                 return True, ""
-            rc, code, _ = sh(["curl", "-s", "-o", "/dev/null", "-m", "6", "-w", "%{http_code}",
-                              f"http://127.0.0.1:{int(port)}/v1/models"])
+            code = str(_http_json(f"http://127.0.0.1:{int(port)}/v1/models", timeout=6)[0])
             # 401＝服務活著、只是設了金鑰（不帶金鑰打 /v1/models 一定 401）。
             # 只認 200 的話，開了金鑰之後每次重啟都會被判成「起不來」而自動還原
             if code.strip() in ("200", "401"):
@@ -1189,9 +1648,13 @@ def _first_key(v):
 
 
 def _local_ip():
-    rc, out, _ = sh(["ip", "-4", "route", "get", "1.1.1.1"])
-    m = re.search(r"\bsrc ([0-9.]+)", out) if rc == 0 else None
-    return m.group(1) if m else "127.0.0.1"
+    """對外網卡的 IP（跟 ip route get 1.1.1.1 的 src 同一個）。UDP connect 不送任何封包，三個系統都能用。"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as so:
+            so.connect(("1.1.1.1", 80))
+            return so.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
 
 
 def _http_json(url, body=None, key="", timeout=8):
@@ -1202,7 +1665,7 @@ def _http_json(url, body=None, key="", timeout=8):
                                           **({"Authorization": f"Bearer {key}"} if key else {})})
     t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with LOCAL.open(req, timeout=timeout) as resp:
             return resp.status, json.load(resp), int((time.time() - t0) * 1000)
     except urllib.error.HTTPError as exc:
         try:
@@ -1581,7 +2044,7 @@ def is_mmproj(name):
 
 def gguf_root(reg=None):
     reg = reg or registry()
-    return os.path.expanduser(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
+    return expand(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
 
 
 def gguf_meta(path, tensors=False):
@@ -1828,19 +2291,37 @@ def llama_build_no(path, version_text):
     return int(d.group(1)) if d and ver <= 1 else ver     # 只有淺層編譯（回 0 或 1）才看資料夾名稱
 
 
+def llama_globs():
+    """家目錄下所有 llama-server：網頁編譯的（llama.cpp-bNNNN/build/bin/）與官方預編譯的（llama.cpp-bNNNN-<平台>/）。"""
+    pats = ("llama.cpp*/build*/bin/llama-server", "llama.cpp*/build*/bin/Release/llama-server", "llama.cpp*/llama-server")
+    found = {c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}
+    if OS == "darwin":
+        found |= {c for c in ("/opt/homebrew/bin/llama-server", "/usr/local/bin/llama-server") if os.path.exists(c)}
+    return sorted(found)
+
+
+GPU_LIBS = (("CUDA", "ggml-cuda"), ("ROCm", "ggml-hip"), ("Vulkan", "ggml-vulkan"), ("Metal", "ggml-metal"))
+
+
+def llama_backend(exe):
+    try:
+        libs = os.listdir(os.path.dirname(exe))
+    except OSError:
+        return "只有 CPU"
+    return next((b for b, key in GPU_LIBS if any(key in x for x in libs)), "只有 CPU")
+
+
 def llama_server_exe(reg=None):
     """這台用哪支 llama-server：登錄檔指定的優先，否則挑家目錄下版本號最大、有 GPU 後端的那支。"""
     reg = reg or registry()
     want = reg["machine"].get("llama_server")
-    if want and os.path.exists(os.path.expanduser(want)):
-        return os.path.expanduser(want)
+    if want and os.path.exists(expand(want)):
+        return expand(want)
     best, best_ver = None, -1
-    for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
+    for cand in llama_globs():
         rc, out, err = sh([cand, "--version"], timeout=15)
         ver = llama_build_no(cand, out + err)
-        libs = os.listdir(os.path.dirname(cand))
-        gpu = any(x.startswith(("libggml-hip", "libggml-cuda", "libggml-vulkan")) for x in libs)
-        score = ver + (10 ** 6 if gpu else 0)
+        score = ver + (10 ** 6 if llama_backend(cand) != "只有 CPU" else 0)
         if rc == 0 and score > best_ver:
             best, best_ver = cand, score
     return best
@@ -1928,7 +2409,10 @@ def llama_launch_env(exe, reg=None, gpus=None):
     env = {**os.environ, **{str(k): str(v) for k, v in (reg["machine"].get("llama_env") or {}).items()}}
     env.update(visible_env(gpus))
     lib = os.path.dirname(exe)
-    env["LD_LIBRARY_PATH"] = lib + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
+    # 執行檔旁邊的函式庫：Linux 靠 LD_LIBRARY_PATH；Windows 找 DLL 會看 PATH；macOS 的預編譯版用 @rpath，不必設
+    var = {"linux": "LD_LIBRARY_PATH", "windows": "PATH"}.get(OS)
+    if var:
+        env[var] = lib + (os.pathsep + env[var] if env.get(var) else "")
     return env
 
 
@@ -1950,6 +2434,9 @@ def llama_unit(slot_id):
 
 def ensure_llama_unit(slot_id, cfg_path):
     unit = llama_unit(slot_id)
+    if not SYSTEMD:
+        SUP.define(unit, cfg_path, engine_file(slot_id, "-llama.log"))
+        return unit
     # systemd --user 只看「登入帳號」的設定目錄；測試時代理的 HOME 是暫存目錄，所以可以另外指定
     unit_dir = os.environ.get("XCONSOLE_UNIT_DIR") or os.path.join(HOME, ".config/systemd/user")
     path = inside(unit_dir, unit)
@@ -1973,13 +2460,16 @@ def load_text(path):
         return None
 
 
-def _free_port(reg, start=8090):
+MODEL_PORTS = (8090, 8290)     # 模型服務可以用的埠；Windows 安裝程式的防火牆規則開同一段（8090-8289）
+
+
+def _free_port(reg, start=MODEL_PORTS[0]):
     used = set()
     for sl in reg["slots"]:
         p = (slot_config(sl) or {}).get("port") or sl.get("port")
         if p:
             used.add(int(p))
-    for p in range(start, start + 200):
+    for p in range(start, MODEL_PORTS[1]):
         if p in used or p == PORT:
             continue
         s = socket.socket()
@@ -2025,6 +2515,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     gpu_ids, err = pick_gpus(slot.get("gpu_ids") if gpus is ... else gpus, cards)
     if err:
         return 400, {"error": err}
+    if gpu_ids and not (has_nvidia() or OS == "linux"):
+        return 400, {"error": "這台的顯示卡（Windows 的 AMD／Intel，或 Apple）不能指定用哪幾張，請改回自動"}
     if gpu_ids and not has_nvidia():
         try:
             visible_env(gpu_ids)
@@ -2267,12 +2759,12 @@ def library():
                            "ready": m["ready"], "in_use": in_use.get(os.path.abspath(m["native"])),
                            "cn_origin": True, "arch": "qwen3.8-flash-next"})
     os.makedirs(root, exist_ok=True)
-    du = os.statvfs(root)
+    free_gib, total_gib = disk_free(root)
     real = os.path.realpath(root)
     store = max((x for x in storage_choices() if real == x["mount"] or real.startswith(x["mount"].rstrip("/") + "/")),
                 key=lambda x: len(x["mount"]), default=None)
-    return {"root": root, "free_gib": round(du.f_bavail * du.f_frsize / GIB, 1), "hdd": (store or {}).get("hdd"),
-            "total_gib": round(du.f_blocks * du.f_frsize / GIB, 1),
+    return {"root": root, "free_gib": free_gib, "hdd": (store or {}).get("hdd"),
+            "total_gib": total_gib,
             "gguf": ggufs, "strata": strata, "problems": problems,
             "llama_server": llama_server_exe(reg), "downloads": jobs}
 
@@ -2357,8 +2849,7 @@ def hf_files(repo, token=""):
         g["files"].append(f["path"])
         g["size"] += f["size"]
     reg = registry()
-    du = os.statvfs(gguf_root(reg)) if os.path.isdir(gguf_root(reg)) else None
-    free = round(du.f_bavail * du.f_frsize / GIB, 1) if du else None
+    free = disk_free(gguf_root(reg))[0] if os.path.isdir(gguf_root(reg)) else None
     out = []
     for g in groups.values():
         name, quant = pretty_model(g["stem"] + ".gguf")
@@ -2575,6 +3066,9 @@ def pools(reg, hw):
         "memory_model": mm,
         "swap": swap_pool(),
         "floors": fl,
+        # 綁卡靠 CUDA_VISIBLE_DEVICES（NVIDIA）或 KFD 序號換 HIP_VISIBLE_DEVICES（Linux 的 AMD）；
+        # Windows 的 AMD／Intel（Vulkan）與 Apple 沒有可靠的對應，不提供綁卡、一律用全部
+        "bindable": has_nvidia() or OS == "linux",
         "gpus": [{
             "id": g.get("id"), "name": g.get("name"),
             "total_gib": round((g.get("vram_total") or 0) / GIB, 1),
@@ -2594,6 +3088,9 @@ def pools(reg, hw):
             "gpu_used_gib": round(vram_used, 1),
             "floor_gib": fl["ram"],
         }
+        if OS == "darwin" and vram_total:
+            # Apple Silicon：GPU 只能用到統一記憶體的一部分（Metal 的上限），模型超過就載不起來
+            out["unified"]["gpu_limit_gib"] = round(vram_total, 1)
         out["ram"] = out["unified"]
     else:
         out["ram"] = {**ram, "floor_gib": fl["ram"]}
@@ -2653,6 +3150,11 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
             kv_note = (f"上下文 {cfg['max_context']:,}×{cfg['parallel']}、KV {cfg['kv']} "
                        f"要先預留 {kv} GiB（沒有 --kv-grow）")
 
+    if mm == "discrete" and not p["gpus"]:
+        # 沒有 GPU 的機器（例：只用 CPU 的 Windows）：權重與 KV 全在系統記憶體，照顯存算的話永遠載不進去
+        need_ram += need_vram
+        need_vram = 0.0
+
     detail = {}
     if mm == "unified_single":
         free = round(p["unified"]["free_gib"] + max(reclaim_vram, reclaim_ram), 1)
@@ -2660,6 +3162,10 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None):
         worst = round(free - need, 1)
         detail["unified"] = {"total": p["unified"]["total_gib"], "free": free,
                              "need": round(need, 1), "worst": worst, "floor": fl["ram"]}
+        lim = p["unified"].get("gpu_limit_gib")
+        if lim and need_vram > lim:
+            reasons.append(f"超過 GPU 能用的上限：這顆要約 {need_vram:.0f} GiB，這台 GPU 最多只能用 {lim:.0f} GiB"
+                           "（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）")
         if need and worst < fl["ram"]:
             reasons.append(
                 f"統一記憶體不足：需要約 {need:.0f} GiB，現在只剩 {free:.0f} GiB，"
@@ -2757,8 +3263,8 @@ def full_state():
         "chip": chip(reg["machine"]),
         # 總覽的「安裝推理引擎」那一步用：只看檔案在不在，不跑 --version（每 15 秒一次太貴）
         "engine": {"llama_server": bool((reg["machine"].get("llama_server")
-                                         and os.path.exists(os.path.expanduser(reg["machine"]["llama_server"])))
-                                        or glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server"))),
+                                         and os.path.exists(expand(reg["machine"]["llama_server"])))
+                                        or llama_globs()),
                    "building": bool(_BUILD.get("thread_alive"))},
         "slots": slots,
         "profiles": reg["profiles"],
@@ -2984,6 +3490,11 @@ def cuda_arch(nvcc):
 
 
 def build_prereqs():
+    if OS != "linux":
+        variant, _, why = prebuilt_variant()
+        return {"mode": "prebuilt", "tools": {}, "missing": [], "apt": "", "backend": variant, "flags": [], "env": {},
+                "notes": [f"這台是 {'macOS' if OS == 'darwin' else 'Windows'}，直接下載 llama.cpp 官方預編譯版：{why}。"
+                          "下載後核對官方公布的 sha256，對不上就不裝"], "jobs": 0}
     cxx = shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
     tools = {"git": bool(shutil.which("git")), "cmake": bool(shutil.which("cmake")), "C++ 編譯器": bool(cxx)}
     apt = {"git": "git", "cmake": "cmake", "C++ 編譯器": "build-essential"}
@@ -3083,6 +3594,175 @@ def _build_run(st, pre, log):
         _BUILD["thread_alive"] = False
 
 
+# ---- macOS／Windows：裝官方預編譯版（不必裝編譯工具）。Linux 照舊在這台編譯（CUDA／ROCm 版本跟著這台的驅動走）
+GH_API = os.environ.get("XCONSOLE_GH_API", "https://api.github.com")      # 測試時指到本機假站
+
+
+def prebuilt_variant():
+    """這台該裝哪一版預編譯：(變體, 另外要下載的執行階段檔名或 None, 給人看的理由)。Linux 回 None（在這台編譯）。"""
+    arm = platform_machine() in ("arm64", "aarch64")
+    if OS == "darwin":
+        return ("macos-arm64", None, "Apple Silicon，用 Metal 加速") if arm else ("macos-x64", None, "Intel Mac，只用 CPU")
+    if OS != "windows":
+        return None
+    a = "arm64" if arm else "x64"
+    if has_nvidia():
+        _, out, _ = sh(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], timeout=15)
+        m = re.match(r"(\d+)", out.strip())
+        drv = int(m.group(1)) if m else 0
+        cu = "13.4" if drv >= 580 or arm else "12.4"      # CUDA 13 要 580 版以上的驅動
+        return f"win-cuda-{cu}-{a}", f"cudart-llama-bin-win-cuda-{cu}-{a}.zip", f"NVIDIA 顯示卡，用 CUDA {cu}（驅動 {drv or '未知'}）"
+    if probe_win_adapters():
+        return f"win-vulkan-{a}", None, "AMD／Intel 顯示卡，用 Vulkan 加速"
+    return f"win-cpu-{a}", None, "沒有偵測到 GPU，只用 CPU"
+
+
+def _gh_json(path):
+    req = urllib.request.Request(GH_API + path, headers={"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def pick_release(releases, variant, extra):
+    """最新一版 bNNNN 裡有這個變體的：回 (版本, 主檔 asset, 執行階段 asset 或 None)。每個檔都要有官方 sha256。"""
+    ext = ".zip" if variant.startswith("win-") else ".tar.gz"
+    for rel in releases:
+        tag = rel.get("tag_name") or ""
+        if rel.get("draft") or not re.fullmatch(r"b\d+", tag):
+            continue
+        assets = {a["name"]: a for a in rel.get("assets") or [] if str(a.get("digest") or "").startswith("sha256:")}
+        main_a = assets.get(f"llama-{tag}-bin-{variant}{ext}")
+        if main_a and (not extra or extra in assets):
+            return tag, main_a, assets.get(extra) if extra else None
+    return None, None, None
+
+
+def _safe_extract(archive, dest):
+    """解壓縮，任何一個檔案會落到 dest 外面（../、絕對路徑、符號連結）就整個拒絕。"""
+    import tarfile
+    import zipfile
+    root = os.path.realpath(dest)
+    if archive.endswith(".zip"):
+        with zipfile.ZipFile(archive) as z:
+            for n in z.namelist():
+                if not os.path.realpath(os.path.join(root, n)).startswith(root + os.sep):
+                    raise RuntimeError(f"壓縮檔裡有不安全的路徑：{n}")
+            z.extractall(root)
+        return
+    with tarfile.open(archive) as t:
+        ok = []
+        for mem in t.getmembers():
+            inside_root = os.path.realpath(os.path.join(root, mem.name)).startswith(root + os.sep)
+            # 同資料夾內的函式庫版本連結（libggml.0.dylib → libggml.dylib）可以；其他連結、裝置檔一律拒絕
+            same_dir_link = mem.issym() and not os.path.isabs(mem.linkname) and ".." not in mem.linkname.split("/") \
+                and "/" not in mem.linkname
+            if not inside_root or not (mem.isfile() or mem.isdir() or same_dir_link):
+                raise RuntimeError(f"壓縮檔裡有不安全的路徑：{mem.name}")
+            ok.append(mem)
+        # 只解開逐一檢查過的成員；Python 有 data 過濾器（3.12 起，3.9.17 起也有）就再加一道
+        if hasattr(tarfile, "data_filter"):
+            t.extractall(root, members=ok, filter="data")
+        else:
+            t.extractall(root, members=ok)
+
+
+def _prebuilt_run(st, log):
+    def note(text):
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+    def fetch(asset, path, base_pct, span):
+        import hashlib
+        h = hashlib.sha256()
+        req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": "xconsole-agent"})
+        total, done, last = int(asset.get("size") or 0), 0, -1
+        with urllib.request.urlopen(req, timeout=60) as resp, open(path, "wb") as fh:
+            while True:
+                if _BUILD["cancel"]:
+                    raise RuntimeError("已取消")
+                chunk = resp.read(1 << 20)
+                if not chunk:
+                    break
+                fh.write(chunk)
+                h.update(chunk)
+                done += len(chunk)
+                pct = base_pct + int(span * done / total) if total else base_pct
+                if pct != last:
+                    note(f"[{pct:3d}%] 下載 {asset['name']}　{done / 1048576:.0f} / {total / 1048576:.0f} MB")
+                    last = pct
+        if "sha256:" + h.hexdigest() != asset["digest"]:
+            raise RuntimeError(f"{asset['name']} 的 sha256 跟官方公布的不一樣，已刪除，不安裝")
+
+    dest = st["dest"]
+    tmp = dest + ".part"
+    try:
+        st["phase"] = "下載"
+        save_json(BUILD_FILE, st)
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp)
+        arc = os.path.join(tmp, st["asset"]["name"])
+        span = 80 if st.get("extra") else 90
+        fetch(st["asset"], arc, 0, span)
+        st["phase"] = "核對與解壓縮"
+        save_json(BUILD_FILE, st)
+        out_dir = os.path.join(tmp, "out")
+        os.makedirs(out_dir)
+        _safe_extract(arc, out_dir)
+        if st.get("extra"):
+            arc2 = os.path.join(tmp, st["extra"]["name"])
+            fetch(st["extra"], arc2, span, 10)
+            _safe_extract(arc2, out_dir)
+        # macOS 的壓縮檔多包一層 llama-bNNNN/，拿掉讓 llama-server 直接在資料夾裡
+        inner = [x for x in os.listdir(out_dir) if not x.startswith(".")]
+        src = os.path.join(out_dir, inner[0]) if len(inner) == 1 and os.path.isdir(os.path.join(out_dir, inner[0])) else out_dir
+        exe = os.path.join(src, "llama-server" + EXE)
+        if not os.path.isfile(exe):
+            raise RuntimeError("壓縮檔裡找不到 llama-server，官方的檔案結構可能改了")
+        try:
+            vp = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60, env=llama_launch_env(exe))
+            rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            rc, out, err = 1, "", str(ex)
+        if rc != 0:
+            raise RuntimeError(f"裝好了但跑不起來（--version 失敗）：{(err or out)[-200:]}")
+        note(f"[100%] 完成：{(out + err).splitlines()[-1] if (out + err) else exe}")
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.replace(src, dest)
+        shutil.rmtree(tmp, ignore_errors=True)
+        st.update(state="done", phase="完成", exe=os.path.join(dest, "llama-server" + EXE))
+    except Exception as ex:  # noqa: BLE001
+        shutil.rmtree(tmp, ignore_errors=True)
+        st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
+    st["ended"] = time.time()
+    save_json(BUILD_FILE, st)
+    with _BUILD_LOCK:
+        _BUILD["thread_alive"] = False
+
+
+def start_prebuilt():
+    variant, extra, why = prebuilt_variant()
+    try:
+        tag, asset, extra_a = pick_release(_gh_json("/repos/ggml-org/llama.cpp/releases?per_page=10"), variant, extra)
+    except Exception as ex:  # noqa: BLE001
+        return 502, {"error": f"連不到 GitHub 取 llama.cpp 的版本清單（{str(ex)[:120]}）；這台要能連外，或把 llama-server 複製進家目錄"}
+    if not tag:
+        return 502, {"error": f"最近幾版 llama.cpp 都沒有 {variant} 的預編譯檔"}
+    with _BUILD_LOCK:
+        if _BUILD.get("thread_alive"):
+            return 409, {"error": "已經在安裝了"}
+        dest = inside(HOME, f"llama.cpp-{tag}-{variant}")
+        os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+        log = engine_file("build", "-llama-build.log")
+        open(log, "w").close()
+        st = {"state": "running", "phase": "準備", "tag": tag, "backend": variant, "dest": dest, "log": log,
+              "mode": "prebuilt", "why": why, "asset": asset, "extra": extra_a, "started": time.time()}
+        save_json(BUILD_FILE, st)
+        _BUILD.update(cancel=False, thread_alive=True)
+    threading.Thread(target=_prebuilt_run, args=(st, log), daemon=True).start()
+    return 200, {"ok": True, "tag": tag, "backend": variant}
+
+
 def parse_tag_refs(out):
     """git ls-remote 的 b<編號> 標籤 → {編號: commit}。附註式標籤要取 ^{} 那一行（指向的 commit），不是標籤物件本身。"""
     refs, peeled = {}, {}
@@ -3092,6 +3772,8 @@ def parse_tag_refs(out):
 
 
 def start_build():
+    if OS != "linux":
+        return start_prebuilt()
     with _BUILD_LOCK:
         if _BUILD.get("thread_alive"):
             return 409, {"error": "已經在編譯了"}
@@ -3131,10 +3813,7 @@ def cancel_build():
         _BUILD["cancel"] = True
         proc = _BUILD["proc"]
     if proc:
-        try:
-            os.killpg(proc.pid, 15)
-        except OSError:
-            pass
+        kill_tree(proc.pid)
     return 200, {"ok": True}
 
 def do_logs(slot_id, lines=300):
@@ -3142,10 +3821,12 @@ def do_logs(slot_id, lines=300):
     slot = next((s for s in reg["slots"] if s["id"] == slot_id), None)
     if not slot or not slot.get("unit"):
         return 404, {"error": "沒有這個欄位"}
-    scope = unit_scope(slot["unit"])
-    flag = "--user " if scope == "user" else ""
     try:
-        _, out, err = sh(["journalctl", *flag.split(), "-u", unit_name(slot["unit"]), "-n", int(lines), "--no-pager", "-o", "short-iso"])
+        if SYSTEMD:
+            flag = "--user " if unit_scope(slot["unit"]) == "user" else ""
+            _, out, err = sh(["journalctl", *flag.split(), "-u", unit_name(slot["unit"]), "-n", int(lines), "--no-pager", "-o", "short-iso"])
+        else:
+            out, err = "\n".join(tail_lines(SUP.log_path(unit_name(slot["unit"])) or "", int(lines))), ""
     except ValueError as ex:
         return 400, {"error": str(ex)}
     text = out or err
@@ -3169,15 +3850,14 @@ OWN_UNITS = ("xconsole-agent.service", "xconsole.service")
 def _apu_like():
     """AMD 的 APU（例 Ryzen AI 395）：CPU 型號裡帶內建顯示（「w/ Radeon 8060S」）。
     不能看 KFD 拓撲：它把同一顆晶片的 CPU 與 GPU 分成兩個節點（.27 實測），以前這樣判斷永遠判不出 APU。"""
-    for ln in (load_text("/proc/cpuinfo") or "").splitlines():
-        if ln.startswith("model name"):
-            return "Radeon" in ln
-    return False
+    return "Radeon" in cpu_name()
 
 
 def suggest_memory_model(gpus=None):
     """依硬體建議記憶體架構，回 (代號, 理由)。只是建議，管理者在網頁上確認後才寫入。"""
     gpus = probe_gpus() if gpus is None else gpus
+    if OS == "darwin":
+        return "unified_single", "Apple Silicon：CPU 與 GPU 共用同一塊統一記憶體（GPU 預設最多只能用到約 2/3～3/4）"
     if os.path.exists("/etc/nv_tegra_release"):
         return "unified_single", "偵測到 Jetson（/etc/nv_tegra_release），GPU 與系統共用同一塊記憶體"
     nvidia = has_nvidia()
@@ -3200,42 +3880,59 @@ def _rotational(dev):
     return None
 
 
+def _mounts():
+    """(掛載點, 裝置) 清單：只列真的檔案系統、可以放模型的地方。"""
+    if OS == "linux":
+        out = []
+        for line in (load_text("/proc/mounts") or "").splitlines():
+            f = line.split()
+            if len(f) >= 3 and f[2] in ("ext4", "xfs", "btrfs", "f2fs"):
+                mnt = f[1].replace("\\040", " ")
+                if not mnt.startswith(("/boot", "/snap")):
+                    out.append((mnt, f[0]))
+        return out
+    if OS == "darwin":
+        # /Volumes 底下另外插的碟；系統自己的（復原、時光機快照、隱藏的）不列
+        vols = [os.path.join("/Volumes", v) for v in sorted(os.listdir("/Volumes"))
+                if not v.startswith((".", "com.apple")) and v not in ("Recovery", "Preboot", "VM", "Update")] \
+            if os.path.isdir("/Volumes") else []
+        return [(v, v) for v in ["/", *vols] if os.path.isdir(v) and not os.path.islink(v)]
+    import ctypes
+    out = []
+    for letter in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+        root = f"{letter}:\\"
+        if os.path.isdir(root) and ctypes.windll.kernel32.GetDriveTypeW(root) == 3:      # 3＝固定磁碟，不列光碟、USB、網路磁碟
+            out.append((root, root))
+    return out
+
+
 def storage_choices():
     """可以當存放區的磁碟：實體檔案系統、50 GiB 以上。標出機械硬碟（大模型放上去載入要好幾分鐘）。"""
     out, seen = [], set()
-    for line in (load_text("/proc/mounts") or "").splitlines():
-        f = line.split()
-        if len(f) < 3 or f[2] not in ("ext4", "xfs", "btrfs", "f2fs") or f[1] in seen:
-            continue
-        mnt = f[1].replace("\\040", " ")
-        if mnt.startswith(("/boot", "/snap")):
+    for mnt, dev in _mounts():
+        if mnt in seen:
             continue
         try:
-            st = os.statvfs(mnt)
+            free, total = disk_free(mnt)
         except OSError:
             continue
-        total = st.f_blocks * st.f_frsize / GIB
         if total < 50:
             continue
-        seen.add(f[1])
-        path = os.path.join(HOME, "models", "gguf") if mnt == "/" or HOME.startswith(mnt.rstrip("/") + "/") \
-            else os.path.join(mnt, "models", "gguf")
-        out.append({"mount": mnt, "device": f[0], "total_gib": round(total, 1),
-                    "free_gib": round(st.f_bavail * st.f_frsize / GIB, 1),
-                    "hdd": _rotational(f[0]), "path": path,
+        seen.add(mnt)
+        under_home = mnt in ("/", HOME[:3]) or HOME.startswith(mnt.rstrip("/\\") + os.sep)
+        path = os.path.join(HOME, "models", "gguf") if under_home else os.path.join(mnt, "models", "gguf")
+        out.append({"mount": mnt, "device": dev, "total_gib": total, "free_gib": free,
+                    "hdd": _rotational(dev) if OS == "linux" else None, "path": path,
                     "writable": os.access(path if os.path.isdir(path) else mnt, os.W_OK)})
     return sorted(out, key=lambda x: (x["hdd"] is True, -x["free_gib"]))
 
 
 def llama_candidates():
     out = []
-    for cand in sorted(set(glob.glob(os.path.join(HOME, "llama.cpp*/build*/bin/llama-server")))):
+    for cand in llama_globs():
         rc, o, e = sh([cand, "--version"], timeout=15)
-        libs = os.listdir(os.path.dirname(cand))
-        gpu = next((b for b, pre in (("CUDA", "libggml-cuda"), ("ROCm", "libggml-hip"), ("Vulkan", "libggml-vulkan"))
-                    if any(x.startswith(pre) for x in libs)), "只有 CPU")
         out.append({"path": cand, "ok": rc == 0, "build": llama_build_no(cand, o + e) or None,
-                    "backend": gpu})
+                    "backend": llama_backend(cand)})
     return out
 
 
@@ -3257,7 +3954,7 @@ def machine_info():
         "detect": {"memory_model": sug, "why": why, "hostname": socket.gethostname(),
                    "gpus": [{"id": g["id"], "name": g.get("name"), "vram_gib": round((g.get("vram_total") or 0) / GIB, 1)}
                             for g in gpus],
-                   "ram_gib": round(_meminfo("MemTotal") / GIB, 1)},
+                   "ram_gib": round(mem_stats()["total"] / GIB, 1), "os": OS},
         "storage": storage_choices(),
         "llama": llama_candidates(),
         "gguf_count": len(models),
@@ -3267,8 +3964,12 @@ def machine_info():
 
 def data_bases():
     """存放區只准放在這些位置底下：家目錄、另外掛載的資料碟、常見的資料目錄。"""
-    mounts = [ln.split()[1].replace("\\040", " ") for ln in (load_text("/proc/mounts") or "").splitlines()
-              if len(ln.split()) > 2 and ln.split()[2] in ("ext4", "xfs", "btrfs", "f2fs")]
+    if OS == "darwin":
+        return [HOME, *(m for m, _ in _mounts() if m.startswith("/Volumes/"))]
+    if OS == "windows":
+        # 系統碟只准家目錄；其他固定磁碟整顆都可以（D:\models 這種常見放法）
+        return [HOME, *(m for m, _ in _mounts() if not m.upper().startswith(os.environ.get("SystemDrive", "C:").upper()))]
+    mounts = [m for m, _ in _mounts()]
     # 家目錄所在的分割區（例：/home 獨立掛載）不能整個當允許位置，否則存放區可以設到別的使用者家目錄裡
     return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot") and not HOME.startswith(m.rstrip("/") + "/")),
             "/data", "/models", "/srv", "/opt"]
@@ -3291,18 +3992,18 @@ def contained(raw, bases):
 
 def check_root(raw):
     """存放區：在允許的位置底下、不是隱藏資料夾、不在系統目錄、建得起來而且寫得進去。"""
-    p = os.path.expanduser(str(raw or "").strip())
+    p = expand(str(raw or "").strip())
     if not p:
         return "", None
     if not os.path.isabs(p):
-        return None, "存放區要寫完整路徑（/ 開頭，或 ~/ 開頭）"
+        return None, "存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）"
     bases = data_bases()
     real = contained(p, bases)
     if real is None:
         return None, "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）"
-    if any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
+    if OS == "linux" and any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
         return None, f"{real} 是系統目錄，不能當存放區"
-    if any(part.startswith(".") for part in real.split("/") if part):
+    if any(part.startswith(".") for part in re.split(r"[\\/]", real) if part):
         return None, "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡"
     try:
         os.makedirs(real, exist_ok=True)
@@ -3315,14 +4016,15 @@ def check_root(raw):
 
 def check_llama(raw):
     """llama-server：只准家目錄、/opt、/usr/local 底下，檔名就是 llama-server，--version 跑得起來（代理會執行它）。"""
-    raw = os.path.expanduser(str(raw or "").strip())
+    raw = expand(str(raw or "").strip())
     if not raw:
         return "", None
-    p = contained(raw, [HOME, "/opt", "/usr/local"])
+    allowed = [HOME, "/opt", "/usr/local"] + (["/opt/homebrew"] if OS == "darwin" else [])
+    p = contained(raw, allowed)
     if p is None:
-        return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下"
-    if os.path.basename(p) != "llama-server" or not os.path.isfile(p) or not os.access(p, os.X_OK):
-        return None, "要指到編好的 llama-server 執行檔（檔名就是 llama-server）"
+        return None, "llama-server 要在家目錄、/opt 或 /usr/local 底下" if OS != "windows" else "llama-server.exe 要在代理的家目錄底下"
+    if os.path.basename(p) != "llama-server" + EXE or not os.path.isfile(p) or not os.access(p, os.X_OK):
+        return None, f"要指到編好的 llama-server{EXE} 執行檔"
     rc, o, e = sh([p, "--version"], timeout=20)
     if rc != 0 or "version" not in (o + e):
         return None, "這支 llama-server 跑不起來（--version 失敗），可能缺函式庫"
@@ -3385,6 +4087,8 @@ def save_machine(body):
 def register_candidates(reg=None):
     """這台可以登記成欄位的服務：使用者自己建立的 systemd 使用者服務（服務檔在家目錄底下），
     扣掉 xConsole 自己的、已經登記過的。系統內建的桌面服務（GNOME、音效、印表機…）一台就上百個，全列出來管理者找不到自己的。"""
+    if not SYSTEMD:
+        return []                     # 沒有 systemd：只能用 xConsole 自己建的模型服務，沒有「既有服務」可登記
     reg = reg or registry()
     used = {s.get("unit") for s in reg["slots"]} | {e.get("unit") for s in reg["slots"]
                                                    for e in (s.get("engines") or {}).values()}
@@ -3595,15 +4299,56 @@ KEY_FILE = os.path.join(STATE_DIR, "agent-key.pem")
 
 def local_names():
     names = {"localhost", "127.0.0.1", socket.gethostname()}
-    _, out, _ = sh(["hostname", "-I"])
-    names.update(out.split())
+    if OS == "linux":
+        _, out, _ = sh(["hostname", "-I"])
+        names.update(out.split())
+    else:
+        # 不用 gethostbyname_ex 反查自己的主機名稱：沒有對應 DNS 的 Mac 會卡在這裡很久，代理一直起不來
+        names.add(_local_ip())
     return sorted(n for n in names if n and not n.startswith("fe80") and "%" not in n)
+
+
+def _cert_with_cryptography():
+    """有 cryptography 就用它產自簽（Windows 沒有 openssl 指令；macOS 內建的 LibreSSL 版本參差）。沒裝回 False 改用 openssl。"""
+    try:
+        import datetime as dt
+        import ipaddress
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+    except ImportError:
+        return False
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    sans = []
+    for n in local_names():
+        try:
+            sans.append(x509.IPAddress(ipaddress.ip_address(n)))
+        except ValueError:
+            sans.append(x509.DNSName(n))
+    name = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, "TW"), x509.NameAttribute(NameOID.ORGANIZATION_NAME, "xCloudinfo"),
+                      x509.NameAttribute(NameOID.COMMON_NAME, f"xconsole-agent-{socket.gethostname()}"[:64])])
+    now = dt.datetime.now(dt.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now - dt.timedelta(minutes=5))
+            .not_valid_after(now + dt.timedelta(days=3650))
+            .add_extension(x509.SubjectAlternativeName(sans), critical=False)
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .sign(key, hashes.SHA256()))
+    fd = os.open(KEY_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    with open(CERT_FILE, "wb") as fh:
+        fh.write(cert.public_bytes(serialization.Encoding.PEM))
+    return True
 
 
 def ensure_cert():
     """代理也走 HTTPS：主控台用 Bearer 權杖連過來，明文 http 等於權杖在內網裸奔。
     第一次啟動產一張自簽，SAN 涵蓋本機所有 IP；主控台部署時經 SSH 取回這張當作信任依據。"""
     if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        return
+    if _cert_with_cryptography():
         return
     san = ",".join(("IP:" if re.fullmatch(r"[\d.]+|[0-9a-fA-F:]+", n) and (":" in n or n.count(".") == 3)
                     else "DNS:") + n for n in local_names())
@@ -3612,7 +4357,8 @@ def ensure_cert():
                      "-subj", f"/C=TW/O=xCloudinfo/CN=xconsole-agent-{socket.gethostname()}",
                      "-addext", "subjectAltName=" + san, "-addext", "basicConstraints=critical,CA:FALSE"], timeout=60)
     if rc != 0:
-        raise SystemExit(f"產不出代理憑證（{err[:200]}），停止啟動，不退回明文 http")
+        raise SystemExit(f"產不出代理憑證（{err[:200]}），停止啟動，不退回明文 http。"
+                         "請安裝 Python 的 cryptography 套件（安裝程式會自動裝），或安裝 openssl")
     os.chmod(KEY_FILE, 0o600)
 
 
@@ -3620,6 +4366,12 @@ class AgentTLSServer(ThreadingHTTPServer):
     """在處理執行緒裡才握手，掃描器之類不講 TLS 的連線直接關掉，不會卡住主執行緒。"""
     daemon_threads = True
     ctx = None
+
+    def server_bind(self):
+        # 不做 HTTPServer 的 getfqdn 反解：沒有反解的機器（實際遇到：macOS 主機）會卡在這裡幾十秒才開始聽
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = socket.gethostname(), self.server_address[1]
 
     def finish_request(self, request, client_address):
         try:
@@ -3792,8 +4544,18 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    for st in (sys.stdout, sys.stderr):
+        # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
+        if st is not None and hasattr(st, "reconfigure"):
+            st.reconfigure(encoding="utf-8", errors="replace")
+    if sys.stdout is None:
+        # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
+        os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
+        sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "agent.log"), "a", encoding="utf-8", buffering=1)
     registry()
     ensure_cert()
+    if not SYSTEMD:
+        SUP.boot()
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(CERT_FILE, KEY_FILE)
@@ -3804,7 +4566,7 @@ def main():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 3 and sys.argv[1] == "--launch-llama":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--launch-llama":
         launch_llama(sys.argv[2])
     else:
         main()

@@ -191,7 +191,8 @@ def main():
     cat.upsert({"repo": "x/y-GGUF", "title": "改名"})
     case("編輯不會重複新增", (len(cat.load()), cat.load()[-2]["title"]), (n0 + 1, "改名"))
     case("移除", (cat.delete("x/y-GGUF"), len(cat.load())), (True, n0))
-    case("清單檔權限 0600", oct(os.stat(os.path.join(d, "c.json")).st_mode & 0o777), "0o600")
+    if os.name != "nt":                    # Windows 靠 ACL（安裝程式限縮資料夾權限），沒有 Unix 的權限位元
+        case("清單檔權限 0600", oct(os.stat(os.path.join(d, "c.json")).st_mode & 0o777), "0o600")
 
     print("\n全部通過" if OK else "\n有項目失敗")
     return 0 if OK else 1
