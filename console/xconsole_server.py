@@ -71,6 +71,9 @@ STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
 CERTS = tls.CertManager(STATE_DIR, PORT)
 CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "catalog.json"),
                             os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_default.json"))
+SD_CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "sd_catalog.json"),
+                               os.path.join(os.path.dirname(os.path.abspath(__file__)), "sd_catalog_default.json"),
+                               keys=("title", "kind", "desc", "tags", "vendor", "license", "parts", "defaults"))
 
 
 def load_json(path, default=None):
@@ -994,7 +997,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; style-src 'self'; script-src 'self'; "
-                         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
+                         "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
                          "frame-ancestors 'none'; object-src 'none'")
         if CERTS.hsts_header():
             # 只有正式憑證且管理者開了開關才送：自簽時送 HSTS 會讓使用者連「略過警告」都沒有
@@ -1113,6 +1116,43 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "；".join(errors)})
         return self._json(200, {"ok": True, "updated": done, "errors": errors})
 
+    def _sd_catalog_save(self, body, all_rows):
+        """畫圖與影片清單：每個元件的檔案與大小由代理讀 Hugging Face 的檔案清單（不下載）。"""
+        rows = SD_CATALOG.load()
+        if all_rows:
+            todo = [r for r in rows]
+        else:
+            fields, err = recommend.check_sd_fields(body)
+            if err:
+                return self._json(400, {"error": err})
+            todo = [fields]
+        done, errors = [], []
+        for fields in todo:
+            trees, last = {}, None
+            for repo in dict.fromkeys(p["repo"] for p in fields["parts"]):
+                for nid in self._hf_node(body.get("node")):
+                    code, t = call_node(nid, "/library/hf/tree", "POST", {"repo": repo}, timeout=60)
+                    if code == 200 or code == 400:      # 400＝repo 本身的問題，換一台也一樣
+                        break
+                if code != 200:
+                    last = t.get("error") or f"代理回 {code}"
+                    break
+                trees[repo] = t["files"]
+            if last:
+                errors.append(f"{fields['repo']}：{last}")
+                continue
+            files = recommend.sd_files(fields["parts"], trees)
+            if not recommend.sd_resolve({**fields, "files": files}):
+                errors.append(f"{fields['repo']}：照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭")
+                continue
+            done.append(SD_CATALOG.upsert({"repo": fields["repo"]} if all_rows else fields,
+                                          extra={"files": files, "refreshed": int(time.time())})["repo"])
+        self._audit("sd_catalog.refresh-all" if all_rows else "sd_catalog.save", "" if all_rows else todo[0]["repo"],
+                    not errors, {"updated": done, "message": "；".join(errors)[:300] if errors else None})
+        if errors and not done:
+            return self._json(400, {"error": "；".join(errors)})
+        return self._json(200, {"ok": True, "updated": done, "errors": errors})
+
     def _audit(self, action, target="", ok=True, detail=None):
         STORE.audit(self.user or "", self.ip, action, target, ok, detail)
 
@@ -1224,9 +1264,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
         if m:
             return self._json(*call_node(m.group(1), "/machine", timeout=60))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/build(/progress)?", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/build(/progress)?", path)
         if m:
-            return self._json(*call_node(m.group(1), "/llama/build" + (m.group(2) or ""), timeout=60))
+            return self._json(*call_node(m.group(1), f"/{m.group(2)}/build{m.group(3) or ''}", timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
             return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
@@ -1245,6 +1285,22 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, out)
         if path == "/api/catalog":
             return self._json(200, {"items": CATALOG.load(), "uses": recommend.USES})
+        # ---- 畫圖與影片
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/recommend", path)
+        if m:
+            code, st = call_node(m.group(1), "/state", timeout=30)
+            if code != 200:
+                return self._json(code, st)
+            lc, lib = call_node(m.group(1), "/sd/library", timeout=60)
+            if lc != 200:
+                return self._json(lc, lib)
+            return self._json(200, recommend.recommend_sd(st, lib, SD_CATALOG.load()))
+        if path == "/api/sd/catalog":
+            return self._json(200, {"items": SD_CATALOG.load(), "roles": recommend.SD_ROLES, "kinds": recommend.SD_KINDS,
+                                    "samplers": recommend.SD_SAMPLERS})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output)?)?", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/sd/jobs" + (m.group(2) or ""), timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -1406,16 +1462,17 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
                                                                        "agent_port": port}})
             return self._json(200, {"ok": True})
-        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel|sd/build|sd/build/cancel)", path)
         if m:
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
             act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
-                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel"}.get(m.group(2)) or (
+                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel",
+                   "sd/build": "sd.build", "sd/build/cancel": "sd.build_cancel"}.get(m.group(2)) or (
                 "profile.delete" if m.group(2).startswith("profiles/") else
                 "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
             self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
                         {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "bandwidth_gbs", "ram_bandwidth_gbs", "gguf_root",
-                                                  "llama_server", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
+                                                  "llama_server", "sd_cli", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
             return self._json(code, out)
 
@@ -1464,9 +1521,12 @@ class Handler(BaseHTTPRequestHandler):
                          "network": (out.get("network") or {}).get("ok")})
             return self._json(code, out)
         # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
-        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|download|delete)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete)", path)
         if m:
             node_id, act = m.groups()
+            if act == "hf/tree":
+                return self._json(*call_node(node_id, "/library/hf/tree", "POST",
+                                             {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
             if act == "hf":
                 return self._json(*call_node(node_id, "/library/hf", "POST",
                                              {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
@@ -1480,6 +1540,45 @@ class Handler(BaseHTTPRequestHandler):
             code, out = call_node(node_id, "/library/delete", "POST", {"id": body.get("id")}, timeout=120)
             self._audit("library.delete", f"{node_id}/{body.get('id')}", code == 200,
                         {"freed_gib": out.get("freed_gib"), "message": out.get("error")})
+            return self._json(code, out)
+        # ---- 畫圖與影片：清單增改刪、下載（照清單組好規格，或內部測試手動組）、刪除、試算、產圖
+        if path in ("/api/sd/catalog/save", "/api/sd/catalog/refresh-all"):
+            return self._sd_catalog_save(body, path.endswith("refresh-all"))
+        if path in ("/api/sd/catalog/delete", "/api/sd/catalog/move"):
+            repo = str(body.get("repo") or "")
+            ok = SD_CATALOG.delete(repo) if path.endswith("delete") else SD_CATALOG.move(repo, -1 if body.get("step") == -1 else 1)
+            self._audit("sd_catalog." + path.rsplit("/", 1)[1], repo, ok)
+            return self._json(200 if ok else 404, {"ok": ok} if ok else {"error": "清單裡沒有這個模型"})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/download", path)
+        if m:
+            if body.get("manual"):
+                spec = {**body["manual"], "internal": True} if isinstance(body["manual"], dict) else {}
+            else:
+                e = next((r for r in SD_CATALOG.load() if r["repo"] == body.get("repo")), None)
+                combo = recommend.sd_resolve(e, str(body.get("path") or "")) if e else []
+                if not combo:
+                    return self._json(404, {"error": "清單裡沒有這顆或這個量化，請重新整理"})
+                spec = recommend.sd_spec(e, combo[0])
+            code, out = call_node(m.group(1), "/sd/download", "POST", {"spec": spec, "token": body.get("token")}, timeout=120)
+            self._audit("sd.download.internal" if body.get("manual") else "sd.download", m.group(1), code == 200,
+                        {"model": spec.get("id"), "parts": [f"{p.get('repo')}/{p.get('path')}" for p in spec.get("parts") or []][:8],
+                         "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/(delete|admit|generate)", path)
+        if m:
+            node_id, act = m.groups()
+            keys = {"delete": ("id",), "admit": ("model", "width", "height", "frames"),
+                    "generate": ("model", "prompt", "negative", "width", "height", "steps", "cfg", "sampler", "seed", "frames", "fps")}[act]
+            code, out = call_node(node_id, f"/sd/{act}", "POST", {k: body.get(k) for k in keys}, timeout=120)
+            if act != "admit":
+                self._audit(f"sd.{act}", f"{node_id}/{body.get('id') or body.get('model')}", code == 200,
+                            {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}"}
+                                                            if act == "generate" else {"freed_gib": out.get("freed_gib")}))
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)
+        if m:
+            code, out = call_node(m.group(1), f"/sd/jobs/{m.group(2)}/{m.group(3)}", "POST", {})
+            self._audit(f"sd.job.{m.group(3)}", f"{m.group(1)}/{m.group(2)}", code == 200, {"message": out.get("error")})
             return self._json(code, out)
         # ---- 推薦清單：管理者增改刪；大小與架構一律由代理從 Hugging Face 檔頭讀，不手填
         if path in ("/api/catalog/save", "/api/catalog/refresh-all"):

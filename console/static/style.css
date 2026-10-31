@@ -997,3 +997,34 @@ html.brand-pending #login-org { visibility: hidden; }
   .brand-logo:not([hidden]) ~ #brand-name { display: none; }
   #brand-name { font-size: 15px; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* ---- 畫圖與影片（產生頁左邊填、右邊看結果；最近產出在區塊內捲，不把頁面拉長） */
+.ok-t { color: var(--ok); }
+.warn-t { color: var(--warn); }
+textarea.short { min-height: 48px; }
+.grid.sd-gen { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.sd-admit { flex: 1 1 260px; min-width: 0; }
+.sd-out .bar { height: 10px; margin: 8px 0 6px; }
+.sd-out .bar .seg { background: var(--brand); transition: width .4s; }
+.sd-media { background: var(--panel); border-radius: var(--radius-sm); display: flex; justify-content: center; align-items: center;
+  min-height: 160px; overflow: hidden; }
+.sd-media img, .sd-media video { display: block; max-width: 100%; max-height: 380px; object-fit: contain; }
+.sd-prompt { color: var(--ink-2); margin: 6px 0 0; overflow-wrap: anywhere; max-height: 3.2em; overflow: hidden; }
+.scrollbox.sd-recent { max-height: 190px; }
+.sd-job { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; width: 100%; text-align: left; padding: 7px 10px;
+  border: 0; background: transparent; border-radius: 8px; cursor: pointer; color: inherit; font: inherit; align-items: center; }
+.sd-job:hover { background: var(--panel); }
+.sd-job-p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.steps[hidden] { display: none; }
+/* 畫圖清單的表格與元件列欄位多（repo、檔名、種類），用比一般寬版更寬的彈窗，repo 不會一字一行 */
+.modal.wide.xwide { width: min(1040px, 100%); }
+.xwide .cat-box td.mono { min-width: 200px; }
+.sd-parts { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.sd-part { display: grid; grid-template-columns: 150px minmax(0, 1.2fr) 190px minmax(0, 1.6fr) auto; gap: 8px; width: 100%; }
+.sd-parts.exact .sd-part { grid-template-columns: 150px minmax(0, 1.2fr) minmax(0, 1.8fr) auto; }
+@media (max-width: 860px) {
+  .grid.sd-gen { grid-template-columns: 1fr; }
+  .grid.sd-gen .form-row { grid-template-columns: 1fr 1fr; }       /* 尺寸、步數這些短欄位兩個一排，手機上不會拉成一長條 */
+  .sd-media img, .sd-media video { max-height: 240px; }
+  .sd-part, .sd-parts.exact .sd-part { grid-template-columns: 1fr 1fr; }
+}

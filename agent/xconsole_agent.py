@@ -13,6 +13,7 @@ node_agent 沒有的那一層：角色欄位與模型、准入控制、啟停、
 
 機密：對外一律 Bearer 權杖，存檔案 0600，不走環境變數、不進網址。
 """
+import base64
 import functools
 import glob
 import io
@@ -2950,26 +2951,40 @@ def start_download(repo, stem, mmproj=None, token=""):
     return 200, {"ok": True, "id": jid, "folder": folder, "size_gib": pick["size_gib"]}
 
 
+def _job_files(j, dest):
+    """(repo, 檔案路徑, 存到哪)。文字模型整批來自同一個 repo、放同一個資料夾；畫圖模型每個檔各有來源與資料夾。"""
+    out = []
+    for f in j["files"]:
+        if isinstance(f, list):
+            repo, path, folder, name = f
+            d = inside(dest, folder)
+            os.makedirs(d, exist_ok=True)
+            out.append((repo, path, inside(d, name)))
+        else:
+            out.append((j["repo"], f, inside(dest, os.path.basename(f))))
+    return out
+
+
 def _download_job(jid, dest):
     j = _DL[jid]
     j["state"] = "running"
     _dl_save()
     try:
+        files = _job_files(j, dest)
         sizes = {}
-        for f in j["files"]:
-            with _hf_get(_hf_file_url(j["repo"], f), j["_token"], timeout=60) as resp:
-                sizes[f] = int(resp.headers.get("Content-Length") or 0)
+        for repo, f, _ in files:
+            with _hf_get(_hf_file_url(repo, f), j["_token"], timeout=60) as resp:
+                sizes[repo, f] = int(resp.headers.get("Content-Length") or 0)
         j["total"] = sum(sizes.values())
         done_before = 0
-        for f in j["files"]:
-            out = inside(dest, os.path.basename(f))
-            if os.path.exists(out) and os.path.getsize(out) == sizes[f]:
-                done_before += sizes[f]
+        for repo, f, out in files:
+            if os.path.exists(out) and os.path.getsize(out) == sizes[repo, f]:
+                done_before += sizes[repo, f]
                 j["done"] = done_before
                 continue
             part = out + ".part"
             have = os.path.getsize(part) if os.path.exists(part) else 0
-            with _hf_get(_hf_file_url(j["repo"], f), j["_token"],
+            with _hf_get(_hf_file_url(repo, f), j["_token"],
                          rng=have if have else None, timeout=60) as resp:
                 mode = "ab" if have and resp.status == 206 else "wb"
                 if mode == "wb":
@@ -2988,10 +3003,10 @@ def _download_job(jid, dest):
                         if time.time() - last > 5:
                             _dl_save()
                             last = time.time()
-            if os.path.getsize(part) != sizes[f]:
-                raise IOError(f"{os.path.basename(f)} 大小不對（{os.path.getsize(part)}／{sizes[f]}），可能連線中斷，重新下載會接續")
+            if os.path.getsize(part) != sizes[repo, f]:
+                raise IOError(f"{os.path.basename(f)} 大小不對（{os.path.getsize(part)}／{sizes[repo, f]}），可能連線中斷，重新下載會接續")
             os.replace(part, out)
-            done_before += sizes[f]
+            done_before += sizes[repo, f]
         j["state"] = "done"
     except InterruptedError as exc:
         j["state"], j["error"] = "cancelled", str(exc)
@@ -3265,7 +3280,9 @@ def full_state():
         "engine": {"llama_server": bool((reg["machine"].get("llama_server")
                                          and os.path.exists(expand(reg["machine"]["llama_server"])))
                                         or llama_globs()),
-                   "building": bool(_BUILD.get("thread_alive"))},
+                   "building": bool(_BUILD.get("thread_alive")) and _BUILD.get("kind") == "llama",
+                   "sd_cli": bool(sd_cli_exe(reg)),
+                   "sd_building": bool(_BUILD.get("thread_alive")) and _BUILD.get("kind") == "sd"},
         "slots": slots,
         "profiles": reg["profiles"],
         "pools": p,
@@ -3454,12 +3471,27 @@ def delete_profile(key):
     return 200, {"ok": True}
 
 
-# ---- 在網頁上編譯 llama.cpp
-# 系統套件（git、cmake、編譯器、CUDA／ROCm）要 sudo，網頁不代裝，只檢查並列出要請 IT 裝什麼；
-# 其餘（下載原始碼、設定、編譯）由代理在背景做，可以看進度、可以取消。版本釘在 llama.cpp 最新的正式版編號。
+# ---- 在網頁上安裝推理引擎（llama.cpp、stable-diffusion.cpp）
+# Linux 在這台編譯（CUDA／ROCm 版本跟著這台的驅動走）：系統套件（git、cmake、編譯器、CUDA／ROCm）要 sudo，網頁不代裝，
+# 只檢查並列出要請 IT 裝什麼；其餘（下載原始碼、設定、編譯）由代理在背景做，可以看進度、可以取消。
+# macOS／Windows 裝官方預編譯版，核對官方公布的 sha256。版本一律釘在官方最新的正式版編號。
+# 兩種引擎共用一把鎖：同時編兩個會把系統記憶體吃光。
 LLAMA_REPO = "https://github.com/ggml-org/llama.cpp"
+SD_REPO = "https://github.com/leejet/stable-diffusion.cpp"
 BUILD_FILE = os.path.join(STATE_DIR, "llama-build.json")
-_BUILD = {"proc": None, "cancel": False}
+ENGINES = {
+    "llama": {"name": "llama.cpp", "repo": LLAMA_REPO, "file": BUILD_FILE, "tag_rx": r"b(\d+)", "glob": "refs/tags/b*",
+              "dir": "llama.cpp-{}", "target": "llama-server", "submodules": False, "extra": ["-DLLAMA_CURL=OFF"],
+              "cuda": "-DGGML_CUDA=ON", "hip": "-DGGML_HIP=ON", "hip_targets": "AMDGPU_TARGETS",
+              "gh": "/repos/ggml-org/llama.cpp/releases?per_page=10"},
+    # stable-diffusion.cpp 的正式版標籤是 master-<編號>-<commit 前七碼>；ggml 等是 git 子模組，要一起抓
+    "sd": {"name": "stable-diffusion.cpp", "repo": SD_REPO, "file": os.path.join(STATE_DIR, "sd-build.json"),
+           "tag_rx": r"master-(\d+)-[0-9a-f]+", "glob": "refs/tags/master-*", "dir": "stable-diffusion.cpp-{}",
+           "target": "sd-cli", "submodules": True, "extra": [],
+           "cuda": "-DSD_CUDA=ON", "hip": "-DSD_HIPBLAS=ON", "hip_targets": "GPU_TARGETS",
+           "gh": "/repos/leejet/stable-diffusion.cpp/releases?per_page=10"},
+}
+_BUILD = {"proc": None, "cancel": False, "kind": None}
 _BUILD_LOCK = threading.Lock()
 
 
@@ -3489,11 +3521,12 @@ def cuda_arch(nvcc):
     return str(best), f"這版 CUDA 編譯器不認得 sm_{want}，改編 sm_{best}，執行時由驅動即時轉換（第一次載入會慢一點）"
 
 
-def build_prereqs():
+def build_prereqs(kind="llama"):
+    eng = ENGINES[kind]
     if OS != "linux":
-        variant, _, why = prebuilt_variant()
-        return {"mode": "prebuilt", "tools": {}, "missing": [], "apt": "", "backend": variant, "flags": [], "env": {},
-                "notes": [f"這台是 {'macOS' if OS == 'darwin' else 'Windows'}，直接下載 llama.cpp 官方預編譯版：{why}。"
+        variant, _, why = prebuilt_variant(kind)
+        return {"mode": "prebuilt", "tools": {}, "missing": [], "apt": "", "backend": variant or "none", "flags": [], "env": {},
+                "notes": [f"這台是 {'macOS' if OS == 'darwin' else 'Windows'}，直接下載 {eng['name']} 官方預編譯版：{why}。"
                           "下載後核對官方公布的 sha256，對不上就不裝"], "jobs": 0}
     cxx = shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
     tools = {"git": bool(shutil.which("git")), "cmake": bool(shutil.which("cmake")), "C++ 編譯器": bool(cxx)}
@@ -3504,7 +3537,7 @@ def build_prereqs():
         nv = _nvcc()
         if nv:
             arch, why = cuda_arch(nv)
-            backend, flags, env = "cuda", ["-DGGML_CUDA=ON", f"-DCMAKE_CUDA_ARCHITECTURES={arch}"], {"PATH": os.path.dirname(nv) + ":" + os.environ.get("PATH", "")}
+            backend, flags, env = "cuda", [eng["cuda"], f"-DCMAKE_CUDA_ARCHITECTURES={arch}"], {"PATH": os.path.dirname(nv) + ":" + os.environ.get("PATH", "")}
             notes.append(why)
         else:
             notes.append("有 NVIDIA 顯示卡但沒有 CUDA 編譯器（nvcc），會編成只用 CPU。要用 GPU 請 IT 安裝 CUDA Toolkit（nvidia-cuda-toolkit 或 NVIDIA 官方套件）")
@@ -3513,9 +3546,11 @@ def build_prereqs():
         if hc:
             _, ri, _ = sh(["rocminfo"], timeout=30)
             gfx = sorted(set(re.findall(r"Name:\s+(gfx\w+)", ri)))
-            rocm = os.path.dirname(os.path.dirname(hc))
+            # hipcc 常是 /usr/bin/hipcc → /etc/alternatives → /opt/rocm-x.y/bin/hipcc 的符號連結：要追到底才找得到 ROCm 根目錄
+            # （.27 實際踩到：照 /usr/bin 推成 /usr，HIPCXX=/usr/llvm/bin/clang 不存在，cmake 設定就失敗）
+            rocm = os.path.dirname(os.path.dirname(os.path.realpath(hc)))
             backend = "hip"
-            flags = ["-DGGML_HIP=ON"] + ([f"-DAMDGPU_TARGETS={';'.join(gfx)}"] if gfx else [])
+            flags = [eng["hip"]] + ([f"-D{eng['hip_targets']}={';'.join(gfx)}"] if gfx else [])
             env = {"HIPCXX": os.path.join(rocm, "llvm/bin/clang"), "HIP_PATH": rocm}
             notes.append(f"用 ROCm 編，目標 {', '.join(gfx) or '自動偵測'}")
         else:
@@ -3526,26 +3561,30 @@ def build_prereqs():
             "backend": backend, "flags": flags, "env": env, "notes": notes, "jobs": max(1, (os.cpu_count() or 2) // 2)}
 
 
-def build_progress():
+def build_progress(kind="llama"):
     """編譯進度（輪詢用，便宜）：工作狀態與記錄最後 40 行。代理重啟過的話，標成中斷。"""
-    st = load_json(BUILD_FILE, {}) or {}
-    if st.get("state") == "running" and not _BUILD.get("thread_alive"):
+    st = load_json(ENGINES[kind]["file"], {}) or {}
+    mine = _BUILD.get("thread_alive") and _BUILD.get("kind") == kind
+    if st.get("state") == "running" and not mine:
         st.update(state="interrupted", error="代理重啟過，編譯中斷；再按一次會接著下載好的原始碼繼續")
     log = st.get("log")
-    return {"job": st, "running": bool(_BUILD.get("thread_alive")),
+    return {"job": st, "running": bool(mine), "other": (_BUILD.get("kind") if _BUILD.get("thread_alive") and not mine else None),
             "log_tail": tail_lines(log, 40) if log and os.path.exists(log) else []}
 
 
-def build_status():
-    """打開編譯視窗時看一次：工具齊不齊、會用哪種加速、已經有哪些編好的 llama-server。"""
-    pre = build_prereqs()
-    return {**build_progress(), "prereqs": {k: v for k, v in pre.items() if k != "env"}, "installed": llama_candidates()}
+def build_status(kind="llama"):
+    """打開編譯視窗時看一次：工具齊不齊、會用哪種加速、已經有哪些編好的執行檔。"""
+    pre = build_prereqs(kind)
+    return {**build_progress(kind), "prereqs": {k: v for k, v in pre.items() if k != "env"},
+            "installed": llama_candidates() if kind == "llama" else sd_candidates()}
 
 
-def _build_run(st, pre, log):
+def _build_run(st, pre, log, kind="llama"):
+    eng = ENGINES[kind]
+
     def step(phase, argv, cwd=None, timeout=7200):
         st["phase"] = phase
-        save_json(BUILD_FILE, st)
+        save_json(eng["file"], st)
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(f"\n===== {phase} =====\n")
             fh.flush()
@@ -3566,30 +3605,33 @@ def _build_run(st, pre, log):
             raise RuntimeError(f"{phase}失敗（結束碼 {rc}），請看下面的記錄")
 
     dest = st["dest"]
+    sub = ["--recurse-submodules", "--shallow-submodules"] if eng["submodules"] else []
     try:
         if not os.path.isdir(os.path.join(dest, ".git")):
-            step("下載原始碼", ["git", "clone", "--depth", "1", "--branch", st["tag"], LLAMA_REPO, dest])
+            step("下載原始碼", ["git", "clone", "--depth", "1", *sub, "--branch", st["tag"], eng["repo"], dest])
         else:
             # 資料夾已經在（上次中斷）：先還原成乾淨的那一版，被改過的檔案與舊的 build 一律清掉，再核對 commit
             step("還原原始碼", ["git", "-C", dest, "reset", "--hard", "--quiet", st["commit"]])
             step("清掉舊檔", ["git", "-C", dest, "clean", "-xfdq"])
+            if eng["submodules"]:
+                step("還原子模組", ["git", "-C", dest, "submodule", "update", "--init", "--recursive", "--depth", "1", "--force"])
         # 編譯之前核對原始碼就是官方那個版本：資料夾早就存在（上次中斷、或別人放的）時也一樣要對得上
         rc, head, _ = sh(["git", "-C", dest, "rev-parse", "HEAD"], timeout=30)
         if rc != 0 or head.strip() != st["commit"]:
             raise RuntimeError(f"{dest} 的原始碼跟官方 {st['tag']} 對不上，不編譯。請把這個資料夾移走再按一次")
         step("設定", ["cmake", "-S", dest, "-B", os.path.join(dest, "build"), "-DCMAKE_BUILD_TYPE=Release",
-                      "-DLLAMA_CURL=OFF", *pre["flags"]])
+                      *eng["extra"], *pre["flags"]])
         step("編譯", ["cmake", "--build", os.path.join(dest, "build"), "--config", "Release", "-j", pre["jobs"],
-                      "--target", "llama-server"])
-        exe = os.path.join(dest, "build", "bin", "llama-server")
-        rc, out, err = sh([exe, "--version"], timeout=30)
+                      "--target", eng["target"]])
+        exe = os.path.join(dest, "build", "bin", eng["target"])
+        rc, out, err = sh([exe, "--version"] if kind == "llama" else [exe, "--help"], timeout=30)
         if rc != 0:
-            raise RuntimeError("編好了但跑不起來（--version 失敗），可能缺 GPU 函式庫")
+            raise RuntimeError(f"編好了但跑不起來（{'--version' if kind == 'llama' else '--help'} 失敗），可能缺 GPU 函式庫")
         st.update(state="done", phase="完成", exe=exe)
     except Exception as ex:  # noqa: BLE001
         st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
     st["ended"] = time.time()
-    save_json(BUILD_FILE, st)
+    save_json(eng["file"], st)
     with _BUILD_LOCK:
         _BUILD["thread_alive"] = False
 
@@ -3598,9 +3640,21 @@ def _build_run(st, pre, log):
 GH_API = os.environ.get("XCONSOLE_GH_API", "https://api.github.com")      # 測試時指到本機假站
 
 
-def prebuilt_variant():
-    """這台該裝哪一版預編譯：(變體, 另外要下載的執行階段檔名或 None, 給人看的理由)。Linux 回 None（在這台編譯）。"""
+def prebuilt_variant(kind="llama"):
+    """這台該裝哪一版預編譯：(變體, 另外要下載的執行階段檔名或 None, 給人看的理由)。Linux 回 None（在這台編譯）。
+    變體為 None 代表官方沒有這台能用的版本（理由寫在第三個）。"""
     arm = platform_machine() in ("arm64", "aarch64")
+    if kind == "sd" and OS in ("darwin", "windows"):
+        # stable-diffusion.cpp 官方只出 Apple Silicon 與 Windows x64（CPU／CUDA 12／Vulkan）
+        if OS == "darwin":
+            return ("macos-arm64", None, "Apple Silicon，用 Metal 加速") if arm else (None, None, "Intel Mac 沒有官方預編譯版")
+        if arm:
+            return None, None, "Windows on ARM 沒有官方預編譯版"
+        if has_nvidia():
+            return "win-cuda12-x64", "cudart-sd-bin-win-cu12-x64.zip", "NVIDIA 顯示卡，用 CUDA 12"
+        if probe_win_adapters():
+            return "win-vulkan-x64", None, "AMD／Intel 顯示卡，用 Vulkan 加速"
+        return "win-cpu-x64", None, "沒有偵測到 GPU，只用 CPU"
     if OS == "darwin":
         return ("macos-arm64", None, "Apple Silicon，用 Metal 加速") if arm else ("macos-x64", None, "Intel Mac，只用 CPU")
     if OS != "windows":
@@ -3623,15 +3677,22 @@ def _gh_json(path):
         return json.load(resp)
 
 
-def pick_release(releases, variant, extra):
-    """最新一版 bNNNN 裡有這個變體的：回 (版本, 主檔 asset, 執行階段 asset 或 None)。每個檔都要有官方 sha256。"""
-    ext = ".zip" if variant.startswith("win-") else ".tar.gz"
+def pick_release(releases, variant, extra, kind="llama"):
+    """最新一版正式版裡有這個變體的：回 (版本, 主檔 asset, 執行階段 asset 或 None)。每個檔都要有官方 sha256。
+    llama.cpp：bNNNN、llama-bNNNN-bin-<變體>；stable-diffusion.cpp：master-NNN-<commit>、sd-master-<commit>-bin-<變體>.zip
+    （macOS 的檔名帶系統版本，例 Darwin-macOS-26.6.2-arm64）。"""
+    ext = ".zip" if variant.startswith("win-") or kind == "sd" else ".tar.gz"
     for rel in releases:
         tag = rel.get("tag_name") or ""
-        if rel.get("draft") or not re.fullmatch(r"b\d+", tag):
+        m = re.fullmatch(r"master-\d+-([0-9a-f]+)" if kind == "sd" else r"b\d+", tag)
+        if rel.get("draft") or not m:
             continue
         assets = {a["name"]: a for a in rel.get("assets") or [] if str(a.get("digest") or "").startswith("sha256:")}
-        main_a = assets.get(f"llama-{tag}-bin-{variant}{ext}")
+        if kind == "sd":
+            want = r"Darwin-macOS-[\d.]+-arm64" if variant == "macos-arm64" else re.escape(variant)
+            main_a = next((a for n, a in assets.items() if re.fullmatch(rf"sd-master-{m.group(1)}-bin-{want}\.zip", n)), None)
+        else:
+            main_a = assets.get(f"llama-{tag}-bin-{variant}{ext}")
         if main_a and (not extra or extra in assets):
             return tag, main_a, assets.get(extra) if extra else None
     return None, None, None
@@ -3666,7 +3727,9 @@ def _safe_extract(archive, dest):
             t.extractall(root, members=ok)
 
 
-def _prebuilt_run(st, log):
+def _prebuilt_run(st, log, kind="llama"):
+    eng = ENGINES[kind]
+
     def note(text):
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(text + "\n")
@@ -3697,14 +3760,14 @@ def _prebuilt_run(st, log):
     tmp = dest + ".part"
     try:
         st["phase"] = "下載"
-        save_json(BUILD_FILE, st)
+        save_json(eng["file"], st)
         shutil.rmtree(tmp, ignore_errors=True)
         os.makedirs(tmp)
         arc = os.path.join(tmp, st["asset"]["name"])
         span = 80 if st.get("extra") else 90
         fetch(st["asset"], arc, 0, span)
         st["phase"] = "核對與解壓縮"
-        save_json(BUILD_FILE, st)
+        save_json(eng["file"], st)
         out_dir = os.path.join(tmp, "out")
         os.makedirs(out_dir)
         _safe_extract(arc, out_dir)
@@ -3712,79 +3775,89 @@ def _prebuilt_run(st, log):
             arc2 = os.path.join(tmp, st["extra"]["name"])
             fetch(st["extra"], arc2, span, 10)
             _safe_extract(arc2, out_dir)
-        # macOS 的壓縮檔多包一層 llama-bNNNN/，拿掉讓 llama-server 直接在資料夾裡
+        # macOS 的壓縮檔多包一層 llama-bNNNN/，拿掉讓執行檔直接在資料夾裡
         inner = [x for x in os.listdir(out_dir) if not x.startswith(".")]
         src = os.path.join(out_dir, inner[0]) if len(inner) == 1 and os.path.isdir(os.path.join(out_dir, inner[0])) else out_dir
-        exe = os.path.join(src, "llama-server" + EXE)
+        exe = os.path.join(src, eng["target"] + EXE)
         if not os.path.isfile(exe):
-            raise RuntimeError("壓縮檔裡找不到 llama-server，官方的檔案結構可能改了")
+            raise RuntimeError(f"壓縮檔裡找不到 {eng['target']}，官方的檔案結構可能改了")
+        if OS != "windows":
+            os.chmod(exe, 0o700)               # 只有代理自己（同一個使用者）要執行它
+        flag = "--version" if kind == "llama" else "--help"
         try:
-            vp = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=60, env=llama_launch_env(exe))
+            vp = subprocess.run([exe, flag], capture_output=True, text=True, timeout=60,
+                                env=llama_launch_env(exe) if kind == "llama" else None)
             rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
         except (OSError, subprocess.TimeoutExpired) as ex:
             rc, out, err = 1, "", str(ex)
         if rc != 0:
-            raise RuntimeError(f"裝好了但跑不起來（--version 失敗）：{(err or out)[-200:]}")
-        note(f"[100%] 完成：{(out + err).splitlines()[-1] if (out + err) else exe}")
+            raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗）：{(err or out)[-200:]}")
+        note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else exe}")
         if os.path.exists(dest):
             shutil.rmtree(dest)
         os.replace(src, dest)
         shutil.rmtree(tmp, ignore_errors=True)
-        st.update(state="done", phase="完成", exe=os.path.join(dest, "llama-server" + EXE))
+        st.update(state="done", phase="完成", exe=os.path.join(dest, eng["target"] + EXE))
     except Exception as ex:  # noqa: BLE001
         shutil.rmtree(tmp, ignore_errors=True)
         st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
     st["ended"] = time.time()
-    save_json(BUILD_FILE, st)
+    save_json(eng["file"], st)
     with _BUILD_LOCK:
         _BUILD["thread_alive"] = False
 
 
-def start_prebuilt():
-    variant, extra, why = prebuilt_variant()
+def start_prebuilt(kind="llama"):
+    eng = ENGINES[kind]
+    variant, extra, why = prebuilt_variant(kind)
+    if not variant:
+        return 400, {"error": f"{why}，{eng['name']} 在這台只能自己編譯後把 {eng['target']} 放進家目錄"}
     try:
-        tag, asset, extra_a = pick_release(_gh_json("/repos/ggml-org/llama.cpp/releases?per_page=10"), variant, extra)
+        tag, asset, extra_a = pick_release(_gh_json(eng["gh"]), variant, extra, kind)
     except Exception as ex:  # noqa: BLE001
-        return 502, {"error": f"連不到 GitHub 取 llama.cpp 的版本清單（{str(ex)[:120]}）；這台要能連外，或把 llama-server 複製進家目錄"}
+        return 502, {"error": f"連不到 GitHub 取 {eng['name']} 的版本清單（{str(ex)[:120]}）；這台要能連外，或把 {eng['target']} 複製進家目錄"}
     if not tag:
-        return 502, {"error": f"最近幾版 llama.cpp 都沒有 {variant} 的預編譯檔"}
+        return 502, {"error": f"最近幾版 {eng['name']} 都沒有 {variant} 的預編譯檔"}
     with _BUILD_LOCK:
         if _BUILD.get("thread_alive"):
-            return 409, {"error": "已經在安裝了"}
-        dest = inside(HOME, f"llama.cpp-{tag}-{variant}")
+            return 409, {"error": "已經在安裝了" if _BUILD.get("kind") == kind
+                         else f"這台正在安裝 {ENGINES[_BUILD['kind']]['name']}，等它裝完再裝"}
+        dest = inside(HOME, eng["dir"].format(f"{tag}-{variant}"))
         os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
-        log = engine_file("build", "-llama-build.log")
+        log = engine_file("build", f"-{kind}-build.log")
         open(log, "w").close()
         st = {"state": "running", "phase": "準備", "tag": tag, "backend": variant, "dest": dest, "log": log,
               "mode": "prebuilt", "why": why, "asset": asset, "extra": extra_a, "started": time.time()}
-        save_json(BUILD_FILE, st)
-        _BUILD.update(cancel=False, thread_alive=True)
-    threading.Thread(target=_prebuilt_run, args=(st, log), daemon=True).start()
+        save_json(eng["file"], st)
+        _BUILD.update(cancel=False, thread_alive=True, kind=kind)
+    threading.Thread(target=_prebuilt_run, args=(st, log, kind), daemon=True).start()
     return 200, {"ok": True, "tag": tag, "backend": variant}
 
 
-def parse_tag_refs(out):
-    """git ls-remote 的 b<編號> 標籤 → {編號: commit}。附註式標籤要取 ^{} 那一行（指向的 commit），不是標籤物件本身。"""
+def parse_tag_refs(out, rx=r"b(\d+)"):
+    """git ls-remote 的正式版標籤 → {編號: (標籤, commit)}。附註式標籤要取 ^{} 那一行（指向的 commit），不是標籤物件本身。"""
     refs, peeled = {}, {}
-    for h, n, pe in re.findall(r"^([0-9a-f]{40})\s+refs/tags/b(\d+)(\^\{\})?$", out, re.M):
-        (peeled if pe else refs)[int(n)] = h
+    for h, tag, n, pe in re.findall(r"^([0-9a-f]{40})\s+refs/tags/(" + rx + r")(\^\{\})?$", out, re.M):
+        (peeled if pe else refs)[int(n)] = (tag, h)
     return {**refs, **peeled}
 
 
-def start_build():
+def start_build(kind="llama"):
     if OS != "linux":
-        return start_prebuilt()
+        return start_prebuilt(kind)
+    eng = ENGINES[kind]
     with _BUILD_LOCK:
         if _BUILD.get("thread_alive"):
-            return 409, {"error": "已經在編譯了"}
-        pre = build_prereqs()
+            return 409, {"error": "已經在編譯了" if _BUILD.get("kind") == kind
+                         else f"這台正在編譯 {ENGINES[_BUILD['kind']]['name']}，等它編完再編（同時編兩個會把記憶體吃光）"}
+        pre = build_prereqs(kind)
         if pre["missing"]:
             return 400, {"error": f"這台缺少編譯工具，請 IT 先執行：{pre['apt']}", "missing": pre["missing"]}
-        rc, out, _ = sh(["git", "ls-remote", "--tags", LLAMA_REPO, "refs/tags/b*"], timeout=60)
-        refs = parse_tag_refs(out)
+        rc, out, _ = sh(["git", "ls-remote", "--tags", eng["repo"], eng["glob"]], timeout=60)
+        refs = parse_tag_refs(out, eng["tag_rx"])
         if rc != 0 or not refs:
-            return 502, {"error": "連不到 GitHub 取 llama.cpp 的版本清單；這台要能連外，或把編好的 llama-server 複製進來"}
-        tag, commit = f"b{max(refs)}", refs[max(refs)]
+            return 502, {"error": f"連不到 GitHub 取 {eng['name']} 的版本清單；這台要能連外，或把編好的 {eng['target']} 複製進來"}
+        tag, commit = refs[max(refs)]
         # 編譯很吃記憶體（每個並行約 1.5 GiB）：照系統記憶體扣掉底線後的餘裕決定並行數，連一個都放不下就不編。
         # 統一記憶體機邊跑大模型邊編譯，可能把整台拖死，這正是這套系統要防的事
         ram = ram_pool()
@@ -3794,27 +3867,28 @@ def start_build():
             return 409, {"error": f"系統記憶體只剩 {ram['free_gib']:.0f} GiB，扣掉 {floors(registry()['machine'])['ram']:.0f} GiB 底線後"
                                   "不夠編譯。請先停掉一個模型再編"}
         pre["jobs"] = jobs
-        dest = inside(HOME, f"llama.cpp-{tag}")
+        dest = inside(HOME, eng["dir"].format(tag))
         os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
-        log = engine_file("build", "-llama-build.log")
+        log = engine_file("build", f"-{kind}-build.log")
         open(log, "w").close()
         st = {"state": "running", "phase": "準備", "tag": tag, "commit": commit, "backend": pre["backend"], "dest": dest, "jobs": jobs,
               "log": log, "started": time.time()}
-        save_json(BUILD_FILE, st)
-        _BUILD.update(cancel=False, thread_alive=True)
-    threading.Thread(target=_build_run, args=(st, pre, log), daemon=True).start()
+        save_json(eng["file"], st)
+        _BUILD.update(cancel=False, thread_alive=True, kind=kind)
+    threading.Thread(target=_build_run, args=(st, pre, log, kind), daemon=True).start()
     return 200, {"ok": True, "tag": tag, "backend": pre["backend"]}
 
 
-def cancel_build():
+def cancel_build(kind="llama"):
     with _BUILD_LOCK:
-        if not _BUILD.get("thread_alive"):
+        if not _BUILD.get("thread_alive") or _BUILD.get("kind") != kind:
             return 409, {"error": "沒有正在進行的編譯"}
         _BUILD["cancel"] = True
         proc = _BUILD["proc"]
     if proc:
         kill_tree(proc.pid)
     return 200, {"ok": True}
+
 
 def do_logs(slot_id, lines=300):
     reg = registry()
@@ -3947,9 +4021,11 @@ def machine_info():
                      "ram_floor_gib": m.get("ram_floor_gib"),
                      "vram_floor_gib": m.get("vram_floor_gib"), "note": m.get("note", ""),
                      "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or "",
-                     "bandwidth_gbs": m.get("bandwidth_gbs"), "ram_bandwidth_gbs": m.get("ram_bandwidth_gbs")},
+                     "bandwidth_gbs": m.get("bandwidth_gbs"), "ram_bandwidth_gbs": m.get("ram_bandwidth_gbs"),
+                     "sd_cli": m.get("sd_cli") or ""},
         "defaults": {k: DEFAULT_FLOORS[k] for k in MEMORY_MODELS},
-        "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg)},
+        "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg),
+                      "sd_cli": sd_cli_exe(reg), "sd_root": sd_root(reg)},
         "chip": chip(m),
         "detect": {"memory_model": sug, "why": why, "hostname": socket.gethostname(),
                    "gpus": [{"id": g["id"], "name": g.get("name"), "vram_gib": round((g.get("vram_total") or 0) / GIB, 1)}
@@ -3957,6 +4033,7 @@ def machine_info():
                    "ram_gib": round(mem_stats()["total"] / GIB, 1), "os": OS},
         "storage": storage_choices(),
         "llama": llama_candidates(),
+        "sd": sd_candidates(),
         "gguf_count": len(models),
         "units": register_candidates(reg),
     }
@@ -4031,6 +4108,22 @@ def check_llama(raw):
     return p, None
 
 
+def check_sd_cli(raw):
+    """sd-cli：同 llama-server 的規則，檔名就是 sd-cli，--help 跑得起來。"""
+    raw = expand(str(raw or "").strip())
+    if not raw:
+        return "", None
+    p = contained(raw, [HOME, "/opt", "/usr/local"] + (["/opt/homebrew"] if OS == "darwin" else []))
+    if p is None:
+        return None, "sd-cli 要在家目錄、/opt 或 /usr/local 底下" if OS != "windows" else "sd-cli.exe 要在代理的家目錄底下"
+    if os.path.basename(p) != "sd-cli" + EXE or not os.path.isfile(p) or not os.access(p, os.X_OK):
+        return None, "要指到編好的 sd-cli 執行檔（檔名就是 sd-cli）"
+    rc, o, e = sh([p, "--help"], timeout=20)
+    if rc != 0:
+        return None, "這支 sd-cli 跑不起來（--help 失敗），可能缺函式庫"
+    return p, None
+
+
 @_locked
 def save_machine(body):
     reg = registry()
@@ -4073,7 +4166,10 @@ def save_machine(body):
     exe, err = check_llama(body.get("llama_server"))
     if err:
         return 400, {"error": err}
-    new["gguf_root"], new["llama_server"] = root, exe
+    sd, err = check_sd_cli(body.get("sd_cli"))
+    if err:
+        return 400, {"error": err}
+    new["gguf_root"], new["llama_server"], new["sd_cli"] = root, exe, sd
     m["confirmed"] = True             # 管理者在網頁上確認過記憶體架構（不再拿偵測建議比對）
     for k, v in new.items():
         if v in (None, "") and k not in ("memory_model", "note"):
@@ -4392,6 +4488,614 @@ class AgentTLSServer(ThreadingHTTPServer):
                 pass
 
 
+# ---------------------------------------------------------------- 畫圖與影片（stable-diffusion.cpp）
+# 一顆畫圖／影片模型＝主體＋文字編碼器＋VAE 等好幾個檔，常來自不同 repo，而且彼此共用（FLUX 系列用同一份 t5xxl）。
+# 每個檔放在 <畫圖存放區>/<repo 資料夾>/<檔名>，重複的只下載一次；哪顆模型由哪幾個檔組成記在存放區的 models.json。
+# sd-cli 每次產圖才載入、產完就結束：記憶體只在產圖那幾分鐘被占用，所以每次產圖前都照「當下」剩多少試算一次，
+# 產圖途中再由看門狗盯著，跌破底線就中止（統一記憶體機吃爆會把整台拖死）。
+SD_ROLES = {"model": "-m", "diffusion": "--diffusion-model", "clip_l": "--clip_l", "clip_g": "--clip_g",
+            "t5xxl": "--t5xxl", "llm": "--llm", "vae": "--vae", "audio_vae": "--audio-vae",
+            "connectors": "--embeddings-connectors"}
+SD_SAMPLERS = ("euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m", "dpm++2mv2", "ipndm", "ipndm_v", "lcm",
+               "ddim_trailing", "tcd")
+SD_EXT = (".gguf", ".safetensors", ".sft")
+# 中國來源（含它的文字編碼器與 VAE：文字編碼器也是一顆會在客戶機器上執行的模型）。與主控台 recommend.SD_CN_RX 相同
+SD_CN_RX = re.compile(r"(?<![a-z0-9])(qwen|wan|z[-_ ]?image|hunyuan|minimax|hidream|ernie|longcat|ovis|moss|kolors|"
+                      r"cogview|lumina|omnigen|bagel|seedream|seedance|sensenova|llada|ming[-_]|deepseek|glm|kimi|"
+                      r"moonshot|baichuan|internlm|doubao)(?![a-z])", re.I)
+SD_JOBS_FILE = os.path.join(STATE_DIR, "sd-jobs.json")
+GEN_DIR = os.path.join(STATE_DIR, "gen")
+SD_KEEP = 30                     # 產出只留最近 30 件
+SD_RAM_SELF = 2.0                # sd-cli 自己（讀檔緩衝、CPU 端張量）要的系統記憶體，GiB
+SD_COMPUTE = {"image": 2.0, "video": 0.3}   # 每百萬像素（影片是每一格）的計算緩衝，GiB；經驗值，產過一次改用實測
+SD_PROGRESS_RX = re.compile(r"\|\s*(\d+)/(\d+)\s*-\s*([\d.]+)\s*(s/it|it/s)")
+_SD_LOCK = threading.Lock()
+_GEN = {"jobs": None, "proc": None}
+_GEN_LOCK = threading.Lock()
+
+
+def sd_root(reg=None):
+    """畫圖與影片模型的存放區：跟文字模型（GGUF 存放區）同一層的 sd 資料夾，換存放區時跟著一起換。
+    分開放是因為擴散模型也是 .gguf，放進 GGUF 存放區會被當成文字模型列進「已安裝」。"""
+    g = gguf_root(reg).rstrip("/")
+    return os.path.join(os.path.dirname(g) or HOME, "sd")
+
+
+def sd_candidates():
+    """家目錄下所有 sd-cli：網頁編譯的（stable-diffusion.cpp-master-…/build/bin/）與官方預編譯的（stable-diffusion.cpp-master-…-<平台>/）。"""
+    pats = ("stable-diffusion.cpp*/build*/bin/sd-cli", "stable-diffusion.cpp*/sd-cli")
+    out = []
+    for cand in sorted({c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}):
+        m = re.search(r"master-(\d+)", cand)
+        pre = re.search(r"-(macos-arm64|win-[\w]+-x64)", cand)
+        out.append({"path": cand, "build": int(m.group(1)) if m else None, "ok": os.access(cand, os.X_OK),
+                    "backend": f"預編譯 {pre.group(1)}" if pre else "在這台編譯"})
+    return out
+
+
+def sd_cli_exe(reg=None):
+    """用哪支 sd-cli：管理者在「這台的設定」指定的優先，否則挑版本最新的那支。"""
+    reg = reg or registry()
+    want = expand(reg["machine"].get("sd_cli") or "")
+    if want and os.access(want, os.X_OK):
+        return want
+    ok = [c for c in sd_candidates() if c["ok"]]
+    return max(ok, key=lambda c: c["build"] or 0)["path"] if ok else None
+
+
+def _sd_folder(repo):
+    owner, name = repo.split("/", 1)
+    return _slug(f"{owner}--{name.removesuffix('-GGUF').removesuffix('-gguf')}")
+
+
+def _sd_file(path):
+    """repo 裡的子資料夾併進檔名（vae/x.safetensors → vae__x.safetensors）：同一個 repo 不同資料夾的同名檔不會互相蓋掉。"""
+    return path.replace("/", "__")
+
+
+def sd_manifest(reg=None):
+    data = load_json(os.path.join(sd_root(reg), "models.json"), {})
+    return data if isinstance(data, dict) else {}
+
+
+def _sd_save(rows, reg=None):
+    root = sd_root(reg)
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    save_json(os.path.join(root, "models.json"), rows)
+
+
+def _sd_path(root, p):
+    return inside(inside(root, p["folder"]), p["file"])
+
+
+def _sd_have(root, p):
+    try:
+        f = _sd_path(root, p)
+    except ValueError:
+        return False
+    return os.path.isfile(f) and os.path.getsize(f) == p["size"]
+
+
+def sd_models(reg=None):
+    reg = reg or registry()
+    root = sd_root(reg)
+    jobs = {j.get("sd_model"): j for j in downloads_list() if j.get("sd_model") and j["state"] in ("running", "queued")}
+    out = []
+    for mid, m in sd_manifest(reg).items():
+        missing = [p["role"] for p in m["parts"] if not _sd_have(root, p)]
+        j = jobs.get(mid)
+        out.append({**m, "id": mid, "size_gib": round(sum(p["size"] for p in m["parts"]) / GIB, 2),
+                    "ready": not missing, "missing": missing,
+                    "job": {"id": j["id"], "done": j["done"], "total": j["total"]} if j else None})
+    return sorted(out, key=lambda x: x.get("created") or 0)
+
+
+def sd_library():
+    reg = registry()
+    root = sd_root(reg)
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    return {"root": root, "free_gib": disk_free(root)[0], "models": sd_models(reg),
+            "sd_cli": sd_cli_exe(reg), "building": bool(_BUILD.get("thread_alive")) and _BUILD.get("kind") == "sd",
+            "memory_model": reg["machine"].get("memory_model", "discrete"),
+            "downloads": [j for j in downloads_list() if j.get("sd_model")]}
+
+
+def _clean_text(v, lim, name, multiline=False):
+    v = str(v or "").strip()
+    bad = r"[\x00-\x08\x0b-\x1f\x7f]" if multiline else r"[\x00-\x1f\x7f]"
+    if len(v) > lim or re.search(bad, v):
+        raise ValueError(f"{name}最多 {lim} 字，不能有控制字元")
+    return v
+
+
+def sd_check_defaults(d, kind):
+    """預設參數（清單上的一顆）或使用者這次要產的參數，一律過同一道檢查。回乾淨的 dict，不合法丟 ValueError。"""
+    d = d or {}
+    out = {}
+    try:
+        out["width"], out["height"] = int(d.get("width") or 1024), int(d.get("height") or 1024)
+        out["steps"] = int(d.get("steps") or 20)
+        out["cfg"] = float(d.get("cfg") if d.get("cfg") is not None else 1.0)
+        out["frames"] = int(d.get("frames") or (33 if kind == "video" else 1))
+        out["fps"] = int(d.get("fps") or 24)
+    except (TypeError, ValueError):
+        raise ValueError("尺寸、步數、引導強度、影格數要是數字") from None
+    for k in ("width", "height"):
+        if not 64 <= out[k] <= 2048 or out[k] % 16:
+            raise ValueError("寬與高要在 64～2048 之間，而且是 16 的倍數")
+    if not 1 <= out["steps"] <= 150:
+        raise ValueError("步數要在 1～150 之間")
+    if not 0 <= out["cfg"] <= 30:
+        raise ValueError("引導強度要在 0～30 之間")
+    if kind == "video" and not (1 <= out["frames"] <= 241 and out["frames"] % 8 == 1):
+        raise ValueError("影格數要在 1～241 之間，而且是 8 的倍數加 1（例：17、33、49、121）")
+    if not 1 <= out["fps"] <= 60:
+        raise ValueError("每秒格數要在 1～60 之間")
+    s = d.get("sampler") or "euler"
+    if s not in SD_SAMPLERS:
+        raise ValueError("取樣方法只能是：" + "、".join(SD_SAMPLERS))
+    out["sampler"] = s
+    if kind != "video":
+        out.pop("frames"), out.pop("fps")
+    return out
+
+
+def sd_check_spec(spec):
+    """要下載的一顆畫圖／影片模型（主控台照推薦清單組好、或管理者在內部測試手動組）。回 (乾淨的 spec, 錯誤)。"""
+    spec = spec or {}
+    try:
+        mid = str(spec.get("id") or "")
+        if not SAFE_ID_RX.fullmatch(mid):
+            raise ValueError("模型代號只能有英數、底線、連字號（最多 64 字）")
+        title = _clean_text(spec.get("title"), 60, "顯示名稱")
+        if not title:
+            raise ValueError("要有顯示名稱")
+        kind = spec.get("kind") or "image"
+        if kind not in ("image", "video"):
+            raise ValueError("種類只能是畫圖或影片")
+        parts, roles = [], set()
+        for p in spec.get("parts") or []:
+            role, repo, path = p.get("role"), str(p.get("repo") or ""), str(p.get("path") or "")
+            if role not in SD_ROLES or role in roles:
+                raise ValueError(f"元件種類不合法或重複：{role}")
+            if not HF_REPO_RX.fullmatch(repo):
+                raise ValueError(f"Hugging Face 名稱格式是「作者/模型」：{repo}")
+            if (not path or path.startswith("/") or ".." in path.split("/") or not path.lower().endswith(SD_EXT)
+                    or len(path) > 200 or re.search(r"[\x00-\x1f\\]", path)):
+                raise ValueError(f"檔名不合法（只收 .gguf、.safetensors、.sft）：{path}")
+            roles.add(role)
+            parts.append({"role": role, "repo": repo, "path": path})
+        if not 1 <= len(parts) <= 8 or len(roles & {"model", "diffusion"}) != 1:
+            # -m（完整模型）與 --diffusion-model（只有擴散模型、其餘元件另給）是兩種模式，不能同時給
+            raise ValueError("要有、而且只能有一個主體（完整模型或擴散模型），最多 8 個檔")
+        defaults = sd_check_defaults(spec.get("defaults"), kind)
+        desc = _clean_text(spec.get("desc"), 160, "說明")
+    except ValueError as ex:
+        return None, str(ex)
+    return {"id": mid, "title": title, "kind": kind, "parts": parts, "defaults": defaults, "desc": desc,
+            "quant": _clean_text(spec.get("quant"), 24, "量化") if spec.get("quant") else "",
+            "catalog": spec.get("catalog") if HF_REPO_RX.fullmatch(str(spec.get("catalog") or "")) else None,
+            "internal": bool(spec.get("internal"))}, None
+
+
+def hf_tree(repo, token=""):
+    """Hugging Face 上這個 repo 的所有檔案與大小（不下載）。"""
+    if not HF_REPO_RX.fullmatch(repo or ""):
+        return 400, {"error": "名稱格式是「作者/模型」"}
+    try:
+        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
+            tree = json.load(resp)
+    except urllib.error.HTTPError as exc:
+        msg = {401: "要登入才看得到（請貼 Hugging Face 權杖）", 403: "要先到 Hugging Face 頁面同意授權條款",
+               404: "找不到這個 repo"}.get(exc.code, f"Hugging Face 回 {exc.code}")
+        return 400, {"error": f"{repo}：{msg}"}
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"連不到 Hugging Face：{str(exc)[:120]}"}
+    return 200, {"repo": repo, "files": [{"path": x["path"], "size": (x.get("lfs") or {}).get("size") or x.get("size") or 0}
+                                         for x in tree if x.get("type") == "file"]}
+
+
+def sd_download(spec, token=""):
+    spec, err = sd_check_spec(spec)
+    if err:
+        return 400, {"error": err}
+    words = " ".join([spec["id"], spec["title"]] + [f"{p['repo']} {p['path']}" for p in spec["parts"]])
+    cn = SD_CN_RX.search(words)
+    if cn and not spec["internal"]:
+        return 400, {"error": f"這顆含中國來源的元件（{cn.group(1)}），政府案不得使用；內部測試要勾「內部測試」才能下載"}
+    trees = {}
+    for p in spec["parts"]:
+        if p["repo"] not in trees:
+            code, t = hf_tree(p["repo"], token)
+            if code != 200:
+                return code, t
+            trees[p["repo"]] = {f["path"]: f["size"] for f in t["files"]}
+        size = trees[p["repo"]].get(p["path"])
+        if not size:
+            return 400, {"error": f"{p['repo']} 裡沒有 {p['path']}"}
+        p.update(size=size, folder=_sd_folder(p["repo"]), file=_sd_file(p["path"]))
+    reg = registry()
+    root = sd_root(reg)
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    need = sum(p["size"] for p in spec["parts"] if not _sd_have(root, p)) / GIB
+    free = disk_free(root)[0]                  # Windows 沒有 os.statvfs
+    if need + 10 >= free:
+        return 400, {"error": f"磁碟不夠：還要下載 {need:.1f} GiB，存放區只剩 {free:.0f} GiB（另需保留 10 GiB）"}
+    if any(j["state"] in ("running", "queued") for j in _DL.values()):
+        return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
+    with _SD_LOCK:
+        rows = sd_manifest(reg)
+        old = rows.get(spec["id"])
+        rows[spec["id"]] = {k: spec[k] for k in ("title", "kind", "parts", "defaults", "desc", "quant", "catalog", "internal")} | {
+            "cn_origin": bool(cn), "created": (old or {}).get("created") or int(time.time()),
+            "measured": (old or {}).get("measured") if old and old.get("parts") == spec["parts"] else None}
+        _sd_save(rows, reg)
+    todo = [[p["repo"], p["path"], p["folder"], p["file"]] for p in spec["parts"] if not _sd_have(root, p)]
+    if not todo:
+        return 200, {"ok": True, "id": None, "model": spec["id"], "need_gib": 0}
+    with _DL_LOCK:
+        if any(j["state"] in ("running", "queued") for j in _DL.values()):
+            return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
+        jid = secrets.token_hex(4)
+        _DL[jid] = {"id": jid, "repo": spec["parts"][0]["repo"], "stem": spec["quant"] or spec["title"],
+                    "title": spec["title"], "folder": "sd", "files": todo, "sd_model": spec["id"],
+                    "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
+                    "_token": token, "_cancel": False}
+    threading.Thread(target=_download_job, args=(jid, root), daemon=True).start()
+    return 200, {"ok": True, "id": jid, "model": spec["id"], "need_gib": round(need, 1)}
+
+
+def sd_delete(mid):
+    """刪一顆畫圖／影片模型。別顆也在用的檔（例：共用的 t5xxl）留著，只刪這顆獨用的。"""
+    reg = registry()
+    root = sd_root(reg)
+    if any(j.get("model") == mid and j["state"] == "running" for j in sd_jobs_list()):
+        return 409, {"error": "這顆正在產圖，等它產完或取消再刪"}
+    if any(j.get("sd_model") == mid and j["state"] in ("running", "queued") for j in downloads_list()):
+        return 409, {"error": "這顆正在下載，先取消下載再刪"}
+    with _SD_LOCK:
+        rows = sd_manifest(reg)
+        m = rows.pop(mid, None)
+        if not m:
+            return 404, {"error": "沒有這顆"}
+        keep = {(p["folder"], p["file"]) for o in rows.values() for p in o["parts"]}
+        freed, removed = 0, []
+        for p in m["parts"]:
+            if (p["folder"], p["file"]) in keep:
+                continue
+            for f in (_sd_path(root, p), _sd_path(root, p) + ".part"):
+                if os.path.isfile(f):
+                    freed += os.path.getsize(f)
+                    os.remove(f)
+                    removed.append(p["file"])
+            d = inside(root, p["folder"])
+            if os.path.isdir(d) and not os.listdir(d):
+                os.rmdir(d)
+        _sd_save(rows, reg)
+    return 200, {"ok": True, "removed": removed, "freed_gib": round(freed / GIB, 1)}
+
+
+def sd_need(m, w, h, frames=1):
+    """產這一件最多要多少記憶體（GiB）：所有權重＋計算緩衝。產過一次之後改用實測的最高用量（同尺寸以下直接用）。"""
+    weights = sum(p["size"] for p in m["parts"]) / GIB
+    mp = w * h / 1e6 * (frames if m["kind"] == "video" else 1)
+    est = weights + 1.0 + SD_COMPUTE[m["kind"]] * mp
+    meas = m.get("measured") or {}
+    if meas.get("peak_gib"):
+        mp0 = meas["w"] * meas["h"] / 1e6 * (meas.get("frames") or 1)
+        est = max(est, meas["peak_gib"] + max(0.0, mp - mp0) * SD_COMPUTE[m["kind"]])
+    return round(est, 1), round(weights, 1)
+
+
+def sd_admit(m, w, h, frames=1, reg=None, hw=None):
+    """產圖前的准入：照三種記憶體架構，用「產圖時最壞剩多少」判斷。plan＝要不要把權重放系統記憶體、用哪張卡。"""
+    reg = reg or registry()
+    hw = hw if hw is not None else hardware()
+    p = pools(reg, hw)
+    mm, fl = p["memory_model"], p["floors"]
+    need, weights = sd_need(m, w, h, frames)
+    biggest = max(x["size"] for x in m["parts"]) / GIB
+    reasons, warnings, detail, plan = [], [], {}, {"offload": False, "gpu": None}
+    tip = "先停掉一個模型、改小尺寸，或換小一級的量化"
+    if mm == "unified_single":
+        free = p["unified"]["free_gib"]
+        worst = round(free - need - SD_RAM_SELF, 1)
+        detail["unified"] = {"free": free, "need": round(need + SD_RAM_SELF, 1), "worst": worst, "floor": fl["ram"]}
+        plan["max_vram"] = free - fl["ram"] - SD_RAM_SELF
+        lim = p["unified"].get("gpu_limit_gib")      # Apple Silicon：Metal 只准 GPU 用統一記憶體的一部分
+        if lim:
+            plan["max_vram"] = min(plan["max_vram"], lim)
+            if need > lim:
+                reasons.append(f"超過 GPU 能用的上限：產這一件要約 {need:.0f} GiB，這台 GPU 最多只能用 {lim:.0f} GiB"
+                               "（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）")
+        if worst < fl["ram"]:
+            reasons.append(f"統一記憶體不足：產這一件要約 {need + SD_RAM_SELF:.0f} GiB，現在只剩 {free:.0f} GiB，"
+                           f"產的時候會剩 {worst} GiB（低於 {fl['ram']} GiB 底線）。統一記憶體吃爆會把整台拖死；{tip}")
+    else:
+        rfree = p["ram"]["free_gib"]
+        if mm == "discrete" and p["gpus"]:
+            card = max(p["gpus"], key=lambda c: c["free_gib"])
+            # Windows 的 AMD／Intel 走 Vulkan，沒辦法用環境變數綁卡（綁卡的對照只有 Linux 的 KFD）：只拿來算額度，不綁
+            plan["gpu"] = str(card["id"]) if p.get("bindable", True) else None
+            vfree, vfl = card["free_gib"], fl["vram"]
+            if vfree - need < vfl and vfree - (biggest + need - weights) >= vfl and rfree - weights - SD_RAM_SELF >= fl["ram"]:
+                plan["offload"] = True                  # 權重放系統記憶體，輪到誰算才搬進顯示卡：慢一些但放得下
+                warnings.append(f"卡 {card['id']} 放不下全部權重，改成權重放系統記憶體、輪流搬進顯示卡算（會慢一些）")
+        elif mm == "discrete":
+            vfree, vfl = None, 0
+        else:
+            vfree, vfl = p["vram"]["free_gib"], fl["vram"]
+        vneed = (biggest + need - weights) if plan["offload"] else need
+        rneed = SD_RAM_SELF + (weights if plan["offload"] or vfree is None else 0)
+        if vfree is not None:
+            wv = round(vfree - vneed, 1)
+            plan["max_vram"] = vfree - vfl
+            detail["vram"] = {"free": vfree, "need": round(vneed, 1), "worst": wv, "floor": vfl}
+            if wv < vfl:
+                where = "GPU 那一塊" if mm == "unified_split" else f"卡 {plan['gpu']}" if plan["gpu"] else "顯示卡"
+                reasons.append(f"{where}不夠：產這一件要約 {vneed:.0f} GiB，現在只剩 {vfree:.0f} GiB，"
+                               f"產的時候會剩 {wv} GiB（低於 {vfl} GiB 底線）；{tip}")
+        wr = round(rfree - rneed, 1)
+        detail["ram"] = {"free": rfree, "need": round(rneed, 1), "worst": wr, "floor": fl["ram"]}
+        if wr < fl["ram"]:
+            extra = "，這台曾因為系統記憶體耗盡整台卡死" if mm == "unified_split" else ""
+            reasons.append(f"系統記憶體不足：要約 {rneed:.0f} GiB，現在只剩 {rfree:.0f} GiB，"
+                           f"產的時候會剩 {wr} GiB（低於 {fl['ram']} GiB 底線{extra}）")
+    if plan.get("max_vram") is not None:
+        plan["max_vram"] = max(1.0, math.floor(plan["max_vram"] * 10) / 10)
+    # ponytail: AMD 一律關 flash attention。實測 .27（gfx1151、ROCm 7.1.1）開著會在載入擴散模型時
+    # 「ROCm error: unspecified launch failure」整個中止，關掉 512×512 四步 12 秒正常出圖。之後 ROCm／sd.cpp 修好再拿掉
+    plan["fa_off"] = not has_nvidia() and bool(probe_amd_sysfs())
+    return {"allow": not reasons, "memory_model": mm, "need_gib": need, "weights_gib": weights,
+            "measured": bool((m.get("measured") or {}).get("peak_gib")),
+            "reasons": reasons, "warnings": warnings, "pools": detail, "plan": plan}
+
+
+def sd_argv(exe, m, root, prm, out, plan):
+    a = [exe] + (["-M", "vid_gen"] if m["kind"] == "video" else [])
+    for p in m["parts"]:
+        a += [SD_ROLES[p["role"]], _sd_path(root, p)]
+    a += ["-p", prm["prompt"], "-W", prm["width"], "-H", prm["height"], "--steps", prm["steps"],
+          "--cfg-scale", prm["cfg"], "--sampling-method", prm["sampler"], "-s", prm["seed"], "-o", out]
+    if prm.get("negative"):
+        a += ["-n", prm["negative"]]
+    if m["kind"] == "video":
+        a += ["--video-frames", prm["frames"], "--fps", prm["fps"]]
+    if plan.get("offload"):
+        a.append("--offload-to-cpu")
+    # sd-cli 會自己依剩餘量把權重分到顯示卡／系統記憶體；給它上限＝准入算出來的額度，它自己也不會越過底線
+    if plan.get("max_vram"):
+        a += ["--max-vram", plan["max_vram"]]
+    if plan.get("fa_off"):
+        a += ["--flash-attn", "off"]
+    # VAE 解碼是產圖時記憶體最高的一刻：大尺寸或影片一律分塊解碼，最高用量少很多，畫質一樣
+    if prm["width"] * prm["height"] * (prm.get("frames") or 1) > 1024 * 1024:
+        a.append("--vae-tiling")
+    return [str(x) for x in a]
+
+
+def parse_sd_progress(text, steps):
+    """sd-cli 的進度列：|=====>   | 3/20 - 1.25s/it。載入權重也有同樣的進度列，只認總數等於步數的那幾行。"""
+    hit = [x for x in SD_PROGRESS_RX.findall(text) if int(x[1]) == steps]
+    if not hit:
+        return None
+    n, total, v, unit = hit[-1]
+    spi = float(v) if unit == "s/it" else (1 / float(v) if float(v) else None)
+    return {"step": int(n), "total": int(total), "s_per_it": round(spi, 2) if spi else None}
+
+
+def _sd_jobs_save():
+    with _GEN_LOCK:
+        rows = [{k: v for k, v in j.items() if not k.startswith("_")} for j in _GEN["jobs"]]
+    save_json(SD_JOBS_FILE, rows)
+
+
+def sd_jobs_list():
+    with _GEN_LOCK:
+        if _GEN["jobs"] is None:
+            rows = load_json(SD_JOBS_FILE, []) or []
+            for j in rows:
+                if j.get("state") == "running":
+                    j.update(state="interrupted", error="代理重啟過，這件沒產完")
+            _GEN["jobs"] = rows
+        return [{k: v for k, v in j.items() if not k.startswith("_")} for j in _GEN["jobs"]]
+
+
+def _gen_sample():
+    """看門狗用的取樣：系統記憶體剩多少（/proc/meminfo）＋各卡顯存已用（NVIDIA 用 nvidia-smi，AMD 讀 sysfs，都很便宜）。"""
+    g = probe_gpus()
+    return ram_pool()["free_gib"], {str(x["id"]): (x.get("vram_used") or 0) / GIB for x in g}
+
+
+def _gen_run(j, argv, env, mm, fl):
+    log = _sd_log(j["id"])
+    r0, g0 = _gen_sample()
+    peak_r = peak_g = 0.0
+    killed = None
+    started = time.time()
+    with open(log, "w", encoding="utf-8") as fh:
+        try:
+            kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
+                  else {"start_new_session": True})
+            proc = subprocess.Popen(argv, stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env}, **kw)
+        except OSError as ex:                  # 執行檔被刪掉、沒有執行權限：不能讓這件一直停在「產生中」擋住後面
+            j.update(state="failed", error=f"sd-cli 啟動失敗：{ex}"[:240], ended=int(time.time()))
+            _sd_jobs_save()
+            return
+        with _GEN_LOCK:
+            _GEN["proc"] = proc
+        last_save = 0
+        while proc.poll() is None:
+            time.sleep(1)
+            rf, g = _gen_sample()
+            peak_r = max(peak_r, r0 - rf)
+            peak_g = max(peak_g, max((g.get(k, 0) - g0.get(k, 0) for k in g), default=0.0))
+            # 看門狗：系統記憶體跌破底線就中止。統一記憶體機（兩種）系統這塊被吃光整台會卡死；獨立顯卡機也一樣會拖垮系統
+            if rf < fl["ram"] and not killed:
+                killed = (f"產的時候系統記憶體只剩 {rf:.1f} GiB（低於 {fl['ram']} GiB 底線），已中止，避免整台被拖死。"
+                          "請改小尺寸、換小一級的量化，或先停掉一個模型")
+            if j["_cancel"] and not killed:
+                killed = "已取消"
+            if killed:
+                kill_tree(proc.pid)
+            pr = parse_sd_progress(tail_text(log), j["steps"])
+            if pr:
+                j.update(pr, phase="產生中")
+            if pr and pr["step"] >= pr["total"]:
+                j["phase"] = "解碼中" if j["kind"] == "image" else "解碼與編碼影片中"
+            if time.time() - last_save > 5:
+                _sd_jobs_save()
+                last_save = time.time()
+        rc = proc.returncode
+    with _GEN_LOCK:
+        _GEN["proc"] = None
+    j["secs"] = round(time.time() - started, 1)
+    j["ended"] = int(time.time())
+    out = os.path.join(GEN_DIR, j["out"])
+    if killed:
+        j.update(state="cancelled" if killed == "已取消" else "failed", error=killed)
+    elif rc != 0 or not os.path.isfile(out) or not os.path.getsize(out):
+        tail = [x for x in tail_lines(log, 12) if x.strip()]
+        j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
+    else:
+        peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
+        j.update(state="done", phase="完成", peak_gib=round(peak, 1), bytes=os.path.getsize(out))
+        # 實測最高用量寫回這顆模型：下次准入改用實測值（取比估算大的那個，不會因為實測偏小就放寬）
+        with _SD_LOCK:
+            rows = sd_manifest()
+            if j["model"] in rows and peak > 0:
+                rows[j["model"]]["measured"] = {"peak_gib": round(peak, 1), "w": j["width"], "h": j["height"],
+                                                "frames": j.get("frames") or 1, "steps": j["steps"],
+                                                "secs": j["secs"], "s_per_it": j.get("s_per_it"), "at": j["ended"]}
+                _sd_save(rows)
+    _sd_jobs_save()
+
+
+def tail_text(path, n=8192):
+    """記錄檔最後 n 個位元組（進度列用 \\r 覆寫同一行，所以不能照行讀）。"""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - n))
+            return fh.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+
+
+def sd_generate(body):
+    reg = registry()
+    m = sd_manifest(reg).get(str(body.get("model") or ""))
+    if not m:
+        return 404, {"error": "沒有這顆畫圖／影片模型"}
+    root = sd_root(reg)
+    if not all(_sd_have(root, p) for p in m["parts"]):
+        return 409, {"error": "這顆還沒下載完整，到「推薦模型」按下載把缺的檔補齊"}
+    exe = sd_cli_exe(reg)
+    if not exe:
+        return 409, {"error": "這台還沒安裝 stable-diffusion.cpp，先按「安裝畫圖引擎」"}
+    try:
+        prm = sd_check_defaults({**m["defaults"], **{k: body[k] for k in ("width", "height", "steps", "cfg", "sampler", "frames", "fps")
+                                                    if body.get(k) not in (None, "")}}, m["kind"])
+        prm["prompt"] = _clean_text(body.get("prompt"), 2000, "提示詞", multiline=True)
+        prm["negative"] = _clean_text(body.get("negative"), 1000, "不要出現的內容", multiline=True)
+        seed = int(body.get("seed") if body.get("seed") not in (None, "") else -1)
+    except (TypeError, ValueError) as ex:
+        return 400, {"error": str(ex) if str(ex) else "種子要是整數"}
+    if not prm["prompt"]:
+        return 400, {"error": "要寫提示詞"}
+    if not -1 <= seed < 2 ** 31:
+        return 400, {"error": "種子要在 0～2147483647 之間（-1＝隨機）"}
+    prm["seed"] = seed if seed >= 0 else secrets.randbelow(2 ** 31)
+    sd_jobs_list()
+    with _GEN_LOCK:
+        if _GEN["proc"] is not None or any(j["state"] == "running" for j in _GEN["jobs"]):
+            return 409, {"error": "一次只產一件：前一件還在產，等它完成或取消"}
+    verdict = sd_admit(m, prm["width"], prm["height"], prm.get("frames") or 1, reg)
+    if not verdict["allow"]:
+        return 409, {"error": "擋下來了", "admit": verdict}
+    os.makedirs(GEN_DIR, mode=0o700, exist_ok=True)
+    jid = secrets.token_hex(4)
+    out = f"{jid}.{'webm' if m['kind'] == 'video' else 'png'}"
+    argv = sd_argv(exe, m, root, prm, os.path.join(GEN_DIR, out), verdict["plan"])
+    env = visible_env([verdict["plan"]["gpu"]]) if verdict["plan"]["gpu"] is not None else {}
+    j = {"id": jid, "model": body["model"], "title": m["title"], "kind": m["kind"], **prm, "out": out,
+         "state": "running", "phase": "載入模型中", "step": 0, "total": prm["steps"], "s_per_it": None,
+         "created": int(time.time()), "need_gib": verdict["need_gib"], "offload": verdict["plan"]["offload"],
+         "warnings": verdict["warnings"], "error": None, "_cancel": False}
+    with _GEN_LOCK:
+        if _GEN["proc"] is not None or any(x["state"] == "running" for x in _GEN["jobs"]):
+            return 409, {"error": "一次只產一件：前一件還在產，等它完成或取消"}
+        _GEN["jobs"].insert(0, j)
+        for old in _GEN["jobs"][SD_KEEP:]:
+            _sd_files_rm(old)
+        del _GEN["jobs"][SD_KEEP:]
+    _sd_jobs_save()
+    p = pools(reg, hardware())
+    threading.Thread(target=_gen_run, args=(j, argv, env, p["memory_model"], p["floors"]), daemon=True).start()
+    return 200, {"ok": True, "id": jid, "admit": verdict}
+
+
+def _sd_log(jid):
+    return engine_file("sd", f"-{jid}.log")
+
+
+def _sd_files_rm(j):
+    for f in (os.path.join(GEN_DIR, j.get("out") or "x"), _sd_log(j["id"])):
+        if os.path.isfile(f):
+            os.remove(f)
+
+
+def _sd_job(jid):
+    sd_jobs_list()
+    with _GEN_LOCK:
+        return next((j for j in _GEN["jobs"] if j["id"] == jid), None)
+
+
+def sd_job(jid):
+    j = _sd_job(jid)
+    if not j:
+        return 404, {"error": "沒有這件"}
+    out = {k: v for k, v in j.items() if not k.startswith("_")}
+    log = _sd_log(jid)
+    out["log_tail"] = [x for x in re.split(r"[\r\n]+", tail_text(log, 4096)) if x.strip()][-12:]
+    return 200, out
+
+
+def sd_output(jid):
+    j = _sd_job(jid)
+    if not j or j["state"] != "done":
+        return 404, {"error": "這件沒有產出"}
+    f = os.path.join(GEN_DIR, j["out"])
+    if not os.path.isfile(f):
+        return 404, {"error": "產出的檔案不見了"}
+    if os.path.getsize(f) > 20 * 1024 * 1024:
+        return 413, {"error": "檔案超過 20 MB，請到這台的 ~/.xconsole/gen/ 取"}
+    with open(f, "rb") as fh:
+        data = base64.b64encode(fh.read()).decode()
+    return 200, {"mime": "video/webm" if f.endswith(".webm") else "image/png", "name": j["out"], "b64": data}
+
+
+def sd_cancel(jid):
+    j = _sd_job(jid)
+    if not j or j["state"] != "running":
+        return 409, {"error": "這件沒有在產"}
+    j["_cancel"] = True
+    return 200, {"ok": True}
+
+
+def sd_job_delete(jid):
+    j = _sd_job(jid)
+    if not j:
+        return 404, {"error": "沒有這件"}
+    if j["state"] == "running":
+        return 409, {"error": "還在產，先取消"}
+    with _GEN_LOCK:
+        _GEN["jobs"] = [x for x in _GEN["jobs"] if x["id"] != jid]
+    _sd_files_rm(j)
+    _sd_jobs_save()
+    return 200, {"ok": True}
+
+
 # ---------------------------------------------------------------- HTTP
 
 class Handler(BaseHTTPRequestHandler):
@@ -4445,10 +5149,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, library())
         if path == "/machine":
             return self._send(200, machine_info())
-        if path == "/llama/build":
-            return self._send(200, build_status())
-        if path == "/llama/build/progress":
-            return self._send(200, build_progress())
+        m = re.fullmatch(r"/(llama|sd)/build(/progress)?", path)
+        if m:
+            return self._send(200, (build_progress if m.group(2) else build_status)(m.group(1)))
+        if path == "/sd/library":
+            return self._send(200, sd_library())
+        if path == "/sd/jobs":
+            return self._send(200, {"jobs": sd_jobs_list()})
+        m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})(/output)?", path)
+        if m:
+            return self._send(*(sd_output if m.group(2) else sd_job)(m.group(1)))
         m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
         if m:
             code, out = api_info(m.group(1))
@@ -4526,10 +5236,29 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*save_machine(body))
         if path == "/slots/add":
             return self._send(*add_slot(body))
-        if path == "/llama/build":
-            return self._send(*start_build())
-        if path == "/llama/build/cancel":
-            return self._send(*cancel_build())
+        m = re.fullmatch(r"/(llama|sd)/build(/cancel)?", path)
+        if m:
+            return self._send(*(cancel_build if m.group(2) else start_build)(m.group(1)))
+        if path == "/library/hf/tree":
+            return self._send(*hf_tree(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+        if path == "/sd/download":
+            return self._send(*sd_download(body.get("spec"), str(body.get("token") or "")))
+        if path == "/sd/delete":
+            return self._send(*sd_delete(str(body.get("id") or "")))
+        if path == "/sd/admit":
+            mdl = sd_manifest().get(str(body.get("model") or ""))
+            if not mdl:
+                return self._send(404, {"error": "沒有這顆畫圖／影片模型"})
+            try:
+                prm = sd_check_defaults({**mdl["defaults"], **{k: body[k] for k in ("width", "height", "frames") if body.get(k)}}, mdl["kind"])
+            except ValueError as ex:
+                return self._send(400, {"error": str(ex)})
+            return self._send(200, sd_admit(mdl, prm["width"], prm["height"], prm.get("frames") or 1))
+        if path == "/sd/generate":
+            return self._send(*sd_generate(body))
+        m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)
+        if m:
+            return self._send(*(sd_cancel if m.group(2) == "cancel" else sd_job_delete)(m.group(1)))
         if path == "/profiles/save":
             return self._send(*save_profile(body))
         m = re.fullmatch(r"/profiles/([a-z][a-z0-9_-]{0,31})/delete", path)
