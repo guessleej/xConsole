@@ -619,8 +619,18 @@ else
   systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
 fi
 PY=$(command -v python3)
-echo "== 2/4 下載節點代理 =="
 mkdir -p -m 700 "$HOME/.xconsole"
+if [ "$OSN" = Darwin ]; then
+  # 代理用 cryptography 產自己的憑證：macOS 內建的 LibreSSL 版本參差，舊版的 openssl req 不支援 -addext
+  echo "準備代理用的 Python 環境（cryptography）…"
+  if "$PY" -m venv "$HOME/.xconsole/venv" >/dev/null 2>&1 \
+     && "$HOME/.xconsole/venv/bin/python" -m pip install -q --disable-pip-version-check 'cryptography>=42' >/dev/null 2>&1; then
+    PY="$HOME/.xconsole/venv/bin/python"
+  elif ! openssl req -help 2>&1 | grep -q addext; then
+    echo "裝不了 cryptography（這台要能連 pypi.org），系統的 openssl 也太舊、產不了代理憑證。請先讓這台能連外再貼一次"; exit 1
+  fi
+fi
+echo "== 2/4 下載節點代理 =="
 get xconsole_agent.py > "$HOME/xconsole_agent.py.new"
 "$PY" -m py_compile "$HOME/xconsole_agent.py.new"
 mv "$HOME/xconsole_agent.py.new" "$HOME/xconsole_agent.py"
@@ -717,8 +727,9 @@ if (-not $py) {{ try {{ $v = & python -c $probe 2>$null; if ($v -and (Test-Path 
 if (-not $py) {{
   $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
   if ($ans -match '^(n|N)') {{ Write-Host '請先安裝 Python 3（https://www.python.org），再貼一次這段指令'; exit 1 }}
-  winget install -e --id Python.Python.3.12 --scope machine --accept-package-agreements --accept-source-agreements
-  $py = (Get-ChildItem 'C:\\Program Files\\Python3*\\python.exe' | Select-Object -Last 1).FullName
+  $scope = if ($admin) {{ 'machine' }} else {{ 'user' }}   # 一般身分裝不了全機版，改裝到自己的帳號底下
+  winget install -e --id Python.Python.3.12 --scope $scope --accept-package-agreements --accept-source-agreements
+  $py = (Get-ChildItem 'C:\\Program Files\\Python3*\\python.exe', "$env:LOCALAPPDATA\\Programs\\Python\\Python3*\\python.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
   if (-not $py) {{ Write-Host 'Python 裝好了但找不到，請重新開一個 PowerShell 視窗再貼一次'; exit 1 }}
 }}
 if ($admin) {{ $base = Join-Path $env:ProgramData 'xConsole' }} else {{ $base = $env:USERPROFILE }}
@@ -748,7 +759,7 @@ if ($admin) {{
   $trg = New-ScheduledTaskTrigger -AtStartup
   $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
   New-NetFirewallRule -DisplayName 'xConsole 節點代理' -Direction Inbound -Protocol TCP -LocalPort 9401 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
-  New-NetFirewallRule -DisplayName 'xConsole 模型 API' -Direction Inbound -Protocol TCP -LocalPort 8090-8189 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
+  New-NetFirewallRule -DisplayName 'xConsole 模型 API' -Direction Inbound -Protocol TCP -LocalPort 8090-8289 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
 }} else {{
   $trg = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
   $pri = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
@@ -1672,6 +1683,10 @@ def is_ip(text):
 
 
 def main():
+    for st in (sys.stdout, sys.stderr):
+        # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
+        if st is not None and hasattr(st, "reconfigure"):
+            st.reconfigure(encoding="utf-8", errors="replace")
     if sys.stdout is None:
         # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
         sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "console.log"), "a", encoding="utf-8", buffering=1)

@@ -106,7 +106,7 @@
 |---|---|---|
 | Ubuntu（含 DGX Spark、Jetson） | `bash install/install.sh` | systemd 使用者服務，開 linger（沒人登入也會跑） |
 | macOS（Apple Silicon） | `bash install/install.sh` | launchd 的 LaunchAgent（登入後自動啟動） |
-| Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／8090～8189 |
+| Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／8090～8289 |
 
 需要 Python 3.9 以上（macOS 沒有的話先 `xcode-select --install`；Windows 沒有會問要不要用 winget 裝）。
 安裝時會問管理者帳號與密碼；自動化安裝用 `--password-file <檔>`（Windows `-PasswordFile`），檔案第一行帳號、第二行密碼。

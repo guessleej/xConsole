@@ -6,7 +6,7 @@
 #   ... install.ps1 -PasswordFile <檔>   自動化安裝：檔案第一行帳號、第二行密碼（用完請刪）
 #
 # 系統管理員身分：裝成開機自動啟動（SYSTEM 帳號，不必有人登入），資料放 C:\ProgramData\xConsole，
-#                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、8090～8189（模型 API）。
+#                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、8090～8289（模型 API）。
 # 一般身分：裝在自己的家目錄，登入後才啟動，防火牆要另外請管理員開。
 param([switch]$Uninstall, [string]$PasswordFile)
 $ErrorActionPreference = 'Stop'
@@ -40,8 +40,9 @@ if (-not $py) { try { $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v
 if (-not $py) {
   $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
   if ($ans -match '^(n|N)') { Die '請先安裝 Python 3（https://www.python.org），再執行一次' }
-  winget install -e --id Python.Python.3.12 --scope machine --accept-package-agreements --accept-source-agreements
-  $py = (Get-ChildItem 'C:\Program Files\Python3*\python.exe' -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
+  $scope = if ($admin) { 'machine' } else { 'user' }   # 一般身分裝不了全機版，改裝到自己的帳號底下
+  winget install -e --id Python.Python.3.12 --scope $scope --accept-package-agreements --accept-source-agreements
+  $py = (Get-ChildItem 'C:\Program Files\Python3*\python.exe', "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
   if (-not $py) { Die 'Python 裝好了但找不到，請重新開一個 PowerShell 視窗再執行一次' }
 }
 
@@ -88,7 +89,7 @@ $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnB
 if ($admin) {
   $trg = New-ScheduledTaskTrigger -AtStartup
   $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-  foreach ($r in @(@('xConsole 網頁', '9400'), @('xConsole 節點代理', '9401'), @('xConsole 模型 API', '8090-8189'))) {
+  foreach ($r in @(@('xConsole 網頁', '9400'), @('xConsole 節點代理', '9401'), @('xConsole 模型 API', '8090-8289'))) {
     Get-NetFirewallRule -DisplayName $r[0] -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     New-NetFirewallRule -DisplayName $r[0] -Direction Inbound -Protocol TCP -LocalPort $r[1] -Action Allow -Profile Domain,Private | Out-Null
   }

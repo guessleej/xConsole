@@ -2447,13 +2447,16 @@ def load_text(path):
         return None
 
 
-def _free_port(reg, start=8090):
+MODEL_PORTS = (8090, 8290)     # 模型服務可以用的埠；Windows 安裝程式的防火牆規則開同一段（8090-8289）
+
+
+def _free_port(reg, start=MODEL_PORTS[0]):
     used = set()
     for sl in reg["slots"]:
         p = (slot_config(sl) or {}).get("port") or sl.get("port")
         if p:
             used.add(int(p))
-    for p in range(start, start + 200):
+    for p in range(start, MODEL_PORTS[1]):
         if p in used or p == PORT:
             continue
         s = socket.socket()
@@ -2499,6 +2502,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     gpu_ids, err = pick_gpus(slot.get("gpu_ids") if gpus is ... else gpus, cards)
     if err:
         return 400, {"error": err}
+    if gpu_ids and not (has_nvidia() or OS == "linux"):
+        return 400, {"error": "這台的顯示卡（Windows 的 AMD／Intel，或 Apple）不能指定用哪幾張，請改回自動"}
     if gpu_ids and not has_nvidia():
         try:
             visible_env(gpu_ids)
@@ -3048,6 +3053,9 @@ def pools(reg, hw):
         "memory_model": mm,
         "swap": swap_pool(),
         "floors": fl,
+        # 綁卡靠 CUDA_VISIBLE_DEVICES（NVIDIA）或 KFD 序號換 HIP_VISIBLE_DEVICES（Linux 的 AMD）；
+        # Windows 的 AMD／Intel（Vulkan）與 Apple 沒有可靠的對應，不提供綁卡、一律用全部
+        "bindable": has_nvidia() or OS == "linux",
         "gpus": [{
             "id": g.get("id"), "name": g.get("name"),
             "total_gib": round((g.get("vram_total") or 0) / GIB, 1),
@@ -3624,12 +3632,20 @@ def _safe_extract(archive, dest):
             z.extractall(root)
         return
     with tarfile.open(archive) as t:
+        ok = []
         for mem in t.getmembers():
-            if not (mem.isfile() or mem.isdir()) or not os.path.realpath(os.path.join(root, mem.name)).startswith(root + os.sep):
-                if mem.issym() and not os.path.isabs(mem.linkname) and ".." not in mem.linkname.split("/"):
-                    continue                           # 同資料夾內的函式庫版本連結（libggml.0.dylib → libggml.dylib）可以
+            inside_root = os.path.realpath(os.path.join(root, mem.name)).startswith(root + os.sep)
+            # 同資料夾內的函式庫版本連結（libggml.0.dylib → libggml.dylib）可以；其他連結、裝置檔一律拒絕
+            same_dir_link = mem.issym() and not os.path.isabs(mem.linkname) and ".." not in mem.linkname.split("/") \
+                and "/" not in mem.linkname
+            if not inside_root or not (mem.isfile() or mem.isdir() or same_dir_link):
                 raise RuntimeError(f"壓縮檔裡有不安全的路徑：{mem.name}")
-        t.extractall(root)
+            ok.append(mem)
+        # 只解開逐一檢查過的成員；Python 有 data 過濾器（3.12 起，3.9.17 起也有）就再加一道
+        if hasattr(tarfile, "data_filter"):
+            t.extractall(root, members=ok, filter="data")
+        else:
+            t.extractall(root, members=ok)
 
 
 def _prebuilt_run(st, log):
@@ -4503,6 +4519,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    for st in (sys.stdout, sys.stderr):
+        # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
+        if st is not None and hasattr(st, "reconfigure"):
+            st.reconfigure(encoding="utf-8", errors="replace")
     if sys.stdout is None:
         # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
         os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)

@@ -8,6 +8,8 @@ on:
     branches: [main]
 permissions:
   contents: read
+env:
+  PYTHONUTF8: '1'          # Windows 的主控台預設 cp1252，測試印中文會例外
 
 jobs:
   selftest:

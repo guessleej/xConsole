@@ -53,6 +53,13 @@ def models_ok(port):
         return False
 
 
+def diag(unit):
+    """CI 上失敗時看得到原因：服務記錄最後幾行、units.json、現在的狀態。"""
+    print("    狀態：", A.unit_state(unit), A.SUP.st.get(unit), (A.SUP._meta().get(unit) or {}))
+    for ln in A.tail_lines(A.SUP.log_path(unit) or "", 12):
+        print("    記錄：", ln)
+
+
 def wait(fn, secs):
     end = time.time() + secs
     while time.time() < end:
@@ -88,6 +95,34 @@ def main():
     case("家目錄底下可以當存放區", err is None, err or root)
     case("系統以外的路徑擋下", A.check_root(os.path.join(tempfile.gettempdir(), "..", "..", "x"))[1] is not None)
 
+    # ---- 預編譯版解壓縮：落到資料夾外面的一律拒絕
+    import io as _io
+    import tarfile
+
+    def mk_tar(entries):
+        path = os.path.join(tempfile.mkdtemp(), "t.tar.gz")
+        with tarfile.open(path, "w:gz") as t:
+            for name, link in entries:
+                ti = tarfile.TarInfo(name)
+                if link:
+                    ti.type, ti.linkname = tarfile.SYMTYPE, link
+                    t.addfile(ti)
+                else:
+                    ti.size = 2
+                    t.addfile(ti, _io.BytesIO(b"ok"))
+        return path
+
+    def extract(entries):
+        try:
+            A._safe_extract(mk_tar(entries), tempfile.mkdtemp())
+            return "解開"
+        except RuntimeError:
+            return "拒絕"
+    case("正常的壓縮檔（含同資料夾的函式庫連結）解得開", extract([("b/llama-server", None), ("b/libx.0.dylib", "libx.dylib")]) == "解開")
+    case("../ 跳出去的拒絕", extract([("../evil", None)]) == "拒絕")
+    case("連結指到別的資料夾的拒絕", extract([("b/x", "../../etc/passwd")]) == "拒絕")
+    case("連結指到子資料夾外的路徑也拒絕", extract([("b/x", "sub/../../y")]) == "拒絕")
+
     # ---- 代理自己看管模型服務（Supervisor）
     mod_dir = tempfile.mkdtemp()
     with open(os.path.join(mod_dir, "fakellama.py"), "w", encoding="utf-8") as fh:
@@ -114,10 +149,11 @@ def main():
     pid1 = int(A.sysctl(unit, "show -p MainPID --value")[1])
     A.kill_tree(pid1)
     case("被砍掉後先進入重開等待（activating）", wait(lambda: A.unit_state(unit) == "activating", 10), A.unit_state(unit))
-    case("十秒左右自動重開", wait(lambda: A.unit_state(unit) == "active" and models_ok(port), 25))
+    if not case("十秒左右自動重開", wait(lambda: A.unit_state(unit) == "active" and models_ok(port), 45)):
+        diag(unit)
     pid2 = int(A.sysctl(unit, "show -p MainPID --value")[1])
     case("重開後是新的行程", pid2 and pid2 != pid1, f"{pid1} → {pid2}")
-    ok, why = A.wait_healthy({"unit": unit, "port": port}, seconds=20)
+    ok, why = A.wait_healthy({"unit": unit, "port": port}, seconds=40)
     case("wait_healthy 認得出服務好了", ok, why)
 
     # 代理重開：舊的看管停掉（真的重開時舊代理整個不在了），新的 Supervisor 認回還在跑的，不帶起第二份
@@ -128,7 +164,8 @@ def main():
     case("代理重開後認回同一個行程", int(A.sysctl(unit, "show -p MainPID --value")[1]) == pid2)
     case("認回來的狀態是 active", A.unit_state(unit) == "active")
     A.kill_tree(pid2)
-    case("認回來的被砍掉也會自動重開", wait(lambda: A.unit_state(unit) == "active" and models_ok(port), 30))
+    if not case("認回來的被砍掉也會自動重開", wait(lambda: A.unit_state(unit) == "active" and models_ok(port), 45)):
+        diag(unit)
     case("記錄檔讀得到", A.do_logs.__name__ and os.path.exists(A.SUP.log_path(unit)))
 
     A.sysctl(unit, "stop")

@@ -506,7 +506,7 @@ async function openSwap(node, s, pre) {
   /* 多卡（獨立顯存、兩張以上）才出現：這顆模型用哪幾張卡。預設帶建議——單張放得下就綁最空的那張，
      少了跨卡傳輸，其他卡還能跑別的模型；放不下才用最少張數一起扛。沒勾任何一張＝全部卡都用。 */
   const cards = node.state?.pools?.gpus || [];
-  const multi = node.state?.pools?.memory_model === "discrete" && cards.length > 1;
+  const multi = node.state?.pools?.memory_model === "discrete" && cards.length > 1 && node.state.pools.bindable !== false;
   const gpuRow = el("div");
   gpuRow.hidden = true;
   const gpuHint = el("div", "assume");
@@ -3239,7 +3239,7 @@ function openAddMachine() {
         det.appendChild(el("summary", null, "這行指令實際做什麼（解碼後的原文）"));
         det.appendChild(el("pre", "log", r.command_windows_text));
         osBox.appendChild(det);
-        ["以系統管理員身分執行：裝成開機自動啟動（不必有人登入），並在防火牆開 9401（主控台連代理）與 8090～8189（模型 API）；"
+        ["以系統管理員身分執行：裝成開機自動啟動（不必有人登入），並在防火牆開 9401（主控台連代理）與 8090～8289（模型 API）；"
           + "一般身分執行：只在這個帳號登入後才跑，防火牆要另外請管理員開",
         "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
         "llama.cpp 不用自己編：加入後在「這台的設定」按一鍵安裝，會依顯示卡下載官方預編譯版（NVIDIA 用 CUDA、AMD／Intel 用 Vulkan）",
