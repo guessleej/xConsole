@@ -37,6 +37,8 @@ jobs:
         run: cd console && python test_e2e_tls.py
       - name: 前端守衛
         run: cd console && python test_ui_guard.py
+      - name: 推薦模型（容量、等級、速度、挑量化、與代理同一條公式）
+        run: cd console && python test_recommend.py
       - name: 客戶品牌與頁尾（名稱與 Logo 驗證、偽裝圖檔、未登入、稽核）
         run: cd console && python test_branding.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）

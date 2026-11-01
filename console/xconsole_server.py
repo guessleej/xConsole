@@ -38,6 +38,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
 from store import Store  # noqa: E402
@@ -66,6 +67,8 @@ _THROTTLE_LOGGED = {}
 os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
 STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
 CERTS = tls.CertManager(STATE_DIR, PORT)
+CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "catalog.json"),
+                            os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_default.json"))
 
 
 def load_json(path, default=None):
@@ -475,7 +478,9 @@ def fleet_state():
         nodes.append({"id": n["id"], "name": n["name"], "host": n["host"],
                       "group": n.get("group", "未分類"), "online": code == 200,
                       "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
-                      "state": body if code == 200 else None})
+                      "state": body if code == 200 else None,
+                      # 「流暢執行 XB 以內」與分層長條：跟推薦清單同一條公式，畫面不自己算
+                      "capacity": recommend.capacity(body) if code == 200 and body.get("pools") else None})
     return {"ts": time.time(), "nodes": nodes}
 
 
@@ -891,6 +896,47 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:  # noqa: BLE001
             return {}
 
+    def _hf_node(self, want):
+        """讀 Hugging Face 要透過一台連得上網路的代理（主控台本身不一定能上網）。"""
+        ids = [n["id"] for n in fleet()["nodes"]]
+        return [want] if want in ids else ids
+
+    def _catalog_save(self, body, all_rows):
+        rows = CATALOG.load()
+        if all_rows:
+            todo = [(r, True) for r in rows]
+        else:
+            fields, err = recommend.check_fields(body)
+            if err:
+                return self._json(400, {"error": err})
+            cur = next((r for r in rows if r["repo"] == fields["repo"]), None)
+            todo = [(fields, cur is None or bool(body.get("refresh")) or not cur.get("quants"))]
+        done, errors = [], []
+        for fields, need_hf in todo:
+            hf = None
+            if need_hf:
+                last = None
+                for nid in self._hf_node(body.get("node")):
+                    code, hf = call_node(nid, "/library/hf/profile", "POST",
+                                         {"repo": fields["repo"], "match": fields.get("match") or ""}, timeout=180)
+                    if code == 200:
+                        break
+                    last, hf = hf.get("error") or f"代理回 {code}", None
+                    if code == 400:          # repo 本身的問題（找不到、沒有 GGUF），換一台也一樣
+                        break
+                if hf is None:
+                    errors.append(f"{fields['repo']}：{last or '沒有連得上的機器可以讀 Hugging Face'}")
+                    continue
+                if hf["profile"].get("cn_origin"):
+                    errors.append(f"{fields['repo']}：檔頭判定為中國來源，政府案不得使用，不列入推薦清單")
+                    continue
+            done.append(CATALOG.upsert(fields if not all_rows else {"repo": fields["repo"]}, hf)["repo"])
+        self._audit("catalog.refresh-all" if all_rows else "catalog.save", "" if all_rows else todo[0][0]["repo"],
+                    not errors, {"updated": done, "message": "；".join(errors)[:300] if errors else None})
+        if errors and not done:
+            return self._json(400, {"error": "；".join(errors)})
+        return self._json(200, {"ok": True, "updated": done, "errors": errors})
+
     def _audit(self, action, target="", ok=True, detail=None):
         STORE.audit(self.user or "", self.ip, action, target, ok, detail)
 
@@ -1008,6 +1054,18 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)
         if m:
             return self._json(*call_node(m.group(1), "/library", timeout=90))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/recommend", path)
+        if m:
+            code, st = call_node(m.group(1), "/state", timeout=30)
+            if code != 200:
+                return self._json(code, st)
+            lc, lib = call_node(m.group(1), "/library", timeout=90)
+            out = recommend.recommend(st, lib if lc == 200 else {}, CATALOG.load())
+            out["chip"] = st.get("chip")
+            out["store"] = {k: lib.get(k) for k in ("root", "free_gib", "total_gib", "hdd", "llama_server")} if lc == 200 else None
+            return self._json(200, out)
+        if path == "/api/catalog":
+            return self._json(200, {"items": CATALOG.load(), "uses": recommend.USES})
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -1173,7 +1231,7 @@ class Handler(BaseHTTPRequestHandler):
                 "profile.delete" if m.group(2).startswith("profiles/") else
                 "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
             self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
-                        {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "gguf_root",
+                        {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "bandwidth_gbs", "ram_bandwidth_gbs", "gguf_root",
                                                   "llama_server", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
             return self._json(code, out)
@@ -1240,6 +1298,14 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("library.delete", f"{node_id}/{body.get('id')}", code == 200,
                         {"freed_gib": out.get("freed_gib"), "message": out.get("error")})
             return self._json(code, out)
+        # ---- 推薦清單：管理者增改刪；大小與架構一律由代理從 Hugging Face 檔頭讀，不手填
+        if path in ("/api/catalog/save", "/api/catalog/refresh-all"):
+            return self._catalog_save(body, path.endswith("refresh-all"))
+        if path in ("/api/catalog/delete", "/api/catalog/move"):
+            repo = str(body.get("repo") or "")
+            ok = CATALOG.delete(repo) if path.endswith("delete") else CATALOG.move(repo, -1 if body.get("step") == -1 else 1)
+            self._audit("catalog." + path.rsplit("/", 1)[1], repo, ok)
+            return self._json(200 if ok else 404, {"ok": ok} if ok else {"error": "推薦清單裡沒有這個模型"})
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/download/([0-9a-f]{8})/cancel", path)
         if m:
             code, out = call_node(m.group(1), f"/library/download/{m.group(2)}/cancel", "POST", {})
