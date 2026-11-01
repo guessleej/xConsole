@@ -11,7 +11,7 @@ NODES=("$@")
 
 echo "=== 傳送主控台程式 ==="
 bash "$XS" "$HOST_ALIAS" 'mkdir -p $HOME/xconsole/static'
-for f in xconsole_server.py tls.py store.py report.py recommend.py catalog_default.json; do
+for f in xconsole_server.py tls.py store.py report.py recommend.py catalog_default.json sd_catalog_default.json; do
   PUT="$HERE/console/$f" DST="/home/xcloud/xconsole/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
 for f in index.html style.css app.js; do

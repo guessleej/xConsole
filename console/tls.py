@@ -813,6 +813,12 @@ class TLSServer(ThreadingHTTPServer):
     """
     daemon_threads = True
     certs = None   # CertManager
+
+    def server_bind(self):
+        # 不做 HTTPServer 的 getfqdn 反解：沒有反解的機器（實際遇到：macOS 主機）會卡在這裡幾十秒才開始聽
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = socket.gethostname(), self.server_address[1]
     # 連線數上限：沒登入的人開一堆連線慢慢送，每條都會佔住一個執行緒；總數與同一來源各設上限，超過的直接關
     MAX_CONNS, MAX_PER_IP = 512, 64
     _conns, _per_ip, _conn_lock = 0, {}, threading.Lock()

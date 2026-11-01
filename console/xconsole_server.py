@@ -32,6 +32,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from http.server import BaseHTTPRequestHandler
@@ -43,7 +44,9 @@ import report  # noqa: E402
 import tls  # noqa: E402
 from store import Store  # noqa: E402
 
-HOME = os.path.expanduser("~")
+# Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
+HOME = (sys.argv[sys.argv.index("--home") + 1] if "--home" in sys.argv[:-1] else None) \
+    or os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
 STATE_DIR = os.path.join(HOME, ".xconsole")
 FLEET = os.path.join(STATE_DIR, "fleet.json")
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -69,6 +72,9 @@ STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
 CERTS = tls.CertManager(STATE_DIR, PORT)
 CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "catalog.json"),
                             os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_default.json"))
+SD_CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "sd_catalog.json"),
+                               os.path.join(os.path.dirname(os.path.abspath(__file__)), "sd_catalog_default.json"),
+                               keys=("title", "kind", "desc", "tags", "vendor", "license", "parts", "defaults"))
 
 
 def load_json(path, default=None):
@@ -438,6 +444,83 @@ def _read_capped(resp, deadline):
     return json.loads(b"".join(chunks) or b"{}")
 
 
+def agent_open(req, ctx, timeout):
+    """連各機代理：一律不走代理伺服器。代理都在內網；macOS 的 urllib 會讀系統的代理設定，
+    單機版連自己的 127.0.0.1 也會被送去代理而連不上。"""
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
+    return op.open(req, timeout=timeout)
+
+
+def node_request(node_id, path, data, ctype="application/json"):
+    """組一個送給某台代理的請求（主機只取自 fleet.json、用部署時取回的憑證驗證）。回 (請求, TLS 設定) 或 (None, 錯誤)。"""
+    node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
+    if not node:
+        return None, "沒有這台機器"
+    ctx = tls.client_context(trust_file(node_id))
+    if ctx is None:
+        return None, f"還沒信任 {node['name']} 的代理憑證"
+    h = node["host"]
+    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
+    return urllib.request.Request(url, data=data, method="POST", headers={
+        "Authorization": f"Bearer {node_token(node)}", "Content-Type": ctype}), ctx
+
+
+# ---- 助理（Agent）：讓模型用唯讀的工具查這個主控台管的機器，回答管理者的問題
+ASSIST_TOOLS = [
+    {"type": "function", "function": {"name": "list_machines", "description": "列出所有納管的機器：是否在線、記憶體架構、可用記憶體、正在跑的模型",
+                                      "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "machine_detail", "description": "某一台機器的詳細狀態：晶片、記憶體、各欄位跑什麼模型、能跑多大",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+    {"type": "function", "function": {"name": "recommend_models", "description": "依某台機器的記憶體與頻寬推薦模型，含預估速度與放不放得下",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+    {"type": "function", "function": {"name": "installed_models", "description": "某台機器存放區裡已下載的模型與剩餘磁碟",
+                                      "parameters": {"type": "object", "properties": {"machine_id": {"type": "string"}}, "required": ["machine_id"]}}},
+]
+ASSIST_SYSTEM = ("你是 xConsole 模型主控台的助理，用繁體中文（台灣用語）回答管理者的問題。"
+                 "需要機器或模型的資料時一律呼叫工具查，不要猜；工具查不到就說查不到。"
+                 "你只能查，不能替管理者啟動、停止或下載任何東西；需要動作時，告訴他在網頁哪裡按。回答簡短、條列重點。")
+
+
+def assist_tool(name, args):
+    """唯讀工具。回給模型的資料不含權杖、金鑰、路徑以外的機密。"""
+    fs = fleet_state()
+    nodes = {n["id"]: n for n in fs["nodes"]}
+    if name == "list_machines":
+        return [{"machine_id": n["id"], "name": n["name"], "online": n["online"],
+                 "memory_model": (n["state"] or {}).get("pools", {}).get("memory_model") if n["online"] else None,
+                 "running": [f"{s.get('role')}：{s.get('model')}" for s in ((n["state"] or {}).get("slots") or []) if s.get("busy")]}
+                for n in fs["nodes"]]
+    n = nodes.get(str(args.get("machine_id") or ""))
+    if not n:
+        return {"error": "沒有這台機器", "machines": [{"machine_id": k, "name": v["name"]} for k, v in nodes.items()]}
+    if not n["online"]:
+        return {"error": f"{n['name']} 現在連不上"}
+    st = n["state"]
+    if name == "machine_detail":
+        p = st["pools"]
+        return {"name": n["name"], "chip": st.get("chip"), "memory_model": p["memory_model"],
+                "pools": {k: p.get(k) for k in ("unified", "vram", "ram") if p.get(k)}, "capacity": n.get("capacity"),
+                "slots": [{k: s.get(k) for k in ("role", "tier", "model", "quant", "active", "port", "kind")} for s in st["slots"]]}
+    if name == "recommend_models":
+        lc, lib = call_node(n["id"], "/library", timeout=90)
+        r = recommend.recommend(st, lib if lc == 200 else {}, CATALOG.load())
+        rows = []
+        for it in r["items"]:
+            p = next((x for x in it["plans"] if x["stem"] == (it.get("installed") or it.get("pick"))), None)
+            if p:
+                rows.append({"model": it["title"], "level": {"smooth": "流暢", "ok": "能跑", "no": "放不下"}.get(p["level"]),
+                             "quant": p["quant"], "size_gib": p["size_gib"], "place": p["place"], "tok_s": p["tok_s"],
+                             "installed": bool(it.get("installed"))})
+        return {"capacity": r["capacity"], "models": rows}
+    if name == "installed_models":
+        lc, lib = call_node(n["id"], "/library", timeout=90)
+        if lc != 200:
+            return {"error": lib.get("error")}
+        return {"free_gib": lib.get("free_gib"), "models": [{k: m.get(k) for k in ("name", "quant", "size_gib", "arch", "in_use", "cn_origin")}
+                                                           for m in lib.get("gguf") or []]}
+    return {"error": "沒有這個工具"}
+
+
 def call_node(node_id, path, method="GET", body=None, timeout=40):
     cfg = fleet()
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
@@ -456,7 +539,7 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     deadline = time.time() + timeout + 60
     try:
         # 單次等待用呼叫端給的時限（換模型要等好幾分鐘才回），讀完整個回應另有總時限
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        with agent_open(req, ctx, timeout) as resp:
             return resp.status, _read_capped(resp, deadline)
     except urllib.error.HTTPError as exc:
         try:
@@ -593,33 +676,80 @@ def join_release(j):
         j["busy"] = False
 
 
+LAUNCHD_LABEL = "tw.xcloudinfo.xconsole-agent"
+
+
 def install_script(code, j):
+    """Linux 與 macOS 共用的安裝腳本：Linux 建 systemd 使用者服務，macOS 建 launchd 的 LaunchAgent。"""
     url = f"https://{j['console']}"
     return f"""#!/usr/bin/env bash
-# xConsole 節點代理安裝：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+# xConsole 節點代理安裝（Linux／macOS）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
 # 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。
 set -euo pipefail
 C='{url}'
 PIN='{j["pin"]}'
 CODE='{code}'
+OSN=$(uname -s)
 get() {{ curl -fsSk --pinnedpubkey "$PIN" "$C/install/$CODE/$1"; }}
 echo "== 1/4 檢查這台 =="
 [ "$(id -u)" = 0 ] && {{ echo "請用一般帳號執行，不要用 root 或 sudo"; exit 1; }}
-for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 $c，請先安裝（Ubuntu：sudo apt install $c）"; exit 1; }}; done
-systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+if [ "$OSN" = Darwin ]; then
+  python3 -c 'import ssl' 2>/dev/null || {{ echo "這台沒有 python3。請先執行 xcode-select --install 安裝命令列工具，再貼一次這行指令"; exit 1; }}
+else
+  for c in python3 openssl curl; do command -v $c >/dev/null || {{ echo "這台沒有 ${{c}}，請先安裝（Ubuntu：sudo apt install ${{c}}）"; exit 1; }}; done
+  systemctl --user show-environment >/dev/null 2>&1 || {{ echo "這個帳號沒有 systemd 使用者服務，請用一般登入的帳號（SSH 或桌面登入）執行"; exit 1; }}
+fi
+PY=$(command -v python3)
+mkdir -p -m 700 "$HOME/.xconsole"
+if [ "$OSN" = Darwin ]; then
+  # 代理用 cryptography 產自己的憑證：macOS 內建的 LibreSSL 版本參差，舊版的 openssl req 不支援 -addext
+  echo "準備代理用的 Python 環境（cryptography）…"
+  if "$PY" -m venv "$HOME/.xconsole/venv" >/dev/null 2>&1 \
+     && "$HOME/.xconsole/venv/bin/python" -m pip install -q --disable-pip-version-check 'cryptography>=42' >/dev/null 2>&1; then
+    PY="$HOME/.xconsole/venv/bin/python"
+  elif ! openssl req -help 2>&1 | grep -q addext; then
+    echo "裝不了 cryptography（這台要能連 pypi.org），系統的 openssl 也太舊、產不了代理憑證。請先讓這台能連外再貼一次"; exit 1
+  fi
+fi
 echo "== 2/4 下載節點代理 =="
-mkdir -p -m 700 "$HOME/.xconsole" "$HOME/.config/systemd/user"
 get xconsole_agent.py > "$HOME/xconsole_agent.py.new"
-python3 -m py_compile "$HOME/xconsole_agent.py.new"
+"$PY" -m py_compile "$HOME/xconsole_agent.py.new"
 mv "$HOME/xconsole_agent.py.new" "$HOME/xconsole_agent.py"
 echo "== 3/4 建立服務並啟動 =="
-cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
-{AGENT_UNIT}UNIT
-systemctl --user daemon-reload
-systemctl --user enable xconsole-agent.service >/dev/null
-systemctl --user restart xconsole-agent.service
 LINGER=yes
-loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+if [ "$OSN" = Darwin ]; then
+  # launchd：登入後自動啟動、掛了自動重開。機器沒有人登入也要跑的話，到「系統設定 → 使用者與群組」開自動登入
+  PL="$HOME/Library/LaunchAgents/{LAUNCHD_LABEL}.plist"
+  mkdir -p "$HOME/Library/LaunchAgents"
+  cat > "$PL" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{LAUNCHD_LABEL}</string>
+  <key>ProgramArguments</key><array><string>$PY</string><string>$HOME/xconsole_agent.py</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ProcessType</key><string>Standard</string>
+  <key>StandardOutPath</key><string>$HOME/.xconsole/agent.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.xconsole/agent.log</string>
+</dict></plist>
+PLIST
+  # 有人在桌面登入就放 gui 網域；只有 SSH、沒有桌面登入的 Mac 沒有 gui 網域，改放 user 網域
+  LDOM="gui/$(id -u)"; launchctl print "$LDOM" >/dev/null 2>&1 || LDOM="user/$(id -u)"
+  launchctl bootout "$LDOM/{LAUNCHD_LABEL}" 2>/dev/null || true
+  launchctl bootstrap "$LDOM" "$PL"
+  launchctl kickstart -k "$LDOM/{LAUNCHD_LABEL}"
+  LOGHINT="tail -n 50 ~/.xconsole/agent.log；launchd 的狀態：launchctl print $LDOM/{LAUNCHD_LABEL}"
+else
+  mkdir -p "$HOME/.config/systemd/user"
+  cat > "$HOME/.config/systemd/user/xconsole-agent.service" <<'UNIT'
+{AGENT_UNIT}UNIT
+  systemctl --user daemon-reload
+  systemctl --user enable xconsole-agent.service >/dev/null
+  systemctl --user restart xconsole-agent.service
+  loginctl enable-linger "$USER" 2>/dev/null || LINGER=no
+  LOGHINT="journalctl --user -u xconsole-agent -n 50"
+fi
 # 等健康檢查真的通過才往下：重新安裝時權杖與憑證檔本來就在，只等檔案出現會在代理重啟到一半時就去連
 UP=no
 for i in $(seq 1 30); do
@@ -627,24 +757,144 @@ for i in $(seq 1 30); do
      && curl -fsS -m 3 --cacert "$HOME/.xconsole/agent-cert.pem" https://127.0.0.1:9401/healthz >/dev/null 2>&1; then UP=yes; break; fi
   sleep 1
 done
-[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：journalctl --user -u xconsole-agent -n 50"; exit 1; }}
+[ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：$LOGHINT"; exit 1; }}
 echo "== 4/4 加入主控台 =="
-RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" python3 - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
-import json, os, socket, subprocess
-home = os.path.expanduser("~")
-ips = subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split()[:4]
-print(json.dumps({{"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
-                  "linger": os.environ["XC_LINGER"] == "yes",
-                  "token": open(os.path.join(home, ".xconsole/token")).read().strip(),
-                  "cert": open(os.path.join(home, ".xconsole/agent-cert.pem")).read()}}))
-PY
+RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" "$PY" - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
+{JOIN_PAYLOAD_PY}PY
 ) || {{ echo "連不到主控台 $C"; exit 1; }}
 STATUS=$(printf '%s' "$RESP" | tail -n 1)
-printf '%s' "$RESP" | sed '$d' | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
+printf '%s' "$RESP" | sed '$d' | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
 [ "$STATUS" = 200 ] || exit 1
 [ "$LINGER" = no ] && echo "提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER"
+[ "$OSN" = Darwin ] && echo "提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台"
 exit 0
 """
+
+
+# 送回主控台的加入資料：權杖、代理憑證、這台的 IP（UDP connect 不送封包，三個系統都能取到對外網卡的 IP）
+JOIN_PAYLOAD_PY = """import json, os, socket, sys
+home = os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
+ips = []
+try:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("1.1.1.1", 80)); ips.append(s.getsockname()[0]); s.close()
+except OSError:
+    pass
+print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
+                  "linger": os.environ.get("XC_LINGER", "yes") == "yes",
+                  "token": open(os.path.join(home, ".xconsole", "token")).read().strip(),
+                  "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
+"""
+
+
+def install_script_ps1(code, j):
+    """Windows 的安裝腳本（Windows PowerShell 5.1，系統內建）。
+    用系統管理員身分執行：裝成開機自啟（SYSTEM 帳號，資料放 C:\\ProgramData\\xConsole，權限只給 SYSTEM 與系統管理員）並開防火牆；
+    一般身分執行：裝成這個帳號登入後自啟，防火牆要另外請系統管理員開。"""
+    url = f"https://{j['console']}"
+    return f"""# xConsole 節點代理安裝（Windows）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
+# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷
+$ErrorActionPreference = 'Continue'
+$C = '{url}'; $CODE = '{code}'; $FP = '{j["fp"]}'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# 只接受主控台那一張憑證（比對整張憑證的 SHA-256），不是關掉驗證
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
+  $h = [Security.Cryptography.SHA256]::Create().ComputeHash($cert.GetRawCertData())
+  ([BitConverter]::ToString($h) -replace '-', '') -eq $FP }}
+$wc = New-Object Net.WebClient
+$admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+Write-Host '== 1/5 檢查這台 =='
+$py = $null
+$probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
+# py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
+try {{ $v = & py -3 -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) {{ $py = $v.Trim() }} }} catch {{}}
+if (-not $py) {{ try {{ $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) {{ $py = $v.Trim() }} }} catch {{}} }}
+if (-not $py) {{
+  $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
+  if ($ans -match '^(n|N)') {{ Write-Host '請先安裝 Python 3（https://www.python.org），再貼一次這段指令'; exit 1 }}
+  $scope = if ($admin) {{ 'machine' }} else {{ 'user' }}   # 一般身分裝不了全機版，改裝到自己的帳號底下
+  winget install -e --id Python.Python.3.12 --scope $scope --accept-package-agreements --accept-source-agreements
+  $py = (Get-ChildItem 'C:\\Program Files\\Python3*\\python.exe', "$env:LOCALAPPDATA\\Programs\\Python\\Python3*\\python.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
+  if (-not $py) {{ Write-Host 'Python 裝好了但找不到，請重新開一個 PowerShell 視窗再貼一次'; exit 1 }}
+}}
+if ($admin) {{ $base = Join-Path $env:ProgramData 'xConsole' }} else {{ $base = $env:USERPROFILE }}
+$dir = Join-Path $base 'xconsole'
+New-Item -ItemType Directory -Force -Path (Join-Path $base '.xconsole') | Out-Null
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+if ($admin) {{
+  # ProgramData 預設一般使用者讀得到：權杖與私鑰放在這裡，只留給 SYSTEM 與系統管理員
+  icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+}}
+Write-Host '== 2/5 準備 Python 環境 =='
+& $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) {{ Write-Host '建不了 Python 虛擬環境'; exit 1 }}
+$vpy = Join-Path $dir '.venv\\Scripts\\python.exe'
+$vpyw = Join-Path $dir '.venv\\Scripts\\pythonw.exe'
+& $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'; if ($LASTEXITCODE) {{ Write-Host '裝不了 cryptography；這台要能連 pypi.org'; exit 1 }}
+Write-Host '== 3/5 下載節點代理 =='
+$agent = Join-Path $dir 'xconsole_agent.py'
+$wc.DownloadFile("$C/install/$CODE/xconsole_agent.py", "$agent.new")
+& $vpy -m py_compile "$agent.new"; if ($LASTEXITCODE) {{ throw '代理程式檔損壞' }}
+Move-Item -Force "$agent.new" $agent
+Write-Host '== 4/5 建立開機自啟並啟動 =='
+$task = 'xConsole Agent'
+Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+$act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $agent + '" --home "' + $base + '"') -WorkingDirectory $dir
+$set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+if ($admin) {{
+  $trg = New-ScheduledTaskTrigger -AtStartup
+  $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+  New-NetFirewallRule -DisplayName 'xConsole 節點代理' -Direction Inbound -Protocol TCP -LocalPort 9401 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
+  New-NetFirewallRule -DisplayName 'xConsole 模型 API' -Direction Inbound -Protocol TCP -LocalPort 8090-8289 -Action Allow -Profile Domain,Private -ErrorAction SilentlyContinue | Out-Null
+}} else {{
+  $trg = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $pri = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+}}
+Register-ScheduledTask -TaskName $task -Action $act -Trigger $trg -Principal $pri -Settings $set -ErrorAction Stop | Out-Null
+Start-ScheduledTask -TaskName $task
+$tok = Join-Path $base '.xconsole\\token'; $crt = Join-Path $base '.xconsole\\agent-cert.pem'
+$up = $false
+for ($i = 0; $i -lt 40 -and -not $up; $i++) {{
+  Start-Sleep 1
+  if ((Test-Path $tok) -and (Test-Path $crt)) {{
+    $mine = New-Object Security.Cryptography.X509Certificates.X509Certificate2 $crt
+    [Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert) $cert.GetRawCertData().Length -eq $mine.RawData.Length -and [Convert]::ToBase64String($cert.GetRawCertData()) -eq [Convert]::ToBase64String($mine.RawData) }}
+    try {{ $up = (New-Object Net.WebClient).DownloadString('https://127.0.0.1:9401/healthz') -match 'xconsole-agent' }} catch {{}}
+  }}
+}}
+if (-not $up) {{ Write-Host '代理沒有起來。請在「工作排程器」查看 xConsole Agent 的最後執行結果'; exit 1 }}
+Write-Host '== 5/5 加入主控台 =='
+[Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
+  $h = [Security.Cryptography.SHA256]::Create().ComputeHash($cert.GetRawCertData())
+  ([BitConverter]::ToString($h) -replace '-', '') -eq $FP }}
+$env:XC_CODE = $CODE; $env:XC_LINGER = 'yes'; $env:XCONSOLE_HOME = $base
+$payload = @'
+{JOIN_PAYLOAD_PY}'@ | & $vpy -
+$req = New-Object Net.WebClient; $req.Headers.Add('Content-Type', 'application/json'); $req.Encoding = [Text.Encoding]::UTF8
+try {{ $resp = $req.UploadString("$C/api/join", $payload); $ok = $true }} catch [Net.WebException] {{
+  $resp = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd(); $ok = $false }}
+$d = $resp | ConvertFrom-Json
+if ($d.message) {{ Write-Host $d.message }} elseif ($d.error) {{ Write-Host $d.error }} else {{ Write-Host $resp }}
+if (-not $ok) {{ exit 1 }}
+if (-not $admin) {{ Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }}
+"""
+
+
+def console_fp():
+    """主控台目前憑證整張的 SHA-256（Windows PowerShell 用來釘住憑證；它拿不到 SubjectPublicKeyInfo）。"""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    with open(CERTS.p.live_cert, "rb") as fh:
+        cert = x509.load_pem_x509_certificates(fh.read())[0]
+    return cert.fingerprint(hashes.SHA256()).hex().upper()
+
+
+def windows_command(url):
+    """一行貼上就能跑的 Windows 指令。用 -EncodedCommand，貼進 cmd 或 PowerShell 都不會被引號、$ 弄壞；
+    內容就是：釘住主控台憑證後下載 agent.ps1 執行（畫面上另外顯示原文，可以先看再貼）。"""
+    head = re.sub(r"\s+", " ", f"""$FP='{{fp}}';[Net.ServicePointManager]::SecurityProtocol='Tls12';
+      [Net.ServicePointManager]::ServerCertificateValidationCallback={{param($s,$c)
+      ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($c.GetRawCertData())) -replace '-','') -eq $FP}};
+      iex ((New-Object Net.WebClient).DownloadString('{url}'))""")
+    return head
 
 
 def join_node(handler, body):
@@ -736,7 +986,7 @@ def _join_node(handler, body):
             url = f"https://{'[' + h + ']' if ':' in h else h}:{port}/state"
             req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
             try:
-                with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+                with agent_open(req, ctx, 10) as resp:
                     if resp.status == 200:
                         good = h
                         break
@@ -818,7 +1068,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("Content-Security-Policy",
                          "default-src 'self'; style-src 'self'; script-src 'self'; "
-                         "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
+                         "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; "
                          "frame-ancestors 'none'; object-src 'none'")
         if CERTS.hsts_header():
             # 只有正式憑證且管理者開了開關才送：自簽時送 HSTS 會讓使用者連「略過警告」都沒有
@@ -881,6 +1131,139 @@ class Handler(BaseHTTPRequestHandler):
         self._json(401, {"error": "請先登入"})
         return True
 
+    def _upload(self, node_id, ctype):
+        """上傳 GGUF 的一塊：本文是檔案的位元組。不是 JSON，所以另外擋跨站：要登入、要 octet-stream、
+        要帶自訂標頭 X-XConsole-Upload（跨站的表單送不出自訂標頭，fetch 送的話會先被 CORS 預檢擋下）。"""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if not self.user or ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1" \
+                or not 0 < n <= 64 * 1024 * 1024:
+            # 小的本文照樣讀掉再回錯誤（沒讀完就關連線，對方收到的是連線重置、看不到原因）；大的不讀直接關：
+            # 沒登入的人不能讓主控台收 64 MB
+            if 0 <= n <= MAX_ANON_BODY:
+                self.rfile.read(n)
+            else:
+                self.close_connection = True
+            self._headers_done()
+            return self._json(401 if not self.user else 400, {"error": "請先登入" if not self.user else "上傳的請求格式不對"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        q = parse_qs(urlparse(self.path).query)
+        g = lambda k: (q.get(k) or [""])[0]  # noqa: E731
+        if not re.fullmatch(r"\d{1,15}", g("offset")) or not re.fullmatch(r"\d{1,15}", g("total")):
+            return self._json(400, {"error": "分塊的位置或大小不對"})
+        qs = urllib.parse.urlencode({k: g(k) for k in ("folder", "name", "offset", "total")})
+        req, ctx = node_request(node_id, "/library/upload?" + qs, data, "application/octet-stream")
+        if req is None:
+            return self._json(404, {"error": ctx})
+        try:
+            with agent_open(req, ctx, 300) as resp:
+                code, out = resp.status, json.load(resp)
+        except urllib.error.HTTPError as exc:
+            code, out = exc.code, json.load(exc)
+        except Exception as exc:  # noqa: BLE001
+            return self._json(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+        if g("offset") == "0" or out.get("done"):
+            self._audit("library.upload", f"{node_id}/{g('folder')}/{g('name')}", code == 200,
+                        {"total": int(g("total")), "done": bool(out.get("done")), "message": out.get("error")})
+        return self._json(code, out)
+
+    def _chat(self, node_id, slot_id, body):
+        """網頁對話：經代理轉給模型服務，串流原樣轉給瀏覽器。對話內容不寫進稽核（只記用了哪個欄位、幾則訊息）。"""
+        n_msg = len(body.get("messages") or [])
+
+        def done(code, out=None):
+            # 稽核在知道結果之後才寫，記真實的成敗（以前一進來就記成功，連不存在的機器都算用過）
+            self._audit("chat", f"{node_id}/{slot_id}", code == 200, {"messages": n_msg, "status": code,
+                                                                        "message": (out or {}).get("error")})
+            return None if out is None else self._json(code, out)
+        req, ctx = node_request(node_id, f"/chat/{slot_id}", json.dumps(body).encode())
+        if req is None:
+            return done(404, {"error": ctx})
+        try:
+            resp = agent_open(req, ctx, 600)
+        except urllib.error.HTTPError as exc:
+            try:
+                return done(exc.code, json.load(exc))
+            except Exception:  # noqa: BLE001
+                return done(exc.code, {"error": f"代理回 {exc.code}"})
+        except Exception as exc:  # noqa: BLE001
+            return done(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
+        done(200)
+        with resp:
+            if "event-stream" not in (resp.headers.get("Content-Type") or ""):
+                return self._json(resp.status, json.load(resp))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self._sec_headers()
+            self.end_headers()
+            self.close_connection = True
+            try:
+                for line in resp:
+                    self.wfile.write(line)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        return None
+
+    def _assist(self, body):
+        """助理：模型要查資料就呼叫唯讀工具，最多來回 6 次。每一步（查了什麼）也回給畫面看。"""
+        node_id, slot_id = str(body.get("node") or ""), str(body.get("slot") or "")
+        msgs = [m for m in (body.get("messages") or []) if isinstance(m, dict) and m.get("role") in ("user", "assistant")][-20:]
+        if not msgs:
+            return self._json(400, {"error": "沒有問題"})
+        convo = [{"role": "system", "content": ASSIST_SYSTEM}] + [{"role": m["role"], "content": str(m.get("content") or "")[:8000]} for m in msgs]
+        steps, seen = [], {}
+
+        def done(code, out):
+            self._audit("assist", f"{node_id}/{slot_id}", code == 200,
+                        {"messages": len(msgs), "steps": len(steps), "status": code, "message": out.get("error")})
+            return self._json(code, out)
+        for rnd in range(6):
+            last = rnd == 5
+            req = {"messages": convo, "stream": False, "max_tokens": 2048, "temperature": 0.2}
+            if not last:
+                req["tools"] = ASSIST_TOOLS
+            else:
+                # 最後一輪不給工具：小模型會一直重複查同一個工具、不肯作答，這一輪逼它用查到的資料回答
+                convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
+            code, out = call_node(node_id, f"/chat/{slot_id}", "POST", req, timeout=600)
+            if code != 200 and "tools" in req:
+                # 帶工具時 llama.cpp 會用文法限制輸出格式，小模型偶爾產出不合格式的東西就整個 500：
+                # 這一輪改成不帶工具、請它用已經查到的資料回答
+                last = True
+                req.pop("tools")
+                convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
+                code, out = call_node(node_id, f"/chat/{slot_id}", "POST", req, timeout=600)
+            if code != 200:
+                return done(code, {"error": out.get("error") or f"模型回 {code}", "steps": steps})
+            msg = ((out.get("choices") or [{}])[0]).get("message") or {}
+            # 一次最多處理 4 個呼叫；回給模型的那則也只留這 4 個，否則下一輪會帶著沒有回覆的呼叫、被伺服器拒絕
+            calls = [] if last else (msg.get("tool_calls") or [])[:4]
+            if not calls:
+                return done(200, {"content": msg.get("content") or "（模型沒有給出回答）", "reasoning": msg.get("reasoning_content"),
+                                  "steps": steps, "usage": out.get("usage"), "timings": out.get("timings")})
+            convo.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+            for c in calls:
+                fn = (c.get("function") or {})
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except ValueError:
+                    args = {}
+                args = args if isinstance(args, dict) else {}
+                key = json.dumps([fn.get("name"), args], sort_keys=True, ensure_ascii=False)
+                if key in seen:
+                    result = {"note": "這個剛剛已經查過了，結果在前面；請直接回答"}
+                else:
+                    result = seen[key] = assist_tool(fn.get("name"), args)
+                    steps.append({"tool": fn.get("name"), "args": args})
+                convo.append({"role": "tool", "tool_call_id": c.get("id"), "content": json.dumps(result, ensure_ascii=False)[:12000]})
+        return done(200, {"content": "（沒有結論）", "steps": steps})
+
     def _body(self, limit=None):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -932,6 +1315,43 @@ class Handler(BaseHTTPRequestHandler):
                     continue
             done.append(CATALOG.upsert(fields if not all_rows else {"repo": fields["repo"]}, hf)["repo"])
         self._audit("catalog.refresh-all" if all_rows else "catalog.save", "" if all_rows else todo[0][0]["repo"],
+                    not errors, {"updated": done, "message": "；".join(errors)[:300] if errors else None})
+        if errors and not done:
+            return self._json(400, {"error": "；".join(errors)})
+        return self._json(200, {"ok": True, "updated": done, "errors": errors})
+
+    def _sd_catalog_save(self, body, all_rows):
+        """畫圖與影片清單：每個元件的檔案與大小由代理讀 Hugging Face 的檔案清單（不下載）。"""
+        rows = SD_CATALOG.load()
+        if all_rows:
+            todo = [r for r in rows]
+        else:
+            fields, err = recommend.check_sd_fields(body)
+            if err:
+                return self._json(400, {"error": err})
+            todo = [fields]
+        done, errors = [], []
+        for fields in todo:
+            trees, last = {}, None
+            for repo in dict.fromkeys(p["repo"] for p in fields["parts"]):
+                for nid in self._hf_node(body.get("node")):
+                    code, t = call_node(nid, "/library/hf/tree", "POST", {"repo": repo}, timeout=60)
+                    if code == 200 or code == 400:      # 400＝repo 本身的問題，換一台也一樣
+                        break
+                if code != 200:
+                    last = t.get("error") or f"代理回 {code}"
+                    break
+                trees[repo] = t["files"]
+            if last:
+                errors.append(f"{fields['repo']}：{last}")
+                continue
+            files = recommend.sd_files(fields["parts"], trees)
+            if not recommend.sd_resolve({**fields, "files": files}):
+                errors.append(f"{fields['repo']}：照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭")
+                continue
+            done.append(SD_CATALOG.upsert({"repo": fields["repo"]} if all_rows else fields,
+                                          extra={"files": files, "refreshed": int(time.time())})["repo"])
+        self._audit("sd_catalog.refresh-all" if all_rows else "sd_catalog.save", "" if all_rows else todo[0]["repo"],
                     not errors, {"updated": done, "message": "；".join(errors)[:300] if errors else None})
         if errors and not done:
             return self._json(400, {"error": "；".join(errors)})
@@ -996,7 +1416,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, branding())
         if path == "/branding/logo":
             return self._logo()
-        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|xconsole_agent\.py)", path)
+        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|agent\.ps1|xconsole_agent\.py)", path)
         if m:
             # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
             j = join_lookup(m.group(1))
@@ -1005,6 +1425,9 @@ class Handler(BaseHTTPRequestHandler):
                                   "text/plain; charset=utf-8")
             if m.group(2) == "agent.sh":
                 return self._send(200, install_script(m.group(1), j).encode(), "text/x-shellscript; charset=utf-8")
+            if m.group(2) == "agent.ps1":
+                # 加 BOM：Windows PowerShell 5.1 沒 BOM 會用 ANSI 讀，中文訊息變亂碼
+                return self._send(200, "\ufeff".encode() + install_script_ps1(m.group(1), j).encode(), "text/plain; charset=utf-8")
             src = agent_source()
             if not src:
                 return self._send(500, "主控台找不到代理程式檔，請重新部署主控台。\n".encode(), "text/plain; charset=utf-8")
@@ -1045,12 +1468,18 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
         if m:
             return self._json(*call_node(m.group(1), "/machine", timeout=60))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/build(/progress)?", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/build(/progress)?", path)
         if m:
-            return self._json(*call_node(m.group(1), "/llama/build" + (m.group(2) or ""), timeout=60))
+            return self._json(*call_node(m.group(1), f"/{m.group(2)}/build{m.group(3) or ''}", timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
         if m:
-            return self._json(*call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=20))
+            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=60)
+            run = out.get("run") if code == 200 else None
+            if run:
+                # 預估速度與推薦清單同一條公式（recommend.decode_speed），畫面不自己算
+                run["tok_s"] = recommend.decode_speed(run.get("size_gib"), run.get("profile") or {}, run.get("bandwidth_gbs"))
+                run["load_est_sec"] = recommend.load_seconds(run.get("size_gib"), run.get("hdd"))
+            return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)
         if m:
             return self._json(*call_node(m.group(1), "/library", timeout=90))
@@ -1066,6 +1495,22 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, out)
         if path == "/api/catalog":
             return self._json(200, {"items": CATALOG.load(), "uses": recommend.USES})
+        # ---- 畫圖與影片
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/recommend", path)
+        if m:
+            code, st = call_node(m.group(1), "/state", timeout=30)
+            if code != 200:
+                return self._json(code, st)
+            lc, lib = call_node(m.group(1), "/sd/library", timeout=60)
+            if lc != 200:
+                return self._json(lc, lib)
+            return self._json(200, recommend.recommend_sd(st, lib, SD_CATALOG.load()))
+        if path == "/api/sd/catalog":
+            return self._json(200, {"items": SD_CATALOG.load(), "roles": recommend.SD_ROLES, "kinds": recommend.SD_KINDS,
+                                    "samplers": recommend.SD_SAMPLERS})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output)?)?", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/sd/jobs" + (m.group(2) or ""), timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -1109,6 +1554,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/upload", path)
+        if m:
+            return self._upload(m.group(1), ctype)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -1173,11 +1621,15 @@ class Handler(BaseHTTPRequestHandler):
             code = secrets.token_urlsafe(24)
             with _JOIN_LOCK:
                 _JOINS[_join_key(code)] = {"exp": time.time() + JOIN_TTL, "name": name, "group": group, "replace": replace,
-                                           "console": host, "pin": console_pin(), "by": self.user}
+                                           "console": host, "pin": console_pin(), "fp": console_fp(), "by": self.user}
             self._audit("node.join_code", host, True, {"name": name, "group": group})
             url = f"https://{host}/install/{code}/agent.sh"
+            ps = windows_command(f"https://{host}/install/{code}/agent.ps1").replace("{fp}", _JOINS[_join_key(code)]["fp"])
             return self._json(200, {"id": _join_key(code)[:12], "expires_at": time.time() + JOIN_TTL,
-                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash"})
+                                    "command": f"curl -fsSk --pinnedpubkey '{_JOINS[_join_key(code)]['pin']}' '{url}' | bash",
+                                    "command_windows": "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand "
+                                                       + base64.b64encode(ps.encode("utf-16-le")).decode(),
+                                    "command_windows_text": ps})
         m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove)", path)
         if m:
             nid, act = m.group(1), m.group(2)
@@ -1223,16 +1675,17 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
                                                                        "agent_port": port}})
             return self._json(200, {"ok": True})
-        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel|sd/build|sd/build/cancel)", path)
         if m:
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
             act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
-                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel"}.get(m.group(2)) or (
+                   "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel",
+                   "sd/build": "sd.build", "sd/build/cancel": "sd.build_cancel"}.get(m.group(2)) or (
                 "profile.delete" if m.group(2).startswith("profiles/") else
                 "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
             self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
                         {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "bandwidth_gbs", "ram_bandwidth_gbs", "gguf_root",
-                                                  "llama_server", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
+                                                  "llama_server", "sd_cli", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
             return self._json(code, out)
 
@@ -1259,7 +1712,7 @@ class Handler(BaseHTTPRequestHandler):
         # ---- API 串接：網址、模型名稱、上下文、金鑰（改完重啟並驗證，失敗自動換回）
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/settings", path)
         if m:
-            want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key")
+            want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key", "thinking", "lan")
                     if k in body}
             # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
@@ -1281,9 +1734,12 @@ class Handler(BaseHTTPRequestHandler):
                          "network": (out.get("network") or {}).get("ok")})
             return self._json(code, out)
         # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
-        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|download|delete)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete)", path)
         if m:
             node_id, act = m.groups()
+            if act == "hf/tree":
+                return self._json(*call_node(node_id, "/library/hf/tree", "POST",
+                                             {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
             if act == "hf":
                 return self._json(*call_node(node_id, "/library/hf", "POST",
                                              {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
@@ -1298,6 +1754,45 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("library.delete", f"{node_id}/{body.get('id')}", code == 200,
                         {"freed_gib": out.get("freed_gib"), "message": out.get("error")})
             return self._json(code, out)
+        # ---- 畫圖與影片：清單增改刪、下載（照清單組好規格，或內部測試手動組）、刪除、試算、產圖
+        if path in ("/api/sd/catalog/save", "/api/sd/catalog/refresh-all"):
+            return self._sd_catalog_save(body, path.endswith("refresh-all"))
+        if path in ("/api/sd/catalog/delete", "/api/sd/catalog/move"):
+            repo = str(body.get("repo") or "")
+            ok = SD_CATALOG.delete(repo) if path.endswith("delete") else SD_CATALOG.move(repo, -1 if body.get("step") == -1 else 1)
+            self._audit("sd_catalog." + path.rsplit("/", 1)[1], repo, ok)
+            return self._json(200 if ok else 404, {"ok": ok} if ok else {"error": "清單裡沒有這個模型"})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/download", path)
+        if m:
+            if body.get("manual"):
+                spec = {**body["manual"], "internal": True} if isinstance(body["manual"], dict) else {}
+            else:
+                e = next((r for r in SD_CATALOG.load() if r["repo"] == body.get("repo")), None)
+                combo = recommend.sd_resolve(e, str(body.get("path") or "")) if e else []
+                if not combo:
+                    return self._json(404, {"error": "清單裡沒有這顆或這個量化，請重新整理"})
+                spec = recommend.sd_spec(e, combo[0])
+            code, out = call_node(m.group(1), "/sd/download", "POST", {"spec": spec, "token": body.get("token")}, timeout=120)
+            self._audit("sd.download.internal" if body.get("manual") else "sd.download", m.group(1), code == 200,
+                        {"model": spec.get("id"), "parts": [f"{p.get('repo')}/{p.get('path')}" for p in spec.get("parts") or []][:8],
+                         "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/(delete|admit|generate)", path)
+        if m:
+            node_id, act = m.groups()
+            keys = {"delete": ("id",), "admit": ("model", "width", "height", "frames"),
+                    "generate": ("model", "prompt", "negative", "width", "height", "steps", "cfg", "sampler", "seed", "frames", "fps")}[act]
+            code, out = call_node(node_id, f"/sd/{act}", "POST", {k: body.get(k) for k in keys}, timeout=120)
+            if act != "admit":
+                self._audit(f"sd.{act}", f"{node_id}/{body.get('id') or body.get('model')}", code == 200,
+                            {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}"}
+                                                            if act == "generate" else {"freed_gib": out.get("freed_gib")}))
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)
+        if m:
+            code, out = call_node(m.group(1), f"/sd/jobs/{m.group(2)}/{m.group(3)}", "POST", {})
+            self._audit(f"sd.job.{m.group(3)}", f"{m.group(1)}/{m.group(2)}", code == 200, {"message": out.get("error")})
+            return self._json(code, out)
         # ---- 推薦清單：管理者增改刪；大小與架構一律由代理從 Hugging Face 檔頭讀，不手填
         if path in ("/api/catalog/save", "/api/catalog/refresh-all"):
             return self._catalog_save(body, path.endswith("refresh-all"))
@@ -1306,6 +1801,18 @@ class Handler(BaseHTTPRequestHandler):
             ok = CATALOG.delete(repo) if path.endswith("delete") else CATALOG.move(repo, -1 if body.get("step") == -1 else 1)
             self._audit("catalog." + path.rsplit("/", 1)[1], repo, ok)
             return self._json(200 if ok else 404, {"ok": ok} if ok else {"error": "推薦清單裡沒有這個模型"})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf/search|upload/status|upload/cancel)", path)
+        if m:
+            want = {k: body.get(k) for k in ("q", "token", "folder", "name") if k in body}
+            code, out = call_node(m.group(1), f"/library/{m.group(2)}", "POST", want, timeout=60)
+            if m.group(2) == "upload/cancel":
+                self._audit("library.upload_cancel", f"{m.group(1)}/{want.get('folder')}/{want.get('name')}", code == 200)
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/chat/([\w.-]+)", path)
+        if m:
+            return self._chat(m.group(1), m.group(2), body)
+        if path == "/api/assistant":
+            return self._assist(body)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/download/([0-9a-f]{8})/cancel", path)
         if m:
             code, out = call_node(m.group(1), f"/library/download/{m.group(2)}/cancel", "POST", {})
@@ -1510,6 +2017,13 @@ def is_ip(text):
 
 
 def main():
+    for st in (sys.stdout, sys.stderr):
+        # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
+        if st is not None and hasattr(st, "reconfigure"):
+            st.reconfigure(encoding="utf-8", errors="replace")
+    if sys.stdout is None:
+        # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
+        sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "console.log"), "a", encoding="utf-8", buffering=1)
     cfg = fleet()
     if not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
@@ -1537,7 +2051,8 @@ if __name__ == "__main__":
             user = input("帳號（預設 admin）：").strip() or "admin"
             pw = getpass.getpass("密碼：")
         else:
-            lines = sys.stdin.read().splitlines()
+            # Windows PowerShell 用管線送進來、或用記事本存的帳密檔，開頭會多一個 BOM：不去掉的話帳號會變成「\ufeffadmin」，怎麼登入都不對
+            lines = sys.stdin.read().lstrip("\ufeff").splitlines()
             user = (lines[0].strip() if lines else "") or "admin"
             pw = lines[1] if len(lines) > 1 else ""
         if len(pw) < 8:

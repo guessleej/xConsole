@@ -41,6 +41,8 @@ jobs:
         run: cd console && python test_recommend.py
       - name: 客戶品牌與頁尾（名稱與 Logo 驗證、偽裝圖檔、未登入、稽核）
         run: cd console && python test_branding.py
+      - name: 畫圖與影片（准入三種架構、中國來源含文字編碼器、sd-cli 參數、看門狗）
+        run: cd console && python test_sd.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）

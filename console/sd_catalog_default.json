@@ -1,0 +1,339 @@
+[
+ {
+  "repo": "leejet/FLUX.1-schnell-gguf",
+  "title": "FLUX.1 schnell",
+  "kind": "image",
+  "desc": "四步就出圖，看得懂長句提示詞、能在圖裡寫英文字；Apache 2.0 可商用，第一顆先裝它",
+  "vendor": "Black Forest Labs",
+  "license": "apache-2.0",
+  "tags": [
+   "快速",
+   "可商用"
+  ],
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "leejet/FLUX.1-schnell-gguf",
+    "match": "flux1-schnell-"
+   },
+   {
+    "role": "clip_l",
+    "repo": "comfyanonymous/flux_text_encoders",
+    "path": "clip_l.safetensors"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "city96/t5-v1_1-xxl-encoder-gguf",
+    "match": "t5-v1_1-xxl-encoder-"
+   },
+   {
+    "role": "vae",
+    "repo": "diffusers/FLUX.1-vae",
+    "path": "diffusion_pytorch_model.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler": "euler"
+  },
+  "files": {
+   "leejet/FLUX.1-schnell-gguf": {
+    "flux1-schnell-q2_k.gguf": 4110959520,
+    "flux1-schnell-q3_k.gguf": 5312873376,
+    "flux1-schnell-q4_0.gguf": 6884606880,
+    "flux1-schnell-q4_k.gguf": 6884606880,
+    "flux1-schnell-q8_0.gguf": 12801721248
+   },
+   "comfyanonymous/flux_text_encoders": {
+    "clip_l.safetensors": 246144152
+   },
+   "city96/t5-v1_1-xxl-encoder-gguf": {
+    "t5-v1_1-xxl-encoder-Q3_K_L.gguf": 2462799040,
+    "t5-v1_1-xxl-encoder-Q3_K_M.gguf": 2296075456,
+    "t5-v1_1-xxl-encoder-Q3_K_S.gguf": 2099467456,
+    "t5-v1_1-xxl-encoder-Q4_K_M.gguf": 2896123072,
+    "t5-v1_1-xxl-encoder-Q4_K_S.gguf": 2738574528,
+    "t5-v1_1-xxl-encoder-Q5_K_M.gguf": 3386856640,
+    "t5-v1_1-xxl-encoder-Q5_K_S.gguf": 3293271232,
+    "t5-v1_1-xxl-encoder-Q6_K.gguf": 3908261056,
+    "t5-v1_1-xxl-encoder-Q8_0.gguf": 5061584064,
+    "t5-v1_1-xxl-encoder-f16.gguf": 9526060224,
+    "t5-v1_1-xxl-encoder-f32.gguf": 19050276032
+   },
+   "diffusers/FLUX.1-vae": {
+    "diffusion_pytorch_model.safetensors": 167666902
+   }
+  },
+  "refreshed": 1793465650
+ },
+ {
+  "repo": "silveroxides/Chroma-GGUF",
+  "title": "Chroma1 HD",
+  "kind": "image",
+  "desc": "以 FLUX.1 schnell 為底重新訓練的高畫質模型，細節與寫實感更好，步數多、比較慢",
+  "vendor": "Lodestone Rock",
+  "license": "apache-2.0",
+  "tags": [
+   "高畫質",
+   "可商用"
+  ],
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "silveroxides/Chroma-GGUF",
+    "match": "Chroma1-HD/Chroma1-HD-"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "city96/t5-v1_1-xxl-encoder-gguf",
+    "match": "t5-v1_1-xxl-encoder-"
+   },
+   {
+    "role": "vae",
+    "repo": "diffusers/FLUX.1-vae",
+    "path": "diffusion_pytorch_model.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 26,
+   "cfg": 4.0,
+   "sampler": "euler"
+  },
+  "files": {
+   "silveroxides/Chroma-GGUF": {
+    "Chroma1-HD/Chroma1-HD-BF16.gguf": 17804202144,
+    "Chroma1-HD/Chroma1-HD-Q4_0.gguf": 5432053920,
+    "Chroma1-HD/Chroma1-HD-Q8_0.gguf": 9735409824
+   },
+   "city96/t5-v1_1-xxl-encoder-gguf": {
+    "t5-v1_1-xxl-encoder-Q3_K_L.gguf": 2462799040,
+    "t5-v1_1-xxl-encoder-Q3_K_M.gguf": 2296075456,
+    "t5-v1_1-xxl-encoder-Q3_K_S.gguf": 2099467456,
+    "t5-v1_1-xxl-encoder-Q4_K_M.gguf": 2896123072,
+    "t5-v1_1-xxl-encoder-Q4_K_S.gguf": 2738574528,
+    "t5-v1_1-xxl-encoder-Q5_K_M.gguf": 3386856640,
+    "t5-v1_1-xxl-encoder-Q5_K_S.gguf": 3293271232,
+    "t5-v1_1-xxl-encoder-Q6_K.gguf": 3908261056,
+    "t5-v1_1-xxl-encoder-Q8_0.gguf": 5061584064,
+    "t5-v1_1-xxl-encoder-f16.gguf": 9526060224,
+    "t5-v1_1-xxl-encoder-f32.gguf": 19050276032
+   },
+   "diffusers/FLUX.1-vae": {
+    "diffusion_pytorch_model.safetensors": 167666902
+   }
+  },
+  "refreshed": 1793465651
+ },
+ {
+  "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
+  "title": "Stable Diffusion 3.5 Medium",
+  "kind": "image",
+  "desc": "Stability AI 的中型模型，畫質與速度均衡；年營收一百萬美元以下可免費商用",
+  "vendor": "Stability AI",
+  "license": "stabilityai-community",
+  "tags": [
+   "均衡"
+  ],
+  "parts": [
+   {
+    "role": "model",
+    "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
+    "match": "sd3.5_medium-"
+   },
+   {
+    "role": "clip_l",
+    "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
+    "match": "clip_l-"
+   },
+   {
+    "role": "clip_g",
+    "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
+    "match": "clip_g-"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
+    "match": "t5xxl-"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 28,
+   "cfg": 4.5,
+   "sampler": "euler"
+  },
+  "files": {
+   "second-state/stable-diffusion-3.5-medium-GGUF": {
+    "sd3.5_medium-Q4_0.gguf": 2079836768,
+    "sd3.5_medium-Q4_1.gguf": 2218741312,
+    "sd3.5_medium-Q5_0.gguf": 2357646176,
+    "sd3.5_medium-Q5_1.gguf": 2496550720,
+    "sd3.5_medium-Q8_0.gguf": 3191079008,
+    "clip_l-Q4_0.gguf": 69384832,
+    "clip_l-Q4_1.gguf": 77069312,
+    "clip_l-Q5_0.gguf": 84754624,
+    "clip_l-Q5_1.gguf": 92439104,
+    "clip_l-Q8_0.gguf": 130864000,
+    "clip_l-f16.gguf": 246137024,
+    "clip_g-Q4_0.gguf": 391439360,
+    "clip_g-Q4_1.gguf": 434826304,
+    "clip_g-Q5_0.gguf": 478215360,
+    "clip_g-Q5_1.gguf": 521602304,
+    "clip_g-Q8_0.gguf": 738543360,
+    "clip_g-f16.gguf": 1389362304,
+    "t5xxl-Q4_0.gguf": 2752841312,
+    "t5xxl-Q4_1.gguf": 3058710496,
+    "t5xxl-Q5_0.gguf": 3364579680,
+    "t5xxl-Q5_1.gguf": 3670448864,
+    "t5xxl-Q8_0.gguf": 5199794784
+   }
+  },
+  "refreshed": 1793465651
+ },
+ {
+  "repo": "second-state/stable-diffusion-v1-5-GGUF",
+  "title": "Stable Diffusion 1.5",
+  "kind": "image",
+  "desc": "最經典的小模型，檔案 2 GB 以內、產一張約要 4 GB；記憶體小的機器也跑得動，畫質普通、適合試流程",
+  "vendor": "Runway／Stability AI",
+  "license": "creativeml-openrail-m",
+  "tags": [
+   "小模型"
+  ],
+  "parts": [
+   {
+    "role": "model",
+    "repo": "second-state/stable-diffusion-v1-5-GGUF",
+    "match": "stable-diffusion-v1-5-pruned-emaonly-"
+   }
+  ],
+  "defaults": {
+   "width": 512,
+   "height": 512,
+   "steps": 20,
+   "cfg": 7.0,
+   "sampler": "euler_a"
+  },
+  "files": {
+   "second-state/stable-diffusion-v1-5-GGUF": {
+    "stable-diffusion-v1-5-pruned-emaonly-Q4_0.gguf": 1566768416,
+    "stable-diffusion-v1-5-pruned-emaonly-Q4_1.gguf": 1591364896,
+    "stable-diffusion-v1-5-pruned-emaonly-Q5_0.gguf": 1615967904,
+    "stable-diffusion-v1-5-pruned-emaonly-Q5_1.gguf": 1640564256,
+    "stable-diffusion-v1-5-pruned-emaonly-Q8_0.gguf": 1763578176,
+    "stable-diffusion-v1-5-pruned-emaonly-f16.gguf": 2132586944,
+    "stable-diffusion-v1-5-pruned-emaonly-f32.gguf": 4265059488
+   }
+  },
+  "refreshed": 1793465651
+ },
+ {
+  "repo": "unsloth/LTX-2.3-GGUF",
+  "title": "LTX-2.3 影片（蒸餾版）",
+  "kind": "video",
+  "desc": "文字產生一段有聲影片；蒸餾版 8 步就好。文字編碼器用 Google Gemma 3 12B，需要 32 GB 以上記憶體",
+  "vendor": "Lightricks",
+  "license": "ltx-2-community",
+  "tags": [
+   "影片",
+   "有聲"
+  ],
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "unsloth/LTX-2.3-GGUF",
+    "match": "distilled-1.1/ltx-2.3-22b-distilled-1.1-"
+   },
+   {
+    "role": "llm",
+    "repo": "unsloth/gemma-3-12b-it-GGUF",
+    "match": "gemma-3-12b-it-"
+   },
+   {
+    "role": "connectors",
+    "repo": "unsloth/LTX-2.3-GGUF",
+    "path": "text_encoders/ltx-2.3-22b-distilled_embeddings_connectors.safetensors"
+   },
+   {
+    "role": "vae",
+    "repo": "unsloth/LTX-2.3-GGUF",
+    "path": "vae/ltx-2.3-22b-distilled_video_vae.safetensors"
+   },
+   {
+    "role": "audio_vae",
+    "repo": "unsloth/LTX-2.3-GGUF",
+    "path": "vae/ltx-2.3-22b-distilled_audio_vae.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 768,
+   "height": 512,
+   "steps": 8,
+   "cfg": 1.0,
+   "sampler": "euler",
+   "frames": 33,
+   "fps": 24
+  },
+  "files": {
+   "unsloth/LTX-2.3-GGUF": {
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-BF16.gguf": 42035412000,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-F16.gguf": 42035412000,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q2_K.gguf": 7935826976,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf": 10629508128,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q3_K_S.gguf": 9741626400,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q4_0.gguf": 12716211232,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q4_1.gguf": 13758266400,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf": 14194441248,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q4_K_S.gguf": 12961578016,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q5_0.gguf": 15286860832,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q5_1.gguf": 16328916000,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q5_K_M.gguf": 15930424352,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q5_K_S.gguf": 15043591200,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q6_K.gguf": 17774906400,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q8_0.gguf": 22755540000,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-UD-Q2_K.gguf": 10897503776,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-UD-Q3_K_M.gguf": 13408718880,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf": 16388660768,
+    "distilled-1.1/ltx-2.3-22b-distilled-1.1-UD-Q5_K_M.gguf": 18208192032,
+    "text_encoders/ltx-2.3-22b-distilled_embeddings_connectors.safetensors": 2312144712,
+    "vae/ltx-2.3-22b-distilled_video_vae.safetensors": 1452256522,
+    "vae/ltx-2.3-22b-distilled_audio_vae.safetensors": 364853140
+   },
+   "unsloth/gemma-3-12b-it-GGUF": {
+    "gemma-3-12b-it-BF16.gguf": 23540151520,
+    "gemma-3-12b-it-IQ4_NL.gguf": 6887164256,
+    "gemma-3-12b-it-IQ4_XS.gguf": 6550964576,
+    "gemma-3-12b-it-Q2_K.gguf": 4768221536,
+    "gemma-3-12b-it-Q2_K_L.gguf": 4768221536,
+    "gemma-3-12b-it-Q3_K_M.gguf": 6008818016,
+    "gemma-3-12b-it-Q3_K_S.gguf": 5458315616,
+    "gemma-3-12b-it-Q4_0.gguf": 6909282656,
+    "gemma-3-12b-it-Q4_1.gguf": 7559563616,
+    "gemma-3-12b-it-Q4_K_M.gguf": 7300778336,
+    "gemma-3-12b-it-Q4_K_S.gguf": 6935333216,
+    "gemma-3-12b-it-Q5_K_M.gguf": 8445036896,
+    "gemma-3-12b-it-Q5_K_S.gguf": 8231962976,
+    "gemma-3-12b-it-Q6_K.gguf": 9660811616,
+    "gemma-3-12b-it-Q8_0.gguf": 12510212576,
+    "gemma-3-12b-it-UD-IQ1_M.gguf": 3249207776,
+    "gemma-3-12b-it-UD-IQ1_S.gguf": 3057668576,
+    "gemma-3-12b-it-UD-IQ2_M.gguf": 4366371296,
+    "gemma-3-12b-it-UD-IQ2_XXS.gguf": 3604238816,
+    "gemma-3-12b-it-UD-IQ3_XXS.gguf": 4834206176,
+    "gemma-3-12b-it-UD-Q2_K_XL.gguf": 4860535136,
+    "gemma-3-12b-it-UD-Q3_K_XL.gguf": 6142818656,
+    "gemma-3-12b-it-UD-Q4_K_XL.gguf": 7432229216,
+    "gemma-3-12b-it-UD-Q5_K_XL.gguf": 8462578016,
+    "gemma-3-12b-it-UD-Q6_K_XL.gguf": 10556051936,
+    "gemma-3-12b-it-UD-Q8_K_XL.gguf": 14394193376
+   }
+  },
+  "refreshed": 1793465652
+ }
+]

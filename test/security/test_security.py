@@ -220,6 +220,20 @@ def console_tests(port, cafile, env):
     cl.cookie = newsid
     check("  新密碼登入", st == 200)
 
+    # ---- 6b. 匯入 GGUF、網頁對話、助理
+    up = "/api/node/nosuch/library/upload?folder=a&name=b.gguf&offset=0&total=4"
+    hdr = {"Content-Type": "application/octet-stream", "X-XConsole-Upload": "1"}
+    check("匯入 GGUF 要登入", cl.req("POST", up, raw_body=b"GGUF", headers=hdr, cookie="")[0] == 401)
+    check("  沒帶自訂標頭（跨站表單送不出）擋下", cl.req("POST", up, raw_body=b"GGUF", headers={"Content-Type": "application/octet-stream"})[0] == 400)
+    check("  不是 octet-stream 擋下", cl.req("POST", up, raw_body=b"GGUF", headers={"Content-Type": "text/plain", "X-XConsole-Upload": "1"})[0] == 400)
+    check("  位置不是數字擋下", cl.req("POST", up.replace("offset=0", "offset=-1"), raw_body=b"GGUF", headers=hdr)[0] == 400)
+    check("  不在名單裡的機器回 404（不會連到任意主機）", cl.req("POST", up, raw_body=b"GGUF", headers=hdr)[0] == 404)
+    chat = {"messages": [{"role": "user", "content": "hi"}]}
+    check("網頁對話要登入", cl.req("POST", "/api/node/nosuch/chat/s1", chat, cookie="")[0] == 401)
+    check("  不在名單裡的機器回 404", cl.req("POST", "/api/node/nosuch/chat/s1", chat)[0] == 404)
+    check("助理要登入", cl.req("POST", "/api/assistant", {"node": "x", "slot": "y", **chat}, cookie="")[0] == 401)
+    check("  沒有問題回 400", cl.req("POST", "/api/assistant", {"node": "x", "slot": "y", "messages": []})[0] == 400)
+
     # ---- 7. 回應標頭
     _, h, _ = cl.req("GET", "/", cookie="")
     csp = h.get("content-security-policy", "")

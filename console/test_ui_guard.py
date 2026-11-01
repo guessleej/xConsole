@@ -81,5 +81,15 @@ check("模型庫在頂層，而且排在 API 串接前面", "lib" in keys and "a
 check("設定排在最後", keys[-1:] == ["settings"], str(keys))
 check("頂層不再逐一列出群組（群組一多就超過六格）", "group:" not in (nv.group(1) if nv else ""))
 
+# ---- 5. 樣式表的大括號要成對：少一個「}」，後面所有規則都會被瀏覽器當成上一個區塊的一部分丟掉
+# （2026-11-01 合併衝突時吃掉品牌區 @media 的結尾，畫圖與影片的樣式整段失效，畫面才看得出來）
+CSS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "style.css"), encoding="utf-8").read()
+css = re.sub(r"/\*.*?\*/", "", CSS, flags=re.S)
+depth, low = 0, 0
+for ch in css:
+    depth += (ch == "{") - (ch == "}")
+    low = min(low, depth)
+check("style.css 的大括號成對", depth == 0 and low == 0, f"結尾深度 {depth}、最低 {low}")
+
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)

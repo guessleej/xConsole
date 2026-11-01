@@ -225,12 +225,26 @@ def main():
           "2222222222222222222222222222222222222222\trefs/tags/b200\n"
           "3333333333333333333333333333333333333333\trefs/tags/b200^{}\n")
     ok &= case("llama.cpp 標籤：附註式取 ^{} 指向的 commit，一般的取本身", A.parse_tag_refs(lr),
-               {100: "1" * 40, 200: "3" * 40})
-    real_lt = A.load_text
+               {100: ("b100", "1" * 40), 200: ("b200", "3" * 40)})
+    sr = ("4444444444444444444444444444444444444444\trefs/tags/master-1028-37bc88b\n"
+          "5555555555555555555555555555555555555555\trefs/tags/master-1030-0a06712\n"
+          "6666666666666666666666666666666666666666\trefs/tags/master-fbd42b6\n"
+          "7777777777777777777777777777777777777777\trefs/tags/workflow-302-fad6178\n")
+    got = A.parse_tag_refs(sr, A.ENGINES["sd"]["tag_rx"])
+    ok &= case("stable-diffusion.cpp 標籤：只認 master-<編號>-<commit>，取編號最大的", got[max(got)],
+               ("master-1030-0a06712", "5" * 40))
+    real_cpu = A.cpu_name
     for cpu, want in (("AMD RYZEN AI MAX+ PRO 395 w/ Radeon 8060S", True), ("AMD EPYC 7543P 32-Core Processor", False)):
-        A.load_text = lambda path, c=cpu: f"processor\t: 0\nmodel name\t: {c}\n" if path == "/proc/cpuinfo" else real_lt(path)
+        A.cpu_name = lambda c=cpu: c                    # 三個系統讀 CPU 型號的方法不同，這裡只測判斷本身
         ok &= case(f"APU 判斷：{cpu[:30]}", A._apu_like(), want)
-    A.load_text = real_lt
+    A.cpu_name = real_cpu
+    # 沒有 GPU 的機器：模型整顆算系統記憶體，不能因為顯存是 0 就永遠擋下
+    reg = reg_for("discrete", [{"id": "c", "est_vram_gib": 3, "est_ram_gib": 2.5}], 32, 20)
+    v = A.admit("c", reg=reg, hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+    ok &= case("只有 CPU：放得下就放行（權重算進系統記憶體）", (v["allow"], v["pools"]["ram"]["need"]), (True, 5.5))
+    v = A.admit("c", reg=reg_for("discrete", [{"id": "c", "est_vram_gib": 12, "est_ram_gib": 2.5}], 32, 20),
+                hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+    ok &= case("只有 CPU：系統記憶體不夠照樣擋", v["allow"], False)
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
