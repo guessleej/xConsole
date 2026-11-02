@@ -49,10 +49,21 @@ EXE = ".exe" if OS == "windows" else ""
 def own_scope(argv):
     """編譯與產圖由代理直接帶起來，在 systemd 底下會跟代理同一個 cgroup，被代理服務的 MemoryMax=256M／CPUQuota=25% 框住
     （FLUX 產一張圖要 20 GiB 上下，編譯會被 OOM 砍掉）。改由 systemd-run --scope 開出去：同一個行程、PID 不變，
-    看門狗與取消照樣用 PID 收，只是不再吃代理的資源上限。"""
-    if SYSTEMD and shutil.which("systemd-run"):
+    看門狗與取消照樣用 PID 收，只是不再吃代理的資源上限。
+    執行檔不在就不包：讓 Popen 當場報「啟動失敗」，而不是 systemd-run 起來之後才失敗。"""
+    if SYSTEMD and shutil.which(str(argv[0])) and _scope_ok():
         return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *argv]
     return argv
+
+
+@functools.cache
+def _scope_ok():
+    """連不上使用者的 systemd（沒有 user bus 的容器、CI）就照原樣執行，不要每件工作都失敗"""
+    try:
+        return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", "true"],
+                              capture_output=True, timeout=15).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 if OS == "windows":
     class _NoWindowPopen(subprocess.Popen):
