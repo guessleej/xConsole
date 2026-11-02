@@ -419,6 +419,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | 網頁編譯在 .27 設定階段就失敗：`HIPCXX=/usr/llvm/bin/clang` 找不到 | `hipcc` 在 `/usr/bin`，是指到 `/opt/rocm-7.1.1/bin/hipcc` 的符號連結；照 `/usr/bin` 推 ROCm 根目錄會推成 `/usr`。要先 `realpath` 追到底（llama.cpp 的編譯也一樣受影響） |
 | AMD 上產圖在載入擴散模型時 `ROCm error: unspecified launch failure` | gfx1151＋ROCm 7.1.1 開 flash attention（HIP MMA）會崩。AMD 一律加 `--flash-attn off`，512×512 四步 12 秒正常出圖 |
 | 畫圖與影片的樣式整段沒套上（最近產出變成白底按鈕） | 合併衝突時吃掉品牌區 `@media` 的結尾 `}`，瀏覽器把後面所有規則都當成那個區塊的一部分丟掉。`test_ui_guard.py` 現在會檢查 `style.css` 的大括號成對 |
+| 正式機上網頁編譯與產圖被砍掉（測試時好好的） | 代理服務設了 `MemoryMax=256M`、`CPUQuota=25%`，代理直接開的子程序在同一個 cgroup 裡；用 nohup 起的測試代理沒有這個限制，所以測不出來。編譯與 sd-cli 改用 `systemd-run --user --scope` 開出去（`own_scope()`），PID 不變、看門狗照用 |
 | 推薦清單裡的 FLUX VAE 要授權才能下載 | `black-forest-labs` 的 repo 要同意條款（gated）。改用 `diffusers/FLUX.1-vae`（diffusers 格式，sd-cli 讀得懂，實測畫面正常） |
 | 新代理沒確認架構，AI 395 被當成獨立顯示卡推薦 | 登錄檔預設 `discrete`。代理把偵測建議放進 `chip.suggest`，沒確認又不一致時，總覽第一步與硬體卡都會要求確認 |
 | macOS 上代理重開後認不回還在跑的模型 | 認行程用「帶起來當下記的程式名稱」：macOS 的 Python 啟動半秒後會從 python3.15 換成 python（Python.app）。名稱去掉結尾版本號，並在看管迴圈裡持續更新 |

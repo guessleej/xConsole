@@ -251,6 +251,15 @@ def main():
     A._gen_run(j3, ["/nonexistent/sd-cli"], {}, "unified_single", {"ram": 12})
     case("sd-cli 啟動不了：這件標失敗，不會一直卡在產生中擋住後面", (j3["state"], "啟動失敗" in j3["error"]), ("failed", True))
 
+    sysd, which = A.SYSTEMD, A.shutil.which
+    A.SYSTEMD, A.shutil.which = True, lambda x: "/usr/bin/" + x
+    case("systemd 底下：編譯與產圖開在自己的 scope，不吃代理服務的 256M 上限",
+         A.own_scope(["sd-cli", "-m", "x"])[:5] + A.own_scope(["sd-cli", "-m", "x"])[-3:],
+         ["systemd-run", "--user", "--scope", "--quiet", "--collect", "sd-cli", "-m", "x"])
+    A.SYSTEMD = False
+    case("沒有 systemd（macOS、Windows、自己看管）：照原樣執行", A.own_scope(["sd-cli"]), ["sd-cli"])
+    A.SYSTEMD, A.shutil.which = sysd, which
+
     print("\n全部通過" if OK else "\n有項目失敗")
     return 0 if OK else 1
 

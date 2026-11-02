@@ -3499,6 +3499,7 @@ function viewLogs() {
       o.value = s.id;
       slotSel.appendChild(o);
     });
+    if (!slotSel.options.length) slotSel.appendChild(el("option", null, "這台沒有模型服務")).value = "";
     if (S.sub?.slot) slotSel.value = S.sub.slot;
   };
   fillSlots();
@@ -3513,8 +3514,22 @@ function viewLogs() {
   card.appendChild(picker);
 
   const pre = el("pre", "log", "讀取中…");
-  card.appendChild(pre);
+  const none = el("div", "note");          // 沒有服務可看時取代黑底記錄框，不去讀一個空的路徑
+  card.append(pre, none);
   const load = async () => {
+    const empty = !nodeSel.value || !slotSel.value;
+    pre.hidden = empty;
+    none.hidden = !empty;
+    slotSel.disabled = !slotSel.options[0]?.value;
+    if (empty) {
+      none.textContent = "";
+      if (!nodeSel.value) { none.append("目前沒有連得上的機器，沒有記錄可看。"); return; }
+      none.append("這台還沒有模型服務，沒有記錄可看。到模型庫下載模型並按「換上」，服務的記錄就會出現在這裡。　");
+      const b = el("button", "btn sm primary", "到模型庫");
+      b.onclick = () => go("lib:" + nodeSel.value);
+      none.appendChild(b);
+      return;
+    }
     pre.textContent = "讀取中…";
     try {
       const d = await api(`/api/node/${nodeSel.value}/logs/${slotSel.value}`);
