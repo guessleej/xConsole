@@ -3489,7 +3489,9 @@ function viewLogs() {
     o.value = n.id;
     nodeSel.appendChild(o);
   });
-  if (S.sub?.node) nodeSel.value = S.sub.node;
+  // 帶進來的機器或服務已離線、不在這台：退回第一個選項，不要把「選不到」當成「沒有」
+  const pick = (sel, want) => { sel.value = want || ""; if (sel.selectedIndex < 0) sel.selectedIndex = 0; };
+  pick(nodeSel, S.sub?.node);
   const slotSel = el("select");
   const fillSlots = () => {
     slotSel.textContent = "";
@@ -3500,7 +3502,7 @@ function viewLogs() {
       slotSel.appendChild(o);
     });
     if (!slotSel.options.length) slotSel.appendChild(el("option", null, "這台沒有模型服務")).value = "";
-    if (S.sub?.slot) slotSel.value = S.sub.slot;
+    pick(slotSel, S.sub?.slot);
   };
   fillSlots();
   nodeSel.onchange = () => { fillSlots(); load(); };
