@@ -901,7 +901,7 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
 }
 
 .rec-for { align-items: center; margin-bottom: 12px; }
-.rec-list { max-height: 400px; overflow-y: auto; margin: 6px -4px 10px; padding: 0 4px; overscroll-behavior: contain; }
+.rec-list { max-height: min(400px, 42vh); overflow-y: auto; margin: 6px -4px 10px; padding: 0 4px; overscroll-behavior: contain; }
 .rec-row {
   display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(150px, 1fr) minmax(160px, 1.1fr) 132px;
   gap: 16px; align-items: center; padding: 13px 14px; border-radius: var(--radius-sm);

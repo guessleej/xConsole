@@ -45,6 +45,26 @@ STATE_DIR = os.path.join(HOME, ".xconsole")
 SYSTEMD = OS == "linux" and os.environ.get("XCONSOLE_SUPERVISOR") != "1"
 EXE = ".exe" if OS == "windows" else ""
 
+
+def own_scope(argv):
+    """編譯與產圖由代理直接帶起來，在 systemd 底下會跟代理同一個 cgroup，被代理服務的 MemoryMax=256M／CPUQuota=25% 框住
+    （FLUX 產一張圖要 20 GiB 上下，編譯會被 OOM 砍掉）。改由 systemd-run --scope 開出去：同一個行程、PID 不變，
+    看門狗與取消照樣用 PID 收，只是不再吃代理的資源上限。
+    執行檔不在就不包：讓 Popen 當場報「啟動失敗」，而不是 systemd-run 起來之後才失敗。"""
+    if SYSTEMD and shutil.which(str(argv[0])) and _scope_ok():
+        return ["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", *argv]
+    return argv
+
+
+@functools.cache
+def _scope_ok():
+    """連不上使用者的 systemd（沒有 user bus 的容器、CI）就照原樣執行，不要每件工作都失敗"""
+    try:
+        return subprocess.run(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--", "true"],
+                              capture_output=True, timeout=15).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
 if OS == "windows":
     class _NoWindowPopen(subprocess.Popen):
         """Windows 用 pythonw 在背景跑時，每帶起一支主控台程式（nvidia-smi、tasklist、typeperf…）就會閃一個黑色視窗。
@@ -3819,7 +3839,7 @@ def _build_run(st, pre, log, kind="llama"):
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(f"\n===== {phase} =====\n")
             fh.flush()
-            proc = subprocess.Popen([str(a) for a in argv], cwd=cwd, stdout=fh, stderr=subprocess.STDOUT,
+            proc = subprocess.Popen(own_scope([str(a) for a in argv]), cwd=cwd, stdout=fh, stderr=subprocess.STDOUT,
                                     env={**os.environ, **pre["env"]}, start_new_session=True)
             with _BUILD_LOCK:
                 _BUILD["proc"] = proc
@@ -5148,7 +5168,7 @@ def _gen_run(j, argv, env, mm, fl):
         try:
             kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
                   else {"start_new_session": True})
-            proc = subprocess.Popen(argv, stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env}, **kw)
+            proc = subprocess.Popen(own_scope(argv), stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env}, **kw)
         except OSError as ex:                  # 執行檔被刪掉、沒有執行權限：不能讓這件一直停在「產生中」擋住後面
             j.update(state="failed", error=f"sd-cli 啟動失敗：{ex}"[:240], ended=int(time.time()))
             _sd_jobs_save()
