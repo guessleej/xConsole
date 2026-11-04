@@ -2690,7 +2690,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
          "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
          "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
 
-    def undo(msg, code=500, extra=None):
+    def undo(msg, code=500, extra=None, restart_old=True):
+        """restart_old=False：還沒動到在跑的服務就失敗（例：准入擋下），只還原設定，不重啟原服務。
+        以前一律重啟，關鍵服務會因為一次被擋下的換模型白白中斷好幾分鐘。"""
         if old_unit != unit:
             sysctl(unit, "stop")
             sysctl(unit, "disable", timeout=30)
@@ -2709,7 +2711,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
         if old_unit:
             if old_enabled:
                 sysctl(old_unit, "enable", timeout=30)
-            if old_alive:
+            if old_alive and restart_old:
                 sysctl(old_unit, "reset-failed", timeout=20)
                 sysctl(old_unit, "restart")
                 back_ok, _ = wait_healthy(old, seconds=600)
@@ -2724,7 +2726,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     old_v = _usage_reclaim(old)[0] if old_unit and old_alive else 0.0
     verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
     if not verdict["allow"] and not force:
-        return undo("記憶體不夠", 409, {"admit": verdict})
+        return undo("記憶體不夠", 409, {"admit": verdict}, restart_old=False)
 
     if old_unit and old_unit != unit:
         sysctl(old_unit, "stop")
@@ -2765,9 +2767,12 @@ def _usage_reclaim(old_slot):
     """切換引擎時，舊引擎占的量要算成「會被釋放」。用舊欄位的原樣去量。"""
     reg = registry()
     hw = hardware()
+    # 量「換之前」的樣子：換模型時登錄檔裡這個欄位已經先寫成新模型的預估，沒綁卡時顯存是照各欄位的預估比例分攤，
+    # 分母若用新的、分子用舊的，舊模型會釋出的量就被少算（128B 換 118B 時 93.1 GiB 只算成 80.6，誤擋下來）
+    probe = dict(old_slot)
+    reg["slots"] = [probe if sl.get("id") == probe.get("id") else sl for sl in reg["slots"]]
     for sl in reg["slots"]:
         sl["_busy_cache"] = _alive(sl)
-    probe = dict(old_slot)
     st = slot_state(probe, reg, hw)
     return (float(st["vram_gib"] or 0), float(st["ram_gib"] or 0)) if st["busy"] else (0.0, 0.0)
 
