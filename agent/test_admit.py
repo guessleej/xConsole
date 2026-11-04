@@ -268,6 +268,30 @@ def main():
     finally:
         for k, f in saved.items():
             setattr(A, k, f)
+    # 多卡又要搬專家：交給 llama.cpp 的 --fit，不帶 -ngl／--n-cpu-moe（自己搬只會搬到第一張卡上的那幾層）
+    saved = {k: getattr(A, k) for k in ("_llama_help", "no_mmap_args", "gpu_used_gib")}
+    A._llama_help = lambda exe: "-fit,  --fit [on|off]  whether to adjust unset arguments"
+    A.no_mmap_args = lambda exe: []
+    try:
+        raw = {"exe": "/x/llama-server", "model": "/m.gguf", "port": 8080, "ctx": 65536, "alias": "m",
+               "cpu_moe": 5, "ngl": 999}
+        a_fit = A.llama_argv(dict(raw, fit=True), reg={"machine": {}})
+        a_old = A.llama_argv(dict(raw, fit=False), reg={"machine": {}})
+        ok &= case("多卡搬專家：交給 --fit，不帶 -ngl 與 --n-cpu-moe",
+                   ("-ngl" in a_fit, "--n-cpu-moe" in a_fit, "-c" in a_fit), (False, False, True))
+        ok &= case("  沒開 fit 照舊帶 -ngl 999 與 --n-cpu-moe 5",
+                   (a_old[a_old.index("-ngl") + 1], a_old[a_old.index("--n-cpu-moe") + 1]), ("999", "5"))
+        A._llama_help = lambda exe: "no such option here"
+        a_noflag = A.llama_argv(dict(raw, fit=True), reg={"machine": {}})
+        ok &= case("  舊版 llama.cpp 沒有 --fit：退回自己帶 -ngl", "-ngl" in a_noflag, True)
+        seq = iter([93.0, 70.0, 2.1])
+        A.gpu_used_gib = lambda: next(seq)
+        ok &= case("停掉舊模型後等顯存收回（93 GiB 降到 2 GiB 才算）", A.wait_vram_released(93.1, 93.1, seconds=10), True)
+        A.gpu_used_gib = lambda: 90.0
+        ok &= case("  一直沒收回：時間到回 False，不卡死", A.wait_vram_released(93.1, 93.1, seconds=1), False)
+    finally:
+        for k, f in saved.items():
+            setattr(A, k, f)
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("准入擋下時只還原設定、不重啟在跑的服務",
                'undo("記憶體不夠", 409, {"admit": verdict}, restart_old=False)' in src, True)

@@ -2450,12 +2450,15 @@ def llama_argv(raw, reg=None):
     """設定檔 → llama-server 參數。金鑰只給檔案路徑（--api-key-file），不放進指令列（ps 看得到）。"""
     reg = reg or registry()
     ctx, par = int(raw.get("ctx", 4096)), int(raw.get("parallel", 1))
+    # fit：多張卡又要把專家搬到系統記憶體時，交給 llama.cpp 的 --fit 依每張卡當下實際剩多少去分。
+    # 自己帶 --n-cpu-moe 只會搬「前幾層」，那幾層全在第一張卡，後面那張一點都沒變輕（2× 48 GB 換 118B MoE 實測爆在卡 1）
+    use_fit = bool(raw.get("fit")) and "--fit" in _llama_help(raw["exe"])
     argv = [raw["exe"], "-m", raw["model"], "--host", raw.get("host", "0.0.0.0"), "--port", str(raw["port"]),
-            "-c", str(ctx * par), "-np", str(par), "-ngl", str(raw.get("ngl", 999)),
+            "-c", str(ctx * par), "-np", str(par)] + ([] if use_fit else ["-ngl", str(raw.get("ngl", 999))]) + [
             "--alias", raw["alias"], "--jinja"]
     if raw.get("mmproj"):
         argv += ["--mmproj", raw["mmproj"]]
-    if raw.get("cpu_moe"):
+    if raw.get("cpu_moe") and not use_fit:
         argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
     argv += reasoning_args(raw["exe"], raw.get("reasoning"))
     if raw.get("max_tokens"):
@@ -2663,7 +2666,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
            "host": "0.0.0.0", "port": int(port), "ctx": want_ctx, "parallel": par, "ngl": 999,
            "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
-           "api_key_file": keyfile, "gpus": gpu_ids, "cpu_moe": cpu_moe or None}
+           "api_key_file": keyfile, "gpus": gpu_ids, "cpu_moe": cpu_moe or None,
+           "fit": bool(cpu_moe) and len([c for c in cards if not gpu_ids or str(c["id"]) in gpu_ids]) > 1}
     save_json(cfg_path, raw)
     os.chmod(cfg_path, 0o600)
     unit = ensure_llama_unit(slot_id, cfg_path)
@@ -2728,10 +2732,15 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
     if not verdict["allow"] and not force:
         return undo("記憶體不夠", 409, {"admit": verdict}, restart_old=False)
 
+    used_before = gpu_used_gib()
     if old_unit and old_unit != unit:
         sysctl(old_unit, "stop")
         if old_enabled:
             sysctl(old_unit, "disable", timeout=30)      # 開機自啟一起換，不然重開機兩個引擎搶同一個埠
+    elif old_alive:
+        sysctl(unit, "stop")
+    if old_alive:
+        wait_vram_released(used_before, old_v)
     sysctl(unit, "reset-failed", timeout=20)
     sysctl(unit, "enable", timeout=30)
     sysctl(unit, "restart")
@@ -2761,6 +2770,29 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=...):
                  "switched_engine": old.get("kind") not in (None, "llama"),
                  "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids,
                  "cpu_moe": cpu_moe, "moved_gib": est["moved_gib"]}
+
+
+def gpu_used_gib():
+    """各卡顯存用量加總（GiB），直接問驅動不走快取；讀不到回 None。"""
+    gpus = probe_gpus()
+    if not gpus or any(g.get("vram_used") is None for g in gpus):
+        return None
+    return sum(g["vram_used"] for g in gpus) / GIB
+
+
+def wait_vram_released(before_gib, expect_gib, seconds=60):
+    """停掉舊模型後，等驅動真的把顯存收回再啟動新的。llama.cpp 照「啟動當下每張卡剩多少」分層，
+    還沒收回的那張分得少、另一張被塞爆（實測：48 GB 的卡被分到 58 GB 而 OOM，平台自動換回原模型）。
+    讀不到用量、或預期釋出不到 1 GiB 就不等；等不到也不擋，交給後面的健康檢查與還原。"""
+    if before_gib is None or not expect_gib or expect_gib < 1:
+        return True
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        now = gpu_used_gib()
+        if now is None or now <= before_gib - expect_gib * 0.9:
+            return True
+        time.sleep(1)
+    return False
 
 
 def _usage_reclaim(old_slot):
