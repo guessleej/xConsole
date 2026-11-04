@@ -36,6 +36,22 @@ check("127.0.0.1 是本機位址", x.is_local_address("127.0.0.1"))
 check("8.8.8.8 不是本機位址", not x.is_local_address("8.8.8.8"))
 check("亂寫的位址不算本機", not x.is_local_address("not-an-ip"))
 
+
+class AnyBind(socket.socket):
+    """模擬 Linux 開了 ip_nonlocal_bind：任何位址都綁得上。"""
+    def bind(self, addr):
+        return None
+
+
+_real = x.socket.socket
+x.socket.socket = AnyBind
+try:
+    check("任何位址都綁得上時，外部位址仍不算本機", not x.is_local_address("8.8.8.8"))
+    check("任何位址都綁得上時，本機節點仍擋外部網址", not x.same_machine("127.0.0.1", "8.8.8.8"))
+    check("任何位址都綁得上時，127.0.0.1 仍是本機", x.is_local_address("127.0.0.1"))
+finally:
+    x.socket.socket = _real
+
 check("本機節點、網址也是 127.0.0.1：放行", x.same_machine("127.0.0.1", "127.0.0.1") == {"127.0.0.1"})
 check("本機節點、網址是外部位址：擋下", not x.same_machine("127.0.0.1", "8.8.8.8"))
 check("本機節點、網址是雲端 metadata：擋下", not x.same_machine("127.0.0.1", "169.254.169.254"))

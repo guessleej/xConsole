@@ -332,12 +332,17 @@ def session_user(sid):
 # ---------------------------------------------------------------- API 串接：從主控台經網路打一次
 
 def is_local_address(ip):
-    """這個位址是不是本機網卡上的：綁得上才算。三個系統都適用，不用解析 ip／ifconfig 的輸出。"""
+    """這個位址是不是本機網卡上的：問系統路由「往這個位址送，來源會用哪個位址」，來源就是它自己才算。
+    本機位址走 loopback、來源等於目的；別台的位址來源會是本機出口網卡，對不上。
+    不用 bind 判斷：Linux 開了 net.ipv4.ip_nonlocal_bind（HA、透明代理常見）時任何位址都綁得上，
+    會把外部網址當成本機、把管理者的金鑰送出去（Codex 審查）。UDP connect 不送封包，三個系統都適用。"""
     try:
-        fam = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        a = ipaddress.ip_address(ip.split("%")[0])
+        fam = socket.AF_INET6 if a.version == 6 else socket.AF_INET
         with socket.socket(fam, socket.SOCK_DGRAM) as s:
-            s.bind((ip, 0))
-        return True
+            s.connect((ip, 9))
+            src = s.getsockname()[0]
+        return ipaddress.ip_address(src.split("%")[0]) == a
     except (OSError, ValueError):
         return False
 
