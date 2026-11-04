@@ -331,6 +331,32 @@ def session_user(sid):
 
 # ---------------------------------------------------------------- API 串接：從主控台經網路打一次
 
+def is_local_address(ip):
+    """這個位址是不是本機網卡上的：綁得上才算。三個系統都適用，不用解析 ip／ifconfig 的輸出。"""
+    try:
+        fam = socket.AF_INET6 if ":" in ip else socket.AF_INET
+        with socket.socket(fam, socket.SOCK_DGRAM) as s:
+            s.bind((ip, 0))
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def same_machine(node_host, url_host):
+    """對外網址解析出來的位址是不是全部落在這個節點上；是就回那組位址，不是回空集合。
+    單機部署時節點記成 127.0.0.1，對外網址卻是這台的網卡位址，
+    只比對 127.0.0.1 會誤判成別台（2026-11-05 客戶單機實測）。節點是本機時，本機網卡上的位址也算同一台；
+    遠端節點仍只認它自己解析出來的位址，雲端 metadata、內網別台一律不放行。"""
+    try:
+        mine = {i[4][0] for i in socket.getaddrinfo(node_host, None)}
+        theirs = {i[4][0] for i in socket.getaddrinfo(url_host, None)}
+    except OSError:
+        return set()
+    if mine and all(ipaddress.ip_address(a.split("%")[0]).is_loopback for a in mine):
+        mine |= {a for a in theirs if is_local_address(a)}
+    return theirs if theirs and theirs <= mine else set()
+
+
 def network_test(node_id, slot_id, key=""):
     """用 IDE 會打的那個網址，從主控台這台經網路實際連一次。
     代理在本機測過只證明服務活著；這一步證明別台電腦也連得到、金鑰保護真的有效。
@@ -345,12 +371,8 @@ def network_test(node_id, slot_id, key=""):
     u = urlparse(base)
     if u.scheme not in ("http", "https") or not u.hostname or not node:
         return {"ok": False, "url": base, "detail": "對外網址格式不對，主控台不代為實測"}
-    try:
-        mine = {i[4][0] for i in socket.getaddrinfo(node["host"], None)}
-        theirs = {i[4][0] for i in socket.getaddrinfo(u.hostname, None)}
-    except OSError:
-        mine, theirs = set(), set()
-    if not theirs or not theirs <= mine:
+    theirs = same_machine(node["host"], u.hostname)
+    if not theirs:
         return {"ok": False, "url": base, "detail": f"對外網址的主機不是這台機器（{node['host']}），主控台不代為實測，免得把金鑰送到別處。"
                                                      "請用 IDE 所在的電腦直接測"}
     # 直接連剛剛檢查過的那個 IP，原本的主機名稱只放在 Host 標頭與 TLS 的 SNI：不讓 DNS 在檢查和連線之間換位址（rebinding）
