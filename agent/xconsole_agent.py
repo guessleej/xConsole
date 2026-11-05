@@ -2491,6 +2491,14 @@ def _profile_cached(path):
     return _META_CACHE[key]
 
 
+def store_hdd(root=None):
+    """存放區所在的碟是不是機械硬碟（True／False；認不出來回 None）。"""
+    real = os.path.realpath(root or gguf_root())
+    store = max((x for x in storage_choices() if real == x["mount"] or real.startswith(x["mount"].rstrip("/") + "/")),
+                key=lambda x: len(x["mount"]), default=None)
+    return (store or {}).get("hdd")
+
+
 def scan_gguf(reg=None):
     """掃存放區：一個資料夾裡可以放同一顆模型的多個量化，各自算一顆；分片要齊才算可用。"""
     reg = reg or registry()
@@ -3184,10 +3192,7 @@ def library():
                            "cn_origin": True, "arch": "qwen3.8-flash-next"})
     os.makedirs(root, exist_ok=True)
     free_gib, total_gib = disk_free(root)
-    real = os.path.realpath(root)
-    store = max((x for x in storage_choices() if real == x["mount"] or real.startswith(x["mount"].rstrip("/") + "/")),
-                key=lambda x: len(x["mount"]), default=None)
-    return {"root": root, "free_gib": free_gib, "hdd": (store or {}).get("hdd"),
+    return {"root": root, "free_gib": free_gib, "hdd": store_hdd(root),
             "total_gib": total_gib,
             "gguf": ggufs, "strata": strata, "problems": problems,
             "llama_server": llama_server_exe(reg), "downloads": jobs}
@@ -5136,6 +5141,19 @@ class _Capped:
             return raw.decode("mbcs" if OS == "windows" else "utf-8", "replace")
 
 
+AGENT_PROCS = set()            # 執行中的 Agent 指令；主控台按「停止」時一次砍掉
+AGENT_PROCS_LOCK = threading.Lock()
+
+
+def agent_exec_cancel():
+    """砍掉所有執行中的 Agent 指令（同一時間只會有一個任務）。"""
+    with AGENT_PROCS_LOCK:
+        procs = list(AGENT_PROCS)
+    for p in procs:
+        kill_tree(p.pid)
+    return 200, {"ok": True, "killed": len(procs)}
+
+
 def agent_exec(folder, cmd, timeout=None):
     if not agent_enabled():
         return _agent_off()
@@ -5161,6 +5179,8 @@ def agent_exec(folder, cmd, timeout=None):
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kw)
     except OSError as ex:
         return 500, {"error": f"指令起不來：{ex}"}
+    with AGENT_PROCS_LOCK:
+        AGENT_PROCS.add(p)
     bufs = {"stdout": _Capped(AGENT_OUT_MAX), "stderr": _Capped(AGENT_OUT_MAX)}
 
     def pump(stream, buf):
@@ -5186,6 +5206,9 @@ def agent_exec(folder, cmd, timeout=None):
                     pass
             p.kill()
             p.wait(timeout=10)
+    finally:
+        with AGENT_PROCS_LOCK:
+            AGENT_PROCS.discard(p)
     for x in th:
         x.join(timeout=5)
     return 200, {"code": p.returncode, "timed_out": timed_out, "timeout": t,
@@ -6114,17 +6137,18 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 code, out = set_model(sid, body.get("pack") or "", body.get("native") or "", force=force)
             return self._send(code, out)
-        if path == "/library/hf":
-            return self._send(*hf_files(str(body.get("repo") or "").strip(), str(body.get("token") or "")))
+        if path in ("/library/hf", "/library/hf/profile"):
+            repo, tok = str(body.get("repo") or "").strip(), str(body.get("token") or "")
+            code, out = hf_profile(repo, tok, str(body.get("match") or "")[:60]) if path.endswith("profile") else hf_files(repo, tok)
+            if code == 200:
+                out["hdd"] = store_hdd()          # 主控台估第一次載入與用硬碟執行的速度要用
+            return self._send(code, out)
         if path == "/library/hf/search":
             return self._send(*hf_search(str(body.get("q") or ""), str(body.get("token") or "")))
         if path == "/library/upload/status":
             return self._send(*upload_status(str(body.get("folder") or ""), str(body.get("name") or "")))
         if path == "/library/upload/cancel":
             return self._send(*upload_cancel(str(body.get("folder") or ""), str(body.get("name") or "")))
-        if path == "/library/hf/profile":
-            return self._send(*hf_profile(str(body.get("repo") or "").strip(), str(body.get("token") or ""),
-                                          str(body.get("match") or "")[:60]))
         if path == "/library/download":
             return self._send(*start_download(str(body.get("repo") or "").strip(), str(body.get("stem") or ""),
                                               body.get("mmproj") or None, str(body.get("token") or "")))
@@ -6161,6 +6185,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*agent_write(body.get("folder"), body.get("path"), body.get("content")))
         if path == "/agent/exec":
             return self._send(*agent_exec(body.get("folder"), body.get("cmd"), body.get("timeout")))
+        if path == "/agent/exec/cancel":
+            return self._send(*agent_exec_cancel())
         if path == "/slots/add":
             return self._send(*add_slot(body))
         m = re.fullmatch(r"/(llama|sd)/build(/cancel)?", path)

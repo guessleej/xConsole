@@ -77,6 +77,8 @@ def fake_call_node(node_id, path, method="GET", body=None, timeout=40):
         return A.agent_write(b.get("folder"), b.get("path"), b.get("content"))
     if path == "/agent/exec":
         return A.agent_exec(b.get("folder"), b.get("cmd"), b.get("timeout"))
+    if path == "/agent/exec/cancel":
+        return A.agent_exec_cancel()
     if path == "/agent/folders/create":
         return A.agent_folder_create(b.get("name"))
     if path.startswith("/chat/"):
@@ -232,6 +234,30 @@ def main():
     req("POST", f"/api/agent/tasks/{tid}/stop", {})
     t = wait(tid, ("stopped", "failed", "done"))
     check("等核准時按停止 → stopped", t["state"] == "stopped" and t["pending"] is None, t["state"])
+    if os.name != "nt":
+        SCRIPT[:] = [say("", call("run_command", command="sleep 120", timeout=300))]
+        st, t = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "睡很久"})
+        tid = t["id"]
+        wait(tid, ("waiting_approval",))
+        req("POST", f"/api/agent/tasks/{tid}/approve", {"allow": True})
+        for _ in range(50):
+            if A.AGENT_PROCS:
+                break
+            time.sleep(0.1)
+        t0 = time.time()
+        st, out = req("POST", f"/api/agent/tasks/{tid}/stop", {})
+        check("指令跑到一半按停止：立刻回 stopped", st == 200 and out["state"] == "stopped" and time.time() - t0 < 3, out)
+        for _ in range(80):
+            if not A.AGENT_PROCS:
+                break
+            time.sleep(0.1)
+        check("  執行中的指令被砍掉", not A.AGENT_PROCS)
+        SCRIPT[:] = [say("", call("finish", summary="好"))]
+        st, t2 = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "下一件"})
+        check("  馬上可以交代下一件事（不被舊任務卡住）", st == 200, t2)
+        if st == 200:
+            wait(t2["id"], ("done", "failed"))
+        check("  舊任務晚回來也維持 stopped", req("GET", f"/api/agent/tasks/{tid}")[1]["state"] == "stopped")
 
     # ---- 8. 本機欄位當模型
     SCRIPT[:] = [say("", call("write_file", path="local.txt", content="本機模型寫的")), say("", call("finish", summary="好了"))]

@@ -1222,3 +1222,5 @@ input.switch:checked::after { transform: translateX(18px); }
 .prov-model-row { display: flex; gap: 8px; align-items: flex-end; }
 .prov-model-row > div { flex: 1; }
 .prov-model-row > .btn { margin-bottom: 1px; }
+
+.prov-ca-pick { margin-top: 6px; }

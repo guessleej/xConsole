@@ -4059,6 +4059,7 @@ function settingsBrand(wrap) {
 
 function render() {
   if (!S.fleet) return;
+  S.live = null;                 // 換頁就清掉上一頁的局部更新
   renderNav();
   const v = S.view;
   if (v === "home" || v === "overview") viewHome();
@@ -4677,8 +4678,10 @@ async function refresh() {
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
     // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
     // 執行、Agent、畫圖、影片也一樣：有選到一半的設定、進行中的載入進度或任務，各自只更新自己那一塊
-    if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) renderNav();
-    else quietRender();
+    if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
+      renderNav();
+      S.live?.();                // 有登記局部更新的頁（執行頁的狀態列）只換那一塊
+    } else quietRender();
   } catch (ex) {
     $("#live").classList.add("stale");
     $("#live-text").textContent = "更新失敗";
@@ -4696,7 +4699,11 @@ function start() {
 
 loadBranding();
 
-$("#refresh").addEventListener("click", refresh);
+// 手動按重新整理：執行與模型頁沒有打到一半的字，直接重畫整頁拿最新狀態；其他頁照自動更新的規則
+$("#refresh").addEventListener("click", async () => {
+  await refresh();
+  if (S.view === "run" || (S.view === "models" && S.libTab !== "hf")) render();
+});
 
 $("#theme").addEventListener("click", () => {
   const now = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";

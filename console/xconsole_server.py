@@ -1057,7 +1057,7 @@ def hf_with_plans(node_id, body):
         out["profile_error"] = why
     sc, st = call_node(node_id, "/state", timeout=30)
     if sc == 200 and st.get("pools"):
-        out = recommend.plan_hf(st, out)
+        out = recommend.plan_hf(st, out, out.get("hdd"))
     return 200, out
 
 
@@ -1562,6 +1562,8 @@ def agent_run(t):
 
     def end(state, error=None):
         with t.lock:
+            if t.stop:                       # 按過停止就維持「已停止」，背景晚回來的結果不改狀態
+                state, error = "stopped", None
             t.state, t.error, t.pending = state, error, None
             t.updated = time.time()
         if error:
@@ -1637,6 +1639,22 @@ def agent_run(t):
         import traceback
         print("Agent 任務出錯：\n" + traceback.format_exc(), flush=True)
         return end("failed", f"任務出錯：{type(exc).__name__}")
+
+
+def agent_stop(t, audit):
+    """按停止：馬上標成已停止並放開「一次一個任務」的鎖，正在跑的指令砍掉。
+    ponytail: 進行中的模型請求不硬切，背景執行緒等它回來就收工、不再做下一步；要秒停得替 call_node 加可中斷的連線。"""
+    with t.lock:
+        was = t.state
+        t.stop = True
+        if was in ("running", "waiting_approval"):
+            t.state, t.pending, t.updated = "stopped", None, time.time()
+    t.event.set()
+    if was in ("running", "waiting_approval"):
+        threading.Thread(target=call_node, args=(t.node, "/agent/exec/cancel", "POST", {}), kwargs={"timeout": 20},
+                         daemon=True).start()
+    audit("agent.task_stop", t.id, True)
+    return {"ok": True, "state": t.state}
 
 
 def agent_start(user, ip, body):
@@ -2512,10 +2530,7 @@ class Handler(BaseHTTPRequestHandler):
             if not t:
                 return self._json(404, {"error": "沒有這個任務"})
             if m.group(2) == "stop":
-                t.stop = True
-                t.event.set()
-                self._audit("agent.task_stop", t.id, True)
-                return self._json(200, {"ok": True})
+                return self._json(200, agent_stop(t, self._audit))
             with t.lock:
                 waiting = t.state == "waiting_approval" and t.pending
                 cmd = (t.pending or {}).get("command", "")

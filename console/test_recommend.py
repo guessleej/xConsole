@@ -211,6 +211,8 @@ def main():
     case("  整體附建議的量化（4～6 位元裡流暢的、不挑輔助檔）", h["pick"], "m-Q4_K_M")
     h2 = R.plan_hf(ADA2, {**json.loads(json.dumps(info)), "profile": DENSE})
     case("讀得到檔頭：不標 guess", any(c["plan"]["guess"] for c in h2["choices"]), False)
+    h3 = R.plan_hf(ADA2, {**json.loads(json.dumps(info)), "profile": DENSE}, True)
+    case("存放區是機械硬碟：第一次載入估得比較久", h3["choices"][0]["plan"]["load_est_sec"] > h2["choices"][0]["plan"]["load_est_sec"], True)
     case("  算記憶體有算進要下載的投影檔", h2["choices"][0]["plan"]["need_gib"] > R.plan_quant(R.capacity(ADA2), DENSE, q("Q4_K_M", 4.6))["need_gib"], True)
     lib = {"hdd": True, "gguf": [{"id": "f/m-Q4_K_M", "quant": "Q4_K_M", "size_gib": 17.4, "mmproj_gib": 0, "load_sec": 41, **DENSE}]}
     R.plan_installed(ADA2, lib)

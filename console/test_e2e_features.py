@@ -201,6 +201,7 @@ def main():
         check("HF 清單：每個量化都有 plan（等級、速度、放哪、需要多少、分層、guess）",
               st == 200 and plans and all(p and {"level", "tok_s", "place", "need_gib", "split", "guess"} <= set(p) for p in plans.values()), out)
         check("  讀得到遠端檔頭：guess=false、整體附 pick", not any(p["guess"] for p in plans.values()) and out.get("pick") in plans, out.get("pick"))
+        check("  代理一併回存放區是不是機械硬碟（hdd）", "hdd" in out, list(out))
         st, out, _ = call("/api/node/local/library/hf", {"repo": "nohead/E2E-GGUF"})
         check("  讀不到檔頭：退回稠密假設、標 guess=true", st == 200 and out["choices"][0]["plan"]["guess"] is True and out.get("profile_error"), out)
 

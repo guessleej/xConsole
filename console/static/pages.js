@@ -336,7 +336,9 @@ async function viewRun() {
   holder.appendChild(statusHolder);
   if (rs) statusHolder.appendChild(statusBar(n, rs));
 
-  const st = { ctx: null, thinking: "auto", lan: true, disk: false };
+  // thinking／lan 先顯示欄位現在的設定；使用者沒動過就不送，代理沿用原本的（不會悄悄改成 0.0.0.0）
+  const st = { ctx: null, thinking: "auto", lan: true, disk: false, base: null, touched: {} };
+  let infoFor = null;
   const draw = () => {
     const m = models.find((x) => x.id === sel.value);
     const slotId = slotSel?.value || rs?.id || slots[0]?.id || null;
@@ -345,9 +347,34 @@ async function viewRun() {
     const running = !!(m.in_use && slot && m.in_use === slot.id && slot.busy);
     drawPlan(left, n, m, p);
     drawSettings(right, n, m, p, slot, running, st, prog, statusHolder);
+    if (slot?.unit && slot.id !== infoFor) {
+      infoFor = slot.id;
+      api(`/api/node/${n.id}/apiinfo/${slot.id}`).then((info) => {
+        const run = info.run;
+        if (!run || slot.id !== infoFor) return;
+        st.base = { thinking: run.thinking || "auto", lan: run.lan !== false };
+        if (!st.touched.thinking) st.thinking = st.base.thinking;
+        if (!st.touched.lan) st.lan = st.base.lan;
+        if (right.isConnected) drawSettings(right, n, models.find((x) => x.id === sel.value), models.find((x) => x.id === sel.value).plan || null,
+          slot, running, st, prog, statusHolder);
+      }).catch(() => {});
+    }
+  };
+  // 自動更新：平常只換狀態列的數字；欄位狀態真的變了（別處啟動、停止、當掉）才整頁重畫一次，選好的模型保留
+  const sigOf = (nn) => JSON.stringify(llmSlots(nn).map((s) => [s.id, s.unit, s.model, s.busy]));
+  const sig = sigOf(n);
+  S.live = () => {
+    const n2 = curNode();
+    if (!n2 || n2.id !== n.id || !holder.isConnected || S.view !== v) return;
+    if (!n2.online || sigOf(n2) !== sig) { S.runPick = sel.value; viewRun(); return; }
+    const rs2 = runningSlot(n2);
+    if (!rs2) return;
+    const b = statusBar(n2, rs2);
+    b.classList.remove("rv");
+    statusHolder.replaceChildren(b);
   };
   sel.onchange = () => { st.ctx = null; st.disk = false; draw(); };
-  if (slotSel) slotSel.onchange = () => { S.runSlot = slotSel.value; draw(); };
+  if (slotSel) slotSel.onchange = () => { S.runSlot = slotSel.value; st.base = null; st.touched = {}; st.thinking = "auto"; st.lan = true; draw(); };
   draw();
   reveal(holder);
 }
@@ -431,8 +458,9 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   };
   if (isLlama) {
     toggle("思考模式", "先想再答，難題答得比較好但比較慢（只對會思考的模型有用）", st.thinking === "on",
-      (v) => { st.thinking = v ? "on" : "auto"; });
-    toggle("區網存取", "讓區網裡的其他電腦（IDE、手機）連得到這個模型；關掉只有這台自己連得到", st.lan, (v) => { st.lan = v; });
+      (v) => { st.thinking = v ? "on" : (st.base && st.base.thinking !== "on" ? st.base.thinking : "auto"); st.touched.thinking = true; });
+    toggle("區網存取", "讓區網裡的其他電腦（IDE、手機）連得到這個模型；關掉只有這台自己連得到", st.lan,
+      (v) => { st.lan = v; st.touched.lan = true; });
   }
 
   const est = el("div", "tiles light run-est");
@@ -461,8 +489,13 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
     }
   }
   const btn = el("button", "btn primary run-go", running ? "套用設定並重新載入" : "啟動模型");
-  btn.disabled = p?.level === "no" || (diskNeed && !st.disk);
-  btn.title = p?.level === "no" ? "這台放不下這顆" : "";
+  // 等級是照預設上下文算的；調短了就可能放得下，交給代理用這個長度重做一次記憶體試算
+  const shorter = !!(st.ctx && p?.ctx && st.ctx < p.ctx);
+  btn.disabled = (p?.level === "no" && !shorter) || (diskNeed && !st.disk && !shorter);
+  btn.title = p?.level === "no" && !shorter ? "這台放不下這顆；可以先把上下文調短" : "";
+  if (shorter && (p?.level === "no" || diskNeed)) {
+    c.appendChild(el("p", "note", `上面的規劃是照 ${int(p.ctx)} 個 token 算的。調到 ${st.ctx / 1024}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。`));
+  }
   c.append(btn, err);
   if (running && slot) {
     const stopB = el("button", "btn danger run-go", "停止模型");
@@ -488,7 +521,8 @@ async function startModel(n, m, slot, st, btn, err, prog, statusHolder, force = 
   const key = n.id + "/" + s.id;
   S.busy.add(key);
   const req = m.engine === "llama"
-    ? { engine: "llama", model: m.id, ...(st.ctx ? { ctx: st.ctx } : {}), thinking: st.thinking, lan: st.lan, ...(st.disk ? { allow_disk: true } : {}) }
+    ? { engine: "llama", model: m.id, ...(st.ctx ? { ctx: st.ctx } : {}), ...(st.touched.thinking ? { thinking: st.thinking } : {}),
+        ...(st.touched.lan ? { lan: st.lan } : {}), ...(st.disk ? { allow_disk: true } : {}) }
     : { pack: m.pack, native: m.native };
   const pc = progressCard(m);
   prog.textContent = "";
@@ -567,11 +601,15 @@ function progressCard(m) {
 const CHAT2 = { sessions: [], cur: null };
 const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型" };
 try { CHAT2.sessions = JSON.parse(sessionStorage.getItem("xconsole-chats") || "[]"); } catch (_) { CHAT2.sessions = []; }
+// 附圖一起存；分頁的儲存空間（約 5 MB）放不下時，只存文字並在那則訊息標 image_lost，
+// 重新整理後畫面會說圖沒了、送給模型時也不再假裝有圖
 const saveChats = () => {
-  try {
-    sessionStorage.setItem("xconsole-chats", JSON.stringify(CHAT2.sessions.slice(0, 30).map((s) => ({
-      ...s, msgs: s.msgs.filter((m) => !m.pending).map(({ role, content, reasoning, stat, error }) => ({ role, content, reasoning, stat, error })) }))));
-  } catch (_) { /* 空間不夠或無痕：只留在記憶體 */ }
+  const pack = (keepImg) => JSON.stringify(CHAT2.sessions.slice(0, 30).map((s) => ({
+    ...s, msgs: s.msgs.filter((m) => !m.pending).map(({ role, content, reasoning, stat, error, image, image_lost }) => ({
+      role, content, reasoning, stat, error,
+      ...(image && keepImg ? { image } : {}), ...(image_lost || (image && !keepImg) ? { image_lost: true } : {}) })) })));
+  try { sessionStorage.setItem("xconsole-chats", pack(true)); return; } catch (_) { /* 多半是圖太大 */ }
+  try { sessionStorage.setItem("xconsole-chats", pack(false)); } catch (_) { /* 空間不夠或無痕：只留在記憶體 */ }
 };
 
 function chatTargets2() {
@@ -709,7 +747,7 @@ async function viewChat() {
     const lastImg = sent.map((m) => !!m.image).lastIndexOf(true);
     const history = sent.map((m, i) => ({ role: m.role,
       content: m.image && i === lastImg ? [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: m.image } }]
-        : m.image ? `（先前附了一張圖）${m.content}` : m.content }));
+        : m.image ? `（先前附了一張圖）${m.content}` : m.image_lost ? `（先前附了一張圖，已經看不到了）${m.content}` : m.content }));
     const t0 = performance.now();
     try {
       cur.ctl = new AbortController();
@@ -821,6 +859,7 @@ function paintMsg(m, final) {
   if (!b) return;
   b.textContent = "";
   if (m.image) { const im = el("img", "msg-img"); im.src = m.image; im.alt = "附加的圖片"; b.appendChild(im); }
+  else if (m.image_lost) b.appendChild(el("p", "small muted", "這則附的圖太大，沒有存進這個分頁，重新整理後就沒了；要繼續問這張圖請重新附上。"));
   if (m.reasoning) {
     const d = el("details", "msg-think");
     d.open = !m.content && !final;
@@ -1262,24 +1301,60 @@ function openProvider(presets, p) {
   const mRow = el("div", "prov-model-row");
   const mBox = fieldBox("預設模型", fModel);
   mRow.append(mBox, listB);
+  // 自建 CA 的內網服務：匯入對方的 CA 憑證，不是關掉驗證
+  const fCa = el("textarea", "mono");
+  fCa.rows = 3;
+  fCa.placeholder = p?.ca_set ? "已匯入 CA 憑證；留空＝不更改" : "-----BEGIN CERTIFICATE-----（對方是公開憑證就留空）";
+  const caFile = el("input");
+  caFile.type = "file";
+  caFile.accept = ".pem,.crt,.cer";
+  caFile.hidden = true;
+  caFile.onchange = async () => { const f = caFile.files[0]; if (f) fCa.value = await f.text(); caFile.value = ""; };
+  const caPick = el("button", "btn sm", "從檔案讀取");
+  caPick.type = "button";
+  caPick.onclick = () => caFile.click();
+  const caRow = fieldBox("對方的 CA 憑證（自建 CA 才需要）", fCa, "PEM 格式；連線時用它驗證對方，不會關掉憑證檢查");
+  caPick.classList.add("prov-ca-pick");
+  caRow.append(caPick, caFile);
+  let fClearCa = null;
+  const caClear = el("label", "check-row small");
+  if (p?.ca_set) {
+    fClearCa = el("input");
+    fClearCa.type = "checkbox";
+    caClear.append(fClearCa, document.createTextNode(" 清除已匯入的 CA 憑證"));
+  }
   d.append(...(p ? [] : [fieldBox("服務商", fPre)]), fieldBox("名稱", fName), fieldBox("網址（OpenAI 相容）", fUrl, "要 https；只有內網位址可以用 http"),
-    fieldBox("API Key", fKey), mRow, hint);
+    fieldBox("API Key", fKey), mRow, caRow, ...(fClearCa ? [caClear] : []), hint);
   const err = el("div");
   d.appendChild(err);
   const ov = modal({ title: p ? `編輯 ${p.name}` : "新增第三方 API", bodyNode: d, hasInput: true });
   const save = async () => {
     const r = await api("/api/providers/save", { method: "POST", body: { ...(p ? { id: p.id } : {}), name: fName.value.trim(),
-      base_url: fUrl.value.trim(), api_key: fKey.value, default_model: fModel.value.trim() } });
+      base_url: fUrl.value.trim(), api_key: fKey.value, default_model: fModel.value.trim(),
+      ...(fCa.value.trim() ? { ca_pem: fCa.value } : {}), ...(fClearCa?.checked ? { clear_ca: true } : {}) } });
     fKey.value = "";
+    fCa.value = "";
     p = r.provider || p;
     return r;
   };
   listB.onclick = async () => {
     errNote(err, "");
+    const wasNew = !p;
+    const keyTyped = fKey.value, caTyped = fCa.value;
     try {
       const r = await save();
       const id = (r.provider || p).id;
-      const m = await api(`/api/providers/${id}/models`, { method: "POST", body: {} });
+      let m;
+      try { m = await api(`/api/providers/${id}/models`, { method: "POST", body: {} }); } catch (ex) {
+        // 新的一筆驗不過就收回，不留一筆壞掉的在對話與 Agent 的選單裡；金鑰放回欄位讓人改
+        if (wasNew) {
+          try { await api(`/api/providers/${id}/delete`, { method: "POST", body: {} }); } catch (_) { /* 刪不掉就留著，管理者看得到 */ }
+          p = null;
+          fKey.value = keyTyped;
+          fCa.value = caTyped;
+        }
+        throw ex;
+      }
       const dl = el("datalist");
       dl.id = "prov-models";
       (m.models || []).forEach((x) => { const o = el("option"); o.value = x.id; if (x.cn_origin) o.label = "中國來源"; dl.appendChild(o); });
