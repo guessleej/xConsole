@@ -61,6 +61,9 @@ class Store:
         CREATE INDEX IF NOT EXISTS samples_node ON samples(node, ts);
         CREATE TABLE IF NOT EXISTS sessions(
           sid_hash TEXT PRIMARY KEY, user TEXT, ip TEXT, created REAL, expires REAL);
+        CREATE TABLE IF NOT EXISTS providers(
+          id TEXT PRIMARY KEY, name TEXT, base_url TEXT, api_key TEXT, default_model TEXT,
+          ca_pem TEXT, created REAL, updated REAL);
         """)
 
     # ---- 稽核
@@ -126,6 +129,37 @@ class Store:
             a.append(ip)
         with self.lock:
             return self.db.execute(q, a).fetchone()[0]
+
+    # ---- 第三方 API（OpenAI 相容）：金鑰欄位只收 enc:v1: 密文（AES-256-GCM，由呼叫端 tls.seal 加密），這裡不碰明文
+    PROVIDER_COLS = ("id", "name", "base_url", "api_key", "default_model", "ca_pem", "created", "updated")
+
+    def provider_list(self):
+        with self.lock:
+            rows = self.db.execute("SELECT " + ",".join(self.PROVIDER_COLS) + " FROM providers ORDER BY created").fetchall()
+        return [dict(zip(self.PROVIDER_COLS, r)) for r in rows]
+
+    def provider_get(self, pid):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.PROVIDER_COLS) + " FROM providers WHERE id=?", (pid,)).fetchone()
+        return dict(zip(self.PROVIDER_COLS, r)) if r else None
+
+    def provider_put(self, row):
+        """新增或整筆更新。api_key 必須是 enc:v1: 密文或空字串，明文一律拒收（防呼叫端忘了加密）。"""
+        key = row.get("api_key") or ""
+        if key and not key.startswith("enc:v1:"):
+            raise ValueError("金鑰沒有加密，拒絕寫入")
+        now = time.time()
+        with self.lock:
+            cur = self.db.execute("SELECT created FROM providers WHERE id=?", (row["id"],)).fetchone()
+            self.db.execute(
+                "INSERT OR REPLACE INTO providers(id,name,base_url,api_key,default_model,ca_pem,created,updated) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (row["id"], row["name"], row["base_url"], key, row.get("default_model") or "", row.get("ca_pem") or "",
+                 cur[0] if cur else now, now))
+
+    def provider_delete(self, pid):
+        with self.lock:
+            return self.db.execute("DELETE FROM providers WHERE id=?", (pid,)).rowcount > 0
 
     # ---- 取樣
     def sample(self, node, online, st=None, counters=None):

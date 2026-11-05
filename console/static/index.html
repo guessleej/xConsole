@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>xConsole 模型主控台｜云碩科技</title>
-<meta name="description" content="云碩科技地端 AI 機群的模型主控台：角色欄位、記憶體准入控制、情境切換、即時監控。">
+<meta name="description" content="云碩科技地端 AI 機群的模型主控台：看硬體推薦模型、一鍵安裝引擎、啟動與記憶體准入、對話、Agent、畫圖與影片。">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23bf181f'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='17' font-weight='bold' fill='white' text-anchor='middle'%3Ex%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
@@ -32,9 +32,14 @@
 <div id="app" hidden>
   <header class="topbar" id="topbar">
     <div class="topbar-row one">
+      <button class="iconbtn menubtn" id="menubtn" title="選單" aria-label="選單">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
       <div class="brand"><span class="brand-mark" id="brand-mark">x</span><img id="brand-logo" class="brand-logo" alt="" hidden><span id="brand-name">xConsole</span></div>
       <nav class="nav" id="nav"></nav>
       <span class="spacer"></span>
+      <span class="nodepick" id="nodepick"></span>
       <span class="livedot" id="live"><i></i><span id="live-text">連線中</span></span>
       <button class="iconbtn" id="refresh" title="立即重新整理" aria-label="立即重新整理">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -55,6 +60,14 @@
     <div class="topbar-row two"><div class="subnav" id="subnav"></div></div>
   </header>
 
+  <div class="mnav" id="mnav" hidden>
+    <div class="mnav-panel">
+      <div class="mnav-head"><b>選單</b><button class="iconbtn" id="mnav-close" aria-label="關閉選單">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <nav id="mnav-list"></nav>
+    </div>
+  </div>
+
   <div id="tls-banner" class="banner" hidden></div>
   <main id="main"></main>
   <footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>
@@ -64,5 +77,6 @@
 <div id="modal-host"></div>
 
 <script src="app.js"></script>
+<script src="pages.js"></script>
 </body>
 </html>

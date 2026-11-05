@@ -4,14 +4,17 @@
 1. 含輸入欄位的彈窗不准點背景關閉（欄位內拖曳選字、滑鼠在窗外放開，整張表單就蒸發）。
 2. Enter 送出要擋中文輸入法組字（注音選字的 Enter 不能被當成送出）。
 3. 自動更新不准讓畫面抖：定時重畫不播進場動畫、不整頁清空重建（2026-10-22 模型庫每 3 秒、總覽每 15 秒閃一次）。
-4. 頂層導覽最多六格，模型庫是頂層的一區：它曾經藏在某台機器的第二列，使用者要先挑機器才找得到（2026-10-25）。
+4. 頂層導覽照使用者動線排（docs/WORKFLOW.md，2026-11-06 參考 LocModel 改版）：概覽 → 模型 → 執行 → 對話…，設定最後，
+   最多八格；模型是頂層的一區，不准再藏到某台機器的第二列（2026-10-25 踩過）。
 跑法：python3 test_ui_guard.py（不需要任何套件）
 """
 import os
 import re
 import sys
 
-JS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "app.js"), encoding="utf-8").read()
+_ST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+# 前端分成好幾支：每一支都要守同一套規矩
+JS = "\n".join(open(os.path.join(_ST, f), encoding="utf-8").read() for f in sorted(os.listdir(_ST)) if f.endswith(".js"))
 OK = True
 
 
@@ -74,12 +77,15 @@ for mm in re.finditer(r"set(?:Timeout|Interval)\(", JS):
 check("計時器回呼裡沒有直接整頁重畫（只更新有變的那一塊）", not timers, f"第 {timers} 行")
 
 # ---- 4. 資訊架構
-nv = re.search(r"function renderNav\(\)\s*\{.*?const items = \[(.*?)\];", JS, re.S)
+nv = re.search(r"const NAV = \[(.*?)\];", JS, re.S)
 keys = re.findall(r'\["(\w+)",', nv.group(1)) if nv else []
-check("頂層導覽最多六格", 0 < len(keys) <= 6, f"現在 {len(keys)} 格：{keys}")
-check("模型庫在頂層，而且排在 API 串接前面", "lib" in keys and "apis" in keys and keys.index("lib") < keys.index("apis"), str(keys))
+check("頂層導覽最多八格", 0 < len(keys) <= 8, f"現在 {len(keys)} 格：{keys}")
+check("照動線排：概覽第一，模型在執行前面，執行在對話前面",
+      keys[:1] == ["home"] and all(k in keys for k in ("models", "run", "chat"))
+      and keys.index("models") < keys.index("run") < keys.index("chat"), str(keys))
 check("設定排在最後", keys[-1:] == ["settings"], str(keys))
-check("頂層不再逐一列出群組（群組一多就超過六格）", "group:" not in (nv.group(1) if nv else ""))
+check("頂層不再逐一列出群組（群組一多就塞爆頂列）", "group:" not in (nv.group(1) if nv else ""))
+check("renderNav() 用的是 NAV", bool(re.search(r"function renderNav\(\)\s*\{.*?const items = NAV;", JS, re.S)))
 
 # ---- 5. 樣式表的大括號要成對：少一個「}」，後面所有規則都會被瀏覽器當成上一個區塊的一部分丟掉
 # （2026-11-01 合併衝突時吃掉品牌區 @media 的結尾，畫圖與影片的樣式整段失效，畫面才看得出來）

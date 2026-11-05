@@ -64,12 +64,17 @@ def main():
     case("31B 稠密在 AI 395：放得下", p["place"], "全部放進 GPU 那一塊")
     case("31B 稠密在 AI 395：256 GB/s 跑不到 10 tok/s，降為「能跑」不算流暢", p["level"], "ok")
     p = R.plan_quant(R.capacity(SPARK), DENSE, q("Q8_0", 130))
-    case("放不下就說放不下", p["level"], "no")
+    case("DGX Spark 放不進統一記憶體：改列「要用硬碟」，不是直接說放不下", p["level"], "disk")
+    case("  溢出到硬碟的量＝權重減掉記憶體放得下的", p["split"]["disk"], round(130 - (106.5 - 1 - 4), 1))
+    p = R.plan_quant(R.capacity(AI395), DENSE, q("Q8_0", 130))
+    case("AI 395（BIOS 切兩塊）放不下：一律放不下，不給用硬碟", (p["level"], p["split"]["disk"]), ("no", 0.0))
     p = R.plan_quant(R.capacity(ADA2), MOE, q("MXFP4", 120))
     case("2 張 48G 放不下的 MoE：專家搬到系統記憶體、等級為能跑", (p["level"], p["cpu_moe"] > 0), ("ok", True))
     case("搬到系統記憶體的速度比全放卡上慢", p["tok_s"] < R.plan_quant(R.capacity(ADA2), MOE, q("Q2_K", 60))["tok_s"], True)
     p = R.plan_quant(R.capacity(ADA2), DENSE, q("Q8_0", 130))
-    case("稠密模型放不下就不搬（整層搬出去太慢，不推薦）", p["level"], "no")
+    case("稠密模型放不下顯示卡：不搬專家，改列「要用硬碟」（檔案映射、管理者勾選才跑）", p["level"], "disk")
+    case("  分層：顯示卡放滿、其餘在系統記憶體當頁快取、沒有溢出到硬碟",
+         (p["split"]["gpu"], p["split"]["ram"], p["split"]["disk"]), (94.0, round(130 - (94 - 1 - 4), 1), 0.0))
     p = R.plan_quant(R.capacity(NOGPU), MOE, q("Q4_K_M", 10))
     case("沒有 GPU：任何模型都不推薦", p["level"], "no")
     case("頻寬未知：速度回 None、不硬掰數字",
@@ -168,6 +173,50 @@ def main():
     open(second, "wb").write(b"changed, longer")
     A._profile_cached(first)
     case("分片模型：後面的分片換過，快取跟著失效", len(A._META_CACHE), before + 1)
+
+    # ---- 用硬碟執行（disk）與分層（split）
+    p = R.plan_quant(R.capacity(ADA2), DENSE, q("Q4_K_M", 17.4))
+    case("全放顯示卡：分層全部算在顯示卡", (p["split"]["gpu"], p["split"]["ram"], p["split"]["disk"]), (p["need_gib"], 0.0, 0.0))
+    p = R.plan_quant(R.capacity(ADA2), MOE, q("MXFP4", 120))
+    case("專家搬到系統記憶體：顯示卡＋系統記憶體＝總需求", round(p["split"]["gpu"] + p["split"]["ram"], 1), p["need_gib"])
+    big = q("Q8_0", 400)
+    fast_disk = R.plan_quant(R.capacity(ADA2), DENSE, big, hdd=False)
+    slow_disk = R.plan_quant(R.capacity(ADA2), DENSE, big, hdd=True)
+    case("放不進記憶體：等級 disk，溢出量＝權重扣掉顯示卡與系統記憶體放得下的",
+         (fast_disk["level"], fast_disk["split"]["disk"]), ("disk", round(400 - (94 - 1 - 4) - 201.5, 1)))
+    case("  速度用硬碟讀取頻寬估，機械硬碟更慢", 0 < slow_disk["tok_s"] < fast_disk["tok_s"] < 1, True)
+    moe_disk = R.plan_quant(R.capacity(SPARK), MOE, big)
+    dense_disk = R.plan_quant(R.capacity(SPARK), DENSE, big)
+    case("  MoE 只算被選中的專家：同樣大小比稠密快", (moe_disk["level"], moe_disk["tok_s"] > dense_disk["tok_s"]), ("disk", True))
+    case("  DGX Spark 用硬碟：快速層之外的權重全部算溢出", dense_disk["split"]["disk"], round(400 - (106.5 - 1 - 4), 1))
+    case("AI 395（BIOS 切兩塊）不管多大都不給 disk",
+         {R.plan_quant(R.capacity(AI395), DENSE, q("Q8_0", n))["level"] for n in (100, 200, 400)}, {"no"})
+    case("沒有 GPU 的機器也不給 disk（跟「不推薦」一致）", R.plan_quant(R.capacity(NOGPU), DENSE, big)["level"], "no")
+    tiny_vram = state("discrete", 400, floors={"ram": 8, "vram": 2}, ram={"total_gib": 64}, gpus=[{"id": "0", "total_gib": 6}])
+    case("KV 與計算緩衝放不進顯示卡：連 disk 都不給", R.plan_quant(R.capacity(tiny_vram), DENSE, big)["level"], "no")
+    case("建議下載不會挑 disk 的量化", R.pick([fast_disk, slow_disk]), None)
+    case("每個量化都帶第一次載入的估計秒數", fast_disk["load_est_sec"], R.load_seconds(400, False))
+    rd = R.recommend(SPARK, {"free_gib": 900}, [{"repo": "z/huge-GGUF", "title": "巨大", "use": "chat", "profile": DENSE,
+                                                 "quants": [q("Q4_K_M", 300)]}])
+    case("推薦清單：只能用硬碟跑的標 disk、不進前三", (rd["items"][0]["level"], rd["top"]), ("disk", []))
+
+    # ---- Hugging Face 量化清單附等級、已安裝清單附等級
+    info = {"repo": "a/b-GGUF", "choices": [{"stem": "m-Q4_K_M", "quant": "Q4_K_M", "size_gib": 4.6, "aux": False},
+                                            {"stem": "m-Q8_0", "quant": "Q8_0", "size_gib": 8.5, "aux": False},
+                                            {"stem": "mtp", "quant": None, "size_gib": 0.1, "aux": True}],
+            "mmproj_sizes": {"mmproj-F16.gguf": 0.8}}
+    h = R.plan_hf(ADA2, json.loads(json.dumps(info)))
+    case("拿不到結構：用稠密假設、每個量化都標 guess", bool(all(c["plan"]["guess"] for c in h["choices"]) and h["guess"]), True)
+    case("  plan 的欄位照合約", set(h["choices"][0]["plan"]) >= {"level", "tok_s", "place", "need_gib", "split", "guess"}, True)
+    case("  整體附建議的量化（4～6 位元裡流暢的、不挑輔助檔）", h["pick"], "m-Q4_K_M")
+    h2 = R.plan_hf(ADA2, {**json.loads(json.dumps(info)), "profile": DENSE})
+    case("讀得到檔頭：不標 guess", any(c["plan"]["guess"] for c in h2["choices"]), False)
+    case("  算記憶體有算進要下載的投影檔", h2["choices"][0]["plan"]["need_gib"] > R.plan_quant(R.capacity(ADA2), DENSE, q("Q4_K_M", 4.6))["need_gib"], True)
+    lib = {"hdd": True, "gguf": [{"id": "f/m-Q4_K_M", "quant": "Q4_K_M", "size_gib": 17.4, "mmproj_gib": 0, "load_sec": 41, **DENSE}]}
+    R.plan_installed(ADA2, lib)
+    pl = lib["gguf"][0]["plan"]
+    case("已安裝：附 plan、機械硬碟的載入估計、實測載入秒數",
+         (pl["level"], pl["load_est_sec"], pl["load_sec"], pl["guess"]), ("smooth", R.load_seconds(17.4, True), 41, False))
 
     # ---- 管理者送來的欄位
     case("中國來源不能加入推薦清單", R.check_fields({"repo": "unsloth/Qwen3-8B-GGUF", "title": "x"})[1] is not None, True)

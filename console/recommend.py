@@ -122,8 +122,10 @@ def capacity(state):
     return out
 
 
-def plan_quant(cap, prof, q, mmproj_gib=0.0):
-    """一個量化放在這台：等級（流暢／能跑／放不下）、放在哪、要多少、估計速度、自動分層幾層。"""
+def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
+    """一個量化放在這台：等級（流暢／能跑／要用硬碟／放不下）、放在哪、要多少、估計速度、自動分層幾層，
+    以及分層（split：放顯示卡／系統記憶體／硬碟各幾 GiB，畫面的三色條照這個畫）。
+    hdd：存放區是不是機械硬碟（只影響「要用硬碟」那一級的速度）。guess：模型結構是猜的（稠密假設）。"""
     size = q["size_gib"]
     ctx = min(CTX, prof.get("ctx_train") or CTX)
     kv = kv_gib(prof, ctx)
@@ -131,7 +133,8 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0):
     act = prof.get("active_frac") or 1.0
     bw, rbw = cap.get("bandwidth_gbs"), cap["ram_bandwidth_gbs"]
     out = {"stem": q["stem"], "quant": q["quant"], "size_gib": size, "need_gib": round(need, 1),
-           "ctx": ctx, "kv_gib": round(kv, 1), "cpu_moe": 0, "bits": quant_bits(q["quant"])}
+           "ctx": ctx, "kv_gib": round(kv, 1), "cpu_moe": 0, "bits": quant_bits(q["quant"]), "guess": bool(guess),
+           "split": {"gpu": 0.0, "ram": 0.0, "disk": 0.0}}
     read = size * act * GIB
     fixed = (prof.get("layers") or 0) * LAYER_MS / 1000
     if need <= cap["fast"]:
@@ -140,25 +143,75 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0):
         # 多張卡是一層接一層輪流算（llama.cpp 預設依層切），頻寬不會相加，照單張卡算
         tok = 1 / (read / (EFFICIENCY * bw * 1e9) + fixed) if bw else None
         # 速度不知道就不說流暢（頻寬沒填的機器），先標「能跑」
-        out.update(level="smooth" if tok is not None else "ok", place=place, tok_s=tok)
-    elif cap["memory_model"] == "discrete" and cap["fast"] and prof.get("moe") and prof.get("expert_layer_frac"):
-        per = prof["expert_layer_frac"] * size
-        n = math.ceil((need - cap["fast"]) / per)
-        moved = n * per
-        if n <= prof.get("expert_layers", 0) and moved <= cap["slow"]:
-            # 搬出去的專家每個 token 只讀被選中的那幾個；其餘照 GPU 頻寬
-            cpu_read = moved * (prof.get("expert_used_frac") or act) * GIB
-            tok = 1 / (((read - cpu_read) / (bw * 1e9) + cpu_read / (rbw * 1e9)) / EFFICIENCY + fixed) if bw else None
-            out.update(level="ok", place=f"{n} 層專家放系統記憶體", tok_s=tok, cpu_moe=n)
-        else:
-            out.update(level="no", place=f"要約 {need:.0f} GiB，這台放不下", tok_s=None)
+        out.update(level="smooth" if tok is not None else "ok", place=place, tok_s=tok,
+                   split={"gpu": need, "ram": 0.0, "disk": 0.0})
     else:
-        out.update(level="no", place=f"要約 {need:.0f} GiB，這台最多 {cap['fast']:.0f} GiB", tok_s=None)
+        moe_ok = False
+        if cap["memory_model"] == "discrete" and cap["fast"] and prof.get("moe") and prof.get("expert_layer_frac"):
+            per = prof["expert_layer_frac"] * size
+            n = math.ceil((need - cap["fast"]) / per)
+            moved = n * per
+            if n <= prof.get("expert_layers", 0) and moved <= cap["slow"]:
+                # 搬出去的專家每個 token 只讀被選中的那幾個；其餘照 GPU 頻寬
+                cpu_read = moved * (prof.get("expert_used_frac") or act) * GIB
+                tok = 1 / (((read - cpu_read) / (bw * 1e9) + cpu_read / (rbw * 1e9)) / EFFICIENCY + fixed) if bw else None
+                out.update(level="ok", place=f"{n} 層專家放系統記憶體", tok_s=tok, cpu_moe=n,
+                           split={"gpu": need - moved, "ram": moved, "disk": 0.0})
+                moe_ok = True
+        if not moe_ok:
+            d = _disk_plan(cap, size, mmproj_gib + ENGINE_OVERHEAD + kv, act, hdd, fixed)
+            if d:
+                out.update(d)
+            else:
+                out.update(level="no", tok_s=None,
+                           place=f"要約 {need:.0f} GiB，這台最多 {cap['fast'] + cap['slow']:.0f} GiB"
+                           + ("（這台 BIOS 把記憶體切成兩塊，不能用硬碟執行）" if cap["memory_model"] == "unified_split" else ""))
+    out["split"] = {k: round(v, 1) for k, v in out["split"].items()}
     if out["tok_s"] is not None:
-        out["tok_s"] = round(out["tok_s"], 1)
+        # 不到 1 tok/s 的（用硬碟執行）留兩位有效數字，不要四捨五入成 0
+        out["tok_s"] = round(out["tok_s"], 1) if out["tok_s"] >= 1 else float(f"{out['tok_s']:.2g}")
         if out["level"] == "smooth" and out["tok_s"] < SMOOTH_TOKS:
             out["level"] = "ok"            # 放得下但太慢，不算流暢
+    out["load_est_sec"] = load_seconds(size, hdd)
     return out
+
+
+def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
+    """放不進記憶體時，以檔案映射（mmap）啟動、權重按需從硬碟讀的規劃。回 None＝連這樣都不行。
+    pinned＝不是檔案映射、一定要占記憶體的部分（KV、引擎計算緩衝、投影檔）；放 GPU 的層也是複製進去的，不能被換出。
+    AI 395 這類 BIOS 切兩塊的機器一律不給：檔案映射的頁快取吃的是系統那一小塊，擠爆會把整台拖死。
+    沒有 GPU 的獨立顯卡機也不給（跟「沒有 GPU 不推薦」一致）。"""
+    mm, fast, slow = cap["memory_model"], cap["fast"], cap["slow"]
+    if mm == "unified_split" or fast <= 0 or pinned > fast:
+        return None
+    if mm == "unified_single":
+        cached = min(size, fast - pinned)          # 剩下的統一記憶體當頁快取
+        gpu_w, ram_w, spill = cached, 0.0, size - cached
+        split = {"gpu": pinned + cached, "ram": 0.0, "disk": spill}
+        rbw = cap.get("bandwidth_gbs")
+    else:
+        gpu_w = min(size, fast - pinned)            # 放得下幾層就放幾層（-ngl），其餘留在檔案映射
+        rest = size - gpu_w
+        ram_w = min(rest, slow)                     # 系統記憶體當頁快取
+        spill = rest - ram_w
+        split = {"gpu": pinned + gpu_w, "ram": ram_w, "disk": spill}
+        rbw = cap["ram_bandwidth_gbs"]
+    bw = cap.get("bandwidth_gbs")
+    disk_gbs = DISK_GBS.get(hdd, DISK_GBS[None])
+    if bw and rbw:
+        # 每個 token：快速層與頁快取照各自的頻寬讀；溢出到硬碟的那段照硬碟讀取頻寬（MoE 只讀被選中的專家）
+        t = (gpu_w * act * GIB / (bw * 1e9) + ram_w * act * GIB / (rbw * 1e9)) / EFFICIENCY \
+            + spill * act * GIB / (disk_gbs * 1e9) + fixed_s
+        tok = 1 / t
+    else:
+        tok = None
+    if spill > 0.05:
+        place = f"有 {spill:.0f} GiB 權重放不進記憶體，執行時從硬碟按需讀（很慢）"
+    elif mm == "unified_single":
+        place = "以檔案映射載入，權重留在頁快取"
+    else:
+        place = f"顯示卡放 {gpu_w:.0f} GiB，其餘 {ram_w:.0f} GiB 以檔案映射留在系統記憶體"
+    return {"level": "disk", "place": place, "tok_s": tok, "split": split}
 
 
 def decode_speed(size_gib, prof, bw):
@@ -185,6 +238,8 @@ def pick(plans):
     2. 這個 repo 根本沒有 4～6 位元時，才考慮流暢的 8 位元；
     3. 都不流暢，退到放得下的 4 位元裡最小的（求快）；
     4. 再不行挑放得下的最大一個。全放不下回 None。"""
+    # 「要用硬碟」不推薦下載：那是管理者自己勾選才開的模式，不是建議
+    plans = [p for p in plans if p["level"] != "disk"]
     usable = [p for p in plans if p["level"] != "no" and p["bits"] and p["bits"] <= 8]
     key = lambda p: (p["bits"], quant_pref(p["quant"]), p["size_gib"])  # noqa: E731
     mid = [p for p in usable if p["level"] == "smooth" and 4 <= p["bits"] <= 6]
@@ -202,6 +257,59 @@ def pick(plans):
     # repo 只放了 F16／BF16（沒有任何量化）：放得下就推它，不要整顆標成放不下
     wide = [p for p in plans if p["level"] != "no"]
     return min(wide, key=lambda p: p["size_gib"]) if wide else None
+
+
+def guess_profile(choices):
+    """拿不到模型結構（讀不到遠端 GGUF 檔頭）時的稠密模型假設：用中間那個量化的大小推參數量，
+    再推層數與每個 token 的 KV（GQA 的典型值：8B 約 128 KiB/token、70B 約 320 KiB/token，大約跟參數量的平方根成正比）。
+    估出來的等級一律標 guess，畫面寫明是假設。"""
+    mains = sorted((c for c in choices or [] if not c.get("aux")), key=lambda c: c["size_gib"])
+    if not mains:
+        return {"ctx_train": None, "kv_full_bpt": 131072, "kv_swa_bpt": 0, "swa_window": 0, "layers": 32,
+                "active_frac": 1.0, "moe": False}
+    mid = mains[len(mains) // 2]
+    bits = quant_bits(mid.get("quant")) or 4
+    params_b = max(0.3, mid["size_gib"] * GIB / 1e9 * 8 / bits)
+    return {"ctx_train": None, "kv_full_bpt": int(46000 * math.sqrt(params_b)), "kv_swa_bpt": 0, "swa_window": 0,
+            "layers": 32 if params_b < 15 else 48 if params_b < 40 else 80, "active_frac": 1.0, "moe": False}
+
+
+def plan_hf(state, info, hdd=None):
+    """Hugging Face 一個 repo 的量化清單（代理 hf_profile 或 hf_files 的回應）→ 每個量化附 plan、整體附 pick。
+    有檔頭讀到的 profile 就用它；沒有就用稠密模型假設並標 guess。"""
+    cap = capacity(state)
+    prof = info.get("profile")
+    guess = not prof
+    if guess:
+        prof = guess_profile(info.get("choices"))
+    proj = pick_mmproj([{"path": k, "gib": v} for k, v in sorted((info.get("mmproj_sizes") or {}).items())])
+    mm = proj["gib"] if proj else 0.0
+    mains = []
+    for c in info.get("choices") or []:
+        p = plan_quant(cap, prof, {"stem": c["stem"], "quant": c.get("quant"), "size_gib": c["size_gib"]}, mm, hdd, guess)
+        c["plan"] = {k: p[k] for k in PLAN_KEYS}
+        if not c.get("aux"):
+            mains.append(p)
+    best = pick(mains)
+    return {**info, "pick": best["stem"] if best else None, "capacity": cap, "mmproj_pick": proj, "guess": guess,
+            "assumptions": {"efficiency": EFFICIENCY, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}}
+
+
+def plan_installed(state, lib):
+    """已安裝的每顆 GGUF 附 plan（結構取自代理讀本機檔頭的結果，不是猜的）。lib 是代理 /library 的回應，會直接改它。"""
+    cap = capacity(state)
+    for m in lib.get("gguf") or []:
+        if not m.get("size_gib"):
+            continue
+        stem = m["id"].rsplit("/", 1)[-1]
+        p = plan_quant(cap, m, {"stem": stem, "quant": m.get("quant"), "size_gib": m["size_gib"]},
+                       m.get("mmproj_gib") or 0.0, lib.get("hdd"), False)
+        m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec")}
+    lib["capacity"] = cap
+    return lib
+
+
+PLAN_KEYS = ("level", "tok_s", "place", "need_gib", "split", "guess", "cpu_moe", "kv_gib", "ctx", "bits", "load_est_sec")
 
 
 def pick_mmproj(mmproj):
@@ -229,7 +337,7 @@ def recommend(state, library, catalog):
         folder = repo_folder(e["repo"])
         plans = []
         for q in e["quants"]:
-            p = plan_quant(cap, prof, q, mm)
+            p = plan_quant(cap, prof, q, mm, lib.get("hdd"))
             got = installed.get(f"{folder}/{q['stem']}")
             p["installed_id"] = got["id"] if got else None
             p["in_use"] = got.get("in_use") if got else None
@@ -239,13 +347,15 @@ def recommend(state, library, catalog):
         mine = next((p for p in plans if p["installed_id"]), None)
         job = next((j for j in jobs if j.get("repo") == e["repo"] and j.get("state") in ("running", "queued")), None)
         # 等級：裝好的那個量化放得下就照它；裝了一個放不下的大量化，不能把另一個放得下的小量化一起藏起來
-        lv = mine["level"] if mine and mine["level"] != "no" else (best or mine or {"level": "no"})["level"]
+        lv = mine["level"] if mine and mine["level"] not in ("no", "disk") else (best or mine or {"level": "no"})["level"]
+        if lv == "no" and any(p["level"] == "disk" for p in plans):
+            lv = "disk"
         items.append({**_public(e), "order": i, "plans": plans, "pick": best["stem"] if best else None,
                       "installed": mine["stem"] if mine else None, "mmproj_pick": proj,
                       "level": lv,
                       "job": {"id": job["id"], "done": job.get("done"), "total": job.get("total"),
                               "stem": job.get("stem")} if job else None})
-    rank = {"smooth": 0, "ok": 1, "no": 2, "unknown": 3}
+    rank = {"smooth": 0, "ok": 1, "disk": 2, "no": 3, "unknown": 4}
     order = sorted(items, key=lambda x: (rank[x["level"]], x["order"]))
     featured = next((x for x in order if x["level"] == "smooth"), None)
     return {"capacity": cap, "items": items, "top": [x["repo"] for x in order if x["level"] in ("smooth", "ok")][:3],

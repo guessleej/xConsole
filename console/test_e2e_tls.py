@@ -60,11 +60,16 @@ def main():
 
     # 測試用 CA 與網站憑證（涵蓋 127.0.0.1）
     with open(os.path.join(W, "leaf.ext"), "w") as fh:
-        fh.write("basicConstraints=CA:FALSE\nsubjectAltName=IP:127.0.0.1\n")
+        # Python 3.13 起預設開 VERIFY_X509_STRICT：測試簽出來的憑證要有 AKI／SKI，否則驗證直接失敗
+        fh.write("basicConstraints=CA:FALSE\nsubjectAltName=IP:127.0.0.1\n"
+                 "subjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n")
+    with open(os.path.join(W, "aki.ext"), "w") as fh:
+        fh.write("basicConstraints=CA:FALSE\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n")
     with open(os.path.join(W, "ca.ext"), "w") as fh:
         fh.write("basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign\n")
     sh("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "root.key", "-out", "root.crt",
-       "-days", "30", "-subj", "/O=E2E Root/CN=E2E Root", "-addext", "basicConstraints=critical,CA:TRUE")
+       "-days", "30", "-subj", "/O=E2E Root/CN=E2E Root", "-addext", "basicConstraints=critical,CA:TRUE",
+       "-addext", "keyUsage=critical,keyCertSign,cRLSign")
     sh("openssl", "req", "-newkey", "rsa:2048", "-nodes", "-keyout", "leaf.key", "-out", "leaf.csr", "-subj", "/CN=127.0.0.1")
     sh("openssl", "x509", "-req", "-in", "leaf.csr", "-CA", "root.crt", "-CAkey", "root.key", "-CAcreateserial",
        "-out", "leaf.crt", "-days", "30", "-extfile", "leaf.ext")
@@ -148,7 +153,7 @@ def main():
         with open(os.path.join(W, "web.csr"), "w") as fh:
             fh.write(c["csr"])
         sh("openssl", "x509", "-req", "-in", "web.csr", "-CA", "root.crt", "-CAkey", "root.key", "-CAcreateserial",
-           "-out", "web.crt", "-days", "30", "-copy_extensions", "copy")
+           "-out", "web.crt", "-days", "30", "-copy_extensions", "copy", "-extfile", "aki.ext")
         code, r = call("/api/tls/inspect", {"files": [f("web.crt")]})
         check("廠商只寄回憑證 → 自動對上 CSR 的私鑰", r["ok"] and any("CSR" in p for p in r["passes"]), r.get("errors"))
         code, a = call("/api/tls/apply", {"token": r["token"]})
