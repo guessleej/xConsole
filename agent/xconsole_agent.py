@@ -5089,7 +5089,7 @@ def agent_write(folder, rel, content):
     created = not os.path.exists(full)
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
     try:
-        fd = os.open(full, flags, 0o644)
+        fd = os.open(full, flags, 0o600)   # 只有代理帳號讀得到，Agent 寫的程式可能含機密
     except OSError as ex:
         return 400, {"error": f"寫不進 {rel}：{ex.strerror}"}
     with os.fdopen(fd, "wb") as fh:

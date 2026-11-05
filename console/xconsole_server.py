@@ -1214,7 +1214,7 @@ def provider_open(prov, method, path, body=None, timeout=60):
          "User-Agent": "xconsole", "Host": u.netloc}
     if key:
         h["Authorization"] = f"Bearer {key}"
-        if (u.hostname or "").endswith("anthropic.com"):
+        if (u.hostname or "") == "api.anthropic.com" or (u.hostname or "").endswith(".anthropic.com"):
             h.update({"x-api-key": key, "anthropic-version": "2023-06-01"})   # 模型清單走它原生的 API
     try:
         conn.request(method, (u.path or "").rstrip("/") + path,

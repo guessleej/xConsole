@@ -73,20 +73,20 @@ def main():
     code, out = A.agent_read("網站專案", "src/index.html")
     case("讀回來的內容一致", code == 200 and out["content"] == "<h1>改過</h1>" and not out["binary"], out)
     outside = tempfile.mkdtemp(prefix="xc-outside-")
-    secret = os.path.join(outside, "secret.txt")
-    with open(secret, "w") as fh:
+    outfile = os.path.join(outside, "secret.txt")
+    with open(outfile, "w") as fh:
         fh.write("機密")
-    for bad in ("../../secret.txt", "../網站專案/../../x", "/etc/passwd", secret, "C:/Windows/win.ini", "a/../../b"):
+    for bad in ("../../secret.txt", "../網站專案/../../x", "/etc/passwd", outfile, "C:/Windows/win.ini", "a/../../b"):
         code_r, _ = A.agent_read("網站專案", bad)
         code_w, _ = A.agent_write("網站專案", bad, "x")
         case(f"路徑跳脫「{bad[:24]}」：讀寫都擋（400）", code_r == 400 and code_w == 400, (code_r, code_w))
     case("讀不存在的資料夾 → 404", A.agent_read("沒有這個", "a.txt")[0] == 404)
     if not WIN:
-        os.symlink(secret, os.path.join(proj, "link.txt"))
+        os.symlink(outfile, os.path.join(proj, "link.txt"))
         os.symlink(outside, os.path.join(proj, "linkdir"))
         case("符號連結指到外面的檔案：讀擋下", A.agent_read("網站專案", "link.txt")[0] == 400)
         case("符號連結指到外面的檔案：寫擋下（不會寫到外面）", A.agent_write("網站專案", "link.txt", "x")[0] == 400
-             and open(secret).read() == "機密")
+             and open(outfile).read() == "機密")
         case("經過指到外面的資料夾連結寫檔：擋下", A.agent_write("網站專案", "linkdir/new.txt", "x")[0] == 400
              and not os.path.exists(os.path.join(outside, "new.txt")))
         os.symlink(outside, os.path.join(root, "壞資料夾"))

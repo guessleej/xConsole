@@ -172,7 +172,7 @@ def swap_tests():
     os.makedirs(os.path.dirname(exe), exist_ok=True)
     with open(exe, "w") as fh:
         fh.write(FAKE.format(py=sys.executable))
-    os.chmod(exe, 0o755)
+    os.chmod(exe, 0o700)
     A.ram_pool = lambda: {"total_gib": 16.0, "free_gib": 4.0, "used_gib": 12.0}
     A.swap_pool = lambda: {"total_gib": 0.0, "used_gib": 0.0}
     A.hardware = lambda: {"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}}
