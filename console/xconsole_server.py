@@ -508,7 +508,7 @@ def assist_tool(name, args):
         for it in r["items"]:
             p = next((x for x in it["plans"] if x["stem"] == (it.get("installed") or it.get("pick"))), None)
             if p:
-                rows.append({"model": it["title"], "level": {"smooth": "流暢", "ok": "能跑", "no": "放不下"}.get(p["level"]),
+                rows.append({"model": it["title"], "level": {"smooth": "流暢", "ok": "能跑", "disk": "要用硬碟", "no": "放不下"}.get(p["level"]),
                              "quant": p["quant"], "size_gib": p["size_gib"], "place": p["place"], "tok_s": p["tok_s"],
                              "installed": bool(it.get("installed"))})
         return {"capacity": r["capacity"], "models": rows}
@@ -1028,6 +1028,684 @@ def _join_node(handler, body):
     name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
     return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
 
+# ---------------------------------------------------------------- Hugging Face 量化清單附等級
+_HF_CACHE = {}                   # (機器, repo, match) → (時間, 代理 hf_profile 的回應)：讀遠端檔頭要抓十幾 MB，10 分鐘內不重抓
+_HF_CACHE_LOCK = threading.Lock()
+
+
+def hf_with_plans(node_id, body):
+    """POST /api/node/{n}/library/hf：每個量化附 plan、整體附 pick。模型結構優先用代理讀遠端 GGUF 檔頭（hf_profile），
+    讀不到就退回只有檔案清單（hf_files），用稠密模型假設估並標 guess。"""
+    repo, token, match = str(body.get("repo") or "").strip(), body.get("token"), str(body.get("match") or "")[:60]
+    key = (node_id, repo, match)
+    with _HF_CACHE_LOCK:
+        hit = _HF_CACHE.get(key)
+    if hit and time.time() - hit[0] < 600 and not token:
+        code, out = 200, json.loads(json.dumps(hit[1]))
+    else:
+        code, out = call_node(node_id, "/library/hf/profile", "POST", {"repo": repo, "token": token, "match": match}, timeout=180)
+        if code == 200 and not token:
+            with _HF_CACHE_LOCK:
+                _HF_CACHE[key] = (time.time(), out)
+                for k in [k for k, v in _HF_CACHE.items() if time.time() - v[0] > 600]:
+                    _HF_CACHE.pop(k, None)
+    if code != 200:
+        why = out.get("error")
+        code, out = call_node(node_id, "/library/hf", "POST", {"repo": repo, "token": token}, timeout=60)
+        if code != 200:
+            return code, out
+        out["profile_error"] = why
+    sc, st = call_node(node_id, "/state", timeout=30)
+    if sc == 200 and st.get("pools"):
+        out = recommend.plan_hf(st, out, out.get("hdd"))
+    return 200, out
+
+
+# ---------------------------------------------------------------- 執行預覽（模型寫出的 HTML 直接跑）
+# 預覽頁跟主控台同源，所以一定要用 CSP sandbox 把它變成「不透明來源」：裡面的程式讀不到主控台的 cookie、
+# 打不了主控台的 API（就算打了也是跨來源、不帶 cookie）。只有建立者那一個登入看得到、30 分鐘過期、只放記憶體。
+PREVIEW_MAX = 2 * 1024 * 1024
+PREVIEW_TTL = 1800
+PREVIEW_KEEP = 50
+_PREVIEWS = {}                   # id → {"html", "sid", "user", "exp"}（插入順序＝建立順序）
+_PREVIEW_LOCK = threading.Lock()
+PREVIEW_CSP = ("sandbox allow-scripts allow-forms allow-modals allow-popups; "
+               "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https: blob:; "
+               "style-src 'unsafe-inline' https:; img-src data: blob: https:; font-src data: https:; "
+               "media-src data: blob: https:; connect-src https:; form-action https:; base-uri 'none'; "
+               "frame-ancestors 'self'")
+
+
+def _sid_hash(sid):
+    return hashlib.sha256((sid or "").encode()).hexdigest()
+
+
+def preview_put(sid, user, html):
+    """回 (id, 錯誤)。"""
+    if not isinstance(html, str) or not html.strip():
+        return None, "沒有 HTML 內容"
+    data = html.encode("utf-8")
+    if len(data) > PREVIEW_MAX:
+        return None, f"預覽內容最多 2 MB（這次 {len(data) / 1048576:.1f} MB）"
+    pid = secrets.token_urlsafe(16)
+    now = time.time()
+    with _PREVIEW_LOCK:
+        for k in [k for k, v in _PREVIEWS.items() if v["exp"] < now]:
+            _PREVIEWS.pop(k)
+        while len(_PREVIEWS) >= PREVIEW_KEEP:
+            _PREVIEWS.pop(next(iter(_PREVIEWS)))
+        _PREVIEWS[pid] = {"html": data, "sid": _sid_hash(sid), "user": user, "exp": now + PREVIEW_TTL}
+    return pid, None
+
+
+def preview_get(pid, sid):
+    """只有建立者的那一個登入拿得到；別的登入、過期、不存在一律回 None（不分辨是哪一種）。"""
+    with _PREVIEW_LOCK:
+        p = _PREVIEWS.get(pid)
+        if not p or p["exp"] < time.time():
+            _PREVIEWS.pop(pid, None)
+            return None
+        if not sid or not hmac.compare_digest(p["sid"], _sid_hash(sid)):
+            return None
+        return p["html"]
+
+
+# ---------------------------------------------------------------- 第三方 API（OpenAI 相容）
+# 管理者在「設定 → 第三方 API」加：名稱、網址、金鑰、預設模型。金鑰 AES-256-GCM（enc:v1:）落地，
+# 任何 GET 都只回 key_set，不回內容；記錄、稽核、錯誤回應前一律遮罩。
+# 網址只收 https；http 只准私有位址與本機（區網裡自架的 vLLM／llama.cpp），不准 169.254（雲端 metadata）。
+# 連線不跟轉址（金鑰不能被帶到別的主機）；自建 CA 的服務可以匯入對方的 CA 憑證，不提供關閉驗證。
+PROVIDER_MAX = 50
+PROVIDER_NAME_RX = re.compile(r"[^\x00-\x1f\x7f<>]{1,40}")
+PROVIDER_MODEL_RX = re.compile(r"[\w.:/@+-]{0,120}")
+# 中國來源（政府案不得使用）：只標示、不擋，使用者自己決定（內部測試可以用）
+CN_HOSTS = ("deepseek", "moonshot", "kimi", "bigmodel", "zhipu", "chatglm", "dashscope", "aliyuncs", "aliyun", "qwen",
+            "minimax", "minimaxi", "volces", "volcengine", "doubao", "bytedance", "hunyuan", "tencent", "baichuan",
+            "baidu", "bce.", "stepfun", "sensenova", "sensetime", "xfyun", "iflytek", "siliconflow", "lingyiwanwu",
+            "01.ai", "infini-ai", "modelscope", ".cn")
+PROVIDER_PRESETS = [
+    {"key": "openai", "name": "OpenAI", "base_url": "https://api.openai.com/v1", "default_model": "",
+     "note": "金鑰在 platform.openai.com 的 API keys 頁產生"},
+    {"key": "gemini", "name": "Google Gemini", "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+     "default_model": "", "note": "Gemini 的 OpenAI 相容端點；金鑰在 Google AI Studio 產生"},
+    {"key": "anthropic", "name": "Anthropic Claude", "base_url": "https://api.anthropic.com/v1", "default_model": "",
+     "note": "Anthropic 的 OpenAI 相容端點；金鑰在 console.anthropic.com 產生"},
+    {"key": "mistral", "name": "Mistral", "base_url": "https://api.mistral.ai/v1", "default_model": "",
+     "note": "金鑰在 console.mistral.ai 產生"},
+    {"key": "custom", "name": "自訂（OpenAI 相容）", "base_url": "", "default_model": "",
+     "note": "任何講 OpenAI Chat Completions 的服務（vLLM、llama.cpp、Ollama、LiteLLM…）；網址填到 /v1 為止"},
+]
+SECRET_TEXT_RX = re.compile(r"(sk-ant-[\w-]{8,}|sk-[\w-]{12,}|AIza[\w-]{20,}|xc-[\w-]{20,}|Bearer\s+[\w.~+/-]{12,})")
+
+
+def mask_secret(text, *keys):
+    """錯誤訊息、記錄、稽核裡的金鑰一律遮掉：對方服務有時會把收到的金鑰原樣回在錯誤裡。"""
+    text = str(text or "")
+    for k in keys:
+        if k and len(k) >= 4:
+            text = text.replace(k, "[已遮罩]")
+    return SECRET_TEXT_RX.sub("[已遮罩]", text)
+
+
+def cn_origin_host(*words):
+    low = " ".join(str(w or "").lower() for w in words)
+    return any(h in low for h in CN_HOSTS)
+
+
+def _private_ok(ip):
+    a = ipaddress.ip_address(ip)
+    return (a.is_private or a.is_loopback) and not a.is_link_local and not a.is_multicast and not a.is_unspecified
+
+
+def check_provider_url(url):
+    """回 (正規化後的網址, 錯誤)。"""
+    url = str(url or "").strip().rstrip("/")
+    if not url or len(url) > 300 or re.search(r"[\s\x00-\x1f]", url):
+        return None, "網址要填，例：https://api.openai.com/v1"
+    u = urlparse(url)
+    if u.scheme not in ("https", "http") or not u.hostname or u.username or u.password or u.query or u.fragment:
+        return None, "網址只收 https://主機/路徑（不能帶帳密、查詢字串）"
+    try:
+        u.port
+    except ValueError:
+        return None, "埠號不對"
+    if u.scheme == "http":
+        try:
+            ips = {i[4][0] for i in socket.getaddrinfo(u.hostname, None)}
+        except OSError:
+            return None, f"解析不到 {u.hostname}"
+        if not ips or not all(_private_ok(i) for i in ips):
+            return None, "http（不加密）只准連區網私有位址或本機；網際網路上的服務請用 https"
+    return url, None
+
+
+class ProviderError(Exception):
+    def __init__(self, code, msg):
+        super().__init__(msg)
+        self.code, self.msg = code, msg
+
+
+def provider_key(prov):
+    k = prov.get("api_key") or ""
+    return tls.unseal(CERTS.p, k).decode() if k.startswith("enc:v1:") else ""
+
+
+def provider_open(prov, method, path, body=None, timeout=60):
+    """連第三方服務：http 時先解析、確認是私有位址才直接連那個 IP（不讓 DNS 在檢查和連線之間換位址）；
+    https 一律驗憑證（可加對方的 CA）、TLS 1.2 以上。回 (連線, 回應, 金鑰)。"""
+    u = urlparse(prov["base_url"])
+    key = provider_key(prov)
+    port = u.port or (443 if u.scheme == "https" else 80)
+    if u.scheme == "http":
+        try:
+            ips = sorted({i[4][0] for i in socket.getaddrinfo(u.hostname, port, proto=socket.IPPROTO_TCP)})
+        except OSError:
+            raise ProviderError(502, f"解析不到 {u.hostname}")
+        if not ips or not all(_private_ok(i) for i in ips):
+            raise ProviderError(400, "http 只准連區網私有位址或本機，這個網址現在解析到外部位址，已拒絕")
+        conn = http.client.HTTPConnection(ips[0], port, timeout=timeout)
+    else:
+        ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        if prov.get("ca_pem"):
+            ctx.load_verify_locations(cadata=prov["ca_pem"])        # 加上對方的 CA，不是關掉驗證
+        conn = http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx)
+    h = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
+         "User-Agent": "xconsole", "Host": u.netloc}
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+        if (u.hostname or "") == "api.anthropic.com" or (u.hostname or "").endswith(".anthropic.com"):
+            h.update({"x-api-key": key, "anthropic-version": "2023-06-01"})   # 模型清單走它原生的 API
+    try:
+        conn.request(method, (u.path or "").rstrip("/") + path,
+                     body=json.dumps(body).encode() if body is not None else None, headers=h)
+        resp = conn.getresponse()
+    except ssl.SSLError as exc:
+        conn.close()
+        raise ProviderError(502, f"{u.hostname} 的憑證驗證不過（{exc.reason or exc}）。自建 CA 的服務請在這筆設定匯入對方的 CA 憑證")
+    except (OSError, http.client.HTTPException) as exc:
+        conn.close()
+        raise ProviderError(502, f"連不到 {u.hostname}：{mask_secret(exc, key)[:160]}")
+    if 300 <= resp.status < 400:
+        conn.close()
+        raise ProviderError(502, f"{u.hostname} 回 {resp.status} 轉址；為了不把金鑰送到別處，不跟轉址。請填實際提供 API 的網址")
+    return conn, resp, key
+
+
+def _provider_err(resp, key):
+    try:
+        raw = resp.read(65536)
+        d = json.loads(raw or b"{}")
+        if isinstance(d, list) and d:
+            d = d[0]
+        e = d.get("error") if isinstance(d, dict) else None
+        msg = (e.get("message") if isinstance(e, dict) else e) or (d.get("message") if isinstance(d, dict) else None) or raw[:300].decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        msg = ""
+    hint = {401: "金鑰不對或沒有權限", 403: "沒有權限（金鑰的權限或帳號方案）", 404: "網址或模型名稱不對",
+            429: "被對方限流或額度用完"}.get(resp.status, "")
+    return mask_secret(f"對方回 {resp.status}" + (f"（{hint}）" if hint else "") + (f"：{msg}" if msg else ""), key)[:400]
+
+
+def provider_json(prov, method, path, body=None, timeout=120):
+    """非串流的一次呼叫。回 (狀態碼, JSON)。錯誤一律 {"error": 遮罩過的訊息}。"""
+    try:
+        conn, resp, key = provider_open(prov, method, path, body, timeout)
+    except ProviderError as exc:
+        return exc.code, {"error": exc.msg}
+    try:
+        if resp.status >= 400:
+            return (400 if resp.status < 500 else 502), {"error": _provider_err(resp, key), "status": resp.status}
+        raw = resp.read(NODE_REPLY_MAX + 1)
+        if len(raw) > NODE_REPLY_MAX:
+            return 502, {"error": "對方回應太大"}
+        try:
+            return 200, json.loads(raw or b"{}")
+        except ValueError:
+            return 502, {"error": "對方回的不是 JSON（網址可能不是 OpenAI 相容的 API）"}
+    finally:
+        conn.close()
+
+
+def provider_public(p):
+    return {"id": p["id"], "name": p["name"], "base_url": p["base_url"], "default_model": p.get("default_model") or "",
+            "key_set": bool(p.get("api_key")), "ca_set": bool(p.get("ca_pem")),
+            "cn_origin": cn_origin_host(urlparse(p["base_url"]).hostname, p.get("default_model")),
+            "created": p.get("created"), "updated": p.get("updated")}
+
+
+def provider_save(body):
+    """回 (狀態碼, 回應, 稽核用的摘要)。編輯時金鑰欄空白＝保留原金鑰；clear_key＝清掉。"""
+    pid = str(body.get("id") or "")
+    cur = STORE.provider_get(pid) if pid else None
+    if pid and not cur:
+        return 404, {"error": "沒有這筆第三方 API"}, None
+    if not cur and len(STORE.provider_list()) >= PROVIDER_MAX:
+        return 400, {"error": f"最多 {PROVIDER_MAX} 筆"}, None
+    name = str(body.get("name") or "").strip()
+    if not PROVIDER_NAME_RX.fullmatch(name):
+        return 400, {"error": "名稱要 1～40 個字，不能有 < > 或控制字元"}, None
+    url, err = check_provider_url(body.get("base_url"))
+    if err:
+        return 400, {"error": err}, None
+    # 沒帶 default_model 欄位就沿用原本的（帶了空字串才是清掉）
+    model = str((body.get("default_model") if "default_model" in body else (cur or {}).get("default_model")) or "").strip()
+    if not PROVIDER_MODEL_RX.fullmatch(model):
+        return 400, {"error": "預設模型名稱只能用英數與 . _ : / @ + -，最多 120 字"}, None
+    key_in = body.get("api_key")
+    key_in = "" if key_in is None else str(key_in).strip()
+    if key_in and (len(key_in) > 512 or re.search(r"[\s\x00-\x1f]", key_in)):
+        return 400, {"error": "金鑰格式不對（不能有空白，最多 512 字）"}, None
+    if key_in:
+        sealed, key_change = tls.seal(CERTS.p, key_in.encode()), "換新"
+    elif body.get("clear_key"):
+        sealed, key_change = "", "清除"
+    else:
+        sealed, key_change = (cur or {}).get("api_key") or "", "保留" if cur else "無"
+    ca = (cur or {}).get("ca_pem") or ""
+    if body.get("clear_ca"):
+        ca = ""
+    elif str(body.get("ca_pem") or "").strip():
+        r, pem = tls.inspect_trusted_ca(str(body["ca_pem"]).encode())
+        if not r.get("ok"):
+            return 400, {"error": "CA 憑證讀不出來：" + "；".join(r.get("errors") or [])}, None
+        ca = pem.decode()
+    row = {"id": pid or secrets.token_hex(6), "name": name, "base_url": url, "api_key": sealed,
+           "default_model": model, "ca_pem": ca}
+    STORE.provider_put(row)
+    saved = STORE.provider_get(row["id"])
+    return 200, {"ok": True, "provider": provider_public(saved)}, {
+        "name": name, "base_url": url, "default_model": model, "credential": key_change, "new": not cur,
+        "ca": bool(ca), "cn_origin": provider_public(saved)["cn_origin"]}
+
+
+CHAT_ROLES = ("system", "user", "assistant", "tool")
+
+
+def check_messages(body):
+    msgs = body.get("messages")
+    if not isinstance(msgs, list) or not 1 <= len(msgs) <= 200:
+        return None, "對話內容不對"
+    for m in msgs:
+        if not isinstance(m, dict) or m.get("role") not in CHAT_ROLES:
+            return None, "對話內容不對"
+    return msgs, None
+
+
+def provider_chat_request(prov, body):
+    """跟本機對話（代理 chat_request）同一組參數規則。回 (請求本文, 錯誤)。"""
+    msgs, err = check_messages(body)
+    if err:
+        return None, err
+    model = str(body.get("model") or prov.get("default_model") or "").strip()
+    if not model or not PROVIDER_MODEL_RX.fullmatch(model):
+        return None, "請先選模型（這筆第三方 API 沒有設預設模型）"
+    req = {"model": model, "messages": msgs, "stream": bool(body.get("stream", True))}
+    if req["stream"]:
+        req["stream_options"] = {"include_usage": True}
+    for k, lo, hi in (("max_tokens", 1, 131072), ("temperature", 0, 2)):
+        if body.get(k) is not None:
+            try:
+                v = float(body[k])
+            except (TypeError, ValueError):
+                return None, f"{k} 要是數字"
+            if not lo <= v <= hi:
+                return None, f"{k} 要在 {lo}～{hi} 之間"
+            req[k] = int(v) if k == "max_tokens" else v
+    if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
+        req["tools"] = body["tools"]
+    return req, None
+
+
+# ---------------------------------------------------------------- Agent 任務（主控台負責對話迴圈）
+# 模型用 OpenAI 的 tools 格式呼叫六個工具；檔案與指令實際在那台機器的代理上做（/agent/*，只能動工作資料夾）。
+# run_command 一定先停在 waiting_approval，有人按允許才送出去；每一條實際執行的指令都寫稽核。
+AGENT_MAX_STEPS = 40
+AGENT_MAX_SEC = 1800
+AGENT_KEEP = 20
+AGENT_TASKS = {}
+_AGENT_LOCK = threading.Lock()
+AGENT_TOOLS = [
+    {"type": "function", "function": {"name": "list_files", "description": "列出工作資料夾（或其中一個子資料夾）裡的檔案",
+                                      "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "子資料夾的相對路徑，空白＝整個工作資料夾"}}}}},
+    {"type": "function", "function": {"name": "read_file", "description": "讀一個文字檔（最多 1 MB）",
+                                      "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "write_file", "description": "建立或覆寫一個檔案（整份內容，最多 2 MB）；上層資料夾會自動建立",
+                                      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+                                                     "required": ["path", "content"]}}},
+    {"type": "function", "function": {"name": "run_command", "description": "在工作資料夾裡執行一條指令（要使用者按允許才會執行）",
+                                      "parameters": {"type": "object", "properties": {"command": {"type": "string"},
+                                                                                      "timeout": {"type": "integer", "description": "秒，預設 120、最多 600"}},
+                                                     "required": ["command"]}}},
+    {"type": "function", "function": {"name": "update_plan", "description": "更新工作計畫（整份），每一步標 pending、in_progress 或 done",
+                                      "parameters": {"type": "object", "properties": {"steps": {"type": "array", "items": {
+                                          "type": "object", "properties": {"text": {"type": "string"}, "status": {"type": "string", "enum": ["pending", "in_progress", "done"]}},
+                                          "required": ["text"]}}}, "required": ["steps"]}}},
+    {"type": "function", "function": {"name": "finish", "description": "工作完成時呼叫，附上給使用者的總結",
+                                      "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}}},
+]
+TOOLS_UNSUPPORTED_RX = re.compile(r"tool|function|jinja", re.I)
+
+
+def agent_system_prompt(folder, osname):
+    shell = {"windows": "Windows PowerShell", "darwin": "macOS 的 zsh", "linux": "Linux 的 bash"}.get(osname, "shell")
+    return ("你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。"
+            f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑；指令在這個資料夾裡用 {shell} 執行。"
+            "做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，"
+            "用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。"
+            "不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。")
+
+
+class AgentTask:
+    def __init__(self, user, ip, node, folder, model, prompt, label):
+        self.id = secrets.token_hex(6)
+        self.user, self.ip, self.node, self.folder, self.model, self.prompt, self.label = user, ip, node, folder, model, prompt, label
+        self.state, self.error, self.summary = "running", None, None
+        self.plan, self.files, self.log, self.tree = [], {}, [], []
+        self.pending, self.decision, self.always, self.stop = None, None, False, False
+        self.steps, self.created, self.updated = 0, time.time(), time.time()
+        self.deadline = self.created + AGENT_MAX_SEC
+        self.event = threading.Event()
+        self.lock = threading.Lock()
+
+    def add(self, kind, **kw):
+        with self.lock:
+            self.log.append({"type": kind, "ts": time.time(), **kw})
+            del self.log[:-400]
+            self.updated = time.time()
+
+    def public(self, full=True):
+        with self.lock:
+            out = {"id": self.id, "node": self.node, "folder": self.folder, "model": self.label, "state": self.state,
+                   "prompt": self.prompt if full else self.prompt[:160], "steps": self.steps, "max_steps": AGENT_MAX_STEPS,
+                   "created": self.created, "updated": self.updated, "deadline": self.deadline, "error": self.error,
+                   "summary": self.summary, "always": self.always, "pending": self.pending}
+            if full:
+                out.update(plan=list(self.plan), log=list(self.log), tree=list(self.tree),
+                           files=[{"path": k, "action": v} for k, v in self.files.items()])
+            return out
+
+
+def agent_model_call(t, req):
+    """呼叫 Agent 用的模型（非串流）。本機欄位經代理；第三方經 provider_json。"""
+    m = t.model
+    if m["kind"] == "local":
+        return call_node(m["node"], f"/chat/{m['slot']}", "POST", req, timeout=600)
+    prov = STORE.provider_get(m["id"])
+    if not prov:
+        return 404, {"error": "這筆第三方 API 已經被刪掉了"}
+    body = {**req, "model": m.get("model") or prov.get("default_model")}
+    if not body["model"]:
+        return 400, {"error": "這筆第三方 API 沒有設預設模型"}
+    return provider_json(prov, "POST", "/chat/completions", body, timeout=600)
+
+
+def _tree_snapshot(t):
+    code, out = call_node(t.node, "/agent/fs/list", "POST", {"folder": t.folder}, timeout=60)
+    if code != 200:
+        return None
+    rows = out.get("files") or []
+    with t.lock:
+        t.tree = [{"path": r["path"], "dir": r["dir"], "size": r["size"]} for r in rows]
+    return {r["path"]: (r["size"], r["mtime"]) for r in rows if not r["dir"]}
+
+
+def _mark_files(t, before, after):
+    if before is None or after is None:
+        return
+    with t.lock:
+        for p, v in after.items():
+            if p not in before:
+                t.files.setdefault(p, "created")
+            elif before[p] != v and t.files.get(p) != "created":
+                t.files[p] = "modified"
+
+
+def _wait_approval(t, cmd, timeout):
+    """停在 waiting_approval，等有人按允許／拒絕；按停止或超過 30 分鐘就不等了。回 True＝允許。"""
+    with t.lock:
+        t.pending = {"id": secrets.token_hex(4), "tool": "run_command", "command": cmd, "timeout": timeout,
+                     "asked_at": time.time()}
+        t.state, t.decision = "waiting_approval", None
+        t.event.clear()
+        t.updated = time.time()
+    while not t.event.wait(1):
+        if t.stop or time.time() > t.deadline:
+            break
+    with t.lock:
+        d, t.pending = t.decision, None
+        if t.state == "waiting_approval":
+            t.state = "running"
+    if not d:
+        return False
+    if d.get("always"):
+        t.always = True
+    return bool(d.get("allow"))
+
+
+def agent_tool(t, name, args):
+    """執行一個工具，回給模型的結果（dict）。"""
+    if name == "list_files":
+        code, out = call_node(t.node, "/agent/fs/list", "POST", {"folder": t.folder, "path": str(args.get("path") or "")}, timeout=60)
+        if code != 200:
+            return {"error": out.get("error")}
+        rows = out.get("files") or []
+        return {"files": [r["path"] + ("/" if r["dir"] else "") for r in rows[:400]], "truncated": len(rows) > 400 or out.get("truncated")}
+    if name == "read_file":
+        code, out = call_node(t.node, "/agent/fs/read", "POST", {"folder": t.folder, "path": str(args.get("path") or "")}, timeout=60)
+        if code != 200:
+            return {"error": out.get("error")}
+        if out.get("binary"):
+            return {"path": out["path"], "size": out["size"], "note": "這是二進位檔，不顯示內容"}
+        c = out.get("content") or ""
+        return {"path": out["path"], "size": out["size"], "content": c[:24000],
+                "truncated": out.get("truncated") or len(c) > 24000}
+    if name == "write_file":
+        path, content = str(args.get("path") or ""), args.get("content")
+        code, out = call_node(t.node, "/agent/fs/write", "POST", {"folder": t.folder, "path": path, "content": content}, timeout=60)
+        if code != 200:
+            return {"error": out.get("error")}
+        with t.lock:
+            if out.get("created"):
+                t.files.setdefault(out["path"], "created")
+            elif t.files.get(out["path"]) != "created":
+                t.files[out["path"]] = "modified"
+        _tree_snapshot(t)
+        return {"ok": True, "path": out["path"], "size": out["size"], "created": out.get("created")}
+    if name == "run_command":
+        cmd = str(args.get("command") or "").strip()
+        try:
+            tmo = max(1, min(600, int(args.get("timeout") or 120)))
+        except (TypeError, ValueError):
+            tmo = 120
+        if not cmd:
+            return {"error": "指令是空的"}
+        if not t.always and not _wait_approval(t, cmd, tmo):
+            if t.stop or time.time() > t.deadline:
+                return {"error": "任務已停止"}
+            t.add("result", tool="run_command", ok=False, text="使用者拒絕執行這條指令")
+            return {"denied": True, "message": "使用者拒絕執行這條指令。請換別的做法，或說明為什麼需要它"}
+        before = _tree_snapshot(t)
+        code, out = call_node(t.node, "/agent/exec", "POST", {"folder": t.folder, "cmd": cmd, "timeout": tmo}, timeout=tmo + 60)
+        STORE.audit(t.user, t.ip, "agent.exec", f"{t.node}/{t.folder}", code == 200 and out.get("code") == 0,
+                    {"task": t.id, "cmd": mask_secret(cmd)[:300], "exit": out.get("code") if code == 200 else None,
+                     "timed_out": out.get("timed_out"), "message": out.get("error")})
+        if code != 200:
+            return {"error": out.get("error")}
+        _mark_files(t, before, _tree_snapshot(t))
+        return {"exit_code": out.get("code"), "timed_out": out.get("timed_out"),
+                "stdout": out.get("stdout"), "stderr": out.get("stderr"), "truncated": out.get("truncated")}
+    if name == "update_plan":
+        steps = args.get("steps") if isinstance(args.get("steps"), list) else args.get("plan")
+        if not isinstance(steps, list):
+            return {"error": "steps 要是清單"}
+        plan = []
+        for x in steps[:30]:
+            if isinstance(x, str):
+                x = {"text": x}
+            if isinstance(x, dict) and str(x.get("text") or x.get("step") or "").strip():
+                st = x.get("status") if x.get("status") in ("pending", "in_progress", "done") else "pending"
+                plan.append({"text": str(x.get("text") or x.get("step")).strip()[:200], "status": st})
+        with t.lock:
+            t.plan = plan
+        return {"ok": True, "steps": len(plan)}
+    if name == "finish":
+        return {"ok": True}
+    return {"error": f"沒有 {name} 這個工具"}
+
+
+def agent_run(t):
+    """背景執行緒：一步＝呼叫模型一次。上限 40 步、30 分鐘。"""
+    convo = [{"role": "system", "content": agent_system_prompt(t.folder, t.model.get("os"))},
+             {"role": "user", "content": t.prompt}]
+    used_tools, bare = False, 0
+
+    def end(state, error=None):
+        with t.lock:
+            if t.stop:                       # 按過停止就維持「已停止」，背景晚回來的結果不改狀態
+                state, error = "stopped", None
+            t.state, t.error, t.pending = state, error, None
+            t.updated = time.time()
+        if error:
+            t.add("error", text=error)
+        STORE.audit(t.user, t.ip, "agent.task_end", f"{t.node}/{t.folder}", state == "done",
+                    {"task": t.id, "state": state, "steps": t.steps, "message": error})
+    try:
+        _tree_snapshot(t)
+        while True:
+            if t.stop:
+                return end("stopped")
+            if t.steps >= AGENT_MAX_STEPS:
+                return end("failed", f"已達 {AGENT_MAX_STEPS} 步上限，任務停止；可以看已完成的部分，再交代下一件事")
+            if time.time() > t.deadline:
+                return end("failed", "已超過 30 分鐘上限，任務停止")
+            t.steps += 1
+            code, out = agent_model_call(t, {"messages": convo, "tools": AGENT_TOOLS, "stream": False,
+                                             "max_tokens": 4096, "temperature": 0.2})
+            if t.stop:
+                return end("stopped")
+            if code != 200:
+                err = mask_secret((out or {}).get("error") or f"模型回 {code}")
+                if not used_tools and TOOLS_UNSUPPORTED_RX.search(err):
+                    return end("failed", "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。"
+                                         f"請換一個支援工具呼叫的模型。對方的訊息：{err[:200]}")
+                return end("failed", f"模型回 {code}：{err[:300]}")
+            msg = ((out.get("choices") or [{}])[0]).get("message") or {}
+            text = (msg.get("content") or "").strip()
+            calls = [c for c in (msg.get("tool_calls") or []) if isinstance(c, dict)][:3]
+            if text:
+                t.add("text", text=text[:8000])
+            if not calls:
+                if used_tools:
+                    with t.lock:
+                        t.summary = text or t.summary
+                    return end("done")
+                bare += 1
+                if bare >= 2:
+                    return end("failed", "模型一直沒有呼叫工具，可能不支援工具呼叫（tools）；請換一個支援的模型")
+                convo += [{"role": "assistant", "content": text},
+                          {"role": "user", "content": "請用提供的工具動手做（先 update_plan），全部做完呼叫 finish。"}]
+                continue
+            used_tools = True
+            for c in calls:
+                c.setdefault("id", "call_" + secrets.token_hex(4))
+                c.setdefault("type", "function")
+            convo.append({"role": "assistant", "content": text, "tool_calls": calls})
+            finished = False
+            for c in calls:
+                fn = c.get("function") or {}
+                name = str(fn.get("name") or "")
+                try:
+                    args = json.loads(fn.get("arguments") or "{}") if isinstance(fn.get("arguments"), str) else (fn.get("arguments") or {})
+                except ValueError:
+                    args = {}
+                args = args if isinstance(args, dict) else {}
+                shown = {k: (v if k != "content" else f"（{len(str(v))} 字）") for k, v in args.items()}
+                t.add("tool", tool=name, args=shown)
+                result = agent_tool(t, name, args)
+                if t.stop:
+                    return end("stopped")
+                if name == "finish":
+                    with t.lock:
+                        t.summary = str(args.get("summary") or text or "")[:8000]
+                    finished = True
+                if not (name == "run_command" and result.get("denied")):
+                    t.add("result", tool=name, ok="error" not in result,
+                          text=json.dumps(result, ensure_ascii=False)[:4000])
+                convo.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(result, ensure_ascii=False)[:12000]})
+            if finished:
+                return end("done")
+    except Exception as exc:  # noqa: BLE001
+        import traceback
+        print("Agent 任務出錯：\n" + traceback.format_exc(), flush=True)
+        return end("failed", f"任務出錯：{type(exc).__name__}")
+
+
+def agent_stop(t, audit):
+    """按停止：馬上標成已停止並放開「一次一個任務」的鎖，正在跑的指令砍掉。
+    ponytail: 進行中的模型請求不硬切，背景執行緒等它回來就收工、不再做下一步；要秒停得替 call_node 加可中斷的連線。"""
+    with t.lock:
+        was = t.state
+        t.stop = True
+        if was in ("running", "waiting_approval"):
+            t.state, t.pending, t.updated = "stopped", None, time.time()
+    t.event.set()
+    if was in ("running", "waiting_approval"):
+        threading.Thread(target=call_node, args=(t.node, "/agent/exec/cancel", "POST", {}), kwargs={"timeout": 20},
+                         daemon=True).start()
+    audit("agent.task_stop", t.id, True)
+    return {"ok": True, "state": t.state}
+
+
+def agent_start(user, ip, body):
+    """回 (狀態碼, 回應)。"""
+    node = str(body.get("node") or "")
+    folder = str(body.get("folder") or "")
+    prompt = str(body.get("prompt") or "").strip()
+    if not any(n["id"] == node for n in fleet()["nodes"]):
+        return 404, {"error": "沒有這台機器"}
+    if not 1 <= len(prompt) <= 8000:
+        return 400, {"error": "請寫要交代的事（最多 8000 字）"}
+    m = body.get("model")
+    if isinstance(m, str):                    # 也收字串：local:<欄位>、provider:<id>[:<模型>]
+        kind, _, rest = m.partition(":")
+        m = {"kind": kind, "slot": rest} if kind == "local" else {"kind": kind, "id": rest.split(":", 1)[0],
+                                                                    "model": rest.split(":", 1)[1] if ":" in rest else ""}
+    if not isinstance(m, dict) or m.get("kind") not in ("local", "provider"):
+        return 400, {"error": "模型要是本機欄位（kind=local, slot）或第三方 API（kind=provider, id）"}
+    if m["kind"] == "local":
+        slot = str(m.get("slot") or "")
+        mnode = str(m.get("node") or node)
+        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]):
+            return 400, {"error": "本機模型要指定欄位"}
+        model, label = {"kind": "local", "node": mnode, "slot": slot}, f"本機 {mnode}/{slot}"
+    else:
+        prov = STORE.provider_get(str(m.get("id") or ""))
+        if not prov:
+            return 404, {"error": "沒有這筆第三方 API"}
+        name = str(m.get("model") or prov.get("default_model") or "")
+        if not name or not PROVIDER_MODEL_RX.fullmatch(name):
+            return 400, {"error": "這筆第三方 API 沒有設預設模型，請指定模型"}
+        model, label = {"kind": "provider", "id": prov["id"], "model": name}, f"{prov['name']}／{name}"
+    code, out = call_node(node, "/agent/folders", timeout=30)
+    if code != 200:
+        return code, {"error": out.get("error"), "disabled": out.get("disabled")}
+    if folder not in [f["name"] for f in out.get("folders") or []]:
+        return 400, {"error": f"沒有「{folder}」這個工作資料夾，請先建立"}
+    model["os"] = out.get("os")
+    with _AGENT_LOCK:
+        busy = next((x for x in AGENT_TASKS.values() if x.state in ("running", "waiting_approval")), None)
+        if busy:
+            return 409, {"error": "已經有一個 Agent 任務在進行，請等它做完或按停止", "task": busy.id}
+        t = AgentTask(user, ip, node, folder, model, prompt, label)
+        AGENT_TASKS[t.id] = t
+        for k in sorted(AGENT_TASKS, key=lambda k: AGENT_TASKS[k].created)[:-AGENT_KEEP]:
+            if AGENT_TASKS[k].state not in ("running", "waiting_approval"):
+                AGENT_TASKS.pop(k)
+    threading.Thread(target=agent_run, args=(t,), daemon=True, name=f"agent-{t.id}").start()
+    return 200, t.public()
+
+
 # ---------------------------------------------------------------- HTTP
 
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -1209,6 +1887,86 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         return None
+
+    def _preview(self, pid):
+        """執行預覽：只回給建立者那一個登入；標頭把它關進 sandbox（不透明來源），只准被主控台自己的頁面嵌入。"""
+        html = preview_get(pid, self._cookie()) if self.user else None
+        if html is None:
+            return self._send(404, "找不到這個預覽，或已經過期（預覽保留 30 分鐘）。\n".encode(), "text/plain; charset=utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(html)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Frame-Options", "SAMEORIGIN")                 # 全站其他頁仍是 DENY
+        self.send_header("Content-Security-Policy", PREVIEW_CSP)
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), usb=(), payment=()")
+        # 主控台頁面帶 COEP require-corp：被嵌入的文件也要宣告 COEP。用 credentialless，CDN 的腳本不必有 CORP 標頭也載得進來
+        self.send_header("Cross-Origin-Embedder-Policy", "credentialless")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        if CERTS.hsts_header():
+            self.send_header("Strict-Transport-Security", "max-age=31536000")
+        self.end_headers()
+        self.wfile.write(html)
+        return None
+
+    def _provider_chat(self, pid, body):
+        """第三方 API 的對話：串流原樣轉給瀏覽器，格式跟本機對話（_chat）一樣（data: 一行一個 JSON、data: [DONE]）。"""
+        prov = STORE.provider_get(pid)
+        n_msg = len(body.get("messages") or []) if isinstance(body.get("messages"), list) else 0
+
+        def done(code, out=None, model=None):
+            self._audit("provider.chat", pid, code == 200, {"messages": n_msg, "status": code, "model": model,
+                                                            "message": (out or {}).get("error")})
+            return None if out is None else self._json(code, out)
+        if not prov:
+            return done(404, {"error": "沒有這筆第三方 API"})
+        req, err = provider_chat_request(prov, body)
+        if err:
+            return done(400, {"error": err})
+        try:
+            conn, resp, key = provider_open(prov, "POST", "/chat/completions", req, timeout=600)
+            if resp.status == 400 and req.get("stream_options"):
+                # 有的相容端點不認 stream_options：拿掉再送一次（只是少了用量統計）
+                peek = _provider_err(resp, key)
+                conn.close()
+                if "stream_options" in peek or "include_usage" in peek:
+                    req.pop("stream_options")
+                    conn, resp, key = provider_open(prov, "POST", "/chat/completions", req, timeout=600)
+                else:
+                    return done(400, {"error": peek}, req["model"])
+        except ProviderError as exc:
+            return done(exc.code, {"error": exc.msg}, req["model"])
+        try:
+            if resp.status >= 400:
+                return done(400 if resp.status < 500 else 502, {"error": _provider_err(resp, key)}, req["model"])
+            done(200, None, req["model"])
+            if "event-stream" not in (resp.getheader("Content-Type") or "") or not req["stream"]:
+                raw = resp.read(NODE_REPLY_MAX)
+                try:
+                    return self._json(200, json.loads(raw or b"{}"))
+                except ValueError:
+                    return self._json(502, {"error": "對方回的不是 JSON"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self._sec_headers()
+            self.end_headers()
+            self.close_connection = True
+            try:
+                while True:
+                    line = resp.readline(1 << 20)
+                    if not line:
+                        break
+                    self.wfile.write(line)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return None
+        finally:
+            conn.close()
 
     def _assist(self, body):
         """助理：模型要查資料就呼叫唯讀工具，最多來回 6 次。每一步（查了什麼）也回給畫面看。"""
@@ -1433,6 +2191,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(500, "主控台找不到代理程式檔，請重新部署主控台。\n".encode(), "text/plain; charset=utf-8")
             with open(src, "rb") as fh:
                 return self._send(200, fh.read(), "text/x-python; charset=utf-8")
+        m = re.fullmatch(r"/preview/([A-Za-z0-9_-]{16,40})", path)
+        if m:
+            return self._preview(m.group(1))
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
@@ -1482,7 +2243,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)
         if m:
-            return self._json(*call_node(m.group(1), "/library", timeout=90))
+            code, lib = call_node(m.group(1), "/library", timeout=90)
+            if code == 200:
+                # 每顆 GGUF 附等級、速度與分層（跟推薦清單同一條公式，畫面不自己算）
+                sc, st = call_node(m.group(1), "/state", timeout=30)
+                if sc == 200 and st.get("pools"):
+                    recommend.plan_installed(st, lib)
+            return self._json(code, lib)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/progress", path)
+        if m:
+            return self._json(*call_node(m.group(1), f"/slot/{m.group(2)}/progress", timeout=15))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/folders", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/agent/folders", timeout=30))
+        if path == "/api/agent/tasks":
+            with _AGENT_LOCK:
+                rows = sorted(AGENT_TASKS.values(), key=lambda x: -x.created)
+            return self._json(200, {"items": [t.public(full=False) for t in rows],
+                                    "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
+        m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})", path)
+        if m:
+            t = AGENT_TASKS.get(m.group(1))
+            return self._json(200, t.public()) if t else self._json(404, {"error": "沒有這個任務"})
+        if path == "/api/providers":
+            return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
+                                    "presets": PROVIDER_PRESETS})
         m = re.fullmatch(r"/api/node/([\w.-]+)/recommend", path)
         if m:
             code, st = call_node(m.group(1), "/state", timeout=30)
@@ -1685,10 +2470,78 @@ class Handler(BaseHTTPRequestHandler):
                 "slot.delete" if m.group(2).endswith("delete") else "slot.edit")
             self._audit(act, f"{m.group(1)}/{m.group(2)}", code == 200,
                         {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "bandwidth_gbs", "ram_bandwidth_gbs", "gguf_root",
-                                                  "llama_server", "sd_cli", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
+                                                  "llama_server", "sd_cli", "agent_enabled", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
             return self._json(code, out)
 
+        # ---- 執行預覽
+        if path == "/api/preview":
+            pid, err = preview_put(self._cookie(), self.user, body.get("html"))
+            self._audit("preview.create", pid or "", not err, {"bytes": len(str(body.get("html") or "").encode()),
+                                                                "message": err})
+            if err:
+                return self._json(400, {"error": err})
+            return self._json(200, {"url": f"/preview/{pid}", "id": pid, "expires_at": time.time() + PREVIEW_TTL})
+        # ---- 第三方 API
+        if path == "/api/providers/save":
+            code, out, det = provider_save(body)
+            self._audit("provider.save", (out.get("provider") or {}).get("id") or str(body.get("id") or ""), code == 200,
+                        det or {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/providers/([0-9a-f]{12})/(delete|models|chat)", path)
+        if m:
+            pid, act = m.groups()
+            if act == "chat":
+                return self._provider_chat(pid, body)
+            prov = STORE.provider_get(pid)
+            if not prov:
+                return self._json(404, {"error": "沒有這筆第三方 API"})
+            if act == "delete":
+                STORE.provider_delete(pid)
+                self._audit("provider.delete", pid, True, {"name": prov["name"], "base_url": prov["base_url"]})
+                return self._json(200, {"ok": True})
+            t0 = time.time()
+            code, out = provider_json(prov, "GET", "/models", timeout=30)
+            ids = [str(x.get("id")) for x in (out.get("data") or []) if isinstance(x, dict) and x.get("id")] if code == 200 else []
+            self._audit("provider.models", pid, code == 200, {"count": len(ids), "message": out.get("error")})
+            if code != 200:
+                return self._json(code, out)
+            return self._json(200, {"ok": True, "ms": int((time.time() - t0) * 1000),
+                                    "models": [{"id": i, "cn_origin": any(c in i.lower() for c in recommend.CN_ORIGIN)}
+                                               for i in sorted(ids)][:500]})
+        # ---- Agent：工作資料夾與任務
+        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/(folders/create|fs/list|fs/read)", path)
+        if m:
+            node_id, act = m.groups()
+            want = {k: body.get(k) for k in ("name", "folder", "path") if k in body}
+            code, out = call_node(node_id, f"/agent/{act}", "POST", want, timeout=60)
+            if act == "folders/create":
+                self._audit("agent.folder_create", f"{node_id}/{body.get('name')}", code == 200, {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/agent/tasks":
+            code, out = agent_start(self.user, self.ip, body)
+            self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
+                        {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
+                         "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})/(approve|stop)", path)
+        if m:
+            t = AGENT_TASKS.get(m.group(1))
+            if not t:
+                return self._json(404, {"error": "沒有這個任務"})
+            if m.group(2) == "stop":
+                return self._json(200, agent_stop(t, self._audit))
+            with t.lock:
+                waiting = t.state == "waiting_approval" and t.pending
+                cmd = (t.pending or {}).get("command", "")
+                if waiting:
+                    t.decision = {"allow": bool(body.get("allow")), "always": bool(body.get("allow") and body.get("always"))}
+            if not waiting:
+                return self._json(409, {"error": "這個任務現在沒有在等核准"})
+            t.event.set()
+            self._audit("agent.approve", t.id, True, {"allow": bool(body.get("allow")), "always": bool(body.get("always")),
+                                                      "cmd": mask_secret(cmd)[:300]})
+            return self._json(200, {"ok": True})
         # ---- 各機動作：轉給代理，並記稽核
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/(start|stop|restart)", path)
         if m:
@@ -1699,7 +2552,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/model", path)
         if m:
-            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "gpus", "force") if k in body}
+            want = {k: body.get(k) for k in ("pack", "native", "engine", "model", "ctx", "gpus", "force", "allow_disk",
+                                             "thinking", "lan") if k in body}
             # 載幾十 GB 的模型加上失敗時的還原，最久可能各要十幾分鐘
             code, out = call_node(m.group(1), f"/slot/{m.group(2)}/model", "POST", want, timeout=2000)
             self._audit("model.swap", f"{m.group(1)}/{m.group(2)}", code == 200,
@@ -1707,6 +2561,8 @@ class Handler(BaseHTTPRequestHandler):
                          "engine": body.get("engine") or "strata", "switched_engine": out.get("switched_engine"),
                          "gpus": out.get("gpus") if code == 200 else body.get("gpus"),
                          "force": bool(body.get("force")), "blocked": code == 409 and "admit" in out,
+                         "allow_disk": body.get("allow_disk") is True, "disk_mode": out.get("disk_mode"),
+                         "thinking": body.get("thinking"), "lan": body.get("lan"),
                          "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
         # ---- API 串接：網址、模型名稱、上下文、金鑰（改完重啟並驗證，失敗自動換回）
@@ -1741,8 +2597,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(*call_node(node_id, "/library/hf/tree", "POST",
                                              {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
             if act == "hf":
-                return self._json(*call_node(node_id, "/library/hf", "POST",
-                                             {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))
+                return self._json(*hf_with_plans(node_id, body))
             if act == "download":
                 want = {k: body.get(k) for k in ("repo", "stem", "mmproj", "token")}
                 code, out = call_node(node_id, "/library/download", "POST", want, timeout=90)

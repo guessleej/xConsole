@@ -98,6 +98,21 @@
 
 ## 四、怎麼用
 
+### 介面與動線（2026-11 照 LocModel 的使用者流程改版）
+
+頂部導覽照使用者的先後排，真本是 [`docs/WORKFLOW.md`](docs/WORKFLOW.md)：
+
+**概覽｜模型｜執行｜對話｜Agent｜畫圖｜影片｜設定**
+
+- **目前這台機器**：頂列右側切換，概覽、模型、執行、Agent、畫圖、影片都只看這一台；只有一台時只顯示名稱。多台時「概覽」第二列可切到「全部機器」。
+- **概覽**：這台的三步（檢測硬體 → 安裝推理引擎 → 下載並啟動一個模型）、執行中狀態列（API 網址可複製、去對話、停止）、「流暢執行 NB 以內」與前三名推薦。
+- **模型**：推薦模型｜已安裝｜畫圖與影片模型｜搜尋 Hugging Face｜存放區，右上「匯入本機 GGUF」。每顆都標等級（流暢、勉強、要用硬碟、跑不動；頻寬沒填時標「放得下」）、預估 tok/s 與三色分層條（深色＝放顯示卡、淺色＝放系統記憶體、灰色＝放硬碟）。
+- **執行**：選一顆已安裝的模型 → 自動分層規劃 → 上下文（自動／8K～128K）、思考模式、區網存取 → 預估速度與第一次載入時間 → 「啟動模型」→ 載入進度（準備、讀取模型、分配快取、預熱、完成）→ 執行中狀態列。**使用者不必先懂欄位**：這台還沒有語言模型欄位時，按啟動會自動建一格「主模型」。第二列另有「角色欄位」（一台跑好幾個模型時用）與「API 串接」。
+- **對話**：本機模型、第三方 API、主控台助理三種來源；程式碼區塊可複製、下載，HTML 可「執行預覽」（沙盒網址，拿不到登入）。對話紀錄只存在這個瀏覽器分頁。
+- **Agent**：選工作資料夾、交代一件事；每條指令要人按允許。每台預設關閉，在「設定 › 機器 › 這台的設定」打開。
+- **畫圖、影片**：各一頁，表單只列那一類的模型；模型或引擎沒準備好時帶到「模型 › 畫圖與影片模型」。
+- **設定**：機器｜推理引擎｜第三方 API｜HTTPS 與憑證｜使用報告｜記錄｜帳號與安全｜品牌與外觀。
+
 ### 安裝：Ubuntu、macOS、Windows 都可以
 
 客戶拿到的安裝包（這個 repo 的壓縮檔）解開後，在那台機器上執行一行，主控台＋節點代理就裝成開機自啟：
@@ -137,16 +152,16 @@ bash deploy_standalone.sh 20      # 代理＋主控台都裝在 .20，它只管�
 
 ### 加一台機器、設定機器與欄位（全部在網頁上）
 
-管理者不用 SSH、不用改 JSON。設定 → 機器（或機器頁第二列最後）按「加一台機器」：
+管理者不用 SSH、不用改 JSON。設定 → 機器按「加一台機器」：
 
 | 步驟 | 在哪裡 | 做什麼 |
 |---|---|---|
 | 1. 產生安裝指令 | 設定 → 機器 →「加一台機器」 | 填名稱、群組、主控台位址（那台連得到的 IP:埠），按「產生安裝指令」。加入碼 30 分鐘、只能用一次 |
 | 2. 在那台貼上執行 | 那台機器的終端機（一般帳號，不要 root） | `curl --pinnedpubkey … \| bash`：釘住主控台憑證的公鑰下載代理、建使用者服務並開機自啟、開 linger、把代理的權杖與憑證送回主控台 |
 | 3. 自動出現 | 同一個視窗 | 主控台用那張憑證與權杖實際連一次，成功才納管；連不到（多半是防火牆擋 9401）會把原因顯示在視窗裡 |
-| 4. 這台的設定 | 機器頁右上「這台的設定」 | 記憶體架構（附偵測建議）、兩種底線、存放區（列出各顆碟、標出機械硬碟）、llama-server、備註；名稱、群組、位址也在這裡改 |
-| 5. 新增欄位 | 機器頁「角色欄位」右上 | 空欄位（之後從模型庫放入 GGUF），或登記這台已經在跑的 systemd 使用者服務 |
-| 6. 放入模型 | 模型庫 | 下載或手動放入，再「換上」 |
+| 4. 這台的設定 | 設定 › 機器，或執行 › 角色欄位右上「這台的設定」 | 記憶體架構（附偵測建議）、兩種底線、存放區（列出各顆碟、標出機械硬碟）、llama-server、Agent 開關、備註；名稱、群組、位址也在這裡改 |
+| 5. 新增欄位（選用） | 執行 › 角色欄位右上 | 一台跑好幾個模型時才需要：空欄位，或登記這台已經在跑的 systemd 使用者服務。只跑一顆的話，在執行頁按「啟動模型」會自動建一格 |
+| 6. 放入模型 | 模型 → 執行 | 下載或匯入，再到執行頁選好按「啟動模型」 |
 
 新機器的機器頁上方會有這幾步的順序軸，全部完成就收起來。移除機器只是不再納管，不動那台機器上的東西。
 代理重裝或換 IP 時，產碼時選「這是哪一台重新安裝」才會更新原本那筆；沒選一律新增，不會自動覆寫（防搶機器）。
@@ -170,13 +185,13 @@ xConsole 管兩種引擎：**Strata 只跑 Qwen3.8-Flash-Next 這一家**（原�
 | 步驟 | 做法 |
 |---|---|
 | 1. 放哪裡 | GGUF 一律放存放區 `~/models/gguf/<資料夾>/<模型>.gguf`（「這台的設定」可以改到別顆碟）。一顆模型一個資料夾；分片放同一個資料夾；看圖模型把 `mmproj*.gguf` 放同資料夾。同一個資料夾放多個量化，各自算一顆 |
-| 2. 怎麼放進來 | 頂部導覽的「模型庫」（可看全部機器或分台）→ 選「下載到哪台」→ 貼 Hugging Face 名稱（例 `unsloth/gemma-4-E4B-it-GGUF`）→ 選量化 → 下載。代理在背景下載、可取消、中斷了再按一次會接續；下載前先檢查磁碟。也可以照頁面上「手動放入」的目錄結構與指令，自己把檔案複製進存放區，重新整理就會掃到 |
-| 3. 怎麼選 | 模型庫清單上按「換上」（那台只有一格可換就直接打開、選好那顆），或欄位卡按「換模型」（空欄位按「放入」）。清單同時列 Strata 與 GGUF；GGUF 的記憶體需求直接讀檔頭算（權重＋上下文的 KV，KV 照每層 KV 頭數算，滑動視窗層只算視窗內），放不下的標出來，套用前還會再做一次准入試算 |
+| 2. 怎麼放進來 | 頂部導覽的「模型」（頂列右側選好機器）→「搜尋 Hugging Face」→ 用關鍵字找或貼名稱（例 `unsloth/gemma-4-E4B-it-GGUF`）→ 選量化 → 下載。代理在背景下載、可取消、中斷了再按一次會接續；下載前先檢查磁碟。已經有檔案就按右上「匯入本機 GGUF」，或照「手動放入」的目錄結構與指令，自己把檔案複製進存放區，重新整理就會掃到 |
+| 3. 怎麼選 | 模型清單上按「執行」帶到執行頁、選好那顆按「啟動模型」；一台有好幾格時，在執行頁上方選放哪一格，或到「角色欄位」用欄位卡的「換模型」。清單同時列 Strata 與 GGUF；GGUF 的記憶體需求直接讀檔頭算（權重＋上下文的 KV，KV 照每層 KV 頭數算，滑動視窗層只算視窗內），放不下的標出來，套用前還會再做一次准入試算 |
 | 4. 怎麼切 | 同一個欄位、同一個埠。跨引擎時舊引擎停掉並取消開機自啟、新引擎接手同一個埠並設成開機自啟，IDE 的網址不用改；金鑰、輸出上限、自己取的模型名稱跟著欄位走。用新設定實際打 `/v1/models`，打不通就整組換回原本的引擎與模型 |
 
 換完會自動帶到「API 串接」頁，提示 IDE 要改成哪個模型名稱，按「實測一次」確認。
 
-模型庫會把中國來源的模型（Qwen、DeepSeek、GLM、Kimi…）標成「政府案不可用」：內部測試可以用，交付政府案的機器不能裝。
+模型頁會把中國來源的模型（Qwen、DeepSeek、GLM、Kimi…）標成「政府案不可用」：內部測試可以用，交付政府案的機器不能裝。
 
 **llama.cpp 欄位怎麼跑起來：** 代理為欄位寫一份 `~/.xconsole/engines/<欄位>-llama.json`（0600）與 systemd 服務
 `xc-<欄位>-llama.service`，服務的進入點是 `xconsole_agent.py --launch-llama <設定檔>`，讀設定後 exec 成 llama-server。
@@ -193,13 +208,13 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 
 ### 推薦模型（依這台的記憶體與頻寬，先算好再下載）
 
-參考 LocModel 的做法：先讀懂這台，再告訴管理者「哪些模型能跑、放在哪、多快、該下載哪個量化」，點一下下載，再換上欄位。
+參考 LocModel 的做法：先讀懂這台，再告訴管理者「哪些模型能跑、放在哪、多快、該下載哪個量化」，點一下下載，再到執行頁啟動。
 
 | 在哪 | 看到什麼 |
 |---|---|
-| 總覽 | 從零到跑起來的三步：檢測硬體（含確認記憶體架構）→ 安裝推理引擎（一鍵編譯 llama.cpp，進度直接顯示在這一步）→ 下載一個模型；全部完成就收起來。只有一台時，總覽直接顯示這台的硬體卡與前三名推薦 |
-| 模型庫 › 推薦模型 | 硬體卡（「流暢執行 XB 以內的模型」＋分層長條＋晶片、處理器、記憶體、頻寬、存放區）與完整推薦清單；可依用途篩選，預設藏起放不下的。每列可換量化，等級、放在哪、速度跟著變 |
-| 模型庫 › 推薦模型 › 管理推薦清單 | 增改刪、調順序、從 Hugging Face 重新讀取。中國來源的模型不能加入 |
+| 概覽 | 從零到跑起來的三步：檢測硬體（含確認記憶體架構）→ 安裝推理引擎（一鍵編譯 llama.cpp，進度直接顯示在這一步）→ 下載並啟動一個模型；全部完成就收起來。下面是這台的硬體卡與前三名推薦 |
+| 模型 › 推薦模型 | 硬體卡（「流暢執行 XB 以內的模型」＋分層長條＋晶片、處理器、記憶體、頻寬、存放區）與完整推薦清單；可依用途篩選，預設藏起放不下的。每列可換量化，等級、放在哪、速度跟著變 |
+| 模型 › 推薦模型 › 管理推薦清單 | 增改刪、調順序、從 Hugging Face 重新讀取。中國來源的模型不能加入 |
 | 這台的設定 | 記憶體頻寬、系統記憶體頻寬（推薦估速度用；空白＝規格書標稱值） |
 
 **數字怎麼來（全部在 `console/recommend.py`，畫面不自己算）：**
@@ -220,8 +235,8 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 
 ### 畫圖與影片（stable-diffusion.cpp）
 
-參考 LocModel 的「畫圖／影片模型」分頁，做在**模型庫 › 畫圖與影片**（不另開頂層導覽：頂層六格已滿，
-而且動線就是「準備模型 → 用模型」，跟文字模型的推薦放在同一區最順）。分頁上方有自己的三步順序軸：
+參考 LocModel：下載與管理放在**模型 › 畫圖與影片模型**，產生放在頂層的**畫圖**與**影片**兩頁（表單只列那一類的模型）。
+分頁上方有自己的三步順序軸：
 
 | 步驟 | 在哪 | 做什麼 |
 |---|---|---|
@@ -256,11 +271,42 @@ LTX-2.3 蒸餾 Q2_K 512×320、17 格、八步 48 秒（webm，含聲音），�
 
 | 功能 | 在哪 | 做法 |
 |---|---|---|
-| 網頁對話 | 對話與 API › 對話 | 選一個正在跑的模型直接聊，一個字一個字串流出來；看圖模型可以附圖。主控台經代理轉給模型服務，**金鑰留在代理那邊不給瀏覽器**。速度顯示 llama-server 自己量的 `predicted_per_second`（實測）。對話只留在這個分頁，不存伺服器、不寫稽核（稽核只記用了哪個欄位、幾則訊息） |
-| 助理 | 對話與 API › 助理 | 模型用四個**唯讀**工具查這個主控台管的機器（列機器、這台狀態、推薦模型、已下載的模型），只能查不能動作。最多來回 6 次；同一個工具同樣參數查第二次直接回「已經查過」；最後一輪不給工具逼它作答；小模型產出不合工具格式（llama.cpp 回 500）時改成不帶工具重答 |
-| 執行設定 | 欄位卡的「執行設定」 | 上下文 8K／16K／32K／64K／128K 一鍵切換，每個選項先用准入公式試算（`admit(cfg_override=…)`），放不下的反灰並說明原因；思考模式（新版 llama.cpp 用 `--reasoning on/off`，舊版關掉用 `--reasoning-budget 0`，看 `--help` 決定）；區網存取（`--host 0.0.0.0` 或 `127.0.0.1`）。顯示預估速度（跟推薦同一條公式）與載入時間——實際載入過就顯示實測秒數，沒有才依磁碟速度估 |
-| 匯入 GGUF | 模型庫 › 下載或匯入 | 瀏覽器分塊送（每塊 32 MB）、可以續傳（代理回報已收到多少）；最後一塊到齊才核對 GGUF 檔頭、改成正式檔名。上傳的本文不是 JSON，另外擋跨站：要登入、要 `application/octet-stream`、要自訂標頭 `X-XConsole-Upload` |
-| 搜尋 Hugging Face | 模型庫 › 下載或匯入 | 關鍵字找 GGUF（照下載數排），點一下帶進名稱並列出量化；中國來源標出來 |
+| 網頁對話 | 對話 | 選一個正在跑的本機模型或第三方 API 直接聊，一個字一個字串流出來；看圖模型可以附圖。主控台經代理轉給模型服務，**金鑰留在代理那邊不給瀏覽器**。速度顯示 llama-server 自己量的 `predicted_per_second`（實測）。對話只留在這個分頁，不存伺服器、不寫稽核（稽核只記用了哪個欄位、幾則訊息） |
+| 助理 | 對話 › 模型選單的「主控台助理」 | 模型用四個**唯讀**工具查這個主控台管的機器（列機器、這台狀態、推薦模型、已下載的模型），只能查不能動作。最多來回 6 次；同一個工具同樣參數查第二次直接回「已經查過」；最後一輪不給工具逼它作答；小模型產出不合工具格式（llama.cpp 回 500）時改成不帶工具重答 |
+| 執行設定 | 執行頁（也可從欄位卡的「執行設定」） | 上下文 8K／16K／32K／64K／128K 一鍵切換，每個選項先用准入公式試算（`admit(cfg_override=…)`），放不下的反灰並說明原因；思考模式（新版 llama.cpp 用 `--reasoning on/off`，舊版關掉用 `--reasoning-budget 0`，看 `--help` 決定）；區網存取（`--host 0.0.0.0` 或 `127.0.0.1`）。顯示預估速度（跟推薦同一條公式）與載入時間——實際載入過就顯示實測秒數，沒有才依磁碟速度估 |
+| 匯入 GGUF | 模型 › 右上「匯入本機 GGUF」 | 瀏覽器分塊送（每塊 32 MB）、可以續傳（代理回報已收到多少）；最後一塊到齊才核對 GGUF 檔頭、改成正式檔名。上傳的本文不是 JSON，另外擋跨站：要登入、要 `application/octet-stream`、要自訂標頭 `X-XConsole-Upload` |
+| 搜尋 Hugging Face | 模型 › 搜尋 Hugging Face | 關鍵字找 GGUF（照下載數排），點一下帶進名稱並列出量化；每個量化標這台跑不跑得動、預估 tok/s 與三色分層條，並標「建議」；中國來源標出來 |
+
+### Agent、第三方 API、執行預覽、用硬碟執行、載入進度（API）
+
+前後端的合約真本在 `docs/WORKFLOW.md` 第四、五節；下面是實際的路由與回應。全部要登入，寫入動作都記稽核。
+
+| 路由 | 回應／說明 |
+|---|---|
+| `POST /api/node/{n}/library/hf` `{repo, token?, match?}` | 代理讀遠端 GGUF 檔頭（`hf_profile`）取結構；每個 `choices[i]` 多 `plan: {level, tok_s, place, need_gib, split:{gpu,ram,disk}, guess, cpu_moe, kv_gib, ctx, bits, load_est_sec}`，整體多 `pick`、`guess`、`capacity`、`mmproj_pick`。讀不到檔頭退回只有檔案清單，用稠密假設估、`guess: true`、另附 `profile_error`。同一個 repo 10 分鐘內不重抓檔頭 |
+| `GET /api/node/{n}/library` | 每顆 `gguf[i]` 多 `plan`（同上格式，另加 `load_sec`＝代理記的實測載入秒數，沒有是 `null`）；整體多 `capacity` |
+| `GET /api/node/{n}/slot/{s}/progress` | `{state: idle\|loading\|ready\|failed, stage: prepare\|read\|alloc\|warmup\|done, pct, read_gib, total_gib, elapsed_sec, eta_sec, message}`；換模型的請求進行中每秒問一次。載入結束後結果保留 10 分鐘 |
+| `POST /api/node/{n}/slot/{s}/model` | 原本的參數之外多收 `allow_disk`（只有 `true` 才算）、`thinking`（auto／on／off）、`lan`（true／false），同一次啟動就套用；回應多 `disk_mode`、`ngl`、`split`、`thinking`、`lan`。AI 395 這類 BIOS 切兩塊的機器帶 `allow_disk` 一律 400（`disk_denied: true`） |
+| `GET /api/node/{n}/apiinfo/{s}` | `run` 多 `split`、`mode`（normal／cpu_moe／disk）、`disk_mode`（現在是不是用硬碟跑）、`disk_allowed`、`disk_needed`、`disk_note` |
+| `POST /api/preview` `{html}` → `{url, id, expires_at}` | `GET /preview/<id>` 回原文，標頭 `Content-Security-Policy: sandbox allow-scripts allow-forms allow-modals allow-popups; …`、`X-Frame-Options: SAMEORIGIN`、`Cross-Origin-Embedder-Policy: credentialless`。只有建立者那一個登入看得到，30 分鐘、單筆 2 MB、最多 50 筆 |
+| `GET /api/providers` | `{items: [{id, name, base_url, default_model, key_set, ca_set, cn_origin, created, updated}], presets: [{key, name, base_url, default_model, note}]}`，永不回金鑰 |
+| `POST /api/providers/save` | `{id?, name, base_url, api_key?, default_model?, ca_pem?, clear_key?, clear_ca?}`；編輯時 `api_key` 空白＝保留、沒帶 `default_model`＝保留 → `{ok, provider}` |
+| `POST /api/providers/{id}/delete`、`/models`、`/chat` | `/models` → `{ok, ms, models: [{id, cn_origin}]}`；`/chat` 參數與串流格式同本機對話（`data: …` 逐行原樣轉送、`data: [DONE]`），不串流回 JSON |
+| `GET /api/node/{n}/agent/folders` | `{enabled, root, os, folders: [{name, files, updated}]}`；這台沒開 Agent 模式回 403 `{disabled: true}` |
+| `POST /api/node/{n}/agent/folders/create` `{name}`、`/agent/fs/list` `{folder, path?}`、`/agent/fs/read` `{folder, path}` | 建資料夾、列檔（`files: [{path, dir, size, mtime, link}]`）、讀檔（唯讀，給右側面板）；寫檔與執行指令只能經任務 |
+| `POST /api/agent/tasks` `{node, folder, model, prompt}` | `model` 是 `{kind: "local", slot, node?}` 或 `{kind: "provider", id, model?}`（也收字串 `local:<欄位>`、`provider:<id>[:<模型>]`）；同時只能一個進行中（409） |
+| `GET /api/agent/tasks`、`GET /api/agent/tasks/{id}` | 清單不含 log；單筆 `{id, state, plan, files:[{path, action: created\|modified}], log:[{type: text\|tool\|result\|error, ts, …}], pending:{id, command, timeout}, tree, steps, max_steps, summary, error, always}` |
+| `POST /api/agent/tasks/{id}/approve` `{allow, always}`、`/stop` | 沒有在等核准時 409 |
+| 這台的設定 `POST /api/node/{n}/machine` | 多收 `agent_enabled`（布林；沒帶就不動），`GET` 的 `settings.agent_enabled` 與 `agent: {enabled, root}` |
+
+等級多一級 `disk`（要用硬碟）：放不進快速層、但 KV、計算緩衝與放 GPU 的層放得下，而且不是 BIOS 切兩塊的機器。
+速度照 `recommend.DISK_GBS`（硬碟讀取頻寬，MoE 只算被選中的專家）估，`split.disk` 是溢出到硬碟的量。建議下載（`pick`）不會挑 disk 的量化。
+代理端換模型時先照一般放法試算，放不下且帶了 `allow_disk` 才改用檔案映射：不加 `--no-mmap`，獨立顯卡 `-ngl` 照放得下的層數，
+Apple 用 999，DGX Spark／Jetson 這類非 Apple 的統一記憶體一律 0（CUDA 會把卸載的層複製成不可換頁的記憶體）；准入只算不是檔案映射的部分，底線照守。
+
+Agent 的工作資料夾固定在每台的 `~/xconsole-agent/`，路徑 realpath 後檢查（符號連結指出去也擋），讀 1 MB、寫 2 MB；
+指令逾時預設 120 秒、上限 600 秒，輸出各截 32 KB，環境變數拿掉代理權杖與 `*_KEY`／`*_TOKEN`／`*_SECRET`；
+每個任務最多 40 步、30 分鐘；`run_command` 一定先等人核准，每條實際執行的指令寫稽核（前 300 字、結束碼）。
 
 ### 加一個情境
 
@@ -340,16 +386,22 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | 測試 | 在哪跑 | 項數 | 測什麼 |
 |---|---|---|---|
 | `agent/test_admit.py` | 任何機器 | 15 | 三種記憶體架構的准入公式、KV 兩種量級、底線邊界 |
-| `console/test_ui_guard.py` | 任何機器 | 5 | 彈窗不准點背景關閉、Enter 擋輸入法 |
+| `console/test_ui_guard.py` | 任何機器 | 14 | 掃所有前端 JS：彈窗不准點背景關閉、Enter 擋輸入法、自動更新不整頁重建、頂層導覽照動線排（概覽第一、模型→執行→對話、設定最後、最多八格）、樣式表大括號成對 |
 | `agent/test_platform.py` | Linux／macOS／Windows | 32 | 硬體讀數、代理自己看管模型服務（帶起來、掛了重開、停掉、代理重開後認回、起不來停在失敗） |
 | `test/e2e_install.py` | 裝好的機器 | 16 | 經網頁 API 走完：登入 → 確認架構 → 推薦 → 裝推理引擎 → 下載模型 → 換上 → 問一句話 → 停掉 |
 | `console/test_sd.py` | 任何機器 | 66 | 畫圖與影片：挑檔與量化、元件跟著主體、三種記憶體架構的准入與 `--max-vram`、中國來源（含文字編碼器與 VAE）、`sd-cli` 參數、進度解析、共用檔刪除、看門狗中止、啟動失敗不卡住、macOS／Windows 預編譯版挑檔 |
 | `agent/test_platform.py` 裡的匯入、搜尋、思考模式 | 三個系統 | 12 | 分塊、續傳位置、同名不覆蓋、不是 GGUF 刪掉、路徑穿越；搜尋字元；新舊版思考模式旗標 |
-| `console/test_recommend.py` | 任何機器 | 44 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源擋下、推薦清單增改刪 |
+| `console/test_recommend.py` | 任何機器 | 77 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源擋下、推薦清單增改刪 |
 | `console/test_branding.py` | 任何 Linux | 49 | 客戶品牌：名稱驗證、Logo 只認 PNG／JPEG／WebP 檔頭（SVG、偽裝檔、超大檔被擋）、未登入、權限 0600、稽核不記圖檔、頁尾寫死 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
 | `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
+| `agent/test_agent_mode.py` | Linux／macOS／Windows | 54 | Agent 模式代理端：預設關閉、路徑跳脫（含符號連結）、讀寫上限、工作目錄、逾時、輸出截斷、環境變數拿掉權杖與金鑰、HTTP 路由 |
+| `agent/test_load_disk.py` | 任何機器（實際換模型那段不跑 Windows） | 37 | 載入進度的階段與百分比、用硬碟執行的分層與 `-ngl`、准入的 KV 分池、假 llama-server 實際換模型（mmap、思考模式與區網同次套用與沿用、進行中問得到進度） |
+| `console/test_providers.py` | 任何機器 | 40 | 第三方 API：金鑰加密落地（資料庫檔找不到明文）、GET 不回金鑰、編輯空白保留、cn_origin、http 只限私有位址、不跟轉址、錯誤遮罩、串流跟本機對話逐位元組相同 |
+| `console/test_preview.py` | 任何機器 | 21 | 執行預覽：sandbox 標頭、別人的登入拿不到、過期、2 MB、50 筆、其他頁仍是 DENY |
+| `console/test_agent_tasks.py` | 任何機器 | 31 | Agent 對話迴圈（假的 OpenAI 相容服務）：等待核准、拒絕、always、步數上限、不支援 tools、單一任務、停止、本機欄位當模型、稽核 |
+| `console/test_e2e_features.py` | 任何機器（要 cryptography） | 18 | 另起隔離的代理與主控台走 HTTPS：HF 等級（假 Hugging Face）、已安裝等級、進度、預覽、第三方 API、打開 Agent 模式、任務核准到完成 |
 | `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
 | `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |
 | `test/test_llama_engine.py` | 有 systemd --user | 36 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |
@@ -428,3 +480,6 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | Windows 上 `print()` 什麼都沒留下 | 用 pythonw 在背景跑時 `sys.stdout` 是 None；代理與主控台啟動時改寫進 `.xconsole/agent.log`／`console.log` |
 | 瀏覽器上傳被擋時看到的是「連線重置」不是錯誤訊息 | 擋下時沒把本文讀完就關連線，對方送到一半收到 RST。小的本文（64 KB 內）照樣讀掉再回錯誤，大的才直接關 |
 | 助理一直重複呼叫同一個工具、不肯作答 | 3B 這種小模型會這樣。重複的呼叫直接回「已經查過」，最後一輪不給工具；llama.cpp 帶工具時遇到不合格式的輸出會整個 500，改成不帶工具重答 |
+| `test_e2e_tls.py` 在 Python 3.13 以上一開始就 `CERTIFICATE_VERIFY_FAILED` | 3.13 起預設 `VERIFY_X509_STRICT`：測試自己簽的憑證要有 AKI／SKI，根 CA 要有 keyUsage。只改測試的憑證產生參數，主控台的驗證不放寬 |
+| 稽核裡「金鑰換新／保留」整欄變成「[已遮罩]」 | `redact()` 看鍵名，含 `key` 的一律遮掉。稽核欄位不要用 `key_change` 這種名字（改叫 `credential`） |
+| 換模型後思考模式、只給本機連的設定不見了 | 以前換 GGUF 都重寫一份新設定（`host` 固定 0.0.0.0、沒有 `reasoning`）。現在沒帶就沿用欄位原本的設定 |
