@@ -1981,16 +1981,24 @@ function sdGen(n, rec, redraw, toRec, kind) {
   fInit.type = "file";
   fInit.accept = "image/png,image/jpeg,image/webp";
   fInit.hidden = true;
-  const initState = { data: null };
+  // 縮圖用 Blob 網址顯示（不把讀進來的字串直接塞進 src）；送給代理時才組成 data URL，代理會再看檔頭
+  const INIT_TYPES = ["image/png", "image/jpeg", "image/webp"];
+  const initState = { b64: null, mime: null, url: null };
   const initPick = el("button", "btn sm", "選一張圖");
   const initClear = el("button", "btn sm", "拿掉");
   const initThumb = el("img", "sd-init-thumb");
   initThumb.alt = "參考圖";
-  const setInit = (dataUrl) => {
-    initState.data = dataUrl;
-    initThumb.hidden = initClear.hidden = !dataUrl;
-    if (dataUrl) initThumb.src = dataUrl; else initThumb.removeAttribute("src");
-    strengthBox.hidden = !dataUrl || model()?.kind !== "image";
+  const setInit = (b64, mime) => {
+    const okType = !!b64 && INIT_TYPES.includes(mime);
+    if (initState.url && initState.b64 !== b64) { URL.revokeObjectURL(initState.url); initState.url = null; }
+    initState.b64 = okType ? b64 : null;
+    initState.mime = okType ? mime : null;
+    if (okType && !initState.url) {
+      initState.url = URL.createObjectURL(new Blob([Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))], { type: mime }));
+    }
+    initThumb.hidden = initClear.hidden = !okType;
+    if (okType) initThumb.src = initState.url; else initThumb.removeAttribute("src");
+    strengthBox.hidden = !okType || model()?.kind !== "image";
   };
   initPick.onclick = () => fInit.click();
   initClear.onclick = () => setInit(null);
@@ -1999,7 +2007,8 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fInit.value = "";
     if (!f) return;
     if (f.size > 4 * 1024 * 1024) { toast("參考圖最大 4 MB", "bad"); return; }
-    setInit(`data:${f.type};base64,` + await readB64(f));
+    if (!INIT_TYPES.includes(f.type)) { toast("參考圖只收 PNG、JPEG、WebP", "bad"); return; }
+    setInit(await readB64(f), f.type);
   };
   const initRow = el("div", "sd-init");
   initRow.append(fInit, initThumb, initPick, initClear);
@@ -2041,7 +2050,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     initBox.querySelector("label.field").textContent = m.kind === "video" ? "第一格畫面（選填）" : "參考圖（選填）";
     const hint = initBox.querySelector(".assume");
     if (hint) hint.textContent = m.kind === "video" ? "從這張圖開始，照提示詞接著往下演" : "在這張圖上面照提示詞重畫";
-    setInit(initState.data);
+    setInit(initState.b64, initState.mime);
     go.textContent = m.kind === "video" ? "產生影片" : "產生圖片";
   };
   const params = () => {
@@ -2050,7 +2059,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     return { model: m.id, prompt: fPrompt.value.trim(), negative: fNeg.value.trim(), width: w, height: h,
       steps: Number(fSteps.value), cfg: Number(fCfg.value), seed: Number(fSeed.value), sampler: fSampler.value,
       ...(m.kind === "video" ? { frames: Number(fFrames.value), fps: Number(fFps.value) } : { count: Number(fCount.value) }),
-      ...(initState.data ? { init_image: initState.data, ...(m.kind === "image" ? { strength: Number(fStrength.value) } : {}) } : {}) };
+      ...(initState.b64 ? { init_image: `data:${initState.mime};base64,${initState.b64}`, ...(m.kind === "image" ? { strength: Number(fStrength.value) } : {}) } : {}) };
   };
   // 試算：換模型、尺寸、影格數時問代理一次（產的時候還會再算一次，這裡只是先讓人知道夠不夠）
   let admitSeq = 0;
@@ -2103,7 +2112,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fCount.value = String(j.count || 1);
     if (j.strength) fStrength.value = j.strength;
     setInit(null);
-    if (j.init) api(`/api/node/${n.id}/sd/jobs/${j.id}/init`).then((r) => setInit(`data:${r.mime};base64,${r.b64}`)).catch(() => {});
+    if (j.init) api(`/api/node/${n.id}/sd/jobs/${j.id}/init`).then((r) => setInit(r.b64, r.mime)).catch(() => {});
     checkAdmit();
   } };
 

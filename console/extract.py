@@ -165,7 +165,8 @@ def main():
         out = {"error": str(ex)}
     except Exception as ex:  # noqa: BLE001
         out = {"error": f"讀不出這個檔案（{type(ex).__name__}），檔案可能損毀"}
-    sys.stdout.write(json.dumps(out, ensure_ascii=False))
+    # 直接寫 UTF-8 位元組：Windows 的標準輸出預設是 cp1252，寫中文會丟 UnicodeEncodeError
+    sys.stdout.buffer.write(json.dumps(out, ensure_ascii=False).encode("utf-8"))
 
 
 if __name__ == "__main__":
