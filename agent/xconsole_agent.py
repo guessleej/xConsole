@@ -3494,6 +3494,13 @@ def upload_cancel(folder, name):
 CHAT_ROLES = ("system", "user", "assistant", "tool")
 
 
+CHAT_SAMPLING = {
+    "temperature": (float, 0, 2), "top_p": (float, 0, 1), "top_k": (int, 0, 1000), "min_p": (float, 0, 1),
+    "repeat_penalty": (float, 0.5, 2), "presence_penalty": (float, -2, 2), "max_tokens": (int, 1, 131072),
+    "seed": (int, -1, 2 ** 31 - 1),
+}
+
+
 def chat_request(slot_id, body):
     """檢查並組好要送給模型的請求。回 (錯誤碼, 錯誤訊息) 或 (埠, 金鑰, 請求本文)。"""
     slot = _slot(slot_id)
@@ -3511,15 +3518,23 @@ def chat_request(slot_id, body):
     req = {"messages": msgs, "stream": bool(body.get("stream", True))}
     if body.get("stream", True):
         req["stream_options"] = {"include_usage": True}
-    for k, lo, hi in (("max_tokens", 1, 131072), ("temperature", 0, 2)):
-        if body.get(k) is not None:
-            try:
-                v = float(body[k])
-            except (TypeError, ValueError):
-                return 400, f"{k} 要是數字"
-            if not lo <= v <= hi:
-                return 400, f"{k} 要在 {lo}～{hi} 之間"
-            req[k] = int(v) if k == "max_tokens" else v
+    # 取樣參數：llama.cpp 的 OpenAI 相容端點都認得（Top K、Min P、重複懲罰是它的擴充）；種子 -1＝隨機，不送
+    for k, (typ, lo, hi) in CHAT_SAMPLING.items():
+        if body.get(k) is None or body.get(k) == "":
+            continue
+        try:
+            if isinstance(body[k], bool):
+                raise ValueError
+            v = float(body[k])
+            if typ is int and v != int(v):
+                raise ValueError
+        except (TypeError, ValueError, OverflowError):
+            return 400, f"{k} 要是{'整數' if typ is int else '數字'}"
+        if not lo <= v <= hi:
+            return 400, f"{k} 要在 {lo}～{hi} 之間"
+        if k == "seed" and v == -1:
+            continue
+        req[k] = int(v) if typ is int else v
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
     name = (raw or {}).get("model_name")
@@ -4306,9 +4321,32 @@ def prebuilt_variant(kind="llama"):
 
 
 def _gh_json(path):
-    req = urllib.request.Request(GH_API + path, headers={"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.load(resp)
+    """問 GitHub API。不帶權杖一小時只能問 60 次（以對外 IP 計，公司共用一個出口時很快用完）；
+    放了 ~/.xconsole/github-token（權限 600，只放唯讀的公開權杖）就帶上，一小時 5,000 次。權杖只送給 GH_API 這一台。"""
+    h = {"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"}
+    tok = (load_text(os.path.join(STATE_DIR, "github-token")) or "").strip()
+    if re.fullmatch(r"[\x21-\x7e]{20,4096}", tok):   # 可見字元、不含空白與換行（不能被拿來多塞一個標頭）；GitHub 權杖格式會變，不鎖死字元集
+        h["Authorization"] = "Bearer " + tok
+    req = urllib.request.Request(GH_API + path, headers=h)
+    for i in range(3):                    # GitHub 偶爾回 502／503／504（版本清單很大時常見）：等一下再問，最多三次
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as ex:
+            if ex.code in (502, 503, 504) and i < 2:
+                time.sleep(3 * (i + 1))
+                continue
+            _gh_limit_error(ex, h)
+            raise
+
+
+def _gh_limit_error(ex, h):
+    """次數用完就換成講人話的錯誤；其他錯誤照原樣往上丟。"""
+    lim, reset = ex.headers.get("X-RateLimit-Limit"), ex.headers.get("X-RateLimit-Reset")
+    if ex.code in (403, 429) and ex.headers.get("X-RateLimit-Remaining") == "0":
+        when = time.strftime("%H:%M", time.localtime(int(reset))) if (reset or "").isdigit() else "一小時內"
+        tk = "有帶權杖" if "Authorization" in h else "沒有帶權杖"
+        raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{tk}，{when} 後恢復）") from ex
 
 
 def pick_release(releases, variant, extra, kind="llama"):

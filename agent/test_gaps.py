@@ -304,5 +304,71 @@ case("畫圖：一張、沒有參考圖就不帶這些參數", "-i" not in a and
 eq("產出檔：一次多張用 outs", A.sd_outs({"out": "ab.png", "outs": ["ab_0.png", "ab_1.png"]}), ["ab_0.png", "ab_1.png"])
 eq("產出檔：單張用 out", A.sd_outs({"out": "ab.png"}), ["ab.png"])
 
+# ---- GitHub API：有權杖檔才帶，沒有就不帶
+seen = []
+
+
+class _R(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+real_open = A.urllib.request.urlopen
+A.urllib.request.urlopen = lambda req, timeout=30: (seen.append(req.get_header("Authorization")), _R(b"[]"))[1]
+try:
+    A._gh_json("/repos/x/y/releases")
+    tp = os.path.join(A.STATE_DIR, "github-token")
+    os.makedirs(A.STATE_DIR, exist_ok=True)
+    open(tp, "w").write("ghs_" + "a" * 36 + "\n")
+    A._gh_json("/repos/x/y/releases")
+    open(tp, "w").write("ghs_abc.def-" + "x" * 300)
+    A._gh_json("/repos/x/y/releases")
+    open(tp, "w").write("not a token; rm -rf")
+    A._gh_json("/repos/x/y/releases")
+    os.remove(tp)
+finally:
+    A.urllib.request.urlopen = real_open
+eq("GitHub API：沒有權杖檔就不帶、有就帶（含點號的長權杖也收）、有空白的不帶", seen,
+   [None, "Bearer ghs_" + "a" * 36, "Bearer ghs_abc.def-" + "x" * 300, None])
+
+
+def _limited(req, timeout=30):
+    import email.message
+    hd = email.message.Message()
+    for k, v in (("X-RateLimit-Limit", "60"), ("X-RateLimit-Remaining", "0"), ("X-RateLimit-Reset", "1900000000")):
+        hd[k] = v
+    raise A.urllib.error.HTTPError(req.full_url, 403, "rate limit exceeded", hd, None)
+
+
+A.urllib.request.urlopen = _limited
+try:
+    A._gh_json("/repos/x/y/releases")
+    msg = ""
+except OSError as ex:
+    msg = str(ex)
+finally:
+    A.urllib.request.urlopen = real_open
+case("GitHub 次數用完：講清楚上限、有沒有帶權杖、幾點恢復", "上限 60" in msg and "沒有帶權杖" in msg and "恢復" in msg, msg)
+tries = []
+
+
+def _flaky(req, timeout=30):
+    tries.append(1)
+    if len(tries) < 3:
+        raise A.urllib.error.HTTPError(req.full_url, 504, "Gateway Timeout", {}, None)
+    return _R(b"[1]")
+
+
+A.urllib.request.urlopen, real_sleep = _flaky, A.time.sleep
+A.time.sleep = lambda s: None
+try:
+    got = A._gh_json("/repos/x/y/releases")
+finally:
+    A.urllib.request.urlopen, A.time.sleep = real_open, real_sleep
+case("GitHub 偶爾回 504：等一下再問，第三次拿到就好", got == [1] and len(tries) == 3, (got, tries))
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

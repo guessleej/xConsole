@@ -15,6 +15,10 @@
    記憶體放不下時自動往後排到硬碟，不必另外勾選；按鈕會標「會用到硬碟，很慢」，存放區在機械硬碟上會提醒改放 SSD。
 4. 對話：直接跟剛啟動的模型聊；按「附件」可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼（主控台抽出文字附進對話），
    看得懂圖的模型也能附圖。模型寫出 HTML 可以直接執行預覽、下載、複製。也可以切到管理者設好的第三方 API。
+   對話紀錄存在主控台（左邊可搜尋、改名、刪除，換瀏覽器也在）；每則回答可以複製、重新生成、調整回答（更簡潔、更詳細、
+   更正式、更口語、換個說法、改用英文）、編輯、刪除，重新生成與調整回答會留下各版本可切換。「對話設定」放系統提示詞與取樣參數。
+   說「畫一張…」「生成一段…的影片」就直接產出，附圖說「把…改成…」就改圖（也可以按輸入列的「畫圖」「影片」）；
+   「工具」打開時模型可以查這台的狀態與推薦。對話太長時，較早的部分自動整理成摘要再送，畫面上標「已壓縮前 N 則」。
 5. Agent：選一個工作資料夾、交代一件事，Agent 自己規劃、建檔、寫程式、跑指令；每條指令要人按允許。
 6. 畫圖、影片：寫一句描述就產出；模型不在就帶去下載。畫圖可選方形、直式、橫式畫幅、一次 1～4 張，
    也可以放一張參考圖在上面重繪；影片可以放第一格畫面，接著往下演。
@@ -42,7 +46,7 @@
 | 概覽 | 三步設定順序軸（真實狀態算出） | 左：「流暢執行 NB 以內的模型」＋三色記憶體條；右：硬體規格 | 為這台推薦（前 3 顆，下載／執行） |
 | 模型 | 分頁 | 清單：名稱、標籤、量化選擇、等級＋預估 tok/s＋三色分層條、動作 | — |
 | 執行 | 模型下拉＋管理模型 | 左：自動分層規劃（顯示卡／系統記憶體／硬碟）；右：上下文、思考、區網、預估、啟動 | 載入進度卡；執行中狀態列（生成速度、顯存、記憶體、API 網址＋複製） |
-| 對話 | 模型選擇（本機／第三方）、新對話、對話紀錄、狀態（tok/s、思考、本機執行或外部） | 訊息 | 輸入框（附件、對話設定），Enter 送出、IME 防誤送 |
+| 對話 | 左：新對話、搜尋、對話清單（改名、刪除；窄螢幕收成抽屜）；右上：模型選擇、狀態（tok/s、上下文、已自訂、已壓縮）、對話設定、匯出 | 訊息（每則下方：複製、重新生成、調整回答、編輯、刪除、版本切換） | 輸入框（附件、工具、畫圖、影片），Enter 送出、IME 防誤送 |
 | Agent | 模型、工作資料夾 | 對話與步驟 | 右側面板：計畫、改動的檔案、工作資料夾 |
 | 畫圖／影片 | 停止引擎、打開作品、下載模型 | 左：表單；右：作品牆 | — |
 
@@ -86,3 +90,14 @@
     `strength`（0.05～1，只限畫圖）。一次多張的產出用 `GET .../sd/jobs/{id}/output/{i}` 取第 i 張，參考圖用 `.../init`。
 11. **機器偵測**：Linux 的 Intel 顯示卡（sysfs vendor 0x8086）用 Vulkan 編譯（缺 `libvulkan-dev glslc` 時講清楚要裝什麼）；
     存放區是不是機械硬碟：Linux 讀 `queue/rotational`、macOS 讀 `diskutil` 的 SolidState、Windows 讀 `Get-PhysicalDisk` 的 MediaType。
+12. **對話紀錄**（每個人只看得到自己的；內容與附圖 AES-256-GCM 加密落地；每人最多 500 則，超過刪最舊的）：
+    `GET /api/chats?q=` → `{items: [{id, title, target, n_msgs, created, updated, snippet?}], limit}`（`q` 搜標題與內容，命中內容時帶 `snippet`）；
+    `GET /api/chats/{id}` → `{id, title, target, created, updated, msgs, settings, summary?}`；
+    `POST /api/chats/save {id?, title, target, msgs, settings, summary?}` → `{id, updated, images: {訊息序號: "blob:<id>"}}`
+    （訊息裡新附的圖用 data URL 送，存成獨立 blob 後換成 `blob:<id>`；本文上限 16 MB）；
+    `GET /api/chats/blob/{id}`（附圖原檔）；`POST /api/chats/{id}/rename {title}`、`POST /api/chats/{id}/delete`、`POST /api/chats/delete-all`。
+    訊息欄位：`role`、`content`、`reasoning`、`stat`、`error`、`image`、`docs`、`alts`＋`alt`（回答的各版本）、`gen`（對話裡畫圖、做影片：
+    `{node, job, kind, prompt, asked, model, title, count, state, edit}`）。
+13. **取樣參數**：本機對話（`/api/node/{n}/chat/{s}`）與助理（`/api/assistant` 的 `sampling`）收 `temperature` 0～2、`top_p` 0～1、
+    `top_k` 0～1000 整數、`min_p` 0～1、`repeat_penalty` 0.5～2、`presence_penalty` -2～2、`max_tokens` 1～131072、`seed` -1～2^31-1（-1＝隨機，不送）；
+    第三方 API 只轉送 `temperature`、`top_p`、`presence_penalty`、`max_tokens`、`seed`。助理另收 `system`（接在主控台的助理指示後面）。

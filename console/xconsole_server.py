@@ -39,6 +39,7 @@ from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import chats  # noqa: E402
 import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
@@ -55,6 +56,7 @@ SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
 MAX_ANON_BODY = 64 * 1024        # 登入與加入機器不需登入：本文只要幾 KB
+CHAT_BODY = 16 * 1024 * 1024     # 存對話：一則新附圖（6 MB，base64 後 8 MB）加上附件文字
 EXTRACT_MAX = 15 * 1024 * 1024    # 對話附件（PDF、Word…）最大 15 MB
 EXTRACT_BODY = EXTRACT_MAX * 4 // 3 + 64 * 1024     # base64 之後再加 JSON 外殼
 HEADER_DEADLINE = 15            # 請求列＋標頭（POST 連同本文）要在幾秒內送完
@@ -1307,6 +1309,14 @@ def provider_json(prov, method, path, body=None, timeout=120):
         conn.close()
 
 
+def chat_seal(data: bytes) -> str:
+    return tls.seal(CERTS.p, data)
+
+
+def chat_unseal(token: str) -> bytes:
+    return tls.unseal(CERTS.p, token)
+
+
 def provider_public(p):
     return {"id": p["id"], "name": p["name"], "base_url": p["base_url"], "default_model": p.get("default_model") or "",
             "key_set": bool(p.get("api_key")), "ca_set": bool(p.get("ca_pem")),
@@ -1383,15 +1393,13 @@ def provider_chat_request(prov, body):
     req = {"model": model, "messages": msgs, "stream": bool(body.get("stream", True))}
     if req["stream"]:
         req["stream_options"] = {"include_usage": True}
-    for k, lo, hi in (("max_tokens", 1, 131072), ("temperature", 0, 2)):
-        if body.get(k) is not None:
-            try:
-                v = float(body[k])
-            except (TypeError, ValueError):
-                return None, f"{k} 要是數字"
-            if not lo <= v <= hi:
-                return None, f"{k} 要在 {lo}～{hi} 之間"
-            req[k] = int(v) if k == "max_tokens" else v
+    # 第三方只送 OpenAI 標準的取樣參數（Top K、Min P、重複懲罰是 llama.cpp 的擴充，有的服務會整筆拒收）
+    try:
+        req.update(chats.sampling(body, only=chats.OPENAI_STD))
+    except chats.Bad as exc:
+        return None, str(exc)
+    if req.get("seed") == -1:
+        req.pop("seed")
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
     return req, None
@@ -2015,7 +2023,14 @@ class Handler(BaseHTTPRequestHandler):
         msgs = [m for m in (body.get("messages") or []) if isinstance(m, dict) and m.get("role") in ("user", "assistant")][-20:]
         if not msgs:
             return self._json(400, {"error": "沒有問題"})
-        convo = [{"role": "system", "content": ASSIST_SYSTEM}] + [{"role": m["role"], "content": str(m.get("content") or "")[:8000]} for m in msgs]
+        extra = str(body.get("system") or "")[:8000].strip()
+        try:
+            samp = chats.sampling(body.get("sampling") or {})
+        except chats.Bad as exc:
+            return self._json(400, {"error": str(exc)})
+        samp.pop("seed", None) if samp.get("seed") == -1 else None
+        convo = [{"role": "system", "content": ASSIST_SYSTEM + (f"\n\n使用者另外的指示：{extra}" if extra else "")}] \
+            + [{"role": m["role"], "content": str(m.get("content") or "")[:8000]} for m in msgs]
         steps, seen = [], {}
 
         def done(code, out):
@@ -2024,7 +2039,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         for rnd in range(6):
             last = rnd == 5
-            req = {"messages": convo, "stream": False, "max_tokens": 2048, "temperature": 0.2}
+            req = {"messages": convo, "stream": False, "max_tokens": 2048, "temperature": 0.2, **samp}
             if not last:
                 req["tools"] = ASSIST_TOOLS
             else:
@@ -2306,6 +2321,20 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             t = AGENT_TASKS.get(m.group(1))
             return self._json(200, t.public()) if t else self._json(404, {"error": "沒有這個任務"})
+        # ---- 對話紀錄（存在主控台、加密落地；每個人只看得到自己的）
+        if path == "/api/chats":
+            q = (parse_qs(urlparse(self.path).query).get("q") or [""])[0]
+            return self._json(200, chats.listing(STORE, chat_unseal, self.user, q))
+        m = re.fullmatch(r"/api/chats/blob/([0-9a-f]{16})", path)
+        if m:
+            got = chats.blob(STORE, chat_unseal, self.user, m.group(1))
+            if not got:
+                return self._json(404, {"error": "找不到這張圖"})
+            return self._send(200, got[1], got[0], {"Cache-Control": "private, max-age=86400"})
+        m = re.fullmatch(r"/api/chats/([0-9a-f]{12})", path)
+        if m:
+            code, out = chats.load(STORE, chat_unseal, self.user, m.group(1))
+            return self._json(code, out)
         if path == "/api/providers":
             return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
                                     "presets": PROVIDER_PRESETS})
@@ -2397,7 +2426,8 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             self._headers_done()
             return self._json(401, {"error": "請先登入"})
-        body = self._body(MAX_ANON_BODY if anon else EXTRACT_BODY if path == "/api/extract" else MAX_BODY)
+        body = self._body(MAX_ANON_BODY if anon else EXTRACT_BODY if path == "/api/extract"
+                          else CHAT_BODY if path == "/api/chats/save" else MAX_BODY)
         self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
@@ -2533,6 +2563,31 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("chat.extract", str(body.get("name") or "")[:120], code == 200,
                         {"chars": out.get("chars"), "message": out.get("error")})
             return self._json(code, out)
+
+        # ---- 對話紀錄
+        if path == "/api/chats/save":
+            code, out = chats.save(STORE, chat_seal, self.user, body)
+            if code != 200:
+                self._audit("chat.save", str(body.get("id") or ""), False, {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/chats/([0-9a-f]{12})/(rename|delete)", path)
+        if m:
+            cid, act = m.groups()
+            if act == "delete":
+                ok = STORE.chat_delete(self.user, cid)
+                self._audit("chat.delete", cid, ok)
+                return self._json(200 if ok else 404, {"ok": True} if ok else {"error": "沒有這則對話"})
+            title = str(body.get("title") or "").strip()[:80]
+            if not title:
+                return self._json(400, {"error": "標題不能空白"})
+            ok = STORE.chat_rename(self.user, cid, chat_seal(title.encode()))
+            return self._json(200 if ok else 404, {"ok": True, "title": title} if ok else {"error": "沒有這則對話"})
+        if path == "/api/chats/delete-all":
+            n = 0
+            for r in STORE.chat_list(self.user):
+                n += STORE.chat_delete(self.user, r["id"])
+            self._audit("chat.delete_all", "", True, {"count": n})
+            return self._json(200, {"ok": True, "deleted": n})
 
         # ---- 執行預覽
         if path == "/api/preview":
