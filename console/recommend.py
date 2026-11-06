@@ -173,6 +173,7 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
         if out["level"] == "smooth" and out["tok_s"] < SMOOTH_TOKS:
             out["level"] = "ok"            # 放得下但太慢，不算流暢
     out["load_est_sec"] = load_seconds(size, hdd)
+    out["hdd"] = hdd                       # 存放區是不是機械硬碟：執行頁要用硬碟時提醒改放 SSD
     return out
 
 

@@ -386,6 +386,31 @@ def probe_amd_sysfs():
     return gpus or None
 
 
+def probe_intel_sysfs(base=None):
+    """Linux 的 Intel 顯示卡（llama.cpp 走 Vulkan）。Arc 獨立顯示卡的顯存讀 sysfs（xe 驅動在 tile0、i915 在卡的資料夾）；
+    讀不到顯存的當成內建顯示晶片（跟系統共用記憶體）。已用量沒有便宜又可靠的讀法，記 0。"""
+    base = base or "/sys/class/drm"
+    if OS != "linux" or not os.path.isdir(base):
+        return None
+    gpus = []
+    for card in sorted(os.listdir(base)):
+        if not re.fullmatch(r"card\d+", card):
+            continue
+        dev = os.path.join(base, card, "device")
+        if (load_text(os.path.join(dev, "vendor")) or "").strip() != "0x8086" \
+                or not (load_text(os.path.join(dev, "class")) or "").strip().startswith("0x03"):
+            continue
+        vram = 0
+        for f in (os.path.join(dev, "tile0", "physical_vram_size_bytes"), os.path.join(base, card, "lmem_total_bytes")):
+            v = (load_text(f) or "").strip()
+            if v.isdigit() and int(v) > 0:
+                vram = int(v)
+                break
+        gpus.append({"id": card[4:], "name": "Intel Arc 顯示卡" if vram else "Intel 內建顯示晶片", "temp": None, "power": None,
+                     "use": None, "vram_total": vram, "vram_used": 0, "vendor": "intel"})
+    return gpus or None
+
+
 def apple_gpu_limit(total):
     """Apple Silicon 的 GPU 最多能用多少統一記憶體（Metal 的 recommendedMaxWorkingSetSize）。
     管理者用 sysctl iogpu.wired_limit_mb 調過就照那個；沒調過是系統預設：36 GB 以下約 2/3，以上約 3/4。"""
@@ -457,7 +482,7 @@ def probe_win_adapters():
 
 
 def probe_gpus():
-    return probe_nvidia() or probe_amd_sysfs() or probe_apple() or probe_win_adapters() or []
+    return probe_nvidia() or probe_amd_sysfs() or probe_intel_sysfs() or probe_apple() or probe_win_adapters() or []
 
 
 def has_nvidia():
@@ -2648,10 +2673,22 @@ def llama_build_no(path, version_text):
     return int(d.group(1)) if d and ver <= 1 else ver     # 只有淺層編譯（回 0 或 1）才看資料夾名稱
 
 
+def imported_exes(prefix):
+    """手動匯入的包：照 .xconsole-exe 記的相對位置找執行檔（不能跳出那個資料夾）。"""
+    out = []
+    for mark in glob.glob(os.path.join(HOME, prefix + "-import-*", ".xconsole-exe")):
+        d = os.path.dirname(mark)
+        rel = (load_text(mark) or "").strip()
+        exe = os.path.realpath(os.path.join(d, rel))
+        if rel and exe.startswith(os.path.realpath(d) + os.sep) and os.path.isfile(exe):
+            out.append(os.path.join(d, rel))
+    return out
+
+
 def llama_globs():
     """家目錄下所有 llama-server：網頁編譯的（llama.cpp-bNNNN/build/bin/）與官方預編譯的（llama.cpp-bNNNN-<平台>/）。"""
     pats = ("llama.cpp*/build*/bin/llama-server", "llama.cpp*/build*/bin/Release/llama-server", "llama.cpp*/llama-server")
-    found = {c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}
+    found = {c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))} | set(imported_exes("llama.cpp"))
     if OS == "darwin":
         found |= {c for c in ("/opt/homebrew/bin/llama-server", "/usr/local/bin/llama-server") if os.path.exists(c)}
     return sorted(found)
@@ -3658,7 +3695,8 @@ def pools(reg, hw):
         "floors": fl,
         # 綁卡靠 CUDA_VISIBLE_DEVICES（NVIDIA）或 KFD 序號換 HIP_VISIBLE_DEVICES（Linux 的 AMD）；
         # Windows 的 AMD／Intel（Vulkan）與 Apple 沒有可靠的對應，不提供綁卡、一律用全部
-        "bindable": has_nvidia() or OS == "linux",
+        # Linux 的 Intel（Vulkan）同樣沒有對應，不綁
+        "bindable": has_nvidia() or (OS == "linux" and not any(g.get("vendor") == "intel" for g in gpu.get("gpus") or [])),
         "gpus": [{
             "id": g.get("id"), "name": g.get("name"),
             "total_gib": round((g.get("vram_total") or 0) / GIB, 1),
@@ -3744,8 +3782,9 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None, cfg_o
             if cfg.get("disk_mode"):
                 kv_note += "；用硬碟執行：權重以檔案映射載入，不算進准入，只算 KV、計算緩衝與放進 GPU 的層"
 
-    if mm == "discrete" and not p["gpus"]:
-        # 沒有 GPU 的機器（例：只用 CPU 的 Windows）：權重與 KV 全在系統記憶體，照顯存算的話永遠載不進去
+    if mm == "discrete" and not any(g["total_gib"] > 0 for g in p["gpus"]):
+        # 沒有 GPU 的機器（例：只用 CPU 的 Windows），或只有讀不到顯存的內建顯示晶片：
+        # 權重與 KV 全在系統記憶體，照顯存算的話永遠載不進去
         need_ram += need_vram
         need_vram = 0.0
 
@@ -4061,13 +4100,13 @@ BUILD_FILE = os.path.join(STATE_DIR, "llama-build.json")
 ENGINES = {
     "llama": {"name": "llama.cpp", "repo": LLAMA_REPO, "file": BUILD_FILE, "tag_rx": r"b(\d+)", "glob": "refs/tags/b*",
               "dir": "llama.cpp-{}", "target": "llama-server", "submodules": False, "extra": ["-DLLAMA_CURL=OFF"],
-              "cuda": "-DGGML_CUDA=ON", "hip": "-DGGML_HIP=ON", "hip_targets": "AMDGPU_TARGETS",
+              "cuda": "-DGGML_CUDA=ON", "hip": "-DGGML_HIP=ON", "hip_targets": "AMDGPU_TARGETS", "vulkan": "-DGGML_VULKAN=ON",
               "gh": "/repos/ggml-org/llama.cpp/releases?per_page=10"},
     # stable-diffusion.cpp 的正式版標籤是 master-<編號>-<commit 前七碼>；ggml 等是 git 子模組，要一起抓
     "sd": {"name": "stable-diffusion.cpp", "repo": SD_REPO, "file": os.path.join(STATE_DIR, "sd-build.json"),
            "tag_rx": r"master-(\d+)-[0-9a-f]+", "glob": "refs/tags/master-*", "dir": "stable-diffusion.cpp-{}",
            "target": "sd-cli", "submodules": True, "extra": [],
-           "cuda": "-DSD_CUDA=ON", "hip": "-DSD_HIPBLAS=ON", "hip_targets": "GPU_TARGETS",
+           "cuda": "-DSD_CUDA=ON", "hip": "-DSD_HIPBLAS=ON", "hip_targets": "GPU_TARGETS", "vulkan": "-DSD_VULKAN=ON",
            "gh": "/repos/leejet/stable-diffusion.cpp/releases?per_page=10"},
 }
 _BUILD = {"proc": None, "cancel": False, "kind": None}
@@ -4098,6 +4137,11 @@ def cuda_arch(nvcc):
     if best is None:
         return "native", "編譯器太舊，交給它自己偵測"
     return str(best), f"這版 CUDA 編譯器不認得 sm_{want}，改編 sm_{best}，執行時由驅動即時轉換（第一次載入會慢一點）"
+
+
+def _vulkan_ready():
+    """編 Vulkan 版要的東西：著色器編譯器 glslc 與 Vulkan 標頭（libvulkan-dev）。"""
+    return bool(shutil.which("glslc")) and any(os.path.exists(p) for p in ("/usr/include/vulkan/vulkan.h", "/usr/local/include/vulkan/vulkan.h"))
 
 
 def build_prereqs(kind="llama"):
@@ -4132,8 +4176,19 @@ def build_prereqs(kind="llama"):
             flags = [eng["hip"]] + ([f"-D{eng['hip_targets']}={';'.join(gfx)}"] if gfx else [])
             env = {"HIPCXX": os.path.join(rocm, "llvm/bin/clang"), "HIP_PATH": rocm}
             notes.append(f"用 ROCm 編，目標 {', '.join(gfx) or '自動偵測'}")
+        elif _vulkan_ready():
+            backend, flags = "vulkan", [eng["vulkan"]]
+            notes.append("有 AMD 顯示卡但沒有 ROCm（hipcc），改用 Vulkan 編（比 ROCm 慢一些）。要更快請 IT 安裝 ROCm")
         else:
-            notes.append("有 AMD 顯示卡但沒有 ROCm（hipcc），會編成只用 CPU。要用 GPU 請 IT 安裝 ROCm")
+            notes.append("有 AMD 顯示卡但沒有 ROCm（hipcc），會編成只用 CPU。要用 GPU 請 IT 安裝 ROCm，"
+                         "或安裝 Vulkan 開發套件改用 Vulkan：sudo apt install libvulkan-dev glslc")
+    elif probe_intel_sysfs():
+        if _vulkan_ready():
+            backend, flags = "vulkan", [eng["vulkan"]]
+            notes.append("Intel 顯示卡，用 Vulkan 編")
+        else:
+            notes.append("有 Intel 顯示卡但沒有 Vulkan 開發套件，會編成只用 CPU。要用 GPU 請 IT 執行："
+                         "sudo apt install libvulkan-dev glslc mesa-vulkan-drivers")
     else:
         notes.append("沒有偵測到 GPU，編成只用 CPU")
     return {"tools": tools, "missing": missing, "apt": ("sudo apt install " + " ".join(missing)) if missing else "",
@@ -4314,45 +4369,76 @@ def _prebuilt_run(st, log, kind="llama"):
             fh.write(text + "\n")
 
     def fetch(asset, path, base_pct, span):
+        """下載到 path（先寫 path.part）。part 還在就用 Range 從斷掉的位置接著下載；整個檔核對官方 sha256 才改名。"""
         import hashlib
         h = hashlib.sha256()
-        req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": "xconsole-agent"})
-        total, done, last = int(asset.get("size") or 0), 0, -1
-        with urllib.request.urlopen(req, timeout=60) as resp, open(path, "wb") as fh:
-            while True:
-                if _BUILD["cancel"]:
-                    raise RuntimeError("已取消")
-                chunk = resp.read(1 << 20)
-                if not chunk:
-                    break
-                fh.write(chunk)
-                h.update(chunk)
-                done += len(chunk)
-                pct = base_pct + int(span * done / total) if total else base_pct
-                if pct != last:
-                    note(f"[{pct:3d}%] 下載 {asset['name']}　{done / 1048576:.0f} / {total / 1048576:.0f} MB")
-                    last = pct
+        total = int(asset.get("size") or 0)
+        part = path + ".part"
+        if os.path.exists(path) and not os.path.exists(part):
+            os.replace(path, part)             # 上次下載完、但後面的步驟失敗：重新核對一次就好，不必重下
+        have = os.path.getsize(part) if os.path.exists(part) else 0
+        if total and have > total:
+            os.remove(part)
+            have = 0
+        if have:
+            with open(part, "rb") as fh:
+                for b in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(b)
+        done, last = have, -1
+        if not (total and have == total):
+            hdr = {"User-Agent": "xconsole-agent", **({"Range": f"bytes={have}-"} if have else {})}
+            req = urllib.request.Request(asset["browser_download_url"], headers=hdr)
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                if have and resp.status != 206:   # 對方不支援續傳：從頭來
+                    h, done = hashlib.sha256(), 0
+                    note(f"下載站不支援續傳，{asset['name']} 從頭下載")
+                elif have:
+                    note(f"接著上次的 {have / 1048576:.0f} MB 繼續下載 {asset['name']}")
+                with open(part, "ab" if done else "wb") as fh:
+                    while True:
+                        if _BUILD["cancel"]:
+                            raise RuntimeError("已暫停")
+                        chunk = resp.read(1 << 20)
+                        if not chunk:
+                            break
+                        fh.write(chunk)
+                        h.update(chunk)
+                        done += len(chunk)
+                        pct = base_pct + int(span * done / total) if total else base_pct
+                        if pct != last:
+                            note(f"[{pct:3d}%] 下載 {asset['name']}　{done / 1048576:.0f} / {total / 1048576:.0f} MB")
+                            last = pct
         if "sha256:" + h.hexdigest() != asset["digest"]:
+            os.remove(part)
             raise RuntimeError(f"{asset['name']} 的 sha256 跟官方公布的不一樣，已刪除，不安裝")
+        os.replace(part, path)
 
     dest = st["dest"]
     tmp = dest + ".part"
+    # 下載的檔放 engines/dl/，暫停、失敗、代理重啟都不刪：下次按「繼續下載」從斷掉的位置接著下
+    dl = os.path.join(ENGINE_DIR, "dl")
+    wanted = {a["name"] for a in (st["asset"], st.get("extra")) if a}
     try:
         st["phase"] = "下載"
         save_json(eng["file"], st)
-        shutil.rmtree(tmp, ignore_errors=True)
-        os.makedirs(tmp)
-        arc = os.path.join(tmp, st["asset"]["name"])
+        os.makedirs(dl, mode=0o700, exist_ok=True)
+        for f in os.listdir(dl):               # 別的版本留下的半成品：用不到了
+            if f.split(".part")[0] not in wanted and f.startswith(("llama-", "sd-", "cudart-")):
+                os.remove(os.path.join(dl, f))
+        arc = os.path.join(dl, st["asset"]["name"])
         span = 80 if st.get("extra") else 90
         fetch(st["asset"], arc, 0, span)
+        arc2 = None
+        if st.get("extra"):
+            arc2 = os.path.join(dl, st["extra"]["name"])
+            fetch(st["extra"], arc2, span, 10)
         st["phase"] = "核對與解壓縮"
         save_json(eng["file"], st)
+        shutil.rmtree(tmp, ignore_errors=True)
         out_dir = os.path.join(tmp, "out")
         os.makedirs(out_dir)
         _safe_extract(arc, out_dir)
-        if st.get("extra"):
-            arc2 = os.path.join(tmp, st["extra"]["name"])
-            fetch(st["extra"], arc2, span, 10)
+        if arc2:
             _safe_extract(arc2, out_dir)
         # macOS 的壓縮檔多包一層 llama-bNNNN/，拿掉讓執行檔直接在資料夾裡
         inner = [x for x in os.listdir(out_dir) if not x.startswith(".")]
@@ -4371,15 +4457,22 @@ def _prebuilt_run(st, log, kind="llama"):
             rc, out, err = 1, "", str(ex)
         if rc != 0:
             raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗）：{(err or out)[-200:]}")
-        note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else exe}")
+        note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.join(dest, eng['target'] + EXE)}")
         if os.path.exists(dest):
             shutil.rmtree(dest)
         os.replace(src, dest)
         shutil.rmtree(tmp, ignore_errors=True)
+        for a in (arc, arc2):
+            if a and os.path.exists(a):
+                os.remove(a)
         st.update(state="done", phase="完成", exe=os.path.join(dest, eng["target"] + EXE))
     except Exception as ex:  # noqa: BLE001
         shutil.rmtree(tmp, ignore_errors=True)
-        st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
+        if _BUILD["cancel"] and st.get("phase") == "下載":
+            st.update(state="paused", error="已暫停；再按「繼續下載」會從斷掉的位置接著下載")
+        else:
+            st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300],
+                      resumable=st.get("phase") == "下載")
     st["ended"] = time.time()
     save_json(eng["file"], st)
     with _BUILD_LOCK:
@@ -4411,6 +4504,196 @@ def start_prebuilt(kind="llama"):
         _BUILD.update(cancel=False, thread_alive=True, kind=kind)
     threading.Thread(target=_prebuilt_run, args=(st, log, kind), daemon=True).start()
     return 200, {"ok": True, "tag": tag, "backend": variant}
+
+
+# ---- 手動匯入安裝包：不能連外的機器，把官方的壓縮檔（或自己編好的）從瀏覽器送上來裝
+# 分塊送、可以續傳（同 GGUF 匯入）；送齊後算 sha256（有填官方的就要對得上），解壓縮時任何檔案落到資料夾外面就整個拒絕
+ENG_IMPORT_RX = re.compile(r"[A-Za-z0-9][\w.+-]{0,150}\.(?:zip|tar\.gz|tgz)")
+ENG_IMPORT_MAX = 4 << 30
+IMPORT_MARK = ".xconsole-exe"        # 手動匯入的包：執行檔在包裡的相對位置
+IMPORT_DIR = os.path.join(ENGINE_DIR, "import")
+
+
+def _imp_paths(kind, name):
+    if kind not in ENGINES or not ENG_IMPORT_RX.fullmatch(name or ""):
+        raise ValueError("安裝包要是 .zip、.tar.gz 或 .tgz，檔名只能用英數、底線、點、加號、連字號")
+    return inside(IMPORT_DIR, f"{kind}-{name}"), inside(IMPORT_DIR, f"{kind}-{name}.part")
+
+
+def engine_import_status(kind, name):
+    try:
+        final, part = _imp_paths(kind, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    out = {"exists": os.path.exists(final), "size": os.path.getsize(final) if os.path.exists(final) else 0,
+           "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    if out["received"]:
+        # 已收到那段開頭（最多 4 MB）的 sha256：瀏覽器比對是不是同一個檔，不是才接著送
+        import hashlib
+        with open(part, "rb") as fh:
+            out["head_sha256"] = hashlib.sha256(fh.read(min(out["received"], UP_EDGE))).hexdigest()
+    return 200, out
+
+
+def engine_import_chunk(kind, name, offset, total, data):
+    try:
+        final, part = _imp_paths(kind, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    if not 0 < total <= ENG_IMPORT_MAX:
+        return 400, {"error": "安裝包最大 4 GiB"}
+    if not (0 <= offset < total) or offset + len(data) > total or not data:
+        return 400, {"error": "分塊的位置或大小不對"}
+    with _UP_LOCK:
+        if os.path.exists(final):
+            os.remove(final)                   # 同名的舊包（上次裝失敗留下的）：以這次送的為準
+        have = os.path.getsize(part) if os.path.exists(part) else 0
+        if offset != have:
+            return 409, {"error": "要從已收到的位置接著送", "received": have}
+        if offset == 0:
+            os.makedirs(IMPORT_DIR, mode=0o700, exist_ok=True)
+            free = disk_free(IMPORT_DIR)[0]
+            if total * 3 / GIB + 5 >= free:    # 壓縮檔＋解開後＋餘裕
+                return 400, {"error": f"磁碟不夠：安裝包 {total / GIB:.1f} GiB，解開要約三倍空間，這台只剩 {free} GiB"}
+        with open(part, "ab") as fh:
+            fh.write(data)
+        have += len(data)
+        if have < total:
+            return 200, {"received": have}
+        with open(part, "rb") as fh:
+            head = fh.read(4)
+        if not (head.startswith(b"PK\x03\x04") or head.startswith(b"\x1f\x8b")):
+            os.remove(part)
+            return 400, {"error": "送完了，但這不是 zip 或 tar.gz（檔頭不對），已刪除"}
+        os.replace(part, final)
+    return 200, {"received": have, "done": True}
+
+
+def engine_import_cancel(kind, name):
+    try:
+        final, part = _imp_paths(kind, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    for f in (final, part):
+        if os.path.exists(f):
+            os.remove(f)
+    return 200, {"ok": True}
+
+
+def _find_exe(root, target, depth=4):
+    """解開的資料夾裡找執行檔（官方的包有的直接放、有的包一層 build/bin/）：取最淺的那支。"""
+    hits = []
+    base = root.rstrip(os.sep).count(os.sep)
+    for d, dirs, files in os.walk(root):
+        if d.count(os.sep) - base >= depth:
+            dirs[:] = []
+        if target + EXE in files:
+            hits.append(os.path.join(d, target + EXE))
+    return min(hits, key=lambda x: x.count(os.sep), default=None)
+
+
+def _import_run(st, log, kind):
+    import hashlib
+    eng = ENGINES[kind]
+    arc = st["archive"]
+    tmp = os.path.join(IMPORT_DIR, f"{kind}-unpack")
+
+    def note(text):
+        with open(log, "a", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+    try:
+        st["phase"] = "核對"
+        save_json(eng["file"], st)
+        h = hashlib.sha256()
+        with open(arc, "rb") as fh:
+            for b in iter(lambda: fh.read(1 << 20), b""):
+                if _BUILD["cancel"]:
+                    raise RuntimeError("已取消")
+                h.update(b)
+        sha = h.hexdigest()
+        st["sha256"] = sha
+        note(f"sha256：{sha}")
+        if st.get("expect") and st["expect"] != sha:
+            raise RuntimeError(f"sha256 跟你填的不一樣（算出來是 {sha}），可能下載不完整或被改過，不安裝")
+        if not st.get("expect"):
+            note("沒有填官方的 sha256：請自己到官方版本頁核對上面這串")
+
+        def stop_if_cancelled():
+            if _BUILD["cancel"]:
+                raise RuntimeError("已取消")
+
+        stop_if_cancelled()
+        st["phase"] = "解壓縮"
+        save_json(eng["file"], st)
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.makedirs(tmp, mode=0o700)
+        _safe_extract(arc, tmp)
+        stop_if_cancelled()
+        exe = _find_exe(tmp, eng["target"])
+        if not exe:
+            raise RuntimeError(f"安裝包裡找不到 {eng['target']}{EXE}。請確認是 {eng['name']} 這台系統用的版本")
+        if OS != "windows":
+            os.chmod(exe, 0o700)
+        st["phase"] = "試跑"
+        save_json(eng["file"], st)
+        flag = "--version" if kind == "llama" else "--help"
+        try:
+            vp = subprocess.run([exe, flag], capture_output=True, text=True, timeout=60,
+                                env=llama_launch_env(exe) if kind == "llama" else None)
+            rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
+        except (OSError, subprocess.TimeoutExpired) as ex:
+            rc, out, err = 1, "", str(ex)
+        if rc != 0:
+            raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗），可能不是這台系統或顯示卡用的版本：{(err or out)[-200:]}")
+        note(f"試跑成功：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.basename(exe)}")
+        stop_if_cancelled()
+        # 整包搬過去（不是只搬執行檔那一層）：有的包把函式庫或執行期資料放在旁邊的資料夾。
+        # 執行檔在包裡的位置寫進 .xconsole-exe，llama_globs／sd_candidates 照這個找
+        inner = [x for x in os.listdir(tmp) if not x.startswith(".")]
+        root = os.path.join(tmp, inner[0]) if len(inner) == 1 and os.path.isdir(os.path.join(tmp, inner[0])) else tmp
+        rel = os.path.relpath(exe, root)
+        dest = inside(HOME, eng["dir"].format(f"import-{sha[:8]}"))
+        if os.path.exists(dest):
+            shutil.rmtree(dest)
+        os.replace(root, dest)
+        with open(os.path.join(dest, IMPORT_MARK), "w", encoding="utf-8") as fh:
+            fh.write(rel.replace(os.sep, "/"))
+        shutil.rmtree(tmp, ignore_errors=True)
+        os.remove(arc)
+        st.update(state="done", phase="完成", dest=dest, exe=os.path.join(dest, rel))
+    except Exception as ex:  # noqa: BLE001
+        shutil.rmtree(tmp, ignore_errors=True)
+        st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
+    st["ended"] = time.time()
+    save_json(eng["file"], st)
+    with _BUILD_LOCK:
+        _BUILD["thread_alive"] = False
+
+
+def engine_import_install(kind, name, expect=""):
+    try:
+        final, _ = _imp_paths(kind, name)
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    expect = str(expect or "").strip().lower()
+    if expect and not re.fullmatch(r"[0-9a-f]{64}", expect):
+        return 400, {"error": "sha256 要是 64 個十六進位字元（官方版本頁每個檔案旁邊那串），不確定就留空"}
+    if not os.path.exists(final):
+        return 404, {"error": "這個安裝包還沒送齊"}
+    eng = ENGINES[kind]
+    with _BUILD_LOCK:
+        if _BUILD.get("thread_alive"):
+            return 409, {"error": "這台正在安裝，等它裝完再匯入"}
+        os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
+        log = engine_file("build", f"-{kind}-build.log")
+        open(log, "w").close()
+        st = {"state": "running", "phase": "準備", "tag": name, "backend": "手動匯入", "mode": "import", "archive": final,
+              "expect": expect, "log": log, "started": time.time()}
+        save_json(eng["file"], st)
+        _BUILD.update(cancel=False, thread_alive=True, kind=kind, proc=None)
+    threading.Thread(target=_import_run, args=(st, log, kind), daemon=True).start()
+    return 200, {"ok": True}
 
 
 def parse_tag_refs(out, rx=r"b(\d+)"):
@@ -4516,6 +4799,8 @@ def suggest_memory_model(gpus=None):
     nvidia = has_nvidia()
     if nvidia and gpus and all(not g.get("vram_total") for g in gpus):
         return "unified_single", "nvidia-smi 回報不出顯存總量（DGX Spark 這類統一記憶體機就是這樣）"
+    if gpus and all(g.get("vendor") == "intel" and not g.get("vram_total") for g in gpus):
+        return "unified_single", "Intel 內建顯示晶片：跟系統共用同一塊記憶體"
     if not nvidia and gpus and _apu_like():
         return "unified_split", "AMD APU（例 Ryzen AI 395）：BIOS 切一塊給 GPU，系統只剩另一塊，兩塊都要盯"
     if gpus:
@@ -4531,6 +4816,41 @@ def _rotational(dev):
         if v is not None:
             return v.strip() == "1"
     return None
+
+
+_WIN_MEDIA = {"at": 0, "map": {}}
+
+
+def _win_media_types():
+    """Windows：磁碟機代號 → 是不是機械硬碟。Get-PhysicalDisk 的 MediaType（HDD／SSD／Unspecified）。
+    一次查全部，快取十分鐘（PowerShell 起一次要一兩秒）。"""
+    if time.time() - _WIN_MEDIA["at"] < 600:
+        return _WIN_MEDIA["map"]
+    ps = ("Get-Partition | Where-Object DriveLetter | ForEach-Object { $n = $_.DiskNumber; "
+          "$m = (Get-PhysicalDisk | Where-Object DeviceId -eq \"$n\").MediaType; \"$($_.DriveLetter)=$m\" }")
+    rc, out, _ = sh(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], timeout=30)
+    got = {}
+    for ln in out.splitlines() if rc == 0 else []:
+        m = re.fullmatch(r"([A-Za-z])=(\w*)", ln.strip())
+        if m and m.group(2) in ("HDD", "SSD"):
+            got[m.group(1).upper()] = m.group(2) == "HDD"
+    _WIN_MEDIA.update(at=time.time(), map=got)
+    return got
+
+
+def disk_is_hdd(mnt, dev):
+    """存放區那顆碟是不是機械硬碟：True／False，認不出來（虛擬磁碟、USB、RAID 卡）回 None。"""
+    if OS == "linux":
+        return _rotational(dev)
+    if OS == "darwin":
+        import plistlib
+        rc, out, _ = sh(["diskutil", "info", "-plist", mnt], timeout=15)
+        try:
+            info = plistlib.loads(out.encode()) if rc == 0 else {}
+        except Exception:  # noqa: BLE001
+            info = {}
+        return (not info["SolidState"]) if isinstance(info.get("SolidState"), bool) else None
+    return _win_media_types().get(str(mnt)[:1].upper())
 
 
 def _mounts():
@@ -4575,7 +4895,7 @@ def storage_choices():
         under_home = mnt in ("/", HOME[:3]) or HOME.startswith(mnt.rstrip("/\\") + os.sep)
         path = os.path.join(HOME, "models", "gguf") if under_home else os.path.join(mnt, "models", "gguf")
         out.append({"mount": mnt, "device": dev, "total_gib": total, "free_gib": free,
-                    "hdd": _rotational(dev) if OS == "linux" else None, "path": path,
+                    "hdd": disk_is_hdd(mnt, dev), "path": path,
                     "writable": os.access(path if os.path.isdir(path) else mnt, os.W_OK)})
     return sorted(out, key=lambda x: (x["hdd"] is True, -x["free_gib"]))
 
@@ -5400,11 +5720,11 @@ def sd_candidates():
     """家目錄下所有 sd-cli：網頁編譯的（stable-diffusion.cpp-master-…/build/bin/）與官方預編譯的（stable-diffusion.cpp-master-…-<平台>/）。"""
     pats = ("stable-diffusion.cpp*/build*/bin/sd-cli", "stable-diffusion.cpp*/sd-cli")
     out = []
-    for cand in sorted({c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}):
+    for cand in sorted({c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))} | set(imported_exes("stable-diffusion.cpp"))):
         m = re.search(r"master-(\d+)", cand)
         pre = re.search(r"-(macos-arm64|win-[\w]+-x64)", cand)
         out.append({"path": cand, "build": int(m.group(1)) if m else None, "ok": os.access(cand, os.X_OK),
-                    "backend": f"預編譯 {pre.group(1)}" if pre else "在這台編譯"})
+                    "backend": f"預編譯 {pre.group(1)}" if pre else "手動匯入" if "-import-" in cand else "在這台編譯"})
     return out
 
 
@@ -5736,6 +6056,11 @@ def sd_argv(exe, m, root, prm, out, plan):
         a += ["-n", prm["negative"]]
     if m["kind"] == "video":
         a += ["--video-frames", prm["frames"], "--fps", prm["fps"]]
+    if prm.get("init"):
+        # 畫圖：參考圖重繪（strength 越大改越多）；影片：當第一格畫面，接著往下演（LTX 的 I2V）
+        a += ["-i", prm["init"]] + (["--strength", prm["strength"]] if m["kind"] == "image" else [])
+    if m["kind"] == "image" and (prm.get("count") or 1) > 1:
+        a += ["-b", prm["count"]]              # 一次多張：sd-cli 存成 <檔名>_<序號>.png
     if plan.get("offload"):
         a.append("--offload-to-cpu")
     # sd-cli 會自己依剩餘量把權重分到顯示卡／系統記憶體；給它上限＝准入算出來的額度，它自己也不會越過底線
@@ -5827,6 +6152,13 @@ def _gen_run(j, argv, env, mm, fl):
     j["secs"] = round(time.time() - started, 1)
     j["ended"] = int(time.time())
     out = os.path.join(GEN_DIR, j["out"])
+    if (j.get("count") or 1) > 1:
+        stem = j["out"].rsplit(".", 1)[0]
+        hits = sorted((f for f in os.listdir(GEN_DIR) if re.fullmatch(re.escape(stem) + r"_\d+\.png", f)),
+                      key=lambda f: int(f.rsplit("_", 1)[1].split(".")[0]))
+        if hits:
+            j["outs"] = hits
+            out = os.path.join(GEN_DIR, hits[0])
     if killed:
         j.update(state="cancelled" if killed == "已取消" else "failed", error=killed)
     elif rc != 0 or not os.path.isfile(out) or not os.path.getsize(out):
@@ -5834,7 +6166,8 @@ def _gen_run(j, argv, env, mm, fl):
         j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
     else:
         peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
-        j.update(state="done", phase="完成", peak_gib=round(peak, 1), bytes=os.path.getsize(out))
+        j.update(state="done", phase="完成", peak_gib=round(peak, 1),
+                 bytes=sum(os.path.getsize(os.path.join(GEN_DIR, f)) for f in sd_outs(j) if os.path.isfile(os.path.join(GEN_DIR, f))))
         # 實測最高用量寫回這顆模型：下次准入改用實測值（取比估算大的那個，不會因為實測偏小就放寬）
         with _SD_LOCK:
             rows = sd_manifest()
@@ -5857,6 +6190,37 @@ def tail_text(path, n=8192):
         return ""
 
 
+SD_INIT_MAX = 4 << 20
+SD_INIT_MAGIC = ((b"\x89PNG\r\n\x1a\n", "png"), (b"\xff\xd8\xff", "jpg"), (b"RIFF", "webp"))
+
+
+def sd_init_image(raw):
+    """參考圖／第一格畫面：瀏覽器送 data URL 或 base64。只收 PNG、JPEG、WebP（看檔頭，不信副檔名），最大 4 MB。
+    回 (位元組, 副檔名)；沒給回 (None, None)；不合法丟 ValueError。"""
+    if raw in (None, ""):
+        return None, None
+    if not isinstance(raw, str):
+        raise ValueError("參考圖格式不對")
+    b64 = raw.split(",", 1)[1] if raw.startswith("data:") else raw
+    if len(b64) > SD_INIT_MAX * 4 // 3 + 8:
+        raise ValueError("參考圖最大 4 MB")
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except (ValueError, TypeError):
+        raise ValueError("參考圖不是有效的 base64") from None
+    ext = next((e for magic, e in SD_INIT_MAGIC if data.startswith(magic) and (e != "webp" or data[8:12] == b"WEBP")), None)
+    if not ext or len(data) > SD_INIT_MAX:
+        raise ValueError("參考圖只收 PNG、JPEG、WebP，最大 4 MB")
+    return data, ext
+
+
+def sd_outs(j):
+    """這件的產出檔：一次多張時是 <id>_<序號>.png，單張是 <id>.png，影片是 <id>.webm。"""
+    if j.get("outs"):
+        return list(j["outs"])
+    return [j["out"]] if j.get("out") else []
+
+
 def sd_generate(body):
     reg = registry()
     m = sd_manifest(reg).get(str(body.get("model") or ""))
@@ -5874,8 +6238,19 @@ def sd_generate(body):
         prm["prompt"] = _clean_text(body.get("prompt"), 2000, "提示詞", multiline=True)
         prm["negative"] = _clean_text(body.get("negative"), 1000, "不要出現的內容", multiline=True)
         seed = int(body.get("seed") if body.get("seed") not in (None, "") else -1)
+        count = int(body.get("count") or 1)
+        strength = float(body.get("strength") if body.get("strength") not in (None, "") else 0.75)
+        init, init_ext = sd_init_image(body.get("init_image"))
     except (TypeError, ValueError) as ex:
-        return 400, {"error": str(ex) if str(ex) else "種子要是整數"}
+        return 400, {"error": str(ex) if str(ex) else "種子、張數、重繪強度要是數字"}
+    if m["kind"] == "image":
+        if not 1 <= count <= 4:
+            return 400, {"error": "一次可以產 1～4 張"}
+        prm["count"] = count
+        if init is not None:
+            if not 0.05 <= strength <= 1.0:
+                return 400, {"error": "重繪強度要在 0.05～1 之間（越大改越多）"}
+            prm["strength"] = round(strength, 2)
     if not prm["prompt"]:
         return 400, {"error": "要寫提示詞"}
     if not -1 <= seed < 2 ** 31:
@@ -5891,7 +6266,14 @@ def sd_generate(body):
     os.makedirs(GEN_DIR, mode=0o700, exist_ok=True)
     jid = secrets.token_hex(4)
     out = f"{jid}.{'webm' if m['kind'] == 'video' else 'png'}"
+    if init is not None:
+        prm["init"] = os.path.join(GEN_DIR, f"{jid}-init.{init_ext}")
+        fd = os.open(prm["init"], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(init)
     argv = sd_argv(exe, m, root, prm, os.path.join(GEN_DIR, out), verdict["plan"])
+    if prm.get("init"):
+        prm["init"] = os.path.basename(prm["init"])       # 工作紀錄只記檔名，不記這台的路徑
     env = visible_env([verdict["plan"]["gpu"]]) if verdict["plan"]["gpu"] is not None else {}
     j = {"id": jid, "model": body["model"], "title": m["title"], "kind": m["kind"], **prm, "out": out,
          "state": "running", "phase": "載入模型中", "step": 0, "total": prm["steps"], "s_per_it": None,
@@ -5915,7 +6297,7 @@ def _sd_log(jid):
 
 
 def _sd_files_rm(j):
-    for f in (os.path.join(GEN_DIR, j.get("out") or "x"), _sd_log(j["id"])):
+    for f in [os.path.join(GEN_DIR, x) for x in sd_outs(j) + ([j["init"]] if j.get("init") else [])] + [_sd_log(j["id"])]:
         if os.path.isfile(f):
             os.remove(f)
 
@@ -5936,18 +6318,32 @@ def sd_job(jid):
     return 200, out
 
 
-def sd_output(jid):
+def sd_output(jid, i=0, init=False):
+    """第 i 張產出（一次多張時）；init＝這件用的參考圖（「用同樣的設定」要帶回去）。"""
     j = _sd_job(jid)
+    if init:
+        if not j or not j.get("init"):
+            return 404, {"error": "這件沒有參考圖"}
+        f = os.path.join(GEN_DIR, j["init"])
+        if not os.path.isfile(f):
+            return 404, {"error": "參考圖不見了"}
+        with open(f, "rb") as fh:
+            data = base64.b64encode(fh.read()).decode()
+        ext = j["init"].rsplit(".", 1)[1]
+        return 200, {"mime": {"jpg": "image/jpeg"}.get(ext, f"image/{ext}"), "name": j["init"], "b64": data}
     if not j or j["state"] != "done":
         return 404, {"error": "這件沒有產出"}
-    f = os.path.join(GEN_DIR, j["out"])
+    outs = sd_outs(j)
+    if not 0 <= i < len(outs):
+        return 404, {"error": "沒有這一張"}
+    f = os.path.join(GEN_DIR, outs[i])
     if not os.path.isfile(f):
         return 404, {"error": "產出的檔案不見了"}
     if os.path.getsize(f) > 20 * 1024 * 1024:
         return 413, {"error": "檔案超過 20 MB，請到這台的 ~/.xconsole/gen/ 取"}
     with open(f, "rb") as fh:
         data = base64.b64encode(fh.read()).decode()
-    return 200, {"mime": "video/webm" if f.endswith(".webm") else "image/png", "name": j["out"], "b64": data}
+    return 200, {"mime": "video/webm" if f.endswith(".webm") else "image/png", "name": outs[i], "b64": data, "count": len(outs)}
 
 
 def sd_cancel(jid):
@@ -6068,9 +6464,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, sd_library())
         if path == "/sd/jobs":
             return self._send(200, {"jobs": sd_jobs_list()})
-        m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})(/output)?", path)
+        m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})(?:/(output)(?:/([0-3]))?|/(init))?", path)
         if m:
-            return self._send(*(sd_output if m.group(2) else sd_job)(m.group(1)))
+            if m.group(2) or m.group(4):
+                return self._send(*sd_output(m.group(1), int(m.group(3) or 0), init=bool(m.group(4))))
+            return self._send(*sd_job(m.group(1)))
         m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
         if m:
             code, out = api_info(m.group(1))
@@ -6101,7 +6499,25 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < n <= UP_CHUNK_MAX:
                 return self._send(413, {"error": "一次最多送 64 MB"})
             return self._send(*upload_chunk(g("folder"), g("name"), offset, total, self.rfile.read(n)))
+        m = re.fullmatch(r"/(llama|sd)/import", path)
+        if m:
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            g = lambda k: (qs.get(k) or [""])[0]  # noqa: E731
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                offset, total = int(g("offset")), int(g("total"))
+            except ValueError:
+                return self._send(400, {"error": "分塊的位置或大小不對"})
+            if not 0 < n <= UP_CHUNK_MAX:
+                return self._send(413, {"error": "一次最多送 64 MB"})
+            return self._send(*engine_import_chunk(m.group(1), g("name"), offset, total, self.rfile.read(n)))
         body = self._body()
+        m = re.fullmatch(r"/(llama|sd)/import/(status|cancel|install)", path)
+        if m:
+            kind, act, name = m.group(1), m.group(2), str(body.get("name") or "")
+            if act == "install":
+                return self._send(*engine_import_install(kind, name, body.get("sha256")))
+            return self._send(*(engine_import_status if act == "status" else engine_import_cancel)(kind, name))
         m = re.fullmatch(r"/chat/([\w.-]+)", path)
         if m:
             return self._chat(m.group(1), body)

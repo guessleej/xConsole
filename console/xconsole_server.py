@@ -55,6 +55,8 @@ SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
 MAX_ANON_BODY = 64 * 1024        # 登入與加入機器不需登入：本文只要幾 KB
+EXTRACT_MAX = 15 * 1024 * 1024    # 對話附件（PDF、Word…）最大 15 MB
+EXTRACT_BODY = EXTRACT_MAX * 4 // 3 + 64 * 1024     # base64 之後再加 JSON 外殼
 HEADER_DEADLINE = 15            # 請求列＋標頭（POST 連同本文）要在幾秒內送完
 NODE_REPLY_MAX = 32 * 1024 * 1024
 NODE_DEADLINE = 300             # 跟代理的一次呼叫，連同讀完回應的總時限（秒）
@@ -1080,6 +1082,44 @@ def _sid_hash(sid):
     return hashlib.sha256((sid or "").encode()).hexdigest()
 
 
+def _extract_limits():
+    """抽文字的子行程限記憶體（Linux）：解析器碰上惡意檔案吃光記憶體時，被砍的是它，不是主控台。"""
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_AS, (2 << 30, 2 << 30))
+    except Exception:  # noqa: BLE001  macOS 不支援 RLIMIT_AS、Windows 沒有 resource：只靠逾時
+        pass
+
+
+def extract_doc(name, b64):
+    """對話附件抽文字：獨立行程跑 extract.py，限時 30 秒。回 (狀態碼, {text, chars, truncated, pages} 或 {error})。"""
+    import subprocess
+    name = str(name or "")[:200]
+    if not name or not isinstance(b64, str):
+        return 400, {"error": "要附檔名與內容"}
+    try:
+        data = base64.b64decode(b64, validate=True)
+    except (ValueError, TypeError):
+        return 400, {"error": "檔案內容不是有效的 base64"}
+    if not data:
+        return 400, {"error": "檔案是空的"}
+    if len(data) > EXTRACT_MAX:
+        return 413, {"error": "附件最大 15 MB"}
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract.py")
+    kw = {"preexec_fn": _extract_limits} if os.name == "posix" and sys.platform.startswith("linux") else {}
+    try:
+        p = subprocess.run([sys.executable, "-I", script, name], input=data, capture_output=True, timeout=30, **kw)
+    except subprocess.TimeoutExpired:
+        return 422, {"error": "這個檔案 30 秒內讀不完（太大或結構異常），請拆小一點再附"}
+    try:
+        out = json.loads(p.stdout.decode("utf-8") or "{}")
+    except ValueError:
+        out = {}
+    if p.returncode != 0 or not out:
+        return 422, {"error": "讀不出這個檔案（解析器中止，可能太大或檔案損毀）"}
+    return (422 if out.get("error") else 200), out
+
+
 def preview_put(sid, user, html):
     """回 (id, 錯誤)。"""
     if not isinstance(html, str) or not html.strip():
@@ -1809,7 +1849,8 @@ class Handler(BaseHTTPRequestHandler):
         self._json(401, {"error": "請先登入"})
         return True
 
-    def _upload(self, node_id, ctype):
+    def _upload(self, node_id, ctype, agent_path="/library/upload", keys=("folder", "name", "offset", "total"),
+                audit="library.upload"):
         """上傳 GGUF 的一塊：本文是檔案的位元組。不是 JSON，所以另外擋跨站：要登入、要 octet-stream、
         要帶自訂標頭 X-XConsole-Upload（跨站的表單送不出自訂標頭，fetch 送的話會先被 CORS 預檢擋下）。"""
         try:
@@ -1832,8 +1873,8 @@ class Handler(BaseHTTPRequestHandler):
         g = lambda k: (q.get(k) or [""])[0]  # noqa: E731
         if not re.fullmatch(r"\d{1,15}", g("offset")) or not re.fullmatch(r"\d{1,15}", g("total")):
             return self._json(400, {"error": "分塊的位置或大小不對"})
-        qs = urllib.parse.urlencode({k: g(k) for k in ("folder", "name", "offset", "total")})
-        req, ctx = node_request(node_id, "/library/upload?" + qs, data, "application/octet-stream")
+        qs = urllib.parse.urlencode({k: g(k) for k in keys})
+        req, ctx = node_request(node_id, agent_path + "?" + qs, data, "application/octet-stream")
         if req is None:
             return self._json(404, {"error": ctx})
         try:
@@ -1844,7 +1885,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             return self._json(502, {"error": f"連不上那台的代理：{str(exc)[:120]}"})
         if g("offset") == "0" or out.get("done"):
-            self._audit("library.upload", f"{node_id}/{g('folder')}/{g('name')}", code == 200,
+            self._audit(audit, f"{node_id}/{g('folder') + '/' if g('folder') else ''}{g('name')}", code == 200,
                         {"total": int(g("total")), "done": bool(out.get("done")), "message": out.get("error")})
         return self._json(code, out)
 
@@ -2293,7 +2334,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/sd/catalog":
             return self._json(200, {"items": SD_CATALOG.load(), "roles": recommend.SD_ROLES, "kinds": recommend.SD_KINDS,
                                     "samplers": recommend.SD_SAMPLERS})
-        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output)?)?", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output(?:/[0-3])?|/init)?)?", path)
         if m:
             return self._json(*call_node(m.group(1), "/sd/jobs" + (m.group(2) or ""), timeout=60))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
@@ -2342,6 +2383,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/upload", path)
         if m:
             return self._upload(m.group(1), ctype)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/import", path)
+        if m:
+            return self._upload(m.group(1), ctype, f"/{m.group(2)}/import", ("name", "offset", "total"), f"{m.group(2)}.import.upload")
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -2353,7 +2397,7 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             self._headers_done()
             return self._json(401, {"error": "請先登入"})
-        body = self._body(MAX_ANON_BODY if anon else MAX_BODY)
+        body = self._body(MAX_ANON_BODY if anon else EXTRACT_BODY if path == "/api/extract" else MAX_BODY)
         self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
@@ -2460,6 +2504,15 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
                                                                        "agent_port": port}})
             return self._json(200, {"ok": True})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/import/(status|cancel|install)", path)
+        if m:
+            nid, kind, act = m.groups()
+            want = {"name": str(body.get("name") or "")[:200]} | ({"sha256": str(body.get("sha256") or "")[:80]} if act == "install" else {})
+            code, out = call_node(nid, f"/{kind}/import/{act}", "POST", want, timeout=60)
+            if act != "status":
+                self._audit(f"{kind}.import.{act}", f"{nid}/{want['name']}", code == 200,
+                            {"sha256": want.get("sha256") or None} | ({"message": out.get("error")} if code != 200 else {}))
+            return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel|sd/build|sd/build/cancel)", path)
         if m:
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
@@ -2472,6 +2525,13 @@ class Handler(BaseHTTPRequestHandler):
                         {k: body.get(k) for k in ("memory_model", "ram_floor_gib", "vram_floor_gib", "bandwidth_gbs", "ram_bandwidth_gbs", "gguf_root",
                                                   "llama_server", "sd_cli", "agent_enabled", "type", "unit", "role", "tier", "port", "key", "name") if k in body}
                         | ({"message": out.get("error")} if code != 200 else {}))
+            return self._json(code, out)
+
+        # ---- 對話附件：抽出文件的文字（不存檔、不寫稽核內容，只記檔名大小）
+        if path == "/api/extract":
+            code, out = extract_doc(body.get("name"), body.get("b64"))
+            self._audit("chat.extract", str(body.get("name") or "")[:120], code == 200,
+                        {"chars": out.get("chars"), "message": out.get("error")})
             return self._json(code, out)
 
         # ---- 執行預覽
@@ -2636,11 +2696,13 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             node_id, act = m.groups()
             keys = {"delete": ("id",), "admit": ("model", "width", "height", "frames"),
-                    "generate": ("model", "prompt", "negative", "width", "height", "steps", "cfg", "sampler", "seed", "frames", "fps")}[act]
+                    "generate": ("model", "prompt", "negative", "width", "height", "steps", "cfg", "sampler", "seed", "frames", "fps",
+                                 "count", "strength", "init_image")}[act]
             code, out = call_node(node_id, f"/sd/{act}", "POST", {k: body.get(k) for k in keys}, timeout=120)
             if act != "admit":
                 self._audit(f"sd.{act}", f"{node_id}/{body.get('id') or body.get('model')}", code == 200,
-                            {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}"}
+                            {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}",
+                                                             "count": body.get("count") or 1, "init_image": bool(body.get("init_image"))}
                                                             if act == "generate" else {"freed_gib": out.get("freed_gib")}))
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)

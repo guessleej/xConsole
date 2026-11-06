@@ -43,6 +43,10 @@ jobs:
         run: cd console && python test_branding.py
       - name: 畫圖與影片（准入三種架構、中國來源含文字編碼器、sd-cli 參數、看門狗）
         run: cd console && python test_sd.py
+      - name: 補齊 LocModel 差距（Intel、SSD、引擎續傳與匯入、參考圖與多張）
+        run: cd agent && python test_gaps.py
+      - name: 對話附件抽文字（獨立行程、壓縮炸彈、逾時）
+        run: cd console && python test_extract.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）

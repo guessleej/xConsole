@@ -1141,6 +1141,10 @@ async function edgeSha256(f) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function sha256Hex(blob) {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function libUploadCard(ok, only) {
   const c = card("從這台電腦匯入 GGUF", "不用轉格式；檔案直接送到那台的存放區");
   const form = el("div", "form-row");
@@ -1693,10 +1697,17 @@ function catalogEditor(e, uses, done) {
 const SD_KIND = { image: "畫圖", video: "影片" };
 const SD_ROLE = { model: "完整模型", diffusion: "擴散模型", clip_l: "CLIP-L", clip_g: "CLIP-G", t5xxl: "T5-XXL",
   llm: "文字編碼器", vae: "VAE", audio_vae: "音訊 VAE", connectors: "嵌入連接器" };
+// 畫幅照 LocModel：方形、直式、橫式都有（寬高都是 16 的倍數）
 const SD_SIZES = {
-  image: [[512, 512], [768, 768], [1024, 1024], [1024, 768], [768, 1024], [1280, 720]],
-  video: [[512, 320], [768, 512], [1024, 576], [1280, 720]],
+  image: [[1024, 1024], [768, 1024], [1024, 768], [720, 1280], [1280, 720], [512, 512], [768, 768]],
+  video: [[768, 512], [512, 768], [1024, 576], [576, 1024], [1280, 720], [720, 1280], [512, 320], [320, 512]],
 };
+function sizeLabel(w, h) {
+  const g = (a, b) => (b ? g(b, a % b) : a);
+  const d = g(w, h);
+  const r = { "1:1": "方形", "3:4": "直式", "9:16": "直式", "2:3": "直式", "4:3": "橫式", "16:9": "橫式", "3:2": "橫式", "8:5": "橫式", "5:8": "直式" }[`${w / d}:${h / d}`];
+  return `${w}×${h}${r ? `（${w / d}:${h / d} ${r}）` : ""}`;
+}
 
 async function getSdRec(nid, fresh) {
   S.sdRec = S.sdRec || {};
@@ -1968,17 +1979,59 @@ function sdGen(n, rec, redraw, toRec, kind) {
   const fSampler = selectInput(["euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m", "dpm++2mv2", "ipndm", "ipndm_v", "lcm", "ddim_trailing", "tcd"].map((x) => [x, x]));
   const fFrames = selectInput([17, 33, 49, 65, 97, 121].map((x) => [String(x), `${x} 格`]));
   const fFps = numInput(24);
+  const fCount = selectInput([1, 2, 3, 4].map((x) => [String(x), `${x} 張`]));
+  // 參考圖：畫圖＝在這張上面重繪；影片＝當第一格畫面，接著往下演
+  const fInit = el("input");
+  fInit.type = "file";
+  fInit.accept = "image/png,image/jpeg,image/webp";
+  fInit.hidden = true;
+  // 縮圖用 Blob 網址顯示（不把讀進來的字串直接塞進 src）；送給代理時才組成 data URL，代理會再看檔頭
+  const INIT_TYPES = ["image/png", "image/jpeg", "image/webp"];
+  const initState = { b64: null, mime: null, url: null };
+  const initPick = el("button", "btn sm", "選一張圖");
+  const initClear = el("button", "btn sm", "拿掉");
+  const initThumb = el("img", "sd-init-thumb");
+  initThumb.alt = "參考圖";
+  const setInit = (b64, mime) => {
+    const okType = !!b64 && INIT_TYPES.includes(mime);
+    if (initState.url && initState.b64 !== b64) { URL.revokeObjectURL(initState.url); initState.url = null; }
+    initState.b64 = okType ? b64 : null;
+    initState.mime = okType ? mime : null;
+    if (okType && !initState.url) {
+      initState.url = URL.createObjectURL(new Blob([Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))], { type: mime }));
+    }
+    initThumb.hidden = initClear.hidden = !okType;
+    if (okType) initThumb.src = initState.url; else initThumb.removeAttribute("src");
+    strengthBox.hidden = !okType || model()?.kind !== "image";
+  };
+  initPick.onclick = () => fInit.click();
+  initClear.onclick = () => setInit(null);
+  fInit.onchange = async () => {
+    const f = fInit.files[0];
+    fInit.value = "";
+    if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { toast("參考圖最大 4 MB", "bad"); return; }
+    if (!INIT_TYPES.includes(f.type)) { toast("參考圖只收 PNG、JPEG、WebP", "bad"); return; }
+    setInit(await readB64(f), f.type);
+  };
+  const initRow = el("div", "sd-init");
+  initRow.append(fInit, initThumb, initPick, initClear);
+  const fStrength = numInput(0.75);
+  fStrength.min = "0.05"; fStrength.max = "1"; fStrength.step = "0.05";
+  const strengthBox = fieldBox("重繪強度", fStrength, "0.3 左右只改細節，0.8 以上幾乎重畫");
+  const initBox = fieldBox("參考圖（選填）", initRow, "在這張圖上面照提示詞重畫");
+  const countBox = fieldBox("張數", fCount, "同一組設定一次產幾張，種子依序加一");
   const fr = el("div", "form-row");
   const framesBox = fieldBox("影格數", fFrames, "8 的倍數加 1；越多越長、越吃記憶體");
   const fpsBox = fieldBox("每秒格數", fFps);
-  fr.append(fieldBox("尺寸", fSize), fieldBox("步數", fSteps, "清單的預設通常就是最佳值"), fieldBox("引導強度", fCfg, "FLUX 類設 1"),
+  fr.append(fieldBox("畫幅", fSize), countBox, fieldBox("步數", fSteps, "清單的預設通常就是最佳值"), fieldBox("引導強度", fCfg, "FLUX 類設 1"),
     fieldBox("種子", fSeed, "-1＝隨機；同種子同設定會產出同一張"), fieldBox("取樣方法", fSampler), framesBox, fpsBox);
   const admit = el("div", "sd-admit small");
   const err = el("div");
   const go = el("button", "btn primary", "產生");
   const row = el("div", "slot-actions");
   row.append(admit, el("span", "spacer"), go);
-  if (ready.length && rec.sd_cli) left.append(fieldBox("模型", fModel), fieldBox("提示詞", fPrompt), fieldBox("不要出現的內容", fNeg), fr, err, row);
+  if (ready.length && rec.sd_cli) left.append(fieldBox("模型", fModel), fieldBox("提示詞", fPrompt), fieldBox("不要出現的內容", fNeg), initBox, strengthBox, fr, err, row);
 
   const model = () => ready.find((m) => m.id === fModel.value);
   const applyDefaults = (m) => {
@@ -1987,7 +2040,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fSize.textContent = "";
     const sizes = SD_SIZES[m.kind].slice();
     if (!sizes.some(([w, h]) => w === d.width && h === d.height)) sizes.unshift([d.width, d.height]);
-    sizes.forEach(([w, h]) => { const o = el("option", null, `${w}×${h}${w === d.width && h === d.height ? "（預設）" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
+    sizes.forEach(([w, h]) => { const o = el("option", null, `${sizeLabel(w, h)}${w === d.width && h === d.height ? "・預設" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
     fSize.value = `${d.width}x${d.height}`;
     fSteps.value = d.steps ?? 20;
     fCfg.value = d.cfg ?? 1;
@@ -1997,6 +2050,11 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fFrames.value = fr;
     fFps.value = d.fps || 24;
     framesBox.hidden = fpsBox.hidden = m.kind !== "video";
+    countBox.hidden = m.kind === "video";
+    initBox.querySelector("label.field").textContent = m.kind === "video" ? "第一格畫面（選填）" : "參考圖（選填）";
+    const hint = initBox.querySelector(".assume");
+    if (hint) hint.textContent = m.kind === "video" ? "從這張圖開始，照提示詞接著往下演" : "在這張圖上面照提示詞重畫";
+    setInit(initState.b64, initState.mime);
     go.textContent = m.kind === "video" ? "產生影片" : "產生圖片";
   };
   const params = () => {
@@ -2004,7 +2062,8 @@ function sdGen(n, rec, redraw, toRec, kind) {
     const m = model();
     return { model: m.id, prompt: fPrompt.value.trim(), negative: fNeg.value.trim(), width: w, height: h,
       steps: Number(fSteps.value), cfg: Number(fCfg.value), seed: Number(fSeed.value), sampler: fSampler.value,
-      ...(m.kind === "video" ? { frames: Number(fFrames.value), fps: Number(fFps.value) } : {}) };
+      ...(m.kind === "video" ? { frames: Number(fFrames.value), fps: Number(fFps.value) } : { count: Number(fCount.value) }),
+      ...(initState.b64 ? { init_image: `data:${initState.mime};base64,${initState.b64}`, ...(m.kind === "image" ? { strength: Number(fStrength.value) } : {}) } : {}) };
   };
   // 試算：換模型、尺寸、影格數時問代理一次（產的時候還會再算一次，這裡只是先讓人知道夠不夠）
   let admitSeq = 0;
@@ -2054,6 +2113,10 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fCfg.value = j.cfg;
     fSampler.value = j.sampler;
     if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; }
+    fCount.value = String(j.count || 1);
+    if (j.strength) fStrength.value = j.strength;
+    setInit(null);
+    if (j.init) api(`/api/node/${n.id}/sd/jobs/${j.id}/init`).then((r) => setInit(r.b64, r.mime)).catch(() => {});
     checkAdmit();
   } };
 
@@ -2122,7 +2185,7 @@ function sdJobDelete(n, j, out, url) {
   const del = el("button", "btn sm danger", "刪除");
   del.onclick = async () => {
     try { await api(`/api/node/${n.id}/sd/jobs/${j.id}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
-    if (url) URL.revokeObjectURL(url);
+    [].concat(url || []).forEach((u) => URL.revokeObjectURL(u));
     out.textContent = "";
     S.sdReload?.();
   };
@@ -2133,7 +2196,8 @@ async function showJob(n, j, out, recent, form) {
   clearTimeout(S.genTimer);
   out.textContent = "";
   recent.querySelectorAll(".sd-job").forEach((b) => b.removeAttribute("aria-current"));
-  const info = el("div", "small muted", `${j.title}・${j.width}×${j.height}${j.frames ? `・${j.frames} 格` : ""}・${j.steps} 步・引導 ${j.cfg}・種子 ${j.seed}`
+  const info = el("div", "small muted", `${j.title}・${j.width}×${j.height}${j.frames ? `・${j.frames} 格` : ""}${(j.count || 1) > 1 ? `・${j.count} 張` : ""}`
+    + `${j.init ? (j.kind === "video" ? "・從參考圖開始" : `・參考圖重繪 ${j.strength}`) : ""}・${j.steps} 步・引導 ${j.cfg}・種子 ${j.seed}`
     + (j.secs ? `・${fmt(j.secs, 0)} 秒` : "") + (j.peak_gib ? `・最高用 ${fmt(j.peak_gib)} GiB` : ""));
   if (j.state !== "done") {
     out.appendChild(el("p", "note " + (j.state === "failed" ? "bad" : "warn"), j.error || { cancelled: "已取消", interrupted: "代理重啟過，這件沒產完" }[j.state] || j.state));
@@ -2145,29 +2209,54 @@ async function showJob(n, j, out, recent, form) {
     const box = el("div", "sd-media");
     box.appendChild(el("p", "small muted", "讀取中…"));
     out.append(box, info);
-    let r;
-    try { r = await api(`/api/node/${n.id}/sd/jobs/${j.id}/output`); } catch (ex) { box.textContent = ex.message; return; }
-    const bin = Uint8Array.from(atob(r.b64), (ch) => ch.charCodeAt(0));
-    const url = URL.createObjectURL(new Blob([bin], { type: r.mime }));
+    // 一次多張：第一張先出來，其他張接著抓；點縮圖換大圖，下載的是目前這張
+    const fetchOut = async (i) => {
+      const r = await api(`/api/node/${n.id}/sd/jobs/${j.id}/output/${i}`);
+      const bin = Uint8Array.from(atob(r.b64), (ch) => ch.charCodeAt(0));
+      return { ...r, url: URL.createObjectURL(new Blob([bin], { type: r.mime })) };
+    };
+    let first;
+    try { first = await fetchOut(0); } catch (ex) { box.textContent = ex.message; return; }
+    const shots = [first];
+    let curShot = first;
     box.textContent = "";
-    const media = el(r.mime.startsWith("video") ? "video" : "img");
-    media.src = url;
+    const media = el(first.mime.startsWith("video") ? "video" : "img");
+    media.src = first.url;
     if (media.tagName === "VIDEO") { media.controls = true; media.loop = true; } else media.alt = j.prompt;
     box.appendChild(media);
+    if ((first.count || 1) > 1) {
+      const strip = el("div", "sd-strip");
+      out.insertBefore(strip, info);
+      const thumb = (sh, i) => {
+        const b = el("button", "sd-thumb");
+        b.setAttribute("aria-label", `第 ${i + 1} 張`);
+        const im = el("img");
+        im.src = sh.url;
+        im.alt = "";
+        b.appendChild(im);
+        b.onclick = () => { media.src = sh.url; curShot = sh; strip.querySelectorAll(".sd-thumb").forEach((x) => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true"); };
+        if (i === 0) b.setAttribute("aria-current", "true");
+        strip.appendChild(b);
+      };
+      thumb(first, 0);
+      for (let i = 1; i < first.count; i++) {
+        try { const sh = await fetchOut(i); shots.push(sh); thumb(sh, i); } catch (_) { /* 少一張不影響其他張 */ }
+      }
+    }
     const acts = el("div", "slot-actions");
     const dl = el("button", "btn sm", "下載");
-    dl.onclick = () => { const a = el("a"); a.href = url; a.download = r.name; document.body.appendChild(a); a.click(); a.remove(); };
+    dl.onclick = () => { const a = el("a"); a.href = curShot.url; a.download = curShot.name; document.body.appendChild(a); a.click(); a.remove(); };
     acts.appendChild(dl);
     if (form) {
       const again = el("button", "btn sm", "用同樣的設定");
       again.onclick = () => {
         if ([...form.fModel.options].some((o) => o.value === j.model)) { form.fModel.value = j.model; S.sdModel = j.model; form.apply(); }
         form.restore(j);
-        toast("已帶入這件的全部設定（提示詞、尺寸、步數、引導強度、種子、取樣方法）", "ok");
+        toast("已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）", "ok");
       };
       acts.appendChild(again);
     }
-    acts.append(el("span", "spacer"), sdJobDelete(n, j, out, url));
+    acts.append(el("span", "spacer"), sdJobDelete(n, j, out, shots.map((x) => x.url)));
     out.appendChild(acts);
   }
   out.appendChild(el("p", "sd-prompt small", j.prompt));
@@ -4582,7 +4671,7 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
   const dl = pre.mode === "prebuilt";
   const verb = dl ? "安裝" : "編譯";
   if (!dl) {
-    body.appendChild(el("p", "small muted", `會下載 ${eng.name} 最新的正式版、在這台編譯 ${eng.exe}。加速方式：${{ cuda: "NVIDIA CUDA", hip: "AMD ROCm", cpu: "只用 CPU" }[pre.backend]}。`));
+    body.appendChild(el("p", "small muted", `會下載 ${eng.name} 最新的正式版、在這台編譯 ${eng.exe}。加速方式：${{ cuda: "NVIDIA CUDA", hip: "AMD ROCm", vulkan: "Vulkan（Intel／AMD）", cpu: "只用 CPU" }[pre.backend] || pre.backend}。`));
   }
   if (b.other) body.appendChild(el("p", "note warn", `這台正在安裝 ${ENGINE[b.other].name}，等它裝完才能裝這個（同時編兩個會把記憶體吃光）。`));
   pre.notes.forEach((t) => body.appendChild(el("p", "note", t)));
@@ -4599,8 +4688,10 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
   const draw = (j, tail, running) => {
     prog.textContent = "";
     if (!j.state) return;
-    const label = { running: `${verb}中：${j.phase}`, done: `裝好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消", interrupted: j.error }[j.state] || j.state;
-    head.className = "note " + (j.state === "done" ? "ok" : j.state === "running" ? "" : "bad");
+    const v = j.mode === "import" ? "匯入" : verb;
+    const label = { running: `${v}中：${j.phase}`, done: `裝好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消",
+      paused: j.error, interrupted: j.error }[j.state] || j.state;
+    head.className = "note " + (j.state === "done" ? "ok" : j.state === "running" ? "" : j.state === "paused" ? "warn" : "bad");
     head.textContent = `${j.tag || ""}　${label}`;
     prog.appendChild(head);
     if (j.state === "done") prog.appendChild(el("p", "small muted", kind === "sd" ? "裝好了。回模型庫的「畫圖與影片」下載一顆模型就能產圖。"
@@ -4610,8 +4701,14 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
     log.scrollTop = log.scrollHeight;
     startBtn.hidden = running;
     cancelBtn.hidden = !running;
+    // 預編譯版下載中可以暫停；暫停或下載到一半失敗，再按會從斷掉的位置接著下載
+    const dlNow = running && j.mode === "prebuilt" && j.phase === "下載";
+    cancelBtn.textContent = dlNow ? "暫停下載" : `取消${v}`;
+    if (dl) startBtn.textContent = j.state === "paused" || (j.state === "failed" && j.resumable) ? "繼續下載" : startLabel;
+    imp.hidden = running;
   };
-  const startBtn = formButton(ov, dl ? "一鍵安裝（下載幾十到幾百 MB）" : "開始編譯（約 10～30 分鐘）", "primary", async () => {
+  const startLabel = dl ? "一鍵安裝（下載幾十到幾百 MB）" : "開始編譯（約 10～30 分鐘）";
+  const startBtn = formButton(ov, startLabel, "primary", async () => {
     try { await api(`/api/node/${nid}/${kind}/build`, { method: "POST", body: {} }); } catch (ex) { errNote(prog, ex.message); return; }
     toast(`開始${verb}，可以關掉這個視窗，之後再回來看進度`, "ok");
     poll();
@@ -4621,6 +4718,8 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
   const cancelBtn = formButton(ov, `取消${verb}`, "danger", async () => {
     try { await api(`/api/node/${nid}/${kind}/build/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); }
   });
+  const imp = engineImportBox(nid, kind, eng, () => poll());
+  body.appendChild(imp);
   draw(b.job, b.log_tail, b.running);
   // 進行中每 3 秒只換掉狀態與記錄的文字，不重畫整個視窗
   async function poll() {
@@ -4636,6 +4735,73 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
     }
   }
   if (b.running) setTimeout(poll, 3000);
+}
+
+/* 手動匯入安裝包：不能連外的機器，在別台電腦下載官方的壓縮檔，從這裡送上去裝。分塊送、可以暫停與續傳。 */
+function engineImportBox(nid, kind, eng, onStart) {
+  const box = el("details", "eng-import");
+  box.appendChild(el("summary", null, "這台不能連外？改成手動匯入安裝包"));
+  box.appendChild(el("p", "small muted", `在能上網的電腦到 ${eng.name} 官方 GitHub 的版本頁，下載這台系統與顯示卡用的壓縮檔`
+    + `（.zip 或 .tar.gz），在這裡選檔送上去。檔案旁邊的 sha256 一併貼上，送齊後會核對，對不上就不裝。`));
+  const fFile = el("input");
+  fFile.type = "file";
+  fFile.accept = ".zip,.gz,.tgz";
+  const fSha = textInput("", "選填，64 個字元");
+  const form = el("div", "form-row");
+  form.append(fieldBox("安裝包", fFile), fieldBox("官方的 sha256", fSha, "不確定就留空，裝完會把算出來的值寫在記錄裡，請自己核對"));
+  const line = el("p", "small mono");
+  const bar = el("div", "bar thin");
+  const fill = el("div", "seg");
+  bar.appendChild(fill);
+  bar.hidden = true;
+  const goB = el("button", "btn primary", "送上去並安裝");
+  const stopB = el("button", "btn sm", "暫停");
+  stopB.hidden = true;
+  const row = el("div", "slot-actions");
+  row.append(goB, stopB);
+  box.append(form, row, bar, line);
+  let ctl = null;
+  stopB.onclick = () => ctl?.abort();
+  goB.onclick = async () => {
+    const f = fFile.files[0];
+    if (!f) { line.textContent = "先選安裝包"; return; }
+    if (!/\.(zip|tar\.gz|tgz)$/i.test(f.name)) { line.textContent = "只收 .zip、.tar.gz、.tgz"; return; }
+    const sha = fSha.value.trim().toLowerCase();
+    if (sha && !/^[0-9a-f]{64}$/.test(sha)) { line.textContent = "sha256 要是 64 個十六進位字元"; return; }
+    const name = f.name.replace(/[^\w.+-]+/g, "-").replace(/^[^A-Za-z0-9]+/, "");
+    ctl = new AbortController();
+    goB.disabled = true; stopB.hidden = false; bar.hidden = false;
+    try {
+      // 伺服器上同名的舊包（上次裝失敗留下的）一律換掉；送到一半的，開頭一樣才接著送，不一樣就從頭送
+      const st = await api(`/api/node/${nid}/${kind}/import/status`, { method: "POST", body: { name } });
+      let off = st.received || 0;
+      if (st.exists || (off && (off > f.size || st.head_sha256 !== await sha256Hex(f.slice(0, Math.min(off, 4 * 1024 * 1024)))))) {
+        await api(`/api/node/${nid}/${kind}/import/cancel`, { method: "POST", body: { name } });
+        off = 0;
+      }
+      const CH = 32 * 1024 * 1024;
+      while (off < f.size) {
+        const res = await fetch(`/api/node/${nid}/${kind}/import?` + new URLSearchParams({ name, offset: off, total: f.size }), {
+          method: "POST", body: f.slice(off, Math.min(off + CH, f.size)), signal: ctl.signal, credentials: "same-origin",
+          headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" } });
+        const r = await res.json().catch(() => ({}));
+        if (res.status === 409 && r.received !== undefined) { off = r.received; continue; }
+        if (!res.ok) throw new Error(r.error || `伺服器回 ${res.status}`);
+        off = r.received;
+        const pct = Math.floor((off / f.size) * 100);
+        fill.style.width = pct + "%";
+        line.textContent = `${f.name}　${fmt(off / 1048576, 0)} / ${fmt(f.size / 1048576, 0)} MB（${pct}%）`;
+      }
+      await api(`/api/node/${nid}/${kind}/import/install`, { method: "POST", body: { name, sha256: sha } });
+      line.textContent = "送齊了，正在核對、解壓縮、試跑；進度看上面";
+      onStart?.();
+    } catch (ex) {
+      line.textContent = ex.name === "AbortError" ? "已暫停；再按一次會從斷掉的地方接著送" : "匯入失敗：" + ex.message;
+    } finally {
+      goB.disabled = false; stopB.hidden = true;
+    }
+  };
+  return box;
 }
 
 function machineSteps(n, info) {
