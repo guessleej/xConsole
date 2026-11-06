@@ -114,10 +114,10 @@ def start_installer(state_dir, url, sha256, version, opener):
                 raise ValueError("安裝檔名稱不對，不下載")
             data = _download(url, sha256, max_bytes=MAX_INSTALLER)
             path = os.path.join(d, name)
-            with open(path, "wb") as fh:
+            # 建立的當下就只有自己能讀寫執行（不是先用預設權限建好再 chmod，中間會有一段別的帳號讀得到）
+            with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o700), "wb") as fh:
                 fh.write(data)
-            if not path.endswith(".exe"):
-                os.chmod(path, 0o700)                 # 只有自己能讀能執行
+            os.chmod(path, 0o700)                     # 檔案原本就在時 os.open 不會改權限，再設一次
             _job("installer_ready", message="安裝檔已下載並核對過，請照安裝程式的畫面完成更新", path=path)
             opener(path)
         except Exception as ex:  # noqa: BLE001
