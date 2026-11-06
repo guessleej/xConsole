@@ -17233,5 +17233,50 @@
 "en": " is a system folder and cannot be the storage area",
 "ja": " はシステムフォルダーのため保存先にできません",
 "ko": " 은(는) 시스템 폴더라 저장소로 쓸 수 없습니다"
+},
+"一小時內": {
+"en": "within an hour",
+"ja": "1 時間以内に",
+"ko": "1시간 안에"
+},
+"有帶權杖": {
+"en": "token sent",
+"ja": "トークンあり",
+"ko": "토큰 사용"
+},
+"沒有帶權杖": {
+"en": "no token sent",
+"ja": "トークンなし",
+"ko": "토큰 없음"
+},
+"GitHub 一小時的查詢次數用完了（上限 {0} 次、{1}，{2} 後恢復）": {
+"en": "GitHub's hourly query limit is used up (limit {0}, {1}; resets at {2})",
+"ja": "GitHub の 1 時間あたりの照会回数を使い切りました（上限 {0} 回、{1}、{2} に回復）",
+"ko": "GitHub 시간당 조회 횟수를 모두 썼습니다(한도 {0}회, {1}, {2}에 복구)"
+},
+"GitHub 一小時的查詢次數用完了（上限": {
+"en": "GitHub's hourly query limit is used up (limit",
+"ja": "GitHub の 1 時間あたりの照会回数を使い切りました（上限",
+"ko": "GitHub 시간당 조회 횟수를 모두 썼습니다(한도"
+},
+"後恢復": {
+"en": "until reset",
+"ja": "に回復",
+"ko": "에 복구"
+},
+"GitHub 一小時的查詢次數用完了（上限 ": {
+"en": "GitHub's hourly query limit is used up (limit ",
+"ja": "GitHub の 1 時間あたりの照会回数を使い切りました（上限 ",
+"ko": "GitHub 시간당 조회 횟수를 모두 썼습니다(한도 "
+},
+" 次、": {
+"en": ", ",
+"ja": "回、",
+"ko": "회, "
+},
+" 後恢復）": {
+"en": ")",
+"ja": "に回復）",
+"ko": "에 복구)"
 }
 }

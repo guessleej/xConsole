@@ -12704,6 +12704,30 @@
 "pattern": false
 },
 {
+"zh": "一小時內",
+"pattern": false
+},
+{
+"zh": "有帶權杖",
+"pattern": false
+},
+{
+"zh": "沒有帶權杖",
+"pattern": false
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限 {0} 次、{1}，{2} 後恢復）",
+"pattern": true
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限",
+"pattern": false
+},
+{
+"zh": "後恢復",
+"pattern": false
+},
+{
 "zh": "壓縮檔裡有不安全的路徑：{0}",
 "pattern": true
 },
@@ -13305,6 +13329,18 @@
 },
 {
 "zh": "有 Intel 顯示卡但沒有 Vulkan 開發套件，會編成只用 CPU。要用 GPU 請 IT 執行：sudo apt install libvulkan-dev glslc mesa-vulkan-drivers",
+"pattern": false
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限 ",
+"pattern": false
+},
+{
+"zh": " 次、",
+"pattern": false
+},
+{
+"zh": " 後恢復）",
 "pattern": false
 },
 {
