@@ -349,6 +349,23 @@ except OSError as ex:
 finally:
     A.urllib.request.urlopen = real_open
 case("GitHub 次數用完：講清楚上限、有沒有帶權杖、幾點恢復", "上限 60" in msg and "沒有帶權杖" in msg and "恢復" in msg, msg)
+tries = []
+
+
+def _flaky(req, timeout=30):
+    tries.append(1)
+    if len(tries) < 3:
+        raise A.urllib.error.HTTPError(req.full_url, 504, "Gateway Timeout", {}, None)
+    return _R(b"[1]")
+
+
+A.urllib.request.urlopen, real_sleep = _flaky, A.time.sleep
+A.time.sleep = lambda s: None
+try:
+    got = A._gh_json("/repos/x/y/releases")
+finally:
+    A.urllib.request.urlopen, A.time.sleep = real_open, real_sleep
+case("GitHub 偶爾回 504：等一下再問，第三次拿到就好", got == [1] and len(tries) == 3, (got, tries))
 
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
