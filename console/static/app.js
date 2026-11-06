@@ -945,7 +945,7 @@ function libDownloadCard(ok, only) {
   form.appendChild(w2);
   // 不知道完整名稱時先用關鍵字找（照下載數排），點一下就帶進上面的名稱並列出量化
   const sRow = el("div", "search-row");
-  const fQ = textInput("", "用關鍵字找 GGUF，例：gemma 4、gpt-oss、granite");
+  const fQ = textInput("", "關鍵字（例：gemma 4、gpt-oss），或直接貼 Hugging Face 網址");
   const sBtn = el("button", "btn sm", "搜尋");
   sRow.append(fQ, sBtn);
   const sOut = el("div", "hf-results");
@@ -954,6 +954,9 @@ function libDownloadCard(ok, only) {
   const search = async () => {
     const q = fQ.value.trim();
     if (!q) return;
+    // 貼的是網址或「作者/模型」：直接列出這個 repo 的量化，不用先搜尋
+    const direct = hfRepoOf(q);
+    if (direct) { fRepo.value = direct; sOut.hidden = true; listBtn.click(); return; }
     sOut.hidden = false;
     loading(sOut);
     let r;
@@ -985,7 +988,9 @@ function libDownloadCard(ok, only) {
     choices.appendChild(el("p", "small muted", "查詢中…"));
     let r;
     const stale = () => fNode.value !== nodeId;   // 查詢途中換了目標機器：舊結果丟掉，免得下載按鈕綁在上一台
-    try { r = await api(`/api/node/${nodeId}/library/hf`, { method: "POST", body: { repo: fRepo.value.trim(), token: fTok.value } }); } catch (ex) {
+    const repo = hfRepoOf(fRepo.value) || fRepo.value.trim();
+    fRepo.value = repo;
+    try { r = await api(`/api/node/${nodeId}/library/hf`, { method: "POST", body: { repo, token: fTok.value } }); } catch (ex) {
       if (stale()) return;
       choices.textContent = "";
       choices.appendChild(el("p", "note bad", ex.message));
@@ -993,7 +998,28 @@ function libDownloadCard(ok, only) {
     }
     if (stale()) return;
     choices.textContent = "";
-    if (!r.choices.length) { choices.appendChild(el("p", "note warn", "這個 repo 沒有 GGUF 檔。llama.cpp 只吃 GGUF，請找名稱帶 GGUF 的 repo。")); return; }
+    if (!r.choices.length) {
+      // 原始權重（safetensors）的 repo：推理引擎只吃 GGUF，自動找別人轉好的 GGUF 版本給人挑
+      choices.appendChild(el("p", "note", `${repo} 是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化：`));
+      const alt = el("div", "hf-results");
+      choices.appendChild(alt);
+      loading(alt);
+      const name = repo.split("/").pop().replace(/-(GGUF|gguf)$/, "");
+      let found = [];
+      try { found = (await api(`/api/node/${nodeId}/library/hf/search`, { method: "POST", body: { q: name.slice(0, 80), token: fTok.value } })).results; } catch (_) { found = []; }
+      if (stale()) return;
+      alt.textContent = "";
+      if (!found.length) { alt.appendChild(el("p", "small muted", "還沒有人轉成 GGUF。可以換一個名稱搜尋，或等社群轉好再來。")); return; }
+      found.forEach((x) => {
+        const b = el("button", "hf-hit");
+        b.appendChild(el("span", "mono", x.repo));
+        if (x.cn_origin) b.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+        b.appendChild(el("span", "small muted", `下載 ${int(x.downloads)}・${x.updated || ""}`));
+        b.onclick = () => { fRepo.value = x.repo; listBtn.click(); };
+        alt.appendChild(b);
+      });
+      return;
+    }
     if (r.choices.some((c) => c.cn_origin)) choices.appendChild(el("p", "note warn", "這是中國來源的模型：內部測試可以用，政府案不得使用。"));
     let mm = null;
     if (r.mmproj.length) {
@@ -1737,7 +1763,9 @@ const SD_SIZES = {
   image: [[1024, 1024], [768, 1024], [1024, 768], [720, 1280], [1280, 720], [512, 512], [768, 768]],
   video: [[768, 512], [512, 768], [1024, 576], [576, 1024], [1280, 720], [720, 1280], [512, 320], [320, 512]],
 };
-function sizeLabel(w, h) {
+function sizeLabel(w, h, kind) {
+  // 影片用 480P／720P 加橫式／直式來說（一般人看得懂的說法）
+  if (kind === "video") return `${Math.min(w, h)}P ${w > h ? "橫式" : w < h ? "直式" : "方形"}（${w}×${h}）`;
   const g = (a, b) => (b ? g(b, a % b) : a);
   const d = g(w, h);
   const r = { "1:1": "方形", "3:4": "直式", "9:16": "直式", "2:3": "直式", "4:3": "橫式", "16:9": "橫式", "3:2": "橫式", "8:5": "橫式", "5:8": "直式" }[`${w / d}:${h / d}`];
@@ -2022,7 +2050,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
   }
   const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・內部測試" : ""}）`]), S.sdModel);
   const fPrompt = el("textarea");
-  fPrompt.placeholder = "想要的畫面，英文描述效果最好。例：a red fox sitting in fresh snow, morning light, photo";
+  fPrompt.placeholder = "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格";
   fPrompt.maxLength = 2000;
   const fNeg = el("textarea", "short");
   fNeg.placeholder = "不要出現的內容（選填）。例：blurry, text, watermark";
@@ -2079,8 +2107,14 @@ function sdGen(n, rec, redraw, toRec, kind) {
   const initBox = fieldBox("參考圖（選填）", initRow, "在這張圖上面照提示詞重畫");
   const countBox = fieldBox("張數", fCount, "同一組設定一次產幾張，種子依序加一");
   const fr = el("div", "form-row");
-  const framesBox = fieldBox("影格數", fFrames, "8 的倍數加 1；越多越長、越吃記憶體");
+  const framesBox = fieldBox("長度", fFrames, "越長越吃記憶體、產得越久");
   const fpsBox = fieldBox("每秒格數", fFps);
+  // 長度用秒數說（LocModel 的說法），格數放括號；每秒格數改了就重算
+  const relabelFrames = () => {
+    const fps = Math.max(1, Number(fFps.value) || 24);
+    [...fFrames.options].forEach((o) => { const v = Number(o.value); o.textContent = `約 ${((v - 1) / fps).toFixed(1)} 秒（${v} 格）`; });
+  };
+  fFps.oninput = relabelFrames;
   fr.append(fieldBox("畫幅", fSize), countBox, fieldBox("步數", fSteps, "清單的預設通常就是最佳值"), fieldBox("引導強度", fCfg, "FLUX 類設 1"),
     fieldBox("種子", fSeed, "-1＝隨機；同種子同設定會產出同一張"), fieldBox("取樣方法", fSampler), framesBox, fpsBox);
   const admit = el("div", "sd-admit small");
@@ -2097,7 +2131,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fSize.textContent = "";
     const sizes = SD_SIZES[m.kind].slice();
     if (!sizes.some(([w, h]) => w === d.width && h === d.height)) sizes.unshift([d.width, d.height]);
-    sizes.forEach(([w, h]) => { const o = el("option", null, `${sizeLabel(w, h)}${w === d.width && h === d.height ? "・預設" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
+    sizes.forEach(([w, h]) => { const o = el("option", null, `${sizeLabel(w, h, m.kind)}${w === d.width && h === d.height ? "・預設" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
     fSize.value = `${d.width}x${d.height}`;
     fSteps.value = d.steps ?? 20;
     fCfg.value = d.cfg ?? 1;
@@ -2106,6 +2140,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     if (![...fFrames.options].some((o) => o.value === fr)) { const o = el("option", null, `${fr} 格`); o.value = fr; fFrames.prepend(o); }
     fFrames.value = fr;
     fFps.value = d.fps || 24;
+    relabelFrames();
     framesBox.hidden = fpsBox.hidden = m.kind !== "video";
     countBox.hidden = m.kind === "video";
     initBox.querySelector("label.field").textContent = m.kind === "video" ? "第一格畫面（選填）" : "參考圖（選填）";
@@ -2146,6 +2181,23 @@ function sdGen(n, rec, redraw, toRec, kind) {
   go.onclick = async () => {
     errNote(err, "");
     go.disabled = true;
+    // 中文提示詞：這台有執行中的對話模型就先翻成英文（多數畫圖、影片模型看英文效果最好），翻好的放回框裡讓人看得到
+    if (/[\u3400-\u9fff]/.test(fPrompt.value)) {
+      const chat = (n.state?.slots || []).find((x) => (x.kind === "llama" || x.kind === "strata") && x.busy && (x.caps || ["文字"]).includes("文字"));
+      if (chat) {
+        const zh = fPrompt.value;
+        go.textContent = "翻譯提示詞中…";
+        try {
+          const out = await api(`/api/node/${n.id}/chat/${chat.id}`, { method: "POST", body: { stream: false, max_tokens: 300, temperature: 0.2,
+            messages: [{ role: "system", content: "You write prompts for " + (model()?.kind === "video" ? "text-to-video" : "text-to-image")
+              + " models. Rewrite the user's request as ONE concise English prompt made of comma-separated descriptive phrases "
+              + "(subject, setting, style, lighting, camera). Output only the prompt." }, { role: "user", content: zh }] } });
+          const en = String(out.choices?.[0]?.message?.content || "").replace(/^["'「]|["'」]$/g, "").split("\n").find((x) => x.trim()) || "";
+          if (en.trim().length >= 3) { fPrompt.value = en.trim(); toast("已把中文提示詞翻成英文（原文：" + zh.slice(0, 40) + "）", "ok"); }
+        } catch (_) { /* 翻不了就用原文 */ }
+        go.textContent = model()?.kind === "video" ? "產生影片" : "產生圖片";
+      } else toast("這台沒有執行中的對話模型，提示詞照中文送出；FLUX、LTX 這類模型看英文效果比較好", "warn");
+    }
     let r;
     try { r = await api(`/api/node/${n.id}/sd/generate`, { method: "POST", body: params() }); } catch (ex) {
       errNote(err, ex.data?.admit ? ex.data.admit.reasons.join("；") : ex.message);
@@ -2169,7 +2221,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fSteps.value = j.steps;
     fCfg.value = j.cfg;
     fSampler.value = j.sampler;
-    if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; }
+    if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; relabelFrames(); }
     fCount.value = String(j.count || 1);
     if (j.strength) fStrength.value = j.strength;
     setInit(null);
@@ -3497,6 +3549,14 @@ function viewLogs() {
 /* ================================================================ 設定頁（五個分頁）
    分頁順序照管理者實際的先後：先確認機器都連得上 → 處理憑證 → 看使用報告 → 帳號；
    品牌只在交機時設一次，放最後。 */
+
+// 使用者貼的 Hugging Face 網址或名稱 → 「作者/模型」；不是這兩種回 null
+function hfRepoOf(text) {
+  const t = String(text || "").trim();
+  const u = t.match(/^(?:https?:\/\/)?(?:www\.)?(?:huggingface\.co|hf\.co)\/([A-Za-z0-9][\w.-]{0,95})\/([A-Za-z0-9][\w.-]{0,95})/);
+  if (u) return `${u[1]}/${u[2]}`;
+  return /^[A-Za-z0-9][\w.-]{0,95}\/[A-Za-z0-9][\w.-]{0,95}$/.test(t) ? t : null;
+}
 
 const SETTINGS_TABS = [
   ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],

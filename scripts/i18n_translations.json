@@ -17658,5 +17658,60 @@
 "en": "Running out of unified memory freezes the whole machine; ",
 "ja": "統合メモリを使い切るとマシン全体が固まります。",
 "ko": "통합 메모리를 다 쓰면 기기 전체가 멈춥니다. "
+},
+"關鍵字（例：gemma 4、gpt-oss），或直接貼 Hugging Face 網址": {
+"en": "Keyword (e.g. gemma 4, gpt-oss), or paste a Hugging Face link",
+"ja": "キーワード（例：gemma 4、gpt-oss）、または Hugging Face のリンクを貼り付け",
+"ko": "키워드(예: gemma 4, gpt-oss) 또는 Hugging Face 링크 붙여넣기"
+},
+"{0} 是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化：": {
+"en": "{0} holds the original weights with no GGUF files. Below are GGUF conversions by others (by downloads); click one to list its quantizations:",
+"ja": "{0} は元の重みで GGUF ファイルがありません。以下は他の人が変換した GGUF 版です（ダウンロード数順）。クリックすると量子化を一覧します：",
+"ko": "{0}은(는) 원본 가중치라 GGUF 파일이 없습니다. 아래는 다른 사람이 변환한 GGUF 버전입니다(다운로드 순). 클릭하면 양자화 목록을 봅니다:"
+},
+"是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化": {
+"en": "holds the original weights with no GGUF files. Below are GGUF conversions by others; click one to list its quantizations",
+"ja": "は元の重みで GGUF ファイルがありません。以下は他の人が変換した GGUF 版です。クリックで量子化を一覧",
+"ko": "은(는) 원본 가중치라 GGUF 파일이 없습니다. 아래 변환 버전을 클릭해 양자화를 보세요"
+},
+"還沒有人轉成 GGUF。可以換一個名稱搜尋，或等社群轉好再來。": {
+"en": "No one has converted it to GGUF yet. Try another name, or check back once the community converts it.",
+"ja": "まだ GGUF に変換されていません。別の名前で検索するか、コミュニティの変換を待ってください。",
+"ko": "아직 GGUF로 변환된 것이 없습니다. 다른 이름으로 검색하거나 커뮤니티 변환을 기다리세요."
+},
+"想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格": {
+"en": "The picture you want, in any language. E.g. a red fox in the snow, morning light, photo style",
+"ja": "欲しい画面。日本語でも英語でも可。例：雪の中の赤いキツネ、朝の光、写真風",
+"ko": "원하는 장면. 한국어든 영어든 가능. 예: 눈 속의 붉은 여우, 아침 햇살, 사진 스타일"
+},
+"長度": {
+"en": "Length",
+"ja": "長さ",
+"ko": "길이"
+},
+"越長越吃記憶體、產得越久": {
+"en": "Longer uses more memory and takes longer",
+"ja": "長いほどメモリを使い、時間もかかります",
+"ko": "길수록 메모리를 더 쓰고 오래 걸립니다"
+},
+"約 {0} 秒（{1} 格）": {
+"en": "about {0} s ({1} frames)",
+"ja": "約 {0} 秒（{1} フレーム）",
+"ko": "약 {0}초({1}프레임)"
+},
+"翻譯提示詞中…": {
+"en": "Translating the prompt…",
+"ja": "プロンプトを翻訳中…",
+"ko": "프롬프트 번역 중…"
+},
+"已把中文提示詞翻成英文（原文：": {
+"en": "Translated the prompt into English (original: ",
+"ja": "プロンプトを英語に翻訳しました（原文：",
+"ko": "프롬프트를 영어로 번역했습니다(원문: "
+},
+"這台沒有執行中的對話模型，提示詞照中文送出；FLUX、LTX 這類模型看英文效果比較好": {
+"en": "No chat model is running on this machine, so the prompt is sent as is; models like FLUX and LTX work better with English",
+"ja": "このマシンで会話モデルが動いていないため、プロンプトはそのまま送ります。FLUX や LTX は英語の方が効果的です",
+"ko": "이 기기에서 대화 모델이 실행 중이 아니라 프롬프트를 그대로 보냅니다. FLUX, LTX 같은 모델은 영어가 더 효과적입니다"
 }
 }

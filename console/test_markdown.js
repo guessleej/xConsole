@@ -25,4 +25,13 @@ let ok = true;
 for (const [md, want] of cases) { const h = mdBlock(md).html(); const pass = h.includes(want); ok = ok && pass; console.log(pass ? "[通過]" : "[失敗]", JSON.stringify(md).slice(0,40), pass ? "" : h); }
 const h = mdBlock("[點我](javascript:alert(1))").html();
 console.log(!h.includes("href=\"javascript") ? "[通過] javascript: 連結不會變成可點" : "[失敗] " + h);
+// Hugging Face 網址或名稱 → 作者/模型（模型頁可以直接貼網址）
+const app = require("fs").readFileSync(require("path").join(__dirname, "static", "app.js"), "utf8");
+eval(app.slice(app.indexOf("function hfRepoOf"), app.indexOf("const SETTINGS_TABS")) + "; global.hfRepoOf = hfRepoOf;");
+for (const [t, w] of [["https://huggingface.co/google/gemma-3-4b-it", "google/gemma-3-4b-it"],
+  ["huggingface.co/unsloth/gemma-4-E4B-it-GGUF/tree/main", "unsloth/gemma-4-E4B-it-GGUF"], ["https://hf.co/a/b?x=1", "a/b"],
+  ["unsloth/gpt-oss-20b-GGUF", "unsloth/gpt-oss-20b-GGUF"], ["gemma 4", null], ["https://evil.com/a/b", null]]) {
+  const g = hfRepoOf(t); const pass = g === w; ok = ok && pass;
+  console.log(pass ? "[通過]" : "[失敗]", "HF 網址", t, pass ? "" : g);
+}
 console.log(ok ? "全部通過" : "有項目失敗"); process.exit(ok ? 0 : 1);

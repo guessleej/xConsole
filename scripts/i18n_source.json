@@ -776,7 +776,7 @@
 "pattern": false
 },
 {
-"zh": "用關鍵字找 GGUF，例：gemma 4、gpt-oss、granite",
+"zh": "關鍵字（例：gemma 4、gpt-oss），或直接貼 Hugging Face 網址",
 "pattern": false
 },
 {
@@ -804,7 +804,15 @@
 "pattern": false
 },
 {
-"zh": "這個 repo 沒有 GGUF 檔。llama.cpp 只吃 GGUF，請找名稱帶 GGUF 的 repo。",
+"zh": "{0} 是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化：",
+"pattern": true
+},
+{
+"zh": "是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化",
+"pattern": false
+},
+{
+"zh": "還沒有人轉成 GGUF。可以換一個名稱搜尋，或等社群轉好再來。",
 "pattern": false
 },
 {
@@ -1816,7 +1824,7 @@
 "pattern": false
 },
 {
-"zh": "方形",
+"zh": "橫式",
 "pattern": false
 },
 {
@@ -1824,7 +1832,7 @@
 "pattern": false
 },
 {
-"zh": "橫式",
+"zh": "方形",
 "pattern": false
 },
 {
@@ -2144,7 +2152,7 @@
 "pattern": false
 },
 {
-"zh": "想要的畫面，英文描述效果最好。例：a red fox sitting in fresh snow, morning light, photo",
+"zh": "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格",
 "pattern": false
 },
 {
@@ -2204,16 +2212,20 @@
 "pattern": false
 },
 {
-"zh": "影格數",
+"zh": "長度",
 "pattern": false
 },
 {
-"zh": "8 的倍數加 1；越多越長、越吃記憶體",
+"zh": "越長越吃記憶體、產得越久",
 "pattern": false
 },
 {
 "zh": "每秒格數",
 "pattern": false
+},
+{
+"zh": "約 {0} 秒（{1} 格）",
+"pattern": true
 },
 {
 "zh": "畫幅",
@@ -2301,6 +2313,22 @@
 },
 {
 "zh": "GiB（底線",
+"pattern": false
+},
+{
+"zh": "文字",
+"pattern": false
+},
+{
+"zh": "翻譯提示詞中…",
+"pattern": false
+},
+{
+"zh": "已把中文提示詞翻成英文（原文：",
+"pattern": false
+},
+{
+"zh": "這台沒有執行中的對話模型，提示詞照中文送出；FLUX、LTX 這類模型看英文效果比較好",
 "pattern": false
 },
 {
@@ -2614,10 +2642,6 @@
 {
 "zh": "{0}失敗：{1}",
 "pattern": true
-},
-{
-"zh": "文字",
-"pattern": false
 },
 {
 "zh": "嵌入",
