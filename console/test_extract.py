@@ -81,17 +81,38 @@ xlsx = ozip({"xl/workbook.xml": '<workbook><sheets><sheet name="預算" sheetId=
 r = E.extract("預算.xlsx", xlsx)
 case("Excel：共用字串、行內字串、數字、每張工作表標名稱",
      r["text"] == "## 工作表：預算\n項目\t金額\n伺服器\t120000\n## 工作表：人力\n工程師\t3", r["text"])
+# 分頁搬過順序：活頁簿裡第一頁「乙」其實是 sheet2.xml；空白格被省略，靠 r 屬性定位
+xlsx2 = ozip({"xl/workbook.xml": '<workbook><sheets><sheet name="乙" sheetId="2" r:id="rId2"/><sheet name="甲" sheetId="1" r:id="rId1"/></sheets></workbook>',
+              "xl/_rels/workbook.xml.rels": '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/></Relationships>',
+              "xl/worksheets/sheet1.xml": '<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>甲的資料</t></is></c></row></sheetData></worksheet>',
+              "xl/worksheets/sheet2.xml": '<worksheet><sheetData><row r="1"><c r="B1"><v>1</v></c><c r="D1"><v>2</v></c></row></sheetData></worksheet>'})
+r = E.extract("排序.xlsx", xlsx2)
+case("Excel：工作表照分頁順序、名稱對到正確的檔；省略的空白格補回來",
+     r["text"] == "## 工作表：乙\n\t1\t\t2\n## 工作表：甲\n甲的資料", r["text"])
 
 pptx = ozip({"ppt/slides/slide2.xml": "<p:sld><a:p><a:r><a:t>第二頁</a:t></a:r></a:p></p:sld>",
              "ppt/slides/slide1.xml": "<p:sld><a:p><a:r><a:t>標題</a:t></a:r></a:p><a:p><a:r><a:t>內文</a:t></a:r></a:p></p:sld>",
              "ppt/slides/slide10.xml": "<p:sld><a:p><a:r><a:t>第十頁</a:t></a:r></a:p></p:sld>"})
 r = E.extract("簡報.pptx", pptx)
-case("PowerPoint：照頁碼排（10 排在 2 後面）", r["text"] == "## 第 1 頁\n標題\n內文\n## 第 2 頁\n第二頁\n## 第 10 頁\n第十頁", r["text"])
+case("PowerPoint：沒有 presentation.xml 時照檔名編號（10 排在 2 後面）", r["text"] == "## 第 1 頁\n標題\n內文\n## 第 2 頁\n第二頁\n## 第 3 頁\n第十頁", r["text"])
+pptx2 = ozip({**{n: z for n, z in [("ppt/slides/slide1.xml", "<p:sld><a:p><a:r><a:t>先建立的</a:t></a:r></a:p></p:sld>"),
+                                   ("ppt/slides/slide2.xml", "<p:sld><a:p><a:r><a:t>搬到第一頁</a:t></a:r></a:p></p:sld>")]},
+              "ppt/presentation.xml": '<p:presentation><p:sldIdLst><p:sldId id="257" r:id="rId3"/><p:sldId id="256" r:id="rId2"/></p:sldIdLst></p:presentation>',
+              "ppt/_rels/presentation.xml.rels": '<Relationships><Relationship Id="rId2" Target="slides/slide1.xml"/><Relationship Id="rId3" Target="slides/slide2.xml"/></Relationships>'})
+r = E.extract("搬過.pptx", pptx2)
+case("PowerPoint：照簡報裡實際的順序，頁碼也照這個順序", r["text"] == "## 第 1 頁\n搬到第一頁\n## 第 2 頁\n先建立的", r["text"])
 
 r = E.extract("a.pdf", pdf("BT /F1 12 Tf 20 100 Td (Hello PDF world) Tj ET"))
 case("PDF：抽得出字、標頁碼、回總頁數", "Hello PDF world" in r["text"] and r["text"].startswith("## 第 1 頁") and r["pages"] == 1, r)
 bad("scan.pdf", pdf(""), "抽不出文字")
 bad("broken.pdf", b"%PDF-1.4\n garbage", "損毀")
+from pypdf import PdfWriter  # noqa: E402
+w = PdfWriter()
+w.add_blank_page(200, 200)
+w.encrypt(user_password="secret", owner_password="owner")
+buf = io.BytesIO()
+w.write(buf)
+bad("locked.pdf", buf.getvalue(), "密碼保護")
 
 # ---- 2. 純文字
 case("純文字：UTF-8", E.extract("a.txt", "你好，世界".encode())["text"] == "你好，世界")

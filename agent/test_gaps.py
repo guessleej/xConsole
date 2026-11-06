@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -146,6 +147,9 @@ def make_zip(inner_dir, target):
         info.external_attr = 0o755 << 16
         z.writestr(info, FAKE_EXE)
         z.writestr(f"{inner_dir}libggml-vulkan.so", b"\0")
+        top = inner_dir.split("/")[0]
+        if inner_dir.count("/") > 1:
+            z.writestr(f"{top}/lib/libextra.so", b"\0")      # 函式庫放在旁邊的資料夾
     return b.getvalue()
 
 
@@ -231,6 +235,8 @@ eq("匯入：第一塊", A.engine_import_chunk("llama", "llama-pkg.zip", 0, len(
 c, r = A.engine_import_chunk("llama", "llama-pkg.zip", 0, len(pkg2), pkg2[:half])
 case("匯入：位置不對要從已收到的接著送", c == 409 and r.get("received") == half, r)
 eq("匯入：狀態回已收到多少", A.engine_import_status("llama", "llama-pkg.zip")[1]["received"], half)
+eq("匯入：狀態回已收到那段開頭的 sha256（瀏覽器比對是不是同一個檔）",
+   A.engine_import_status("llama", "llama-pkg.zip")[1].get("head_sha256"), hashlib.sha256(pkg2[:min(half, 4 << 20)]).hexdigest())
 c, r = A.engine_import_chunk("llama", "llama-pkg.zip", half, len(pkg2), pkg2[half:])
 case("匯入：送齊", c == 200 and r.get("done"), r)
 eq("匯入：sha256 格式不對", A.engine_import_install("llama", "llama-pkg.zip", "abc")[0], 400)
@@ -242,11 +248,26 @@ if POSIX:
     c, r = A.engine_import_install("llama", "llama-pkg.zip", hashlib.sha256(pkg2).hexdigest())
     st = wait_build()
     eq("匯入：sha256 對得上、裝好", st.get("state"), "done")
-    case("匯入：找得到包在 build/bin/ 的執行檔、裝進 llama.cpp-import-<sha>",
-         st.get("exe", "").endswith(os.path.join(f"llama.cpp-import-{hashlib.sha256(pkg2).hexdigest()[:8]}", "llama-server")), st.get("exe"))
+    case("匯入：找得到包在 build/bin/ 的執行檔、整包裝進 llama.cpp-import-<sha>",
+         st.get("exe", "").endswith(os.path.join(f"llama.cpp-import-{hashlib.sha256(pkg2).hexdigest()[:8]}", "build", "bin", "llama-server")), st.get("exe"))
+    case("匯入：旁邊資料夾的檔案也一起搬過去", os.path.isfile(os.path.join(st["dest"], "lib", "libextra.so")))
     case("匯入：裝好的會被找到（llama_globs）", os.path.realpath(st.get("exe")) in map(os.path.realpath, A.llama_globs()), A.llama_globs())
     case("匯入：函式庫跟著搬過去（辨認 GPU 後端）", A.llama_backend(st["exe"]) == "Vulkan")
     case("匯入：安裝包刪掉", not A.engine_import_status("llama", "llama-pkg.zip")[1]["exists"])
+    # 核對完之後按取消：解壓縮後就停，不會裝上去
+    A.engine_import_chunk("llama", "llama-pkg.zip", 0, len(pkg2), pkg2)
+    real_extract = A._safe_extract
+
+    def extract_then_cancel(arc, dest):
+        real_extract(arc, dest)
+        A._BUILD["cancel"] = True
+
+    A._safe_extract = extract_then_cancel
+    shutil.rmtree(st["dest"])
+    A.engine_import_install("llama", "llama-pkg.zip")
+    st2 = wait_build()
+    A._safe_extract = real_extract
+    case("匯入：核對完之後取消，停下來、不裝上去", st2.get("state") == "cancelled" and not os.path.exists(st["dest"]), st2.get("state"))
     nope = make_zip("x/", "other-tool")
     A.engine_import_chunk("sd", "sd.zip", 0, len(nope), nope)
     A.engine_import_install("sd", "sd.zip")

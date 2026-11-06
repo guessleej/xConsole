@@ -1141,6 +1141,10 @@ async function edgeSha256(f) {
   return [...new Uint8Array(await crypto.subtle.digest("SHA-256", buf))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function sha256Hex(blob) {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function libUploadCard(ok, only) {
   const c = card("從這台電腦匯入 GGUF", "不用轉格式；檔案直接送到那台的存放區");
   const form = el("div", "form-row");
@@ -4768,8 +4772,13 @@ function engineImportBox(nid, kind, eng, onStart) {
     ctl = new AbortController();
     goB.disabled = true; stopB.hidden = false; bar.hidden = false;
     try {
+      // 伺服器上同名的舊包（上次裝失敗留下的）一律換掉；送到一半的，開頭一樣才接著送，不一樣就從頭送
       const st = await api(`/api/node/${nid}/${kind}/import/status`, { method: "POST", body: { name } });
-      let off = st.exists ? f.size : (st.received || 0);
+      let off = st.received || 0;
+      if (st.exists || (off && (off > f.size || st.head_sha256 !== await sha256Hex(f.slice(0, Math.min(off, 4 * 1024 * 1024)))))) {
+        await api(`/api/node/${nid}/${kind}/import/cancel`, { method: "POST", body: { name } });
+        off = 0;
+      }
       const CH = 32 * 1024 * 1024;
       while (off < f.size) {
         const res = await fetch(`/api/node/${nid}/${kind}/import?` + new URLSearchParams({ name, offset: off, total: f.size }), {

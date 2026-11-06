@@ -65,38 +65,97 @@ def docx_text(z):
     return "\n".join(out)
 
 
+def _rels(z, path):
+    """關聯檔（_rels/*.rels）：Id → 目標檔在壓縮檔裡的完整路徑。"""
+    if path not in z.namelist():
+        return {}
+    base = path.split("_rels/")[0]
+    out = {}
+    for attrs in re.findall(r"<Relationship\s([^>]*?)/?>", _member(z, path)):
+        rid = re.search(r'\bId="([^"]*)"', attrs)
+        tgt = re.search(r'\bTarget="([^"]*)"', attrs)
+        if rid and tgt:
+            t = tgt.group(1)
+            out[rid.group(1)] = t.lstrip("/") if t.startswith("/") else _norm(base + t)
+    return out
+
+
+def _norm(path):
+    parts = []
+    for p in path.split("/"):
+        if p == "..":
+            if parts:
+                parts.pop()
+        elif p and p != ".":
+            parts.append(p)
+    return "/".join(parts)
+
+
+def _col(ref):
+    """儲存格位置（例 D12）→ 欄的序號（0 起算）。"""
+    m = re.match(r"([A-Z]+)", ref or "")
+    n = 0
+    for ch in m.group(1) if m else "":
+        n = n * 26 + ord(ch) - 64
+    return n - 1
+
+
 def xlsx_text(z):
     names = z.namelist()
     shared = []
     if "xl/sharedStrings.xml" in names:
         for si in re.findall(r"<si>(.*?)</si>", _member(z, "xl/sharedStrings.xml"), re.S):
             shared.append("".join(_runs(si, "t")))
-    sheet_names = re.findall(r'<sheet [^>]*name="([^"]*)"', _member(z, "xl/workbook.xml")) if "xl/workbook.xml" in names else []
-    sheets = sorted((n for n in names if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)), key=lambda n: int(re.findall(r"\d+", n)[-1]))
+    # 工作表照活頁簿裡分頁的順序，名稱經 r:id 對到實際的 sheetN.xml（分頁搬過順序時兩者不一致）
+    rels = _rels(z, "xl/_rels/workbook.xml.rels")
+    sheets, titles = [], []
+    if "xl/workbook.xml" in names:
+        for attrs in re.findall(r"<sheet\s([^>]*?)/?>", _member(z, "xl/workbook.xml")):
+            nm = re.search(r'\bname="([^"]*)"', attrs)
+            rid = re.search(r'\br:id="([^"]*)"', attrs)
+            titles.append(_unxml(nm.group(1)) if nm else "")
+            target = rels.get(rid.group(1)) if rid else None
+            if target in names:
+                sheets.append((titles[-1] or target, target))
+    if not sheets:   # 沒有關聯檔（少見）：照檔名編號，名稱照順序配
+        files = sorted((n for n in names if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)), key=lambda n: int(re.findall(r"\d+", n)[-1]))
+        sheets = [(titles[i] if i < len(titles) and titles[i] else n, n) for i, n in enumerate(files)]
     out = []
-    for i, n in enumerate(sheets):
-        out.append(f"## 工作表：{_unxml(sheet_names[i]) if i < len(sheet_names) else n}")
+    for title, n in sheets:
+        out.append(f"## 工作表：{title}")
         for row in re.findall(r"<row[^>]*>(.*?)</row>", _member(z, n), re.S):
-            cells = []
+            cells = {}
             for attrs, body in re.findall(r"<c([^>]*?)(?:/>|>(.*?)</c>)", row, re.S):
+                ref = re.search(r'\br="([A-Z]+\d+)"', attrs)
                 t = re.search(r'\bt="(\w+)"', attrs)
                 v = re.search(r"<v>([^<]*)</v>", body or "")
                 if t and t.group(1) == "s" and v and v.group(1).isdigit() and int(v.group(1)) < len(shared):
-                    cells.append(shared[int(v.group(1))])
+                    val = shared[int(v.group(1))]
                 elif t and t.group(1) == "inlineStr":
-                    cells.append("".join(_runs(body or "", "t")))
+                    val = "".join(_runs(body or "", "t"))
                 else:
-                    cells.append(_unxml(v.group(1)) if v else "")
-            if any(c.strip() for c in cells):
-                out.append("\t".join(cells))
+                    val = _unxml(v.group(1)) if v else ""
+                # 空白格常被省略、只靠 r 屬性記位置：照欄位放，中間補空格，欄位才不會往前擠
+                col = _col(ref.group(1)) if ref else (max(cells) + 1 if cells else 0)
+                cells[col] = val
+            if any(str(c).strip() for c in cells.values()):
+                out.append("\t".join(cells.get(i, "") for i in range(min(max(cells) + 1, 512))))   # 512 欄以後不補空格
     return "\n".join(out)
 
 
 def pptx_text(z):
-    slides = sorted((n for n in z.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)), key=lambda n: int(re.findall(r"\d+", n)[-1]))
+    names = z.namelist()
+    # 投影片照簡報裡的實際順序（presentation.xml 的 sldIdLst），不是照建立時的檔名編號
+    rels = _rels(z, "ppt/_rels/presentation.xml.rels")
+    slides = []
+    if "ppt/presentation.xml" in names:
+        for rid in re.findall(r'<p:sldId\b[^>]*\br:id="([^"]*)"', _member(z, "ppt/presentation.xml")):
+            if rels.get(rid) in names:
+                slides.append(rels[rid])
+    if not slides:
+        slides = sorted((n for n in names if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)), key=lambda n: int(re.findall(r"\d+", n)[-1]))
     out = []
-    for n in slides:
-        i = int(re.findall(r"\d+", n)[-1])
+    for i, n in enumerate(slides, 1):
         xml = _member(z, n)
         lines = [t for t in ("".join(_runs(p, "a:t")) for p in re.split(r"</a:p>", xml)) if t.strip()]
         if lines:
@@ -113,10 +172,13 @@ def pdf_text(data):
     except PyPdfError:
         raise ValueError("這份 PDF 損毀或不完整，讀不出來") from None
     if r.is_encrypted:
+        # 有些 PDF 只有「擁有者密碼」（限制列印），用空白密碼就打得開；真的要密碼才看得到的，decrypt 回 0（不一定丟例外）
         try:
-            r.decrypt("")
+            ok = r.decrypt("")
         except Exception:  # noqa: BLE001
-            raise ValueError("這份 PDF 有密碼保護，請先解除再附上") from None
+            ok = 0
+        if not ok:
+            raise ValueError("這份 PDF 有密碼保護，請先解除再附上")
     out = []
     pages = r.pages
     n = len(pages)

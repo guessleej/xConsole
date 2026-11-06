@@ -2673,10 +2673,22 @@ def llama_build_no(path, version_text):
     return int(d.group(1)) if d and ver <= 1 else ver     # 只有淺層編譯（回 0 或 1）才看資料夾名稱
 
 
+def imported_exes(prefix):
+    """手動匯入的包：照 .xconsole-exe 記的相對位置找執行檔（不能跳出那個資料夾）。"""
+    out = []
+    for mark in glob.glob(os.path.join(HOME, prefix + "-import-*", ".xconsole-exe")):
+        d = os.path.dirname(mark)
+        rel = (load_text(mark) or "").strip()
+        exe = os.path.realpath(os.path.join(d, rel))
+        if rel and exe.startswith(os.path.realpath(d) + os.sep) and os.path.isfile(exe):
+            out.append(os.path.join(d, rel))
+    return out
+
+
 def llama_globs():
     """家目錄下所有 llama-server：網頁編譯的（llama.cpp-bNNNN/build/bin/）與官方預編譯的（llama.cpp-bNNNN-<平台>/）。"""
     pats = ("llama.cpp*/build*/bin/llama-server", "llama.cpp*/build*/bin/Release/llama-server", "llama.cpp*/llama-server")
-    found = {c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}
+    found = {c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))} | set(imported_exes("llama.cpp"))
     if OS == "darwin":
         found |= {c for c in ("/opt/homebrew/bin/llama-server", "/usr/local/bin/llama-server") if os.path.exists(c)}
     return sorted(found)
@@ -4498,6 +4510,7 @@ def start_prebuilt(kind="llama"):
 # 分塊送、可以續傳（同 GGUF 匯入）；送齊後算 sha256（有填官方的就要對得上），解壓縮時任何檔案落到資料夾外面就整個拒絕
 ENG_IMPORT_RX = re.compile(r"[A-Za-z0-9][\w.+-]{0,150}\.(?:zip|tar\.gz|tgz)")
 ENG_IMPORT_MAX = 4 << 30
+IMPORT_MARK = ".xconsole-exe"        # 手動匯入的包：執行檔在包裡的相對位置
 IMPORT_DIR = os.path.join(ENGINE_DIR, "import")
 
 
@@ -4512,8 +4525,14 @@ def engine_import_status(kind, name):
         final, part = _imp_paths(kind, name)
     except ValueError as ex:
         return 400, {"error": str(ex)}
-    return 200, {"exists": os.path.exists(final), "size": os.path.getsize(final) if os.path.exists(final) else 0,
-                 "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    out = {"exists": os.path.exists(final), "size": os.path.getsize(final) if os.path.exists(final) else 0,
+           "received": os.path.getsize(part) if os.path.exists(part) else 0}
+    if out["received"]:
+        # 已收到那段開頭（最多 4 MB）的 sha256：瀏覽器比對是不是同一個檔，不是才接著送
+        import hashlib
+        with open(part, "rb") as fh:
+            out["head_sha256"] = hashlib.sha256(fh.read(min(out["received"], UP_EDGE))).hexdigest()
+    return 200, out
 
 
 def engine_import_chunk(kind, name, offset, total, data):
@@ -4599,11 +4618,18 @@ def _import_run(st, log, kind):
             raise RuntimeError(f"sha256 跟你填的不一樣（算出來是 {sha}），可能下載不完整或被改過，不安裝")
         if not st.get("expect"):
             note("沒有填官方的 sha256：請自己到官方版本頁核對上面這串")
+
+        def stop_if_cancelled():
+            if _BUILD["cancel"]:
+                raise RuntimeError("已取消")
+
+        stop_if_cancelled()
         st["phase"] = "解壓縮"
         save_json(eng["file"], st)
         shutil.rmtree(tmp, ignore_errors=True)
         os.makedirs(tmp, mode=0o700)
         _safe_extract(arc, tmp)
+        stop_if_cancelled()
         exe = _find_exe(tmp, eng["target"])
         if not exe:
             raise RuntimeError(f"安裝包裡找不到 {eng['target']}{EXE}。請確認是 {eng['name']} 這台系統用的版本")
@@ -4620,14 +4646,22 @@ def _import_run(st, log, kind):
             rc, out, err = 1, "", str(ex)
         if rc != 0:
             raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗），可能不是這台系統或顯示卡用的版本：{(err or out)[-200:]}")
-        note(f"試跑成功：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else exe}")
+        note(f"試跑成功：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.basename(exe)}")
+        stop_if_cancelled()
+        # 整包搬過去（不是只搬執行檔那一層）：有的包把函式庫或執行期資料放在旁邊的資料夾。
+        # 執行檔在包裡的位置寫進 .xconsole-exe，llama_globs／sd_candidates 照這個找
+        inner = [x for x in os.listdir(tmp) if not x.startswith(".")]
+        root = os.path.join(tmp, inner[0]) if len(inner) == 1 and os.path.isdir(os.path.join(tmp, inner[0])) else tmp
+        rel = os.path.relpath(exe, root)
         dest = inside(HOME, eng["dir"].format(f"import-{sha[:8]}"))
         if os.path.exists(dest):
             shutil.rmtree(dest)
-        os.replace(os.path.dirname(exe), dest)
+        os.replace(root, dest)
+        with open(os.path.join(dest, IMPORT_MARK), "w", encoding="utf-8") as fh:
+            fh.write(rel.replace(os.sep, "/"))
         shutil.rmtree(tmp, ignore_errors=True)
         os.remove(arc)
-        st.update(state="done", phase="完成", dest=dest, exe=os.path.join(dest, eng["target"] + EXE))
+        st.update(state="done", phase="完成", dest=dest, exe=os.path.join(dest, rel))
     except Exception as ex:  # noqa: BLE001
         shutil.rmtree(tmp, ignore_errors=True)
         st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
@@ -5686,11 +5720,11 @@ def sd_candidates():
     """家目錄下所有 sd-cli：網頁編譯的（stable-diffusion.cpp-master-…/build/bin/）與官方預編譯的（stable-diffusion.cpp-master-…-<平台>/）。"""
     pats = ("stable-diffusion.cpp*/build*/bin/sd-cli", "stable-diffusion.cpp*/sd-cli")
     out = []
-    for cand in sorted({c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))}):
+    for cand in sorted({c for pat in pats for c in glob.glob(os.path.join(HOME, pat + EXE))} | set(imported_exes("stable-diffusion.cpp"))):
         m = re.search(r"master-(\d+)", cand)
         pre = re.search(r"-(macos-arm64|win-[\w]+-x64)", cand)
         out.append({"path": cand, "build": int(m.group(1)) if m else None, "ok": os.access(cand, os.X_OK),
-                    "backend": f"預編譯 {pre.group(1)}" if pre else "在這台編譯"})
+                    "backend": f"預編譯 {pre.group(1)}" if pre else "手動匯入" if "-import-" in cand else "在這台編譯"})
     return out
 
 

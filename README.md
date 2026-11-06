@@ -401,8 +401,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |
 | `console/test_e2e_tls.py` | .27 | 21 | 另起隔離主控台，經網頁 API 走完換憑證整套流程（不碰正式環境） |
 | `agent/test_agent_mode.py` | Linux／macOS／Windows | 54 | Agent 模式代理端：預設關閉、路徑跳脫（含符號連結）、讀寫上限、工作目錄、逾時、輸出截斷、環境變數拿掉權杖與金鑰、HTTP 路由 |
-| `agent/test_gaps.py` | Linux／macOS／Windows（裝執行檔那幾段不跑 Windows） | 55 | Linux 的 Intel 顯示卡偵測、記憶體架構、不綁卡、Vulkan 編譯；macOS／Windows 分辨 SSD；預編譯版接著下載（Range）、sha256、暫停；手動匯入（續傳、檔頭、sha256、子資料夾的執行檔、試跑）；參考圖檢查、`-i`／`--strength`／`-b` |
-| `console/test_extract.py` | Linux／macOS／Windows | 26 | 對話附件抽文字：Word／Excel／PowerPoint／PDF、四種文字編碼、二進位與舊版 Office、壓縮炸彈、截斷；主控台端的獨立行程、逾時、被砍、上限 |
+| `agent/test_gaps.py` | Linux／macOS／Windows（裝執行檔那幾段不跑 Windows） | 58 | Linux 的 Intel 顯示卡偵測、記憶體架構、不綁卡、Vulkan 編譯；macOS／Windows 分辨 SSD；預編譯版接著下載（Range）、sha256、暫停；手動匯入（續傳、檔頭、sha256、子資料夾的執行檔、試跑）；參考圖檢查、`-i`／`--strength`／`-b` |
+| `console/test_extract.py` | Linux／macOS／Windows | 29 | 對話附件抽文字：Word／Excel／PowerPoint／PDF、四種文字編碼、二進位與舊版 Office、壓縮炸彈、截斷；主控台端的獨立行程、逾時、被砍、上限 |
 | `agent/test_load_disk.py` | 任何機器（實際換模型那段不跑 Windows） | 37 | 載入進度的階段與百分比、用硬碟執行的分層與 `-ngl`、准入的 KV 分池、假 llama-server 實際換模型（mmap、思考模式與區網同次套用與沿用、進行中問得到進度） |
 | `console/test_providers.py` | 任何機器 | 40 | 第三方 API：金鑰加密落地（資料庫檔找不到明文）、GET 不回金鑰、編輯空白保留、cn_origin、http 只限私有位址、不跟轉址、錯誤遮罩、串流跟本機對話逐位元組相同 |
 | `console/test_preview.py` | 任何機器 | 21 | 執行預覽：sandbox 標頭、別人的登入拿不到、過期、2 MB、50 筆、其他頁仍是 DENY |
