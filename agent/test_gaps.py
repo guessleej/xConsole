@@ -331,5 +331,24 @@ finally:
     A.urllib.request.urlopen = real_open
 eq("GitHub API：沒有權杖檔就不帶、有就帶、格式怪的不帶", seen, [None, "Bearer ghs_" + "a" * 36, None])
 
+
+def _limited(req, timeout=30):
+    import email.message
+    hd = email.message.Message()
+    for k, v in (("X-RateLimit-Limit", "60"), ("X-RateLimit-Remaining", "0"), ("X-RateLimit-Reset", "1900000000")):
+        hd[k] = v
+    raise A.urllib.error.HTTPError(req.full_url, 403, "rate limit exceeded", hd, None)
+
+
+A.urllib.request.urlopen = _limited
+try:
+    A._gh_json("/repos/x/y/releases")
+    msg = ""
+except OSError as ex:
+    msg = str(ex)
+finally:
+    A.urllib.request.urlopen = real_open
+case("GitHub 次數用完：講清楚上限、有沒有帶權杖、幾點恢復", "上限 60" in msg and "沒有帶權杖" in msg and "恢復" in msg, msg)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
