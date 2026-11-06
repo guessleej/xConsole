@@ -16,6 +16,10 @@ env:
   PYTHONUTF8: '1'
   TAURI_CLI: '@tauri-apps/cli@2.11.2'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   build:
     name: 桌面版安裝檔（${{ matrix.os }}）
@@ -87,7 +91,9 @@ jobs:
           B=desktop/src-tauri/target/release/bundle
           find "$B" -maxdepth 2 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist/ \;
           ls -la dist
-          (cd dist && shasum -a 256 * | tee SHA256SUMS-${{ runner.os }})
+          # Windows 的 Git Bash 沒有 shasum：用 Python 算，三個平台同一套
+          python -c "import hashlib,os,sys; [print(hashlib.sha256(open(os.path.join('dist',f),'rb').read()).hexdigest()+'  '+f) for f in sorted(os.listdir('dist'))]" | tee "SHA256SUMS-${{ runner.os }}"
+          mv "SHA256SUMS-${{ runner.os }}" dist/
       - name: Windows：用微軟 Defender 實際掃描安裝檔與裝好的程式（被判有問題就不放行）
         if: runner.os == 'Windows'
         shell: pwsh
