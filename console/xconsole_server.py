@@ -1342,8 +1342,16 @@ def open_with_system(path):
         os.startfile(path)  # noqa: S606  路徑是自己下載、核對過 sha256 的安裝檔
     elif sys.platform == "darwin":
         subprocess.Popen(["open", path])
+    elif path.endswith(".AppImage") and os.environ.get("APPIMAGE"):
+        # AppImage：直接換掉正在用的那個檔（執行中的不受影響），下次打開就是新版
+        import shutil
+        tmp = os.environ["APPIMAGE"] + ".new"
+        shutil.copyfile(path, tmp)
+        os.chmod(tmp, 0o700)
+        os.replace(tmp, os.environ["APPIMAGE"])
+        updater._job("installer_ready", message="新版已換上，從系統匣結束 xConsole 再打開就是新版")
     else:
-        subprocess.Popen(["xdg-open", os.path.dirname(path)])
+        subprocess.Popen(["xdg-open", path])     # .deb：交給系統的軟體安裝程式
 
 
 def restart_console():
@@ -2568,6 +2576,11 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return self._upload(m.group(1), ctype, f"/{m.group(2)}/import", ("name", "offset", "total"), f"{m.group(2)}.import.upload")
         if path == "/api/update/upload":
+            if DESKTOP:
+                # 桌面版換的是整個應用程式（含內附的 Python 與外殼），不能只換原始碼包
+                self._body(MAX_ANON_BODY)
+                self._headers_done()
+                return self._json(400, {"error": "桌面版用安裝檔更新；請到「版本與更新」按更新，或到 GitHub 的版本頁下載安裝檔"})
             return self._update_upload(ctype)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
@@ -2826,7 +2839,7 @@ class Handler(BaseHTTPRequestHandler):
             code, out = updater.start_installer(STATE_DIR, inst["url"], inst["sha256"], info["latest"], open_with_system)
             self._audit("update.installer", info["latest"], code == 200, {"from": updater.current_version(), "message": out.get("error")})
             return self._json(code, out)
-        if path in ("/api/update/rollback", "/api/update/upload") and DESKTOP:
+        if path == "/api/update/rollback" and DESKTOP:
             return self._json(400, {"error": "桌面版用安裝檔更新；要回舊版，請到 GitHub 的版本頁下載那一版的安裝檔"})
         if path == "/api/update/apply":
             # 網址與 sha256 一律由主控台自己問 GitHub 拿，不收畫面送來的（避免被指到別的檔）
@@ -3329,7 +3342,8 @@ def main():
     moved = migrate_tokens()
     if moved:
         print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
-    wait_for_address()
+    if not DESKTOP or cfg.get("lan_access"):
+        wait_for_address()           # 桌面版只給這台用時不等網路位址：離線的筆電也要馬上開得起來
     fresh = CERTS.ensure(hostnames())
     bind = "0.0.0.0" if not DESKTOP or cfg.get("lan_access") else "127.0.0.1"
     srv = tls.TLSServer((bind, PORT), Handler)

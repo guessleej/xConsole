@@ -92,6 +92,11 @@ def main():
     st, out, _, _ = req("POST", "/api/desktop/enter", {"key": key}, host=f"127.0.0.1:{plain.server_address[1]}",
                         port=plain.server_address[1], cookie=False)
     check("一般通道不能用鑰匙進入", st == 403, (st, out))
+    c = http.client.HTTPConnection("127.0.0.1", x.APP_PORT, timeout=10)
+    c.request("POST", "/api/update/upload", body=b"x" * 100, headers={"Host": f"127.0.0.1:{x.APP_PORT}", "Cookie": "xconsole=" + jar["v"],
+              "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1"})
+    r = c.getresponse()
+    check("桌面版擋掉手動上傳原始碼更新包（要用安裝檔）", r.status == 400 and "安裝檔" in json.loads(r.read()).get("error", ""), r.status)
     audit = json.dumps(x.STORE.audit_list(100), ensure_ascii=False)
     check("稽核不記鑰匙與密碼", key not in audit and "desk-pass-1234" not in audit)
     print("全部通過" if OK else "有項目失敗")

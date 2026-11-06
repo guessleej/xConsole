@@ -91,6 +91,9 @@ fn spawn_agent(rt: &Runtime) -> std::io::Result<Child> {
     let home = rt.data.to_string_lossy().to_string();
     let mut c = command(rt, &["agent/xconsole_agent.py", "--home", &home, "--bind", "127.0.0.1", "--parent-pid", &pid], "agent.log");
     c.env("XCONSOLE_AGENT_PORT", rt.ports.agent.to_string());
+    // Linux 也由代理自己帶起、看著模型服務（不走 systemd --user）：資料放在應用程式的資料夾，
+    // systemd 找不到那裡的服務檔；而且應用程式結束時要停得掉模型
+    c.env("XCONSOLE_SUPERVISOR", "1");
     c.stdin(Stdio::null());
     c.spawn()
 }

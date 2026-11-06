@@ -91,7 +91,10 @@ def installer_pattern():
         return r"xConsole_[\d.]+_(x64|arm64)-setup\.exe" if not arm else r"xConsole_[\d.]+_arm64-setup\.exe"
     if sys.platform == "darwin":
         return r"xConsole_[\d.]+_" + ("aarch64" if arm else "x64") + r"\.dmg"
-    return r"xConsole_[\d.]+_" + ("aarch64" if arm else "amd64") + r"\.AppImage"
+    arch = "arm64" if arm else "amd64"
+    if os.environ.get("APPIMAGE"):             # 從 AppImage 跑的就換 AppImage；用 .deb 裝的就下載 .deb 交給系統裝
+        return r"xConsole_[\d.]+_" + ("aarch64" if arm else "amd64") + r"\.AppImage"
+    return r"xConsole_[\d.]+_" + arch + r"\.deb"
 
 
 def start_installer(state_dir, url, sha256, version, opener):

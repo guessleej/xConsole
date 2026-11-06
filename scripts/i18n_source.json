@@ -8836,6 +8836,10 @@
 "pattern": false
 },
 {
+"zh": "新版已換上，從系統匣結束 xConsole 再打開就是新版",
+"pattern": false
+},
+{
 "zh": "子資料夾的相對路徑，空白＝整個工作資料夾",
 "pattern": false
 },
@@ -8933,6 +8937,10 @@
 },
 {
 "zh": "目前沒有待配對的 CSR",
+"pattern": false
+},
+{
+"zh": "桌面版用安裝檔更新；請到「版本與更新」按更新，或到 GitHub 的版本頁下載安裝檔",
 "pattern": false
 },
 {

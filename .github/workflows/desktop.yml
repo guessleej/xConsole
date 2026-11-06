@@ -53,7 +53,7 @@ jobs:
       - name: Windows 程式碼簽章憑證（有設才簽；沒有簽章，SmartScreen 第一次會擋）
         if: runner.os == 'Windows'
         id: sign
-        shell: powershell
+        shell: pwsh
         env:
           PFX_B64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
           PFX_PW: ${{ secrets.WINDOWS_SIGN_PFX_PASSWORD }}
@@ -90,7 +90,7 @@ jobs:
           (cd dist && shasum -a 256 * | tee SHA256SUMS-${{ runner.os }})
       - name: Windows：用微軟 Defender 實際掃描安裝檔與裝好的程式（被判有問題就不放行）
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
           $st = Get-MpComputerStatus -ErrorAction SilentlyContinue
           if (-not $st -or -not $st.AntivirusEnabled) {
@@ -109,7 +109,7 @@ jobs:
           Write-Host "安裝檔簽章狀態：$($sig.Status) $($sig.SignerCertificate.Subject)"
       - name: Windows：靜默安裝、啟動、確認主控台與代理起得來
         if: runner.os == 'Windows'
-        shell: powershell
+        shell: pwsh
         run: |
           $setup = Get-ChildItem dist\*-setup.exe | Select-Object -First 1
           Start-Process $setup.FullName -ArgumentList '/S' -Wait

@@ -17448,5 +17448,15 @@
 "en": "--bind accepts only 0.0.0.0 or 127.0.0.1",
 "ja": "--bind は 0.0.0.0 か 127.0.0.1 のみ",
 "ko": "--bind 는 0.0.0.0 또는 127.0.0.1만 허용"
+},
+"新版已換上，從系統匣結束 xConsole 再打開就是新版": {
+"en": "The new version is in place; quit xConsole from the tray and open it again",
+"ja": "新しい版に置き換えました。トレイから xConsole を終了して開き直すと新しい版になります",
+"ko": "새 버전으로 바꿨습니다. 트레이에서 xConsole을 종료하고 다시 열면 새 버전입니다"
+},
+"桌面版用安裝檔更新；請到「版本與更新」按更新，或到 GitHub 的版本頁下載安裝檔": {
+"en": "The desktop edition updates with installers; use Update under Version & updates, or download the installer from the GitHub releases page",
+"ja": "デスクトップ版はインストーラーで更新します。「バージョンと更新」で更新するか、GitHub のリリースページからインストーラーを入手してください",
+"ko": "데스크톱판은 설치 파일로 업데이트합니다. '버전 및 업데이트'에서 업데이트하거나 GitHub 릴리스 페이지에서 설치 파일을 받으세요"
 }
 }

@@ -143,6 +143,19 @@ def main():
     check("退回上一版：檔換回原本的", c == 200 and out["version"] == "2026.1.1" and job["state"] == "restarting"
           and U.current_version() == "2026.1.1" and open(os.path.join(inst, "static", "app.js")).read() == "// old app", (out, job))
     check("  相依清單不同：把舊版的相依套件裝回去", piped and "newdep" not in piped[0], piped)
+    import re as _re
+    saved = (U.os.name, U.sys.platform, os.environ.get("APPIMAGE"))
+    try:
+        U.sys.platform = "linux"
+        os.environ.pop("APPIMAGE", None)
+        check("Linux 用 .deb 裝的：更新抓 .deb", _re.fullmatch(U.installer_pattern(), "xConsole_2099.1.1_amd64.deb")
+              or _re.fullmatch(U.installer_pattern(), "xConsole_2099.1.1_arm64.deb"))
+        os.environ["APPIMAGE"] = "/tmp/xConsole.AppImage"
+        check("  從 AppImage 跑的：更新抓 AppImage", _re.fullmatch(U.installer_pattern(), "xConsole_2099.1.1_amd64.AppImage")
+              or _re.fullmatch(U.installer_pattern(), "xConsole_2099.1.1_aarch64.AppImage"))
+    finally:
+        U.sys.platform = saved[1]
+        os.environ.pop("APPIMAGE", None) if saved[2] is None else os.environ.__setitem__("APPIMAGE", saved[2])
     data2, sha2 = U.bundled_agent()
     check("隨附代理的 sha256", sha2 == hashlib.sha256(open(os.path.join(inst, "agent", "xconsole_agent.py"), "rb").read()).hexdigest())
 
