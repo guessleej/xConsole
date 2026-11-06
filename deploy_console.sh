@@ -11,7 +11,7 @@ NODES=("$@")
 
 echo "=== 傳送主控台程式 ==="
 bash "$XS" "$HOST_ALIAS" 'mkdir -p $HOME/xconsole/static'
-for f in xconsole_server.py tls.py store.py report.py recommend.py extract.py chats.py computer.py catalog_default.json sd_catalog_default.json; do
+for f in xconsole_server.py tls.py store.py report.py recommend.py extract.py chats.py computer.py updater.py catalog_default.json sd_catalog_default.json; do
   PUT="$HERE/console/$f" DST="/home/xcloud/xconsole/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
 # 整個 static 都送：只列檔名會漏掉新加的檔（pages.js 就差點被漏掉）
@@ -20,6 +20,7 @@ for fp in "$HERE"/console/static/*; do
   PUT="$fp" DST="/home/xcloud/xconsole/static/$f" bash "$XS" "$HOST_ALIAS" --scp
 done
 PUT="$HERE/requirements.txt" DST="/home/xcloud/xconsole/requirements.txt" bash "$XS" "$HOST_ALIAS" --scp
+PUT="$HERE/VERSION" DST="/home/xcloud/xconsole/VERSION" bash "$XS" "$HOST_ALIAS" --scp
 # 「加一台機器」的安裝指令從主控台下載代理程式：放一份在主控台旁邊
 bash "$XS" "$HOST_ALIAS" 'mkdir -p $HOME/xconsole/agent'
 PUT="$HERE/agent/xconsole_agent.py" DST="/home/xcloud/xconsole/agent/xconsole_agent.py" bash "$XS" "$HOST_ALIAS" --scp

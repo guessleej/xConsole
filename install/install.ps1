@@ -54,13 +54,14 @@ if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
   icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 }
-foreach ($f in 'xconsole_server.py', 'tls.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'computer.py', 'catalog_default.json', 'sd_catalog_default.json') {
+foreach ($f in 'xconsole_server.py', 'tls.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
 }
 Copy-Item -Force (Join-Path $SRC 'console\static\*') (Join-Path $dir 'static')
 Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'agent\xconsole_agent.py')
 Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'xconsole_agent.py')
 Copy-Item -Force (Join-Path $SRC 'requirements.txt') (Join-Path $dir 'requirements.txt')
+Copy-Item -Force (Join-Path $SRC 'VERSION') (Join-Path $dir 'VERSION')
 
 Say '3/6 準備 Python 環境（主控台與代理都需要 cryptography）'
 $vpy = Join-Path $dir '.venv\Scripts\python.exe'

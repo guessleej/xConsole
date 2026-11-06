@@ -25,6 +25,7 @@
       <button class="btn primary login-submit" type="submit">登入</button>
     </div>
     <p id="login-err" class="small login-err" hidden></p>
+    <div id="langpick-login" class="login-lang"></div>
   </form>
   <footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>
 </div>
@@ -46,6 +47,7 @@
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
       </button>
+      <span id="langpick-top"></span>
       <button class="iconbtn" id="theme" title="切換深淺色" aria-label="切換深淺色">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -65,6 +67,7 @@
       <div class="mnav-head"><b>選單</b><button class="iconbtn" id="mnav-close" aria-label="關閉選單">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <nav id="mnav-list"></nav>
+      <div id="langpick-m" class="mnav-lang"></div>
     </div>
   </div>
 
@@ -76,6 +79,7 @@
 <div class="toasts" id="toasts"></div>
 <div id="modal-host"></div>
 
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 <script src="pages.js"></script>
 <script src="chat.js"></script>

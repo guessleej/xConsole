@@ -41,6 +41,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chats  # noqa: E402
 import computer  # noqa: E402
+import updater  # noqa: E402
 import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
@@ -1321,6 +1322,24 @@ def hf_token():
         return ""
 
 
+def restart_console():
+    """換好新版之後結束行程，由服務管理員（systemd、launchd、Windows 排程）重新帶起。結束碼不是 0：Windows 排程要失敗才會重啟。"""
+    os._exit(3)
+
+
+def update_overview():
+    job, cur = updater.status()
+    _, sha = updater.bundled_agent()
+    nodes = []
+    for n in fleet()["nodes"]:
+        code, out = call_node(n["id"], "/self", timeout=10)
+        nodes.append({"id": n["id"], "name": n["name"], "online": code == 200, "sha256": out.get("sha256") if code == 200 else None,
+                      "os": out.get("os"), "current": code == 200 and out.get("sha256") == sha,
+                      "old_agent": code == 404})          # 太舊的代理沒有 /self：要用安裝程式或部署腳本更新一次
+    return {"current": cur, "job": job, "backups": updater.backups(STATE_DIR), "agent_sha256": sha, "nodes": nodes,
+            "repo": updater.REPO}
+
+
 def chat_seal(data: bytes) -> str:
     return tls.seal(CERTS.p, data)
 
@@ -1813,7 +1832,7 @@ def agent_start(user, ip, body):
 
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".js": "application/javascript; charset=utf-8", ".svg": "image/svg+xml",
-        ".png": "image/png", ".ico": "image/x-icon"}
+        ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json; charset=utf-8"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1991,6 +2010,32 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         return None
+
+    def _update_upload(self, ctype):
+        """手動上傳更新包（不能連外的機器）：本文就是 .tar.gz，sha256 放在網址查詢字串（管理者從 GitHub 版本頁抄來）。"""
+        if not self.user:
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._json(401, {"error": "請先登入"})
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        # 跟上傳模型一樣擋跨站：要 octet-stream 加自訂標頭（跨站表單送不出自訂標頭）
+        if ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1":
+            if 0 <= n <= MAX_ANON_BODY:
+                self.rfile.read(n)
+            self.close_connection = True
+            return self._json(415, {"error": "只接受 application/octet-stream，並要帶 X-XConsole-Upload"})
+        if not 0 < n <= updater.MAX_PKG:
+            self.close_connection = True
+            return self._json(413, {"error": "更新包要在 64 MB 以內"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        sha = (parse_qs(urlparse(self.path).query).get("sha256") or [""])[0]
+        code, out = updater.start_update(STATE_DIR, restart_console, data=data, sha256=sha, version="手動上傳")
+        self._audit("update.upload", hashlib.sha256(data).hexdigest()[:16], code == 200, {"bytes": n, "message": out.get("error")})
+        return self._json(code, out)
 
     def _preview(self, pid):
         """執行預覽：只回給建立者那一個登入；標頭把它關進 sandbox（不透明來源），只准被主控台自己的頁面嵌入。"""
@@ -2380,6 +2425,8 @@ class Handler(BaseHTTPRequestHandler):
                 rows = sorted(AGENT_TASKS.values(), key=lambda x: -x.created)
             return self._json(200, {"items": [t.public(full=False) for t in rows],
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
+        if path == "/api/update":
+            return self._json(200, update_overview())
         m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})", path)
         if m:
             t = computer.TASKS.get(m.group(1))
@@ -2489,6 +2536,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/import", path)
         if m:
             return self._upload(m.group(1), ctype, f"/{m.group(2)}/import", ("name", "offset", "total"), f"{m.group(2)}.import.upload")
+        if path == "/api/update/upload":
+            return self._update_upload(ctype)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -2721,6 +2770,31 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/update/check":
+            code, out = updater.check()
+            self._audit("update.check", out.get("latest") or "", code == 200, {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/update/apply":
+            # 網址與 sha256 一律由主控台自己問 GitHub 拿，不收畫面送來的（避免被指到別的檔）
+            code, info = updater.check()
+            if code != 200 or not info.get("asset") or not info["asset"].get("sha256"):
+                return self._json(code if code != 200 else 400, {"error": info.get("error") or "這一版沒有可以核對的安裝包"})
+            code, out = updater.start_update(STATE_DIR, restart_console, url=info["asset"]["url"], sha256=info["asset"]["sha256"],
+                                             version=info["latest"])
+            self._audit("update.apply", info["latest"], code == 200, {"from": updater.current_version(), "message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/update/rollback":
+            code, out = updater.rollback(STATE_DIR, restart_console)
+            self._audit("update.rollback", out.get("version") or "", code == 200, {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/update/agent/([\w.-]+)", path)
+        if m:
+            data, sha = updater.bundled_agent()
+            if not data:
+                return self._json(404, {"error": "主控台這裡沒有隨附的代理程式"})
+            code, out = call_node(m.group(1), "/self/update", "POST", {"code": base64.b64encode(data).decode(), "sha256": sha}, timeout=60)
+            self._audit("update.agent", m.group(1), code == 200, {"sha256": sha[:12], "message": out.get("error")})
             return self._json(code, out)
         if path == "/api/computer/tasks":
             who, where = self.user or "", self.ip      # 背景執行緒寫稽核：先記下來，不能事後再讀 self（連線會被下一個請求重用）

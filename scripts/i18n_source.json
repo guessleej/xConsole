@@ -1,0 +1,13018 @@
+[
+{
+"zh": "請先登入",
+"pattern": false
+},
+{
+"zh": "伺服器回 {0}",
+"pattern": true
+},
+{
+"zh": "伺服器回",
+"pattern": false
+},
+{
+"zh": "取消",
+"pattern": false
+},
+{
+"zh": "概覽",
+"pattern": false
+},
+{
+"zh": "模型",
+"pattern": false
+},
+{
+"zh": "執行",
+"pattern": false
+},
+{
+"zh": "對話",
+"pattern": false
+},
+{
+"zh": "畫圖",
+"pattern": false
+},
+{
+"zh": "影片",
+"pattern": false
+},
+{
+"zh": "設定",
+"pattern": false
+},
+{
+"zh": "這台",
+"pattern": false
+},
+{
+"zh": "全部機器",
+"pattern": false
+},
+{
+"zh": "執行模型",
+"pattern": false
+},
+{
+"zh": "角色欄位",
+"pattern": false
+},
+{
+"zh": "API 串接",
+"pattern": false
+},
+{
+"zh": "已用 {0} / {1} GiB　剩 {2}",
+"pattern": true
+},
+{
+"zh": "已用",
+"pattern": false
+},
+{
+"zh": "GiB　剩",
+"pattern": false
+},
+{
+"zh": "系統記憶體",
+"pattern": false
+},
+{
+"zh": "其他（系統與未歸帳）：{0} GiB",
+"pattern": true
+},
+{
+"zh": "其他（系統與未歸帳",
+"pattern": false
+},
+{
+"zh": "其他 {0}",
+"pattern": true
+},
+{
+"zh": "其他",
+"pattern": false
+},
+{
+"zh": "底線：再往右就低於 {0} GiB，不准再載",
+"pattern": true
+},
+{
+"zh": "底線：再往右就低於",
+"pattern": false
+},
+{
+"zh": "GiB，不准再載",
+"pattern": false
+},
+{
+"zh": "底線 {0} GiB",
+"pattern": true
+},
+{
+"zh": "底線",
+"pattern": false
+},
+{
+"zh": "放入",
+"pattern": false
+},
+{
+"zh": "卡 ",
+"pattern": false
+},
+{
+"zh": "關鍵服務",
+"pattern": false
+},
+{
+"zh": "上下文",
+"pattern": false
+},
+{
+"zh": "顯示記憶體",
+"pattern": false
+},
+{
+"zh": "（整機）",
+"pattern": false
+},
+{
+"zh": "記憶體",
+"pattern": false
+},
+{
+"zh": "匯入 tok/s",
+"pattern": false
+},
+{
+"zh": "生成 tok/s",
+"pattern": false
+},
+{
+"zh": "量過最長提示",
+"pattern": false
+},
+{
+"zh": "重啟",
+"pattern": false
+},
+{
+"zh": "停止",
+"pattern": false
+},
+{
+"zh": "啟動",
+"pattern": false
+},
+{
+"zh": "換模型",
+"pattern": false
+},
+{
+"zh": "執行設定",
+"pattern": false
+},
+{
+"zh": "上下文長度、思考模式、區網存取；看預估速度與載入時間",
+"pattern": false
+},
+{
+"zh": "網址、模型名稱、上下文、各工具設定範例與實測",
+"pattern": false
+},
+{
+"zh": "記錄",
+"pattern": false
+},
+{
+"zh": "讀取這台裝了哪些模型…",
+"pattern": false
+},
+{
+"zh": "放入模型",
+"pattern": false
+},
+{
+"zh": "讀不到模型清單：",
+"pattern": false
+},
+{
+"zh": "上下文長度（token）",
+"pattern": false
+},
+{
+"zh": "每種組合都放不下約 {0} GiB，套用時會被准入擋下。",
+"pattern": true
+},
+{
+"zh": "每種組合都放不下約",
+"pattern": false
+},
+{
+"zh": "GiB，套用時會被准入擋下",
+"pattern": false
+},
+{
+"zh": "建議只用卡 {0}：單張放得下，少了跨卡傳輸，其他卡可以跑別的模型。",
+"pattern": true
+},
+{
+"zh": "建議只用卡",
+"pattern": false
+},
+{
+"zh": "單張放得下，少了跨卡傳輸，其他卡可以跑別的模型",
+"pattern": false
+},
+{
+"zh": "建議用卡 {0} 一起扛：要約 {1} GiB，{2} 張放不下。",
+"pattern": true
+},
+{
+"zh": "建議用卡",
+"pattern": false
+},
+{
+"zh": "一起扛：要約",
+"pattern": false
+},
+{
+"zh": "張放不下",
+"pattern": false
+},
+{
+"zh": "　沒勾任何一張＝全部卡都用。",
+"pattern": false
+},
+{
+"zh": "用哪幾張卡",
+"pattern": false
+},
+{
+"zh": " 卡 {0}　可用 {1} / {2} GiB",
+"pattern": true
+},
+{
+"zh": "卡",
+"pattern": false
+},
+{
+"zh": "　可用",
+"pattern": false
+},
+{
+"zh": "這顆最多 {0}；上下文 {1} 時 KV 約 {2} GiB，",
+"pattern": true
+},
+{
+"zh": "這顆最多",
+"pattern": false
+},
+{
+"zh": "時 KV 約",
+"pattern": false
+},
+{
+"zh": "加權重共約 {0} GiB。套用前還會再做一次記憶體試算。",
+"pattern": true
+},
+{
+"zh": "加權重共約",
+"pattern": false
+},
+{
+"zh": "GiB。套用前還會再做一次記憶體試算",
+"pattern": false
+},
+{
+"zh": "・{0} 個分片",
+"pattern": true
+},
+{
+"zh": "個分片",
+"pattern": false
+},
+{
+"zh": "{0} GiB{1}・{2}・最長 {3}・預估約 {4} GiB",
+"pattern": true
+},
+{
+"zh": "最長",
+"pattern": false
+},
+{
+"zh": "預估約",
+"pattern": false
+},
+{
+"zh": "{0} GiB・{1} 個分片",
+"pattern": true
+},
+{
+"zh": "・目前使用中（可改上下文或用哪幾張卡）",
+"pattern": false
+},
+{
+"zh": "・目前使用中",
+"pattern": false
+},
+{
+"zh": "看圖",
+"pattern": false
+},
+{
+"zh": "中國來源・政府案不可用",
+"pattern": false
+},
+{
+"zh": "這台放不下",
+"pattern": false
+},
+{
+"zh": "自動分層：{0} 層專家放系統記憶體",
+"pattern": true
+},
+{
+"zh": "自動分層",
+"pattern": false
+},
+{
+"zh": "層專家放系統記憶體",
+"pattern": false
+},
+{
+"zh": "缺 tokenizer",
+"pattern": false
+},
+{
+"zh": "沒有。",
+"pattern": false
+},
+{
+"zh": "Strata 引擎（Qwen3.8-Flash-Next 家族）",
+"pattern": false
+},
+{
+"zh": "這個引擎只跑 Qwen3.8-Flash-Next 的各個版本，長上下文最省記憶體。",
+"pattern": false
+},
+{
+"zh": "llama.cpp 引擎（GGUF）",
+"pattern": false
+},
+{
+"zh": "其他模型都走這裡（Gemma、gpt-oss、Llama…）。存放區：{0}",
+"pattern": true
+},
+{
+"zh": "其他模型都走這裡（Gemma、gpt-oss、Llama…）。存放區",
+"pattern": false
+},
+{
+"zh": "這台找不到 llama-server，GGUF 模型還不能啟動。請先編好 llama.cpp，或在登錄檔 machine.llama_server 指定路徑。",
+"pattern": false
+},
+{
+"zh": "到模型庫下載或管理模型",
+"pattern": false
+},
+{
+"zh": "會替這個欄位配一個沒人用的埠並啟動。",
+"pattern": false
+},
+{
+"zh": "套用時會先備份設定、做記憶體試算，再重啟；換到另一個引擎時，舊引擎會停掉並取消開機自啟，新引擎接手同一個埠，IDE 的網址不用改。",
+"pattern": false
+},
+{
+"zh": "模型要重新載入，大約一到數分鐘；載入失敗會自動換回原本的設定。",
+"pattern": false
+},
+{
+"zh": "放入並啟動",
+"pattern": false
+},
+{
+"zh": "套用並重啟",
+"pattern": false
+},
+{
+"zh": "換",
+"pattern": false
+},
+{
+"zh": "{0} {1} 中，模型要重新載入…",
+"pattern": true
+},
+{
+"zh": "中，模型要重新載入…",
+"pattern": false
+},
+{
+"zh": "（引擎改為 {0}）",
+"pattern": true
+},
+{
+"zh": "引擎改為",
+"pattern": false
+},
+{
+"zh": "已換成 {0}{1}",
+"pattern": true
+},
+{
+"zh": "已換成",
+"pattern": false
+},
+{
+"zh": "，用卡 {0}",
+"pattern": true
+},
+{
+"zh": "用卡",
+"pattern": false
+},
+{
+"zh": "，全部卡一起用",
+"pattern": false
+},
+{
+"zh": "下面的模型名稱",
+"pattern": false
+},
+{
+"zh": "已換成 {0}。IDE 裡的模型名稱請改成 {1}，",
+"pattern": true
+},
+{
+"zh": "IDE 裡的模型名稱請改成",
+"pattern": false
+},
+{
+"zh": "上下文與輸出上限照下面填，再按「實測一次」。",
+"pattern": false
+},
+{
+"zh": "統一記憶體的機器一旦吃爆，不是服務掛掉而是整台卡死，要到現場重開。",
+"pattern": false
+},
+{
+"zh": "擋下來了：{0} 放不下",
+"pattern": true
+},
+{
+"zh": "擋下來了",
+"pattern": false
+},
+{
+"zh": "放不下",
+"pattern": false
+},
+{
+"zh": "我知道風險，仍要套用",
+"pattern": false
+},
+{
+"zh": "放入失敗：",
+"pattern": false
+},
+{
+"zh": "換模型失敗：",
+"pattern": false
+},
+{
+"zh": "這是標記為關鍵的服務。",
+"pattern": false
+},
+{
+"zh": "換成 {0} 期間這個欄位會中斷。確定要換？",
+"pattern": true
+},
+{
+"zh": "換成",
+"pattern": false
+},
+{
+"zh": "期間這個欄位會中斷。確定要換？",
+"pattern": false
+},
+{
+"zh": "更換關鍵服務的模型",
+"pattern": false
+},
+{
+"zh": "確定更換",
+"pattern": false
+},
+{
+"zh": "匯入本機 GGUF",
+"pattern": false
+},
+{
+"zh": "連不上代理",
+"pattern": false
+},
+{
+"zh": "推薦模型",
+"pattern": false
+},
+{
+"zh": "已安裝（{0}）",
+"pattern": true
+},
+{
+"zh": "已安裝",
+"pattern": false
+},
+{
+"zh": "畫圖與影片模型",
+"pattern": false
+},
+{
+"zh": "搜尋 Hugging Face",
+"pattern": false
+},
+{
+"zh": "存放區",
+"pattern": false
+},
+{
+"zh": "手動組一顆畫圖／影片模型（內部測試）",
+"pattern": false
+},
+{
+"zh": "已經有 GGUF 檔案就按右上「匯入本機 GGUF」。畫圖與影片模型請到「畫圖與影片模型」分頁一鍵下載（主體、文字編碼器、VAE 一起）。",
+"pattern": false
+},
+{
+"zh": "推薦給：",
+"pattern": false
+},
+{
+"zh": "複製路徑",
+"pattern": false
+},
+{
+"zh": "在 {0} 上打開資料夾",
+"pattern": true
+},
+{
+"zh": "在",
+"pattern": false
+},
+{
+"zh": "上打開資料夾",
+"pattern": false
+},
+{
+"zh": "「打開資料夾」會在那台的桌面跳出檔案總管；那台沒有人登入桌面時打不開，就用上面的路徑。",
+"pattern": false
+},
+{
+"zh": "已在那台打開",
+"pattern": false
+},
+{
+"zh": "打不開：",
+"pattern": false
+},
+{
+"zh": "{0}{1} 的位置",
+"pattern": true
+},
+{
+"zh": "的位置",
+"pattern": false
+},
+{
+"zh": "已安裝的模型",
+"pattern": false
+},
+{
+"zh": "{0} 顆",
+"pattern": true
+},
+{
+"zh": "顆",
+"pattern": false
+},
+{
+"zh": "機器",
+"pattern": false
+},
+{
+"zh": "大小",
+"pattern": false
+},
+{
+"zh": "這台跑起來",
+"pattern": false
+},
+{
+"zh": "架構／最長上下文",
+"pattern": false
+},
+{
+"zh": "使用中",
+"pattern": false
+},
+{
+"zh": "{0} 個分片",
+"pattern": true
+},
+{
+"zh": "匯入",
+"pattern": false
+},
+{
+"zh": "・看圖",
+"pattern": false
+},
+{
+"zh": "・執行中",
+"pattern": false
+},
+{
+"zh": "開啟位置",
+"pattern": false
+},
+{
+"zh": "刪除",
+"pattern": false
+},
+{
+"zh": "有欄位正在用，先換成別的模型",
+"pattern": false
+},
+{
+"zh": "會從 {0} 的磁碟永久刪除 {1}/ 裡這顆模型的檔案（約 {2} GiB），無法復原。",
+"pattern": true
+},
+{
+"zh": "會從",
+"pattern": false
+},
+{
+"zh": "的磁碟永久刪除",
+"pattern": false
+},
+{
+"zh": "/ 裡這顆模型的檔案（約",
+"pattern": false
+},
+{
+"zh": "GiB），無法復原",
+"pattern": false
+},
+{
+"zh": "刪除 {0}{1}",
+"pattern": true
+},
+{
+"zh": "永久刪除",
+"pattern": false
+},
+{
+"zh": "已刪除，釋出 {0} GiB",
+"pattern": true
+},
+{
+"zh": "已刪除，釋出",
+"pattern": false
+},
+{
+"zh": "還沒有模型。到「推薦模型」挑一顆下載、到「搜尋 Hugging Face」找，或按右上「匯入本機 GGUF」。",
+"pattern": false
+},
+{
+"zh": "{0} 台",
+"pattern": true
+},
+{
+"zh": "台",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>機器</th><th>存放區</th><th class='num'>剩餘空間</th><th>硬碟</th><th>llama.cpp</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "機械硬碟（載入慢）",
+"pattern": false
+},
+{
+"zh": "固態硬碟",
+"pattern": false
+},
+{
+"zh": "找得到",
+"pattern": false
+},
+{
+"zh": "找不到 llama-server，GGUF 還不能啟動",
+"pattern": false
+},
+{
+"zh": "一鍵安裝",
+"pattern": false
+},
+{
+"zh": "更改",
+"pattern": false
+},
+{
+"zh": "Strata 引擎只跑 Qwen3.8-Flash-Next 家族，由 Strata 的 setup.sh 安裝；其他模型都是 GGUF，走 llama.cpp。",
+"pattern": false
+},
+{
+"zh": "從 Hugging Face 下載",
+"pattern": false
+},
+{
+"zh": "每台一次下載一個；中斷了再按一次會接續",
+"pattern": false
+},
+{
+"zh": "{0}（剩 {1} GiB）",
+"pattern": true
+},
+{
+"zh": "剩",
+"pattern": false
+},
+{
+"zh": "例：unsloth/gemma-4-E4B-it-GGUF",
+"pattern": false
+},
+{
+"zh": "需要授權的模型才填",
+"pattern": false
+},
+{
+"zh": "下載到哪台",
+"pattern": false
+},
+{
+"zh": "模型名稱（作者/模型）",
+"pattern": false
+},
+{
+"zh": "Hugging Face 令牌（選填）",
+"pattern": false
+},
+{
+"zh": "這裡填的只用這一次；要一直用就按「存起來」（加密保存在主控台，畫面看不到內容）",
+"pattern": false
+},
+{
+"zh": "用關鍵字找 GGUF，例：gemma 4、gpt-oss、granite",
+"pattern": false
+},
+{
+"zh": "搜尋",
+"pattern": false
+},
+{
+"zh": "找不到含這個關鍵字的 GGUF。",
+"pattern": false
+},
+{
+"zh": "下載 {0}・{1}",
+"pattern": true
+},
+{
+"zh": "下載",
+"pattern": false
+},
+{
+"zh": "列出可下載的量化",
+"pattern": false
+},
+{
+"zh": "查詢中…",
+"pattern": false
+},
+{
+"zh": "這個 repo 沒有 GGUF 檔。llama.cpp 只吃 GGUF，請找名稱帶 GGUF 的 repo。",
+"pattern": false
+},
+{
+"zh": "這是中國來源的模型：內部測試可以用，政府案不得使用。",
+"pattern": false
+},
+{
+"zh": "看圖用的 mmproj（選填）",
+"pattern": false
+},
+{
+"zh": "不下載（只用文字）",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>量化</th><th class='num'>大小</th><th>這台跑起來</th><th></th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "建議",
+"pattern": false
+},
+{
+"zh": "磁碟不夠",
+"pattern": false
+},
+{
+"zh": "輔助檔（推測解碼用），不是主模型",
+"pattern": false
+},
+{
+"zh": "目標機器換了，請重新列出可下載的量化",
+"pattern": false
+},
+{
+"zh": "開始下載 {0}",
+"pattern": true
+},
+{
+"zh": "開始下載",
+"pattern": false
+},
+{
+"zh": "等級與速度依這台的記憶體與頻寬估算；深色＝放顯示卡、淺色＝放系統記憶體、灰色＝放硬碟（最慢）。實際載入前還會再做一次記憶體試算。",
+"pattern": false
+},
+{
+"zh": "<這台的 IP>",
+"pattern": false
+},
+{
+"zh": "手動放入",
+"pattern": false
+},
+{
+"zh": "不能連外、或模型已經在別台機器上時",
+"pattern": false
+},
+{
+"zh": "存放區底下一顆模型一個資料夾，放好之後重新整理這頁就會出現，不用重啟。",
+"pattern": false
+},
+{
+"zh": "{0}/\n├── gemma-4-E4B-it/\n│   ├── gemma-4-E4B-it-Q4_K_M.gguf      同一個資料夾可放多種量化\n│   └── mmproj-F16.gguf                 看圖模型的視覺檔，檔名以 mmproj 開頭\n└── gpt-oss-120b/\n    ├── gpt-oss-120b-00001-of-00002.gguf 分片放同一個資料夾，要齊才會出現\n    └── gpt-oss-120b-00002-of-00002.gguf",
+"pattern": true
+},
+{
+"zh": "/\n├── gemma-4-E4B-it/\n│   ├── gemma-4-E4B-it-Q4_K_M.gguf      同一個資料夾可放多種量化\n│   └── mmproj-F16.gguf                 看圖模型的視覺檔，檔名以 mmproj 開頭\n└── gpt-oss-120b/\n    ├── gpt-oss-120b-00001-of-00002.gguf 分片放同一個資料夾，要齊才會出現\n    └── gpt-oss-120b-00002-of-00002.gguf",
+"pattern": false
+},
+{
+"zh": "帳號",
+"pattern": false
+},
+{
+"zh": "1. 在這台建資料夾",
+"pattern": false
+},
+{
+"zh": "2. 在來源機器上傳過來",
+"pattern": false
+},
+{
+"zh": "F 換成模型的資料夾名稱。第 2 行在來源機器、模型資料夾的上一層執行，從那台直接傳給這台，不要經過自己的電腦中轉。直接丟在存放區根目錄的 .gguf 不會被認到。",
+"pattern": false
+},
+{
+"zh": "放到哪台",
+"pattern": false
+},
+{
+"zh": "{0} 沒有可以換模型的欄位",
+"pattern": true
+},
+{
+"zh": "沒有可以換模型的欄位",
+"pattern": false
+},
+{
+"zh": "要把 {0}{1} 放進 {2} 的哪一格？",
+"pattern": true
+},
+{
+"zh": "要把",
+"pattern": false
+},
+{
+"zh": "放進",
+"pattern": false
+},
+{
+"zh": "的哪一格？",
+"pattern": false
+},
+{
+"zh": "空欄位",
+"pattern": false
+},
+{
+"zh": "換上到哪個欄位",
+"pattern": false
+},
+{
+"zh": "下載紀錄",
+"pattern": false
+},
+{
+"zh": "進行中的下載每 3 秒更新",
+"pattern": false
+},
+{
+"zh": "排隊中",
+"pattern": false
+},
+{
+"zh": "下載中 {0}%",
+"pattern": true
+},
+{
+"zh": "下載中",
+"pattern": false
+},
+{
+"zh": "完成",
+"pattern": false
+},
+{
+"zh": "失敗",
+"pattern": false
+},
+{
+"zh": "已取消",
+"pattern": false
+},
+{
+"zh": "中斷（再下載一次會接續）",
+"pattern": false
+},
+{
+"zh": "從這台電腦匯入 GGUF",
+"pattern": false
+},
+{
+"zh": "不用轉格式；檔案直接送到那台的存放區",
+"pattern": false
+},
+{
+"zh": "預設用第一個檔名",
+"pattern": false
+},
+{
+"zh": "匯入到哪台",
+"pattern": false
+},
+{
+"zh": "GGUF 檔案",
+"pattern": false
+},
+{
+"zh": "分片模型請一次選齊所有分片；看圖模型把 mmproj 一起選",
+"pattern": false
+},
+{
+"zh": "放進哪個資料夾",
+"pattern": false
+},
+{
+"zh": "一顆模型一個資料夾",
+"pattern": false
+},
+{
+"zh": "開始匯入",
+"pattern": false
+},
+{
+"zh": "暫停",
+"pattern": false
+},
+{
+"zh": "先選檔案",
+"pattern": false
+},
+{
+"zh": "只收 .gguf 檔",
+"pattern": false
+},
+{
+"zh": "準備中…",
+"pattern": false
+},
+{
+"zh": "{0}/{1} 已經有一個不一樣的檔案。請換一個資料夾名稱，或先到「已安裝」刪掉舊的",
+"pattern": true
+},
+{
+"zh": "已經有一個不一樣的檔案。請換一個資料夾名稱，或先到「已安裝」刪掉舊的",
+"pattern": false
+},
+{
+"zh": "（{0} 個檔案已經在、內容相同，沒有重送）",
+"pattern": true
+},
+{
+"zh": "個檔案已經在、內容相同，沒有重送",
+"pattern": false
+},
+{
+"zh": "已匯入到 {0}/{1}",
+"pattern": true
+},
+{
+"zh": "已匯入到",
+"pattern": false
+},
+{
+"zh": "已暫停；再按一次「開始匯入」會從中斷的地方接著送",
+"pattern": false
+},
+{
+"zh": "匯入失敗：",
+"pattern": false
+},
+{
+"zh": "{0}・{1}　執行設定",
+"pattern": true
+},
+{
+"zh": "　執行設定",
+"pattern": false
+},
+{
+"zh": "這個欄位不是 llama.cpp 跑的，執行設定請到 API 串接頁。",
+"pattern": false
+},
+{
+"zh": "預估速度",
+"pattern": false
+},
+{
+"zh": "約 {0} tok/s",
+"pattern": true
+},
+{
+"zh": "約",
+"pattern": false
+},
+{
+"zh": "未知",
+"pattern": false
+},
+{
+"zh": "依記憶體頻寬估算，實際以實測為準",
+"pattern": false
+},
+{
+"zh": "到「這台的設定」填記憶體頻寬",
+"pattern": false
+},
+{
+"zh": "載入時間",
+"pattern": false
+},
+{
+"zh": "{0} 秒",
+"pattern": true
+},
+{
+"zh": "秒",
+"pattern": false
+},
+{
+"zh": "約 {0} 秒",
+"pattern": true
+},
+{
+"zh": "上次實際載入",
+"pattern": false
+},
+{
+"zh": "還沒實際載入過，依磁碟速度估",
+"pattern": false
+},
+{
+"zh": "最長上下文 {0}",
+"pattern": true
+},
+{
+"zh": "最長上下文",
+"pattern": false
+},
+{
+"zh": "上下文長度",
+"pattern": false
+},
+{
+"zh": "KV 約 {0} GiB；載完最壞剩 {1} GiB",
+"pattern": true
+},
+{
+"zh": "KV 約",
+"pattern": false
+},
+{
+"zh": "GiB；載完最壞剩",
+"pattern": false
+},
+{
+"zh": "{0} 個 token：KV 約 {1} GiB，載完最壞還剩 {2} GiB。放不下的選項會反灰（游標移上去看原因）。",
+"pattern": true
+},
+{
+"zh": "個 token：KV 約",
+"pattern": false
+},
+{
+"zh": "GiB，載完最壞還剩",
+"pattern": false
+},
+{
+"zh": "GiB。放不下的選項會反灰（游標移上去看原因",
+"pattern": false
+},
+{
+"zh": "目前 {0}（不在常用選項裡）。",
+"pattern": true
+},
+{
+"zh": "目前",
+"pattern": false
+},
+{
+"zh": "不在常用選項裡",
+"pattern": false
+},
+{
+"zh": "思考模式",
+"pattern": false
+},
+{
+"zh": "照模型預設",
+"pattern": false
+},
+{
+"zh": "開：先想再答",
+"pattern": false
+},
+{
+"zh": "關：直接回答",
+"pattern": false
+},
+{
+"zh": "只對會思考的模型有用（例 gpt-oss、Granite、Nemotron）；關掉回答比較快，但難題可能答得比較差。",
+"pattern": false
+},
+{
+"zh": "這支 llama.cpp 太舊，不支援切換思考模式；到「這台的設定」重新安裝推理引擎。",
+"pattern": false
+},
+{
+"zh": "區網存取",
+"pattern": false
+},
+{
+"zh": " 讓區網裡的其他電腦（IDE、手機）連得到這個模型",
+"pattern": false
+},
+{
+"zh": "關掉就只有這台自己連得到（127.0.0.1）；主控台的網頁對話照樣能用。",
+"pattern": false
+},
+{
+"zh": "套用並重新載入",
+"pattern": false
+},
+{
+"zh": "重新載入模型中，大模型要幾分鐘…",
+"pattern": false
+},
+{
+"zh": "已套用並重新載入",
+"pattern": false
+},
+{
+"zh": "流暢",
+"pattern": false
+},
+{
+"zh": "勉強",
+"pattern": false
+},
+{
+"zh": "要用硬碟",
+"pattern": false
+},
+{
+"zh": "跑不動",
+"pattern": false
+},
+{
+"zh": "待更新",
+"pattern": false
+},
+{
+"zh": "還讀不到這台的記憶體",
+"pattern": false
+},
+{
+"zh": "這台沒有 GPU",
+"pattern": false
+},
+{
+"zh": "記憶體扣掉底線後放不下推薦的模型",
+"pattern": false
+},
+{
+"zh": "流暢執行 {0}B 以內的模型",
+"pattern": true
+},
+{
+"zh": "流暢執行",
+"pattern": false
+},
+{
+"zh": "B 以內的模型",
+"pattern": false
+},
+{
+"zh": "適合跑 4B 以下的小模型",
+"pattern": false
+},
+{
+"zh": "還不知道這台的記憶體頻寬，速度算不出來：這裡只照記憶體容量估。到「這台的設定」填頻寬，推薦會標出預估速度。",
+"pattern": false
+},
+{
+"zh": "記憶體放得下約 {0}B 的稠密模型，但超過 {1}B 會低於每秒 10 個 token；",
+"pattern": true
+},
+{
+"zh": "記憶體放得下約",
+"pattern": false
+},
+{
+"zh": "B 的稠密模型，但超過",
+"pattern": false
+},
+{
+"zh": "B 會低於每秒 10 個 token",
+"pattern": false
+},
+{
+"zh": "MoE 模型每次只動用一部分參數，更大的也跑得順。",
+"pattern": false
+},
+{
+"zh": "顯示卡放不下時，MoE 模型會自動把部分專家層放到系統記憶體繼續跑——最大約 {0}B（4 位元量化），只是比較慢。",
+"pattern": true
+},
+{
+"zh": "顯示卡放不下時，MoE 模型會自動把部分專家層放到系統記憶體繼續跑——最大約",
+"pattern": false
+},
+{
+"zh": "B（4 位元量化），只是比較慢",
+"pattern": false
+},
+{
+"zh": "模型先放進顯示卡，放不下的專家層依序放到系統記憶體。越靠左越快。",
+"pattern": false
+},
+{
+"zh": "模型放 GPU 那一塊；系統那一塊只給引擎，吃爆會拖死整台，載入前一律先試算。",
+"pattern": false
+},
+{
+"zh": "載入前先試算載完最壞剩多少，低於保留量就擋下，不會把整台拖死。",
+"pattern": false
+},
+{
+"zh": "記憶體架構還沒確認：現在照「{0}」算，",
+"pattern": true
+},
+{
+"zh": "記憶體架構還沒確認：現在照「",
+"pattern": false
+},
+{
+"zh": "」算",
+"pattern": false
+},
+{
+"zh": "偵測建議是「{0}」。架構不對，推薦與載入前的試算都會不準。",
+"pattern": true
+},
+{
+"zh": "偵測建議是「",
+"pattern": false
+},
+{
+"zh": "」。架構不對，推薦與載入前的試算都會不準",
+"pattern": false
+},
+{
+"zh": "確認記憶體架構",
+"pattern": false
+},
+{
+"zh": "顯示卡",
+"pattern": false
+},
+{
+"zh": "晶片",
+"pattern": false
+},
+{
+"zh": "認不出型號",
+"pattern": false
+},
+{
+"zh": "統一記憶體",
+"pattern": false
+},
+{
+"zh": "{0} {1} GiB，已用 {2} GiB",
+"pattern": true
+},
+{
+"zh": "GiB，已用",
+"pattern": false
+},
+{
+"zh": "（{0} 張）",
+"pattern": true
+},
+{
+"zh": "張",
+"pattern": false
+},
+{
+"zh": "處理器",
+"pattern": false
+},
+{
+"zh": "{0} 執行緒",
+"pattern": true
+},
+{
+"zh": "執行緒",
+"pattern": false
+},
+{
+"zh": "可用 {0} GiB",
+"pattern": true
+},
+{
+"zh": "可用",
+"pattern": false
+},
+{
+"zh": "記憶體頻寬",
+"pattern": false
+},
+{
+"zh": "估不出速度，請到這台的設定填",
+"pattern": false
+},
+{
+"zh": "模型存放區",
+"pattern": false
+},
+{
+"zh": "，機械硬碟（大模型載入會很慢）",
+"pattern": false
+},
+{
+"zh": "，固態硬碟",
+"pattern": false
+},
+{
+"zh": "剩 {0} GiB{1}",
+"pattern": true
+},
+{
+"zh": "重新偵測",
+"pattern": false
+},
+{
+"zh": "已重新讀取",
+"pattern": false
+},
+{
+"zh": "自家",
+"pattern": false
+},
+{
+"zh": "{0} 年 {1} 月發布",
+"pattern": true
+},
+{
+"zh": "年",
+"pattern": false
+},
+{
+"zh": "月發布",
+"pattern": false
+},
+{
+"zh": "{0} 年發布",
+"pattern": true
+},
+{
+"zh": "年發布",
+"pattern": false
+},
+{
+"zh": "授權 {0}",
+"pattern": true
+},
+{
+"zh": "授權",
+"pattern": false
+},
+{
+"zh": "還沒從 Hugging Face 讀到大小",
+"pattern": false
+},
+{
+"zh": "單一檔案",
+"pattern": false
+},
+{
+"zh": "推薦",
+"pattern": false
+},
+{
+"zh": "已下載",
+"pattern": false
+},
+{
+"zh": "共 {0} GiB",
+"pattern": true
+},
+{
+"zh": "共",
+"pattern": false
+},
+{
+"zh": "速度未知",
+"pattern": false
+},
+{
+"zh": "下載 {0} GiB",
+"pattern": true
+},
+{
+"zh": "存放區空間不夠（另需保留 10 GiB）",
+"pattern": false
+},
+{
+"zh": "，含看圖用的 mmproj {0} GiB",
+"pattern": true
+},
+{
+"zh": "含看圖用的 mmproj",
+"pattern": false
+},
+{
+"zh": "把 {0} {1}（{2} GiB{3}）下載到 {4}？",
+"pattern": true
+},
+{
+"zh": "把",
+"pattern": false
+},
+{
+"zh": "下載到",
+"pattern": false
+},
+{
+"zh": "（速度未知）",
+"pattern": false
+},
+{
+"zh": "{0}，預估約 {1}。下載在背景進行，中斷了再按一次會接續；完成後在清單上按「換上」。",
+"pattern": true
+},
+{
+"zh": "下載在背景進行，中斷了再按一次會接續；完成後在清單上按「換上」",
+"pattern": false
+},
+{
+"zh": "下載模型",
+"pattern": false
+},
+{
+"zh": "已開始下載",
+"pattern": false
+},
+{
+"zh": "為 {0} 推薦",
+"pattern": true
+},
+{
+"zh": "為",
+"pattern": false
+},
+{
+"zh": "管理推薦清單",
+"pattern": false
+},
+{
+"zh": "適合這台",
+"pattern": false
+},
+{
+"zh": "全部",
+"pattern": false
+},
+{
+"zh": "對話與知識",
+"pattern": false
+},
+{
+"zh": "寫程式",
+"pattern": false
+},
+{
+"zh": "看圖與 OCR",
+"pattern": false
+},
+{
+"zh": "推理",
+"pattern": false
+},
+{
+"zh": "隱藏放不下的",
+"pattern": false
+},
+{
+"zh": "也顯示放不下的",
+"pattern": false
+},
+{
+"zh": "推薦清單是空的，按「管理推薦清單」新增。",
+"pattern": false
+},
+{
+"zh": "推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或放不下的，或到「搜尋 Hugging Face」找小一點的。",
+"pattern": false
+},
+{
+"zh": "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。",
+"pattern": false
+},
+{
+"zh": "速度是估算：記憶體頻寬 × {0}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），",
+"pattern": true
+},
+{
+"zh": "速度是估算：記憶體頻寬 ×",
+"pattern": false
+},
+{
+"zh": "% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家",
+"pattern": false
+},
+{
+"zh": "上下文以 {0} 計、低於 {1} tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用）。",
+"pattern": true
+},
+{
+"zh": "上下文以",
+"pattern": false
+},
+{
+"zh": "計、低於",
+"pattern": false
+},
+{
+"zh": "tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用",
+"pattern": false
+},
+{
+"zh": "為這台機器推薦",
+"pattern": false
+},
+{
+"zh": "全部模型",
+"pattern": false
+},
+{
+"zh": "推薦清單裡沒有這台放得下的模型。",
+"pattern": false
+},
+{
+"zh": "這份清單決定每台機器的「推薦模型」列出哪些；順序就是同等級時的排列先後。",
+"pattern": false
+},
+{
+"zh": "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型不能加入。",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>名稱</th><th>Hugging Face</th><th>用途</th><th>量化</th><th>更新於</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "{0} 種",
+"pattern": true
+},
+{
+"zh": "種",
+"pattern": false
+},
+{
+"zh": "還沒讀到",
+"pattern": false
+},
+{
+"zh": "編輯",
+"pattern": false
+},
+{
+"zh": "移除",
+"pattern": false
+},
+{
+"zh": "移除 {0}",
+"pattern": true
+},
+{
+"zh": "只從推薦清單拿掉；已經下載到各台的模型不受影響。",
+"pattern": false
+},
+{
+"zh": "已移除",
+"pattern": false
+},
+{
+"zh": "上移",
+"pattern": false
+},
+{
+"zh": "下移",
+"pattern": false
+},
+{
+"zh": "新增模型",
+"pattern": false
+},
+{
+"zh": "全部從 Hugging Face 重新讀取",
+"pattern": false
+},
+{
+"zh": "讀取中，一顆約 5 秒…",
+"pattern": false
+},
+{
+"zh": "更新 {0} 顆；{1}",
+"pattern": true
+},
+{
+"zh": "更新",
+"pattern": false
+},
+{
+"zh": "已更新 {0} 顆",
+"pattern": true
+},
+{
+"zh": "已更新",
+"pattern": false
+},
+{
+"zh": "關閉",
+"pattern": false
+},
+{
+"zh": "畫面上顯示的名稱，例：Gemma 4 E4B",
+"pattern": false
+},
+{
+"zh": "例：Google、云碩 xVITA",
+"pattern": false
+},
+{
+"zh": "例：繁中、看圖（最多 6 個）",
+"pattern": false
+},
+{
+"zh": "選填，例：coder-v2",
+"pattern": false
+},
+{
+"zh": "Hugging Face 名稱",
+"pattern": false
+},
+{
+"zh": "GGUF 的 repo；新增時會讀它的檔頭，約 5 秒",
+"pattern": false
+},
+{
+"zh": "顯示名稱",
+"pattern": false
+},
+{
+"zh": "用途",
+"pattern": false
+},
+{
+"zh": "來源",
+"pattern": false
+},
+{
+"zh": "標籤",
+"pattern": false
+},
+{
+"zh": "檔名要含",
+"pattern": false
+},
+{
+"zh": "同一個 repo 放了好幾個不同模型時，只列檔名含這段字的量化；改了要勾下面的重新讀取",
+"pattern": false
+},
+{
+"zh": "一句話：這顆擅長什麼、適合誰用（最多 160 字）",
+"pattern": false
+},
+{
+"zh": "說明",
+"pattern": false
+},
+{
+"zh": " 儲存時重新從 Hugging Face 讀大小與架構",
+"pattern": false
+},
+{
+"zh": "編輯 {0}",
+"pattern": true
+},
+{
+"zh": "新增推薦模型",
+"pattern": false
+},
+{
+"zh": "儲存",
+"pattern": false
+},
+{
+"zh": "儲存中…",
+"pattern": false
+},
+{
+"zh": "已儲存",
+"pattern": false
+},
+{
+"zh": "完整模型",
+"pattern": false
+},
+{
+"zh": "擴散模型",
+"pattern": false
+},
+{
+"zh": "文字編碼器",
+"pattern": false
+},
+{
+"zh": "音訊 VAE",
+"pattern": false
+},
+{
+"zh": "嵌入連接器",
+"pattern": false
+},
+{
+"zh": "方形",
+"pattern": false
+},
+{
+"zh": "直式",
+"pattern": false
+},
+{
+"zh": "橫式",
+"pattern": false
+},
+{
+"zh": "已存的令牌：讀取中…",
+"pattern": false
+},
+{
+"zh": "存起來",
+"pattern": false
+},
+{
+"zh": "清除已存的",
+"pattern": false
+},
+{
+"zh": "已存的令牌：已設定（沒填上面那格時自動用它）",
+"pattern": false
+},
+{
+"zh": "已存的令牌：沒有",
+"pattern": false
+},
+{
+"zh": "已加密存在主控台",
+"pattern": false
+},
+{
+"zh": "這台機器：",
+"pattern": false
+},
+{
+"zh": "產生圖片與影片",
+"pattern": false
+},
+{
+"zh": "已下載（{0}）",
+"pattern": true
+},
+{
+"zh": "畫圖與影片：{0}",
+"pattern": true
+},
+{
+"zh": "畫圖與影片",
+"pattern": false
+},
+{
+"zh": "{0}・存放區 {1}，剩 {2} GiB",
+"pattern": true
+},
+{
+"zh": "手動組一顆（內部測試）",
+"pattern": false
+},
+{
+"zh": "安裝畫圖引擎",
+"pattern": false
+},
+{
+"zh": "正在編譯 stable-diffusion.cpp…",
+"pattern": false
+},
+{
+"zh": "依這台的顯示卡自動選 CUDA／ROCm，在網頁上一鍵編譯 stable-diffusion.cpp（約 10～20 分鐘）",
+"pattern": false
+},
+{
+"zh": "看進度",
+"pattern": false
+},
+{
+"zh": "下載一顆模型",
+"pattern": false
+},
+{
+"zh": "主體、文字編碼器、VAE 一次下載齊；照這台的記憶體建議量化，標好流暢或能跑",
+"pattern": false
+},
+{
+"zh": "看推薦",
+"pattern": false
+},
+{
+"zh": "產生第一張",
+"pattern": false
+},
+{
+"zh": "產之前先試算這台還剩多少記憶體，不夠就擋下；產過一次會記下實測的時間與用量",
+"pattern": false
+},
+{
+"zh": "去產圖",
+"pattern": false
+},
+{
+"zh": "看步驟",
+"pattern": false
+},
+{
+"zh": "收起步驟",
+"pattern": false
+},
+{
+"zh": "、{0} 格",
+"pattern": true
+},
+{
+"zh": "格",
+"pattern": false
+},
+{
+"zh": "實測：{0}×{1}{2}、{3} 步 {4} 秒，最高用 {5} GiB",
+"pattern": true
+},
+{
+"zh": "實測",
+"pattern": false
+},
+{
+"zh": "步",
+"pattern": false
+},
+{
+"zh": "秒，最高用",
+"pattern": false
+},
+{
+"zh": "管理清單",
+"pattern": false
+},
+{
+"zh": "清單是空的，按「管理清單」新增。",
+"pattern": false
+},
+{
+"zh": "「要約」＝所有權重加上產圖時的計算緩衝（以清單的預設尺寸計）。擴散模型吃的是算力不是頻寬，速度不估算，",
+"pattern": false
+},
+{
+"zh": "產過一次後顯示這台的實測。清單不含中國來源模型——文字編碼器與 VAE 也算（政府案不得使用）。",
+"pattern": false
+},
+{
+"zh": "還沒從 Hugging Face 讀到檔案",
+"pattern": false
+},
+{
+"zh": "原始",
+"pattern": false
+},
+{
+"zh": "共 {0} GiB，{1} 個檔",
+"pattern": true
+},
+{
+"zh": "個檔",
+"pattern": false
+},
+{
+"zh": "{0}，要約 {1} GiB",
+"pattern": true
+},
+{
+"zh": "要約",
+"pattern": false
+},
+{
+"zh": "產過一次後顯示實測速度",
+"pattern": false
+},
+{
+"zh": "補齊下載",
+"pattern": false
+},
+{
+"zh": "加入（檔案都在了）",
+"pattern": false
+},
+{
+"zh": "把 {0} {1} 下載到 {2}？共 {3} 個檔、{4} GiB；",
+"pattern": true
+},
+{
+"zh": "？共",
+"pattern": false
+},
+{
+"zh": "這台已經有其中幾個共用檔，實際要下載 {0} GiB：",
+"pattern": true
+},
+{
+"zh": "這台已經有其中幾個共用檔，實際要下載",
+"pattern": false
+},
+{
+"zh": "全部都要下載：",
+"pattern": false
+},
+{
+"zh": "{0}，產圖時要約 {1} GiB。下載在背景進行，中斷了再按一次會接續；完成後到「產生圖片與影片」。",
+"pattern": true
+},
+{
+"zh": "產圖時要約",
+"pattern": false
+},
+{
+"zh": "GiB。下載在背景進行，中斷了再按一次會接續；完成後到「產生圖片與影片」",
+"pattern": false
+},
+{
+"zh": "下載畫圖／影片模型",
+"pattern": false
+},
+{
+"zh": "需要的檔案都已經在這台了，可以直接產圖",
+"pattern": false
+},
+{
+"zh": "已下載的畫圖與影片模型",
+"pattern": false
+},
+{
+"zh": "還沒有。到「推薦模型」挑一顆下載。",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>名稱</th><th>種類</th><th class='num'>大小</th><th>狀態</th><th>實測</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "中國來源・只限內部測試",
+"pattern": false
+},
+{
+"zh": "內部測試",
+"pattern": false
+},
+{
+"zh": "可以用",
+"pattern": false
+},
+{
+"zh": "缺：{0}（到推薦模型按「補齊下載」）",
+"pattern": true
+},
+{
+"zh": "缺",
+"pattern": false
+},
+{
+"zh": "到推薦模型按「補齊下載」",
+"pattern": false
+},
+{
+"zh": "還沒產過",
+"pattern": false
+},
+{
+"zh": "刪除 {0}",
+"pattern": true
+},
+{
+"zh": "刪掉這顆獨用的檔（不可復原）；別顆也在用的共用檔（例：同一份文字編碼器）會留著。",
+"pattern": false
+},
+{
+"zh": "已刪除，空出 {0} GiB",
+"pattern": true
+},
+{
+"zh": "已刪除，空出",
+"pattern": false
+},
+{
+"zh": "產生",
+"pattern": false
+},
+{
+"zh": "還沒安裝畫圖引擎",
+"pattern": false
+},
+{
+"zh": "結果",
+"pattern": false
+},
+{
+"zh": "最近產出",
+"pattern": false
+},
+{
+"zh": "這台還沒安裝 stable-diffusion.cpp。",
+"pattern": false
+},
+{
+"zh": "畫圖／影片",
+"pattern": false
+},
+{
+"zh": "這台還沒有下載好的{0}模型。",
+"pattern": true
+},
+{
+"zh": "這台還沒有下載好的",
+"pattern": false
+},
+{
+"zh": "・內部測試",
+"pattern": false
+},
+{
+"zh": "想要的畫面，英文描述效果最好。例：a red fox sitting in fresh snow, morning light, photo",
+"pattern": false
+},
+{
+"zh": "不要出現的內容（選填）。例：blurry, text, watermark",
+"pattern": false
+},
+{
+"zh": "{0} 格",
+"pattern": true
+},
+{
+"zh": "{0} 張",
+"pattern": true
+},
+{
+"zh": "選一張圖",
+"pattern": false
+},
+{
+"zh": "拿掉",
+"pattern": false
+},
+{
+"zh": "參考圖",
+"pattern": false
+},
+{
+"zh": "參考圖最大 4 MB",
+"pattern": false
+},
+{
+"zh": "參考圖只收 PNG、JPEG、WebP",
+"pattern": false
+},
+{
+"zh": "重繪強度",
+"pattern": false
+},
+{
+"zh": "0.3 左右只改細節，0.8 以上幾乎重畫",
+"pattern": false
+},
+{
+"zh": "參考圖（選填）",
+"pattern": false
+},
+{
+"zh": "在這張圖上面照提示詞重畫",
+"pattern": false
+},
+{
+"zh": "張數",
+"pattern": false
+},
+{
+"zh": "同一組設定一次產幾張，種子依序加一",
+"pattern": false
+},
+{
+"zh": "影格數",
+"pattern": false
+},
+{
+"zh": "8 的倍數加 1；越多越長、越吃記憶體",
+"pattern": false
+},
+{
+"zh": "每秒格數",
+"pattern": false
+},
+{
+"zh": "畫幅",
+"pattern": false
+},
+{
+"zh": "步數",
+"pattern": false
+},
+{
+"zh": "清單的預設通常就是最佳值",
+"pattern": false
+},
+{
+"zh": "引導強度",
+"pattern": false
+},
+{
+"zh": "FLUX 類設 1",
+"pattern": false
+},
+{
+"zh": "種子",
+"pattern": false
+},
+{
+"zh": "-1＝隨機；同種子同設定會產出同一張",
+"pattern": false
+},
+{
+"zh": "取樣方法",
+"pattern": false
+},
+{
+"zh": "提示詞",
+"pattern": false
+},
+{
+"zh": "不要出現的內容",
+"pattern": false
+},
+{
+"zh": "・預設",
+"pattern": false
+},
+{
+"zh": "第一格畫面（選填）",
+"pattern": false
+},
+{
+"zh": "從這張圖開始，照提示詞接著往下演",
+"pattern": false
+},
+{
+"zh": "產生影片",
+"pattern": false
+},
+{
+"zh": "產生圖片",
+"pattern": false
+},
+{
+"zh": "試算記憶體中…",
+"pattern": false
+},
+{
+"zh": "（依實測）",
+"pattern": false
+},
+{
+"zh": "（估算）",
+"pattern": false
+},
+{
+"zh": "夠：這次要約 {0} GiB{1}，產的時候最壞剩 {2} GiB（底線 {3}）{4}",
+"pattern": true
+},
+{
+"zh": "夠：這次要約",
+"pattern": false
+},
+{
+"zh": "產的時候最壞剩",
+"pattern": false
+},
+{
+"zh": "GiB（底線",
+"pattern": false
+},
+{
+"zh": "還沒有產出。",
+"pattern": false
+},
+{
+"zh": "產生中",
+"pattern": false
+},
+{
+"zh": "中斷",
+"pattern": false
+},
+{
+"zh": "左邊填好按「產生」，進度與結果會出現在這裡。",
+"pattern": false
+},
+{
+"zh": "讀不到進度：",
+"pattern": false
+},
+{
+"zh": "　{0}/{1} 步",
+"pattern": true
+},
+{
+"zh": "、每步 {0} 秒",
+"pattern": true
+},
+{
+"zh": "每步",
+"pattern": false
+},
+{
+"zh": "{0}×{1}{2}、種子 {3}{4}、已經 {5} 秒",
+"pattern": true
+},
+{
+"zh": "已經",
+"pattern": false
+},
+{
+"zh": "　權重放系統記憶體（較慢）",
+"pattern": false
+},
+{
+"zh": "・{0} 格",
+"pattern": true
+},
+{
+"zh": "・{0} 張",
+"pattern": true
+},
+{
+"zh": "・參考圖重繪 {0}",
+"pattern": true
+},
+{
+"zh": "參考圖重繪",
+"pattern": false
+},
+{
+"zh": "・從參考圖開始",
+"pattern": false
+},
+{
+"zh": "{0}・{1} 步・引導 {2}・種子 {3}",
+"pattern": true
+},
+{
+"zh": "步・引導",
+"pattern": false
+},
+{
+"zh": "・{0} 秒",
+"pattern": true
+},
+{
+"zh": "・最高用 {0} GiB",
+"pattern": true
+},
+{
+"zh": "最高用",
+"pattern": false
+},
+{
+"zh": "代理重啟過，這件沒產完",
+"pattern": false
+},
+{
+"zh": "讀取中…",
+"pattern": false
+},
+{
+"zh": "第 {0} 張",
+"pattern": true
+},
+{
+"zh": "第",
+"pattern": false
+},
+{
+"zh": "用同樣的設定",
+"pattern": false
+},
+{
+"zh": "已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）",
+"pattern": false
+},
+{
+"zh": "管理畫圖與影片清單",
+"pattern": false
+},
+{
+"zh": "這份清單決定每台機器「畫圖與影片」列出哪些模型；順序就是同等級時的排列先後。每顆寫明主體、文字編碼器、VAE 各是哪個 repo 的哪個檔，",
+"pattern": false
+},
+{
+"zh": "大小由機器從 Hugging Face 讀。中國來源的模型不能加入——文字編碼器、VAE 也算。",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>名稱</th><th>主體</th><th>種類</th><th>元件</th><th>更新於</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "只從清單拿掉；已經下載到各台的不受影響。",
+"pattern": false
+},
+{
+"zh": "作者/模型",
+"pattern": false
+},
+{
+"zh": "檔名",
+"pattern": false
+},
+{
+"zh": "檔名開頭",
+"pattern": false
+},
+{
+"zh": "例：vae/ae.safetensors",
+"pattern": false
+},
+{
+"zh": "加一個元件",
+"pattern": false
+},
+{
+"zh": "影格數（影片）",
+"pattern": false
+},
+{
+"zh": "每秒格數（影片）",
+"pattern": false
+},
+{
+"zh": "預設寬",
+"pattern": false
+},
+{
+"zh": "預設高",
+"pattern": false
+},
+{
+"zh": "主體所在的 repo，例：leejet/FLUX.1-schnell-gguf",
+"pattern": false
+},
+{
+"zh": "例：FLUX.1 schnell",
+"pattern": false
+},
+{
+"zh": "例：Black Forest Labs",
+"pattern": false
+},
+{
+"zh": "例：apache-2.0",
+"pattern": false
+},
+{
+"zh": "例：快速、可商用（最多 6 個）",
+"pattern": false
+},
+{
+"zh": "種類",
+"pattern": false
+},
+{
+"zh": "一句話：擅長什麼、適合誰用（最多 160 字）",
+"pattern": false
+},
+{
+"zh": "元件",
+"pattern": false
+},
+{
+"zh": "主體選「擴散模型」或「完整模型」，repo 要跟上面的 Hugging Face 名稱一樣。寫「檔名開頭」時，機器會在開頭相符的 .gguf 裡照記憶體挑量化，其他元件跟著主體的位元數。",
+"pattern": false
+},
+{
+"zh": "預設參數",
+"pattern": false
+},
+{
+"zh": "新增畫圖／影片模型",
+"pattern": false
+},
+{
+"zh": "讀取 Hugging Face 中…",
+"pattern": false
+},
+{
+"zh": "給內部測試用：不在推薦清單上的模型（含中國來源，例 Qwen-Image、Wan）可以在這裡自己組。政府案不得使用中國來源模型，交付前要刪掉。",
+"pattern": false
+},
+{
+"zh": "例：Qwen-Image Q4（測試）",
+"pattern": false
+},
+{
+"zh": "需要授權的 repo 才填",
+"pattern": false
+},
+{
+"zh": "Hugging Face 權杖",
+"pattern": false
+},
+{
+"zh": "只在這次下載用，不會存下來",
+"pattern": false
+},
+{
+"zh": "元件（每列一個檔，寫完整的檔名，含子資料夾）",
+"pattern": false
+},
+{
+"zh": " 這顆只做內部測試，不會出現在交付給客戶的機器上",
+"pattern": false
+},
+{
+"zh": "手動組一顆（{0}）",
+"pattern": true
+},
+{
+"zh": "手動組一顆",
+"pattern": false
+},
+{
+"zh": "要勾「只做內部測試」才能下載",
+"pattern": false
+},
+{
+"zh": "核對檔案中…",
+"pattern": false
+},
+{
+"zh": "檔案都在了",
+"pattern": false
+},
+{
+"zh": "強制執行可能讓這台機器記憶體耗盡。統一記憶體的機器一旦吃爆，不是服務掛掉而是整台卡死，要到現場重開。",
+"pattern": false
+},
+{
+"zh": "擋下來了：不建議{0}「{1}」",
+"pattern": true
+},
+{
+"zh": "擋下來了：不建議",
+"pattern": false
+},
+{
+"zh": "我知道風險，仍要執行",
+"pattern": false
+},
+{
+"zh": "確定要{0}「{1}・{2}」？",
+"pattern": true
+},
+{
+"zh": "確定要",
+"pattern": false
+},
+{
+"zh": "{0}關鍵服務",
+"pattern": true
+},
+{
+"zh": "確定{0}",
+"pattern": true
+},
+{
+"zh": "確定",
+"pattern": false
+},
+{
+"zh": "{0} 的「{1}」已{2}",
+"pattern": true
+},
+{
+"zh": "的「",
+"pattern": false
+},
+{
+"zh": "」已",
+"pattern": false
+},
+{
+"zh": "{0}失敗：{1}",
+"pattern": true
+},
+{
+"zh": "文字",
+"pattern": false
+},
+{
+"zh": "嵌入",
+"pattern": false
+},
+{
+"zh": "已複製",
+"pattern": false
+},
+{
+"zh": "複製失敗，請手動選取",
+"pattern": false
+},
+{
+"zh": "複製",
+"pattern": false
+},
+{
+"zh": "（模型名稱）",
+"pattern": false
+},
+{
+"zh": "<貼上金鑰>",
+"pattern": false
+},
+{
+"zh": "貼進 VS Code 的 settings.json。也可以在 Copilot 對話框的模型選單 → 管理模型 → 新增「OpenAI Compatible」，",
+"pattern": false
+},
+{
+"zh": "填同樣的網址與模型名稱。網址填到 /v1；若你的版本要求完整路徑，改填 ",
+"pattern": false
+},
+{
+"zh": "GitHub Copilot 桌面版／其他 IDE",
+"pattern": false
+},
+{
+"zh": "只要工具有「OpenAI 相容（OpenAI Compatible）」的自訂提供者，就填這幾欄。",
+"pattern": false
+},
+{
+"zh": "提供者類型   OpenAI Compatible",
+"pattern": false
+},
+{
+"zh": "模型名稱     {0}",
+"pattern": true
+},
+{
+"zh": "模型名稱",
+"pattern": false
+},
+{
+"zh": "不需要（工具要求必填就隨便填一串）",
+"pattern": false
+},
+{
+"zh": "API 金鑰     {0}",
+"pattern": true
+},
+{
+"zh": "API 金鑰",
+"pattern": false
+},
+{
+"zh": "上下文長度   {0}",
+"pattern": true
+},
+{
+"zh": "輸出上限     {0}",
+"pattern": true
+},
+{
+"zh": "輸出上限",
+"pattern": false
+},
+{
+"zh": "不支援",
+"pattern": false
+},
+{
+"zh": "支援（代理模式可用）",
+"pattern": false
+},
+{
+"zh": "工具呼叫     {0}",
+"pattern": true
+},
+{
+"zh": "工具呼叫",
+"pattern": false
+},
+{
+"zh": "支援",
+"pattern": false
+},
+{
+"zh": "看圖         {0}",
+"pattern": true
+},
+{
+"zh": "存成專案根目錄的 opencode.json，或 ~/.config/opencode/opencode.json。",
+"pattern": false
+},
+{
+"zh": "金鑰放在環境變數 XCONSOLE_API_KEY，不寫進設定檔。",
+"pattern": false
+},
+{
+"zh": "加進 ~/.continue/config.yaml 的 models。",
+"pattern": false
+},
+{
+"zh": "設定 → API Provider 選「OpenAI Compatible」，填這幾欄。",
+"pattern": false
+},
+{
+"zh": "隨便填一串（伺服器沒設金鑰）",
+"pattern": false
+},
+{
+"zh": "Claude Code（Anthropic 介面）",
+"pattern": false
+},
+{
+"zh": "這個引擎也講 Anthropic 的 /v1/messages，Claude Code 可以直接接。",
+"pattern": false
+},
+{
+"zh": "在任何一台連得到的電腦上貼上執行，回「連線成功」就通了。",
+"pattern": false
+},
+{
+"zh": "請只回答：連線成功",
+"pattern": false
+},
+{
+"zh": "用官方 openai 套件（pip install openai）。串到自己的服務時照這樣寫。",
+"pattern": false
+},
+{
+"zh": "    messages=[{\"role\": \"user\", \"content\": \"請只回答：連線成功\"}],",
+"pattern": false
+},
+{
+"zh": "確認服務在跑",
+"pattern": false
+},
+{
+"zh": "IDE 打過來要有人接；沒在跑就先到機器頁啟動或換模型",
+"pattern": false
+},
+{
+"zh": "（服務沒有回應）",
+"pattern": false
+},
+{
+"zh": "確認網址、模型名稱與上下文",
+"pattern": false
+},
+{
+"zh": "這三個要原封不動填進 IDE；上下文不夠，IDE 一輪的提示就送不出去",
+"pattern": false
+},
+{
+"zh": "決定要不要金鑰",
+"pattern": false
+},
+{
+"zh": "有金鑰才不會讓內網任何人都能用；開了之後每個工具都要補上金鑰",
+"pattern": false
+},
+{
+"zh": "實測一次",
+"pattern": false
+},
+{
+"zh": "從這台本機與主控台經網路各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
+"pattern": false
+},
+{
+"zh": "換完模型之後，IDE 與其他服務要打的網址、模型名稱與上下文都在這裡",
+"pattern": false
+},
+{
+"zh": "目前沒有提供 API 的模型欄位。先到機器頁啟動或換上一顆文字模型。",
+"pattern": false
+},
+{
+"zh": "欄位",
+"pattern": false
+},
+{
+"zh": "模型名稱（填進 IDE）",
+"pattern": false
+},
+{
+"zh": "網址",
+"pattern": false
+},
+{
+"zh": "金鑰",
+"pattern": false
+},
+{
+"zh": "上次實測",
+"pattern": false
+},
+{
+"zh": "設定與實測",
+"pattern": false
+},
+{
+"zh": "有",
+"pattern": false
+},
+{
+"zh": "沒有",
+"pattern": false
+},
+{
+"zh": "通過",
+"pattern": false
+},
+{
+"zh": "還沒測",
+"pattern": false
+},
+{
+"zh": "網址是 http：這些模型服務在內網直接對外，沒有經過主控台。設了金鑰的話，金鑰會以明文在內網傳輸。",
+"pattern": false
+},
+{
+"zh": "API 串接：{0} {1}・{2}",
+"pattern": true
+},
+{
+"zh": "連線資訊",
+"pattern": false
+},
+{
+"zh": "服務有回應",
+"pattern": false
+},
+{
+"zh": "服務沒有回應",
+"pattern": false
+},
+{
+"zh": "網址（Base URL）",
+"pattern": false
+},
+{
+"zh": "單次輸出上限",
+"pattern": false
+},
+{
+"zh": "引擎預設（範例填 {0}）",
+"pattern": true
+},
+{
+"zh": "引擎預設（範例填",
+"pattern": false
+},
+{
+"zh": "已設定（只在產生當下顯示一次）",
+"pattern": false
+},
+{
+"zh": "沒有設定",
+"pattern": false
+},
+{
+"zh": "支援的介面",
+"pattern": false
+},
+{
+"zh": "工具呼叫／看圖",
+"pattern": false
+},
+{
+"zh": "服務實際回報的模型名稱是 {0}，跟設定檔不一致，IDE 請填實際的那個。",
+"pattern": true
+},
+{
+"zh": "服務實際回報的模型名稱是",
+"pattern": false
+},
+{
+"zh": "跟設定檔不一致，IDE 請填實際的那個",
+"pattern": false
+},
+{
+"zh": "連不上",
+"pattern": false
+},
+{
+"zh": "本機打 :{0}/v1/models 沒有回應（{1}）。",
+"pattern": true
+},
+{
+"zh": "本機打 :",
+"pattern": false
+},
+{
+"zh": "/v1/models 沒有回應",
+"pattern": false
+},
+{
+"zh": "改完會重啟這個模型並用新設定實際打一次，打不通自動換回",
+"pattern": false
+},
+{
+"zh": "這個服務的設定檔不由 xConsole 管理，只能改對外網址",
+"pattern": false
+},
+{
+"zh": "對外網址",
+"pattern": false
+},
+{
+"zh": "IDE 所在的電腦要打的位址。留空＝這台的 IP 與埠；前面有反向代理或內部網域時改成那個",
+"pattern": false
+},
+{
+"zh": "IDE 裡填的就是這個；自己取過的名稱，換模型時會沿用",
+"pattern": false
+},
+{
+"zh": "調大前會先做記憶體試算，不夠會擋下",
+"pattern": false
+},
+{
+"zh": "單次輸出上限（token）",
+"pattern": false
+},
+{
+"zh": "留空＝引擎預設",
+"pattern": false
+},
+{
+"zh": "要小於上下文長度",
+"pattern": false
+},
+{
+"zh": "維持現在的金鑰",
+"pattern": false
+},
+{
+"zh": "維持不使用金鑰",
+"pattern": false
+},
+{
+"zh": "重新產生金鑰（舊的立即失效）",
+"pattern": false
+},
+{
+"zh": "產生金鑰",
+"pattern": false
+},
+{
+"zh": "不使用金鑰",
+"pattern": false
+},
+{
+"zh": "金鑰只在產生的當下顯示一次；之後忘了就重新產生",
+"pattern": false
+},
+{
+"zh": "沒有變更",
+"pattern": false
+},
+{
+"zh": "套用中，模型重新載入約一到兩分鐘…",
+"pattern": false
+},
+{
+"zh": "上下文調大之後記憶體不夠",
+"pattern": false
+},
+{
+"zh": "會改寫這個模型的設定檔（先自動備份）並重啟；重啟期間這個模型的 API 會中斷約一到兩分鐘。",
+"pattern": false
+},
+{
+"zh": "套用後會用新設定實際打一次，打不通就自動換回原本的設定。",
+"pattern": false
+},
+{
+"zh": "模型名稱改成 {0} 之後，所有已串接的工具都要改成新名稱。",
+"pattern": true
+},
+{
+"zh": "模型名稱改成",
+"pattern": false
+},
+{
+"zh": "之後，所有已串接的工具都要改成新名稱",
+"pattern": false
+},
+{
+"zh": "舊金鑰會立即失效，所有已串接的工具都要換上新金鑰。",
+"pattern": false
+},
+{
+"zh": "開了金鑰之後，所有已串接的工具都要補上金鑰才連得上。",
+"pattern": false
+},
+{
+"zh": "拿掉金鑰之後，內網任何連得到這台的人都能使用這個模型。",
+"pattern": false
+},
+{
+"zh": "上次：{0}・{1}（台北時間）",
+"pattern": true
+},
+{
+"zh": "上次",
+"pattern": false
+},
+{
+"zh": "台北時間",
+"pattern": false
+},
+{
+"zh": "還沒測過",
+"pattern": false
+},
+{
+"zh": "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。",
+"pattern": false
+},
+{
+"zh": "金鑰（選填，只用這一次、不保存；填了會連經網路的那一段一起完整驗）",
+"pattern": false
+},
+{
+"zh": "測試中…",
+"pattern": false
+},
+{
+"zh": "從主控台經網路連對外網址",
+"pattern": false
+},
+{
+"zh": "（{0} 毫秒）",
+"pattern": true
+},
+{
+"zh": "毫秒",
+"pattern": false
+},
+{
+"zh": "全部通過，可以貼到 IDE 了",
+"pattern": false
+},
+{
+"zh": "有項目沒通過，看下面的說明",
+"pattern": false
+},
+{
+"zh": "再測一次",
+"pattern": false
+},
+{
+"zh": "工具設定範例",
+"pattern": false
+},
+{
+"zh": "依上面的設定即時產生",
+"pattern": false
+},
+{
+"zh": "複製這段",
+"pattern": false
+},
+{
+"zh": "這把金鑰只顯示這一次。關掉之後主控台與節點都不會再顯示它；忘了就重新產生。",
+"pattern": false
+},
+{
+"zh": "在這個分頁重新整理之前，下面的設定範例會直接帶入這把金鑰。",
+"pattern": false
+},
+{
+"zh": "新的 API 金鑰",
+"pattern": false
+},
+{
+"zh": "機群模型主控台",
+"pattern": false
+},
+{
+"zh": "哪台機器上開了哪個模型、還剩多少記憶體、能不能再開 —— 不用再自己記。",
+"pattern": false
+},
+{
+"zh": "機器在線",
+"pattern": false
+},
+{
+"zh": "全部連得上",
+"pattern": false
+},
+{
+"zh": "有機器連不上代理",
+"pattern": false
+},
+{
+"zh": "模型運作中",
+"pattern": false
+},
+{
+"zh": "已登錄的欄位",
+"pattern": false
+},
+{
+"zh": "顯示記憶體使用",
+"pattern": false
+},
+{
+"zh": "更新於",
+"pattern": false
+},
+{
+"zh": "每 15 秒自動更新",
+"pattern": false
+},
+{
+"zh": "檢測硬體",
+"pattern": false
+},
+{
+"zh": "{0} 偵測到 {1}，建議記憶體架構是「{2}」；確認後推薦與試算才準",
+"pattern": true
+},
+{
+"zh": "偵測到",
+"pattern": false
+},
+{
+"zh": "建議記憶體架構是「",
+"pattern": false
+},
+{
+"zh": "」；確認後推薦與試算才準",
+"pattern": false
+},
+{
+"zh": " 等 {0} 台",
+"pattern": true
+},
+{
+"zh": "等",
+"pattern": false
+},
+{
+"zh": "{0}{1}：顯示卡、記憶體、頻寬與存放區都讀到了",
+"pattern": true
+},
+{
+"zh": "顯示卡、記憶體、頻寬與存放區都讀到了",
+"pattern": false
+},
+{
+"zh": "加一台機器，主控台會讀出它的顯示卡、記憶體、頻寬與磁碟，算出能跑多大的模型",
+"pattern": false
+},
+{
+"zh": "加一台機器",
+"pattern": false
+},
+{
+"zh": "安裝推理引擎",
+"pattern": false
+},
+{
+"zh": "{0} 正在安裝 llama.cpp…",
+"pattern": true
+},
+{
+"zh": "正在安裝 llama.cpp…",
+"pattern": false
+},
+{
+"zh": "{0} 還沒有 llama.cpp：依這台的顯示卡自動選加速方式一鍵安裝（macOS、Windows 下載官方預編譯版，Linux 在這台編譯）",
+"pattern": true
+},
+{
+"zh": "還沒有 llama.cpp：依這台的顯示卡自動選加速方式一鍵安裝（macOS、Windows 下載官方預編譯版，Linux 在這台編譯",
+"pattern": false
+},
+{
+"zh": "每台都有可用的 llama.cpp",
+"pattern": false
+},
+{
+"zh": "下載一個模型",
+"pattern": false
+},
+{
+"zh": "照這台的記憶體推薦、標好速度與放不放得下；點一下下載，再換上欄位",
+"pattern": false
+},
+{
+"zh": "讀取進度…",
+"pattern": false
+},
+{
+"zh": "進行中 {0}%",
+"pattern": true
+},
+{
+"zh": "進行中",
+"pattern": false
+},
+{
+"zh": "已結束，按「看進度」看結果",
+"pattern": false
+},
+{
+"zh": "系統記憶體剩",
+"pattern": false
+},
+{
+"zh": "運作中",
+"pattern": false
+},
+{
+"zh": "無",
+"pattern": false
+},
+{
+"zh": "能跑多大",
+"pattern": false
+},
+{
+"zh": "流暢 {0}B 以內",
+"pattern": true
+},
+{
+"zh": "B 以內",
+"pattern": false
+},
+{
+"zh": "小模型",
+"pattern": false
+},
+{
+"zh": "情境",
+"pattern": false
+},
+{
+"zh": "進入",
+"pattern": false
+},
+{
+"zh": "連不上這台的代理",
+"pattern": false
+},
+{
+"zh": "這台的設定",
+"pattern": false
+},
+{
+"zh": "這台的模型庫",
+"pattern": false
+},
+{
+"zh": "情境：",
+"pattern": false
+},
+{
+"zh": "切換到「{0}」",
+"pattern": true
+},
+{
+"zh": "切換到「",
+"pattern": false
+},
+{
+"zh": "會改寫設定檔並重啟對應服務（先自動備份，失敗會還原回上一版）。重啟期間這台的模型會短暫中斷。",
+"pattern": false
+},
+{
+"zh": "套用中，模型要重新載入，約一到兩分鐘…",
+"pattern": false
+},
+{
+"zh": "已切換到「{0}」",
+"pattern": true
+},
+{
+"zh": "已切換到「",
+"pattern": false
+},
+{
+"zh": "切換失敗：",
+"pattern": false
+},
+{
+"zh": "全部停止",
+"pattern": false
+},
+{
+"zh": "停止這台所有模型",
+"pattern": false
+},
+{
+"zh": "會停掉這台上所有已登錄的欄位。標記為關鍵的服務預設會跳過，除非你在下面確認。",
+"pattern": false
+},
+{
+"zh": "全部停止（跳過關鍵服務）",
+"pattern": false
+},
+{
+"zh": "已送出；跳過 {0} 個關鍵服務",
+"pattern": true
+},
+{
+"zh": "已送出；跳過",
+"pattern": false
+},
+{
+"zh": "個關鍵服務",
+"pattern": false
+},
+{
+"zh": "管理情境",
+"pattern": false
+},
+{
+"zh": "新增情境",
+"pattern": false
+},
+{
+"zh": "一組參數一鍵切換，例如寫程式要長上下文、抓料要多並行",
+"pattern": false
+},
+{
+"zh": "{0} 個運作中，共 {1} 格",
+"pattern": true
+},
+{
+"zh": "個運作中，共",
+"pattern": false
+},
+{
+"zh": "新增欄位",
+"pattern": false
+},
+{
+"zh": "這台還沒有欄位。按「新增欄位」建一格空欄位，再到模型庫挑模型放進來。",
+"pattern": false
+},
+{
+"zh": "還空著 {0} 格",
+"pattern": true
+},
+{
+"zh": "還空著",
+"pattern": false
+},
+{
+"zh": "{0} 張卡，顯示記憶體與系統記憶體各一塊",
+"pattern": true
+},
+{
+"zh": "張卡，顯示記憶體與系統記憶體各一塊",
+"pattern": false
+},
+{
+"zh": "沒有偵測到 GPU，只算系統記憶體",
+"pattern": false
+},
+{
+"zh": "顯示記憶體（{0} 張卡合計）",
+"pattern": true
+},
+{
+"zh": "張卡合計",
+"pattern": false
+},
+{
+"zh": "卡 {0}{1}{2}",
+"pattern": true
+},
+{
+"zh": "置換空間：已用 {0} / {1} GiB",
+"pattern": true
+},
+{
+"zh": "置換空間：已用",
+"pattern": false
+},
+{
+"zh": "系統記憶體只剩 {0} GiB，已低於 {1} GiB 的底線。",
+"pattern": true
+},
+{
+"zh": "系統記憶體只剩",
+"pattern": false
+},
+{
+"zh": "GiB，已低於",
+"pattern": false
+},
+{
+"zh": "GiB 的底線",
+"pattern": false
+},
+{
+"zh": "再載東西進去，系統會開始用置換空間，整台變慢。",
+"pattern": false
+},
+{
+"zh": "這台是統一記憶體機，再載東西進去有機會把整台拖死。",
+"pattern": false
+},
+{
+"zh": "硬體",
+"pattern": false
+},
+{
+"zh": "本代理直接量測",
+"pattern": false
+},
+{
+"zh": "機群監控代理",
+"pattern": false
+},
+{
+"zh": "資料來源：",
+"pattern": false
+},
+{
+"zh": "使用率",
+"pattern": false
+},
+{
+"zh": "溫度",
+"pattern": false
+},
+{
+"zh": "耗電",
+"pattern": false
+},
+{
+"zh": "時脈",
+"pattern": false
+},
+{
+"zh": "CPU 與系統",
+"pattern": false
+},
+{
+"zh": "負載",
+"pattern": false
+},
+{
+"zh": "核心",
+"pattern": false
+},
+{
+"zh": "已開機",
+"pattern": false
+},
+{
+"zh": " 天",
+"pattern": false
+},
+{
+"zh": "磁碟",
+"pattern": false
+},
+{
+"zh": "掛載",
+"pattern": false
+},
+{
+"zh": "監控中的埠",
+"pattern": false
+},
+{
+"zh": "共 {0} 個，對外 {1} 個",
+"pattern": true
+},
+{
+"zh": "個，對外",
+"pattern": false
+},
+{
+"zh": "個",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th class='num'>埠</th><th>類別</th><th>是什麼</th><th>範圍</th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "對外",
+"pattern": false
+},
+{
+"zh": "僅本機",
+"pattern": false
+},
+{
+"zh": "這台沒有模型服務",
+"pattern": false
+},
+{
+"zh": "重新讀取",
+"pattern": false
+},
+{
+"zh": "目前沒有連得上的機器，沒有記錄可看。",
+"pattern": false
+},
+{
+"zh": "這台還沒有模型服務，沒有記錄可看。到模型庫下載模型並按「換上」，服務的記錄就會出現在這裡。　",
+"pattern": false
+},
+{
+"zh": "到模型庫",
+"pattern": false
+},
+{
+"zh": "（沒有內容）",
+"pattern": false
+},
+{
+"zh": "讀不到：",
+"pattern": false
+},
+{
+"zh": "推理引擎",
+"pattern": false
+},
+{
+"zh": "第三方 API",
+"pattern": false
+},
+{
+"zh": "HTTPS 與憑證",
+"pattern": false
+},
+{
+"zh": "使用報告",
+"pattern": false
+},
+{
+"zh": "帳號與安全",
+"pattern": false
+},
+{
+"zh": "品牌與外觀",
+"pattern": false
+},
+{
+"zh": "讀不到 {0}",
+"pattern": true
+},
+{
+"zh": "讀不到",
+"pattern": false
+},
+{
+"zh": "主控台憑證已在 {0}（台北時間）過期，使用者連線會看到錯誤。請到「設定 → HTTPS 與憑證」匯入新憑證。",
+"pattern": true
+},
+{
+"zh": "主控台憑證已在",
+"pattern": false
+},
+{
+"zh": "台北時間）過期，使用者連線會看到錯誤。請到「設定 → HTTPS 與憑證」匯入新憑證",
+"pattern": false
+},
+{
+"zh": "主控台憑證剩 {0} 天，{1}（台北時間）到期。請盡快到「設定 → HTTPS 與憑證」匯入新憑證。",
+"pattern": true
+},
+{
+"zh": "主控台憑證剩",
+"pattern": false
+},
+{
+"zh": "天",
+"pattern": false
+},
+{
+"zh": "台北時間）到期。請盡快到「設定 → HTTPS 與憑證」匯入新憑證",
+"pattern": false
+},
+{
+"zh": "納管的機器",
+"pattern": false
+},
+{
+"zh": "共 {0} 台",
+"pattern": true
+},
+{
+"zh": "機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。",
+"pattern": false
+},
+{
+"zh": "主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。",
+"pattern": false
+},
+{
+"zh": "還沒有納管任何機器。按右上角「加一台機器」開始。",
+"pattern": false
+},
+{
+"zh": "統一記憶體（切兩塊）",
+"pattern": false
+},
+{
+"zh": "統一記憶體（單一池）",
+"pattern": false
+},
+{
+"zh": "獨立顯示記憶體",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>代理憑證</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "在線",
+"pattern": false
+},
+{
+"zh": "尚未信任",
+"pattern": false
+},
+{
+"zh": "修改",
+"pattern": false
+},
+{
+"zh": "選 {0} 代理的憑證檔（在該機的 ~/.xconsole/agent-cert.pem）。主控台之後只接受這張憑證，其他人冒充會被拒絕。",
+"pattern": true
+},
+{
+"zh": "選",
+"pattern": false
+},
+{
+"zh": "代理的憑證檔（在該機的 ~/.xconsole/agent-cert.pem）。主控台之後只接受這張憑證，其他人冒充會被拒絕",
+"pattern": false
+},
+{
+"zh": "匯入 {0} 的代理憑證",
+"pattern": true
+},
+{
+"zh": "的代理憑證",
+"pattern": false
+},
+{
+"zh": "沒有選檔案",
+"pattern": false
+},
+{
+"zh": "已信任 {0}：{1}…",
+"pattern": true
+},
+{
+"zh": "已信任",
+"pattern": false
+},
+{
+"zh": "確認使用者會打的網址",
+"pattern": false
+},
+{
+"zh": "憑證必須涵蓋這些網址與 IP，不然使用者會看到憑證錯誤",
+"pattern": false
+},
+{
+"zh": "取得憑證",
+"pattern": false
+},
+{
+"zh": "已有憑證就直接上傳；沒有就在下面產生 CSR 交給憑證廠商",
+"pattern": false
+},
+{
+"zh": "上傳並檢查",
+"pattern": false
+},
+{
+"zh": "先看懂哪裡有問題再決定套不套，不會直接換上去",
+"pattern": false
+},
+{
+"zh": "套用",
+"pattern": false
+},
+{
+"zh": "不必重開機，新連線立刻生效；失敗會自動換回原本那張",
+"pattern": false
+},
+{
+"zh": "開啟 HSTS",
+"pattern": false
+},
+{
+"zh": "讓瀏覽器以後一律走 HTTPS，不會被降級成 http",
+"pattern": false
+},
+{
+"zh": "（要先換成正式憑證）",
+"pattern": false
+},
+{
+"zh": "{0}/{1} 步完成",
+"pattern": true
+},
+{
+"zh": "步完成",
+"pattern": false
+},
+{
+"zh": "下一步：{0}. {1}",
+"pattern": true
+},
+{
+"zh": "下一步",
+"pattern": false
+},
+{
+"zh": "全部完成",
+"pattern": false
+},
+{
+"zh": "必要步驟都完成了，其餘可略過",
+"pattern": false
+},
+{
+"zh": "還有步驟要先完成前面的才能做",
+"pattern": false
+},
+{
+"zh": "已完成",
+"pattern": false
+},
+{
+"zh": "現在做這步",
+"pattern": false
+},
+{
+"zh": "還不能做",
+"pattern": false
+},
+{
+"zh": "可略過",
+"pattern": false
+},
+{
+"zh": "（要先完成第 {0} 步）",
+"pattern": true
+},
+{
+"zh": "要先完成第",
+"pattern": false
+},
+{
+"zh": "換憑證不必找工程師、不必重開機",
+"pattern": false
+},
+{
+"zh": "目前使用的憑證",
+"pattern": false
+},
+{
+"zh": "已匯入",
+"pattern": false
+},
+{
+"zh": "暫用自簽",
+"pattern": false
+},
+{
+"zh": "目前是系統自己產生的暫用自簽憑證，使用者第一次連線會看到安全警告。正式上線請匯入憑證廠商或貴單位 CA 簽發的憑證。",
+"pattern": false
+},
+{
+"zh": "涵蓋的網址",
+"pattern": false
+},
+{
+"zh": "發行者",
+"pattern": false
+},
+{
+"zh": "到期",
+"pattern": false
+},
+{
+"zh": "{0}（台北時間），剩 {1} 天",
+"pattern": true
+},
+{
+"zh": "台北時間），剩",
+"pattern": false
+},
+{
+"zh": "憑證鏈",
+"pattern": false
+},
+{
+"zh": "指紋（SHA-256 前 16 碼）",
+"pattern": false
+},
+{
+"zh": "套用時間",
+"pattern": false
+},
+{
+"zh": "（台北時間）",
+"pattern": false
+},
+{
+"zh": "還原上一張",
+"pattern": false
+},
+{
+"zh": "上一張：{0}，{1} 到期",
+"pattern": true
+},
+{
+"zh": "上一張",
+"pattern": false
+},
+{
+"zh": "沒有上一張",
+"pattern": false
+},
+{
+"zh": "還原上一張憑證",
+"pattern": false
+},
+{
+"zh": "還原",
+"pattern": false
+},
+{
+"zh": "會換回 {0}（{1} 到期）。新連線立刻生效，不必重開。",
+"pattern": true
+},
+{
+"zh": "會換回",
+"pattern": false
+},
+{
+"zh": "到期）。新連線立刻生效，不必重開",
+"pattern": false
+},
+{
+"zh": "依目前網址重產暫用自簽",
+"pattern": false
+},
+{
+"zh": "重新產生暫用自簽",
+"pattern": false
+},
+{
+"zh": "重新產生",
+"pattern": false
+},
+{
+"zh": "目前是正式憑證。換回暫用自簽之後，使用者連線會看到安全警告，確定嗎？",
+"pattern": false
+},
+{
+"zh": "會依「使用者會打的網址」重新產一張暫用自簽，瀏覽器需要再確認一次。",
+"pattern": false
+},
+{
+"zh": "1. 使用者會打的網址",
+"pattern": false
+},
+{
+"zh": "一行一個，網域或 IP 都可以",
+"pattern": false
+},
+{
+"zh": "儲存網址",
+"pattern": false
+},
+{
+"zh": "網址已儲存",
+"pattern": false
+},
+{
+"zh": "2. 還沒有憑證：產生 CSR 交給憑證廠商",
+"pattern": false
+},
+{
+"zh": "私鑰在這台伺服器上產生並加密保存，不會離開伺服器",
+"pattern": false
+},
+{
+"zh": "已有一份待配對的 CSR（{0}，{1}（台北時間）產生）。",
+"pattern": true
+},
+{
+"zh": "已有一份待配對的 CSR",
+"pattern": false
+},
+{
+"zh": "台北時間）產生",
+"pattern": false
+},
+{
+"zh": "廠商簽回憑證後，在下面第 3 步只要上傳憑證，系統會自動對上這把私鑰。",
+"pattern": false
+},
+{
+"zh": "下載 CSR",
+"pattern": false
+},
+{
+"zh": "下載失敗",
+"pattern": false
+},
+{
+"zh": "主要網址（CN）",
+"pattern": false
+},
+{
+"zh": "例：xconsole.貴單位網域.tw",
+"pattern": false
+},
+{
+"zh": "單位名稱（選填）",
+"pattern": false
+},
+{
+"zh": "金鑰類型",
+"pattern": false
+},
+{
+"zh": "RSA 2048（相容性最好）",
+"pattern": false
+},
+{
+"zh": "ECC P-256（較新、較快）",
+"pattern": false
+},
+{
+"zh": "其他網址會自動放進 CSR 的主體別名（SAN）：",
+"pattern": false
+},
+{
+"zh": "重新產生 CSR（舊的會作廢）",
+"pattern": false
+},
+{
+"zh": "產生 CSR",
+"pattern": false
+},
+{
+"zh": "CSR 已產生並下載，請交給憑證廠商",
+"pattern": false
+},
+{
+"zh": "3. 上傳並檢查　4. 套用",
+"pattern": false
+},
+{
+"zh": "PFX／P12、PEM、CER、CRT、KEY、P7B 都可以，順序不拘",
+"pattern": false
+},
+{
+"zh": "<strong>把憑證檔拖到這裡，或點這裡選檔</strong>可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）",
+"pattern": false
+},
+{
+"zh": "PFX 匯出時設定的密碼",
+"pattern": false
+},
+{
+"zh": "私鑰的密碼",
+"pattern": false
+},
+{
+"zh": "PFX／P12 密碼",
+"pattern": false
+},
+{
+"zh": "私鑰密碼",
+"pattern": false
+},
+{
+"zh": "檢查",
+"pattern": false
+},
+{
+"zh": "套用這張憑證",
+"pattern": false
+},
+{
+"zh": "不能套用",
+"pattern": false
+},
+{
+"zh": "要注意",
+"pattern": false
+},
+{
+"zh": "可以套用",
+"pattern": false
+},
+{
+"zh": "這張憑證：{0}，發行者 {1}，{2}（台北時間）到期，",
+"pattern": true
+},
+{
+"zh": "這張憑證",
+"pattern": false
+},
+{
+"zh": "台北時間）到期",
+"pattern": false
+},
+{
+"zh": "涵蓋 {0}，指紋 {1}…",
+"pattern": true
+},
+{
+"zh": "涵蓋",
+"pattern": false
+},
+{
+"zh": "指紋",
+"pattern": false
+},
+{
+"zh": "請先選擇檔案",
+"pattern": false
+},
+{
+"zh": "換成 {0}（{1}，{2} 到期）。",
+"pattern": true
+},
+{
+"zh": "新連線立刻使用，已連上的不會中斷；系統會實際連自己一次核對，不對就自動換回原本那張。",
+"pattern": false
+},
+{
+"zh": "讓瀏覽器以後一律走 HTTPS",
+"pattern": false
+},
+{
+"zh": "已開啟",
+"pattern": false
+},
+{
+"zh": "未開啟",
+"pattern": false
+},
+{
+"zh": "開啟後一年內，瀏覽器不會再用 http 連這台。之後憑證出問題時，使用者連「略過警告」都沒有，所以只在正式憑證驗證過後才開。",
+"pattern": false
+},
+{
+"zh": "目前是暫用自簽或憑證已過期，不能開啟——開了之後憑證一出問題，使用者連「略過警告」都沒有。",
+"pattern": false
+},
+{
+"zh": "HSTS 已開啟",
+"pattern": false
+},
+{
+"zh": "HSTS 已關閉",
+"pattern": false
+},
+{
+"zh": "服務使用報告",
+"pattern": false
+},
+{
+"zh": "數字全由系統的取樣與操作紀錄算出",
+"pattern": false
+},
+{
+"zh": "期間：",
+"pattern": false
+},
+{
+"zh": "近 {0} 天",
+"pattern": true
+},
+{
+"zh": "近",
+"pattern": false
+},
+{
+"zh": "下載 JSON",
+"pattern": false
+},
+{
+"zh": "xConsole-使用報告-近{0}天.json",
+"pattern": true
+},
+{
+"zh": "xConsole-使用報告-近",
+"pattern": false
+},
+{
+"zh": "天.json",
+"pattern": false
+},
+{
+"zh": "{0} 至 {1}（台北時間）",
+"pattern": true
+},
+{
+"zh": "至",
+"pattern": false
+},
+{
+"zh": "登入次數",
+"pattern": false
+},
+{
+"zh": "失敗 {0} 次",
+"pattern": true
+},
+{
+"zh": "次",
+"pattern": false
+},
+{
+"zh": "操作次數",
+"pattern": false
+},
+{
+"zh": "{0} 個帳號",
+"pattern": true
+},
+{
+"zh": "個帳號",
+"pattern": false
+},
+{
+"zh": "地端處理請求",
+"pattern": false
+},
+{
+"zh": "匯入 {0} token",
+"pattern": true
+},
+{
+"zh": "快取命中",
+"pattern": false
+},
+{
+"zh": "重用的提示占比",
+"pattern": false
+},
+{
+"zh": "GPU 用電",
+"pattern": false
+},
+{
+"zh": "{0} 度",
+"pattern": true
+},
+{
+"zh": "度",
+"pattern": false
+},
+{
+"zh": "約 NT$ {0}",
+"pattern": true
+},
+{
+"zh": "約 NT$",
+"pattern": false
+},
+{
+"zh": "未設電價",
+"pattern": false
+},
+{
+"zh": "待處理",
+"pattern": false
+},
+{
+"zh": "設備有沒有用到",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>機器</th><th>在線比例</th><th>池子平均／峰值</th><th>系統記憶體最低</th><th>低於底線</th><th>運作中欄位</th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "{0}／{1} GiB（共 {2}）",
+"pattern": true
+},
+{
+"zh": "GiB（共",
+"pattern": false
+},
+{
+"zh": "單一池",
+"pattern": false
+},
+{
+"zh": "{0} 次",
+"pattern": true
+},
+{
+"zh": "本期還沒有取樣資料",
+"pattern": false
+},
+{
+"zh": "系統健康與治理",
+"pattern": false
+},
+{
+"zh": "本期無異常。",
+"pattern": false
+},
+{
+"zh": "緊急",
+"pattern": false
+},
+{
+"zh": "估算用的假設",
+"pattern": false
+},
+{
+"zh": "沒有設定就不換算金額，報告裡會寫明",
+"pattern": false
+},
+{
+"zh": "修改估算假設（電價、雲端參考單價）",
+"pattern": false
+},
+{
+"zh": "電價（NT$／度）",
+"pattern": false
+},
+{
+"zh": "例：貴單位電費單上的平均單價",
+"pattern": false
+},
+{
+"zh": "雲端參考模型名稱",
+"pattern": false
+},
+{
+"zh": "例：某雲端模型",
+"pattern": false
+},
+{
+"zh": "每百萬輸入 token（US$）",
+"pattern": false
+},
+{
+"zh": "照該模型官方定價填",
+"pattern": false
+},
+{
+"zh": "每百萬輸出 token（US$）",
+"pattern": false
+},
+{
+"zh": "匯率（NT$／US$）",
+"pattern": false
+},
+{
+"zh": "選填",
+"pattern": false
+},
+{
+"zh": "儲存假設",
+"pattern": false
+},
+{
+"zh": "已儲存，報告會依新的假設重算",
+"pattern": false
+},
+{
+"zh": "要產出給主管看的 Word 月報，在有 xConsole 原始碼的電腦上執行：",
+"pattern": false
+},
+{
+"zh": "變更密碼",
+"pattern": false
+},
+{
+"zh": "目前登入：{0}",
+"pattern": true
+},
+{
+"zh": "目前登入",
+"pattern": false
+},
+{
+"zh": "目前的密碼",
+"pattern": false
+},
+{
+"zh": "新密碼（至少 8 碼）",
+"pattern": false
+},
+{
+"zh": "再輸入一次新密碼",
+"pattern": false
+},
+{
+"zh": "兩次輸入的新密碼不一樣",
+"pattern": false
+},
+{
+"zh": "密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。變更後所有已登入的裝置都會被登出。",
+"pattern": false
+},
+{
+"zh": "最近的操作紀錄",
+"pattern": false
+},
+{
+"zh": "只記操作與結果，不記密碼、私鑰與權杖",
+"pattern": false
+},
+{
+"zh": "登入",
+"pattern": false
+},
+{
+"zh": "切換情境",
+"pattern": false
+},
+{
+"zh": "檢查憑證",
+"pattern": false
+},
+{
+"zh": "套用憑證",
+"pattern": false
+},
+{
+"zh": "還原憑證",
+"pattern": false
+},
+{
+"zh": "HSTS 開關",
+"pattern": false
+},
+{
+"zh": "修改網址",
+"pattern": false
+},
+{
+"zh": "重產自簽",
+"pattern": false
+},
+{
+"zh": "憑證到期提醒",
+"pattern": false
+},
+{
+"zh": "信任代理憑證",
+"pattern": false
+},
+{
+"zh": "修改報告假設",
+"pattern": false
+},
+{
+"zh": "修改品牌名稱",
+"pattern": false
+},
+{
+"zh": "更換 Logo",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>時間（台北）</th><th>帳號</th><th>來源</th><th>動作</th><th>對象</th><th>結果</th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "成功",
+"pattern": false
+},
+{
+"zh": "被准入擋下",
+"pattern": false
+},
+{
+"zh": "還沒有紀錄",
+"pattern": false
+},
+{
+"zh": "賣給客戶時換成客戶的名稱與 Logo；頁尾固定顯示 Powered by xCloudinfo 云碩科技",
+"pattern": false
+},
+{
+"zh": "（系統名稱）",
+"pattern": false
+},
+{
+"zh": "預覽（頁首會長這樣）",
+"pattern": false
+},
+{
+"zh": "單位名稱",
+"pattern": false
+},
+{
+"zh": "例：中原大學。用在 Logo 的替代文字、分頁標題與登入頁",
+"pattern": false
+},
+{
+"zh": "系統名稱",
+"pattern": false
+},
+{
+"zh": "例：AI 模型主控台。顯示在頁首與登入頁大標",
+"pattern": false
+},
+{
+"zh": "已套用，所有頁面與登入頁都換成新的名稱",
+"pattern": false
+},
+{
+"zh": "儲存名稱",
+"pattern": false
+},
+{
+"zh": "PNG、JPEG、WebP，1 MB 以內；不收 SVG",
+"pattern": false
+},
+{
+"zh": "目前使用 {0}×{1} 像素的 Logo",
+"pattern": true
+},
+{
+"zh": "目前使用",
+"pattern": false
+},
+{
+"zh": "像素的 Logo",
+"pattern": false
+},
+{
+"zh": "還沒有上傳 Logo，頁首用單位名稱的第一個字代替",
+"pattern": false
+},
+{
+"zh": "選擇圖檔上傳",
+"pattern": false
+},
+{
+"zh": "移除 Logo",
+"pattern": false
+},
+{
+"zh": "Logo 要在 1 MB 以內",
+"pattern": false
+},
+{
+"zh": "Logo 已更換",
+"pattern": false
+},
+{
+"zh": "已移除 Logo",
+"pattern": false
+},
+{
+"zh": "建議用橫式、透明背景、高度 64 像素以上的圖。Logo 一律放在白底上顯示，深色模式也看得清楚。瀏覽器分頁的小圖示用單位名稱第一個字產生。",
+"pattern": false
+},
+{
+"zh": "統一記憶體・切兩塊（AMD AI 395 這類）",
+"pattern": false
+},
+{
+"zh": "統一記憶體・單一池（DGX Spark、Jetson）",
+"pattern": false
+},
+{
+"zh": "獨立顯示記憶體（一般 GPU 伺服器）",
+"pattern": false
+},
+{
+"zh": "例：NVIDIA 伺服器",
+"pattern": false
+},
+{
+"zh": "主控台會產生一行安裝指令。到要加入的那台機器上貼上執行，它會裝好節點代理、自動出現在這裡。指令 30 分鐘內有效、只能用一次。",
+"pattern": false
+},
+{
+"zh": "選填，不填就用那台的主機名稱",
+"pattern": false
+},
+{
+"zh": "不是，這是新的一台",
+"pattern": false
+},
+{
+"zh": "名稱",
+"pattern": false
+},
+{
+"zh": "群組",
+"pattern": false
+},
+{
+"zh": "主控台位址",
+"pattern": false
+},
+{
+"zh": "要加入的那台機器連得到的位址（IP:埠）",
+"pattern": false
+},
+{
+"zh": "這是哪一台重新安裝？",
+"pattern": false
+},
+{
+"zh": "代理重裝或換了 IP 時選它，加入後會更新那一筆，名稱與群組不變；新機器不用選",
+"pattern": false
+},
+{
+"zh": "產生安裝指令",
+"pattern": false
+},
+{
+"zh": "在那台開「Windows PowerShell」，貼上執行（建議按右鍵「以系統管理員身分執行」）",
+"pattern": false
+},
+{
+"zh": "安裝指令",
+"pattern": false
+},
+{
+"zh": "這行指令實際做什麼（解碼後的原文）",
+"pattern": false
+},
+{
+"zh": "以系統管理員身分執行：裝成開機自動啟動（不必有人登入），並在防火牆開 9401（主控台連代理）與 8090～8289（模型 API）；",
+"pattern": false
+},
+{
+"zh": "一般身分執行：只在這個帳號登入後才跑，防火牆要另外請管理員開",
+"pattern": false
+},
+{
+"zh": "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
+"pattern": false
+},
+{
+"zh": "llama.cpp 不用自己編：加入後在「這台的設定」按一鍵安裝，會依顯示卡下載官方預編譯版（NVIDIA 用 CUDA、AMD／Intel 用 Vulkan）",
+"pattern": false
+},
+{
+"zh": "下載時只接受主控台這一張憑證（比對整張憑證的 SHA-256），不是關掉驗證",
+"pattern": false
+},
+{
+"zh": "到那台機器上，用一般帳號（不要用 root）開終端機貼上執行",
+"pattern": false
+},
+{
+"zh": "Ubuntu：要有 python3、curl、openssl（預設都有）；會建立 systemd 使用者服務並設成開機自啟",
+"pattern": false
+},
+{
+"zh": "macOS（Apple Silicon）：只要有 python3（沒有的話先執行 xcode-select --install）；會建立 launchd 服務，登入後自動啟動。",
+"pattern": false
+},
+{
+"zh": "第一次會問是否允許 python3 接受傳入連線，請按允許",
+"pattern": false
+},
+{
+"zh": "那台要連得到 {0}；主控台要連得到那台的 9401 埠，有防火牆要先開",
+"pattern": true
+},
+{
+"zh": "那台要連得到",
+"pattern": false
+},
+{
+"zh": "主控台要連得到那台的 9401 埠，有防火牆要先開",
+"pattern": false
+},
+{
+"zh": "最後把代理的憑證與權杖送回主控台；下載時釘住主控台憑證的公鑰，不是關掉驗證",
+"pattern": false
+},
+{
+"zh": "等待那台執行…（這個視窗開著會自動更新）",
+"pattern": false
+},
+{
+"zh": "已加入。",
+"pattern": false
+},
+{
+"zh": "提醒：那台還沒開 linger，帳號登出後代理會停，請照安裝畫面最後一行處理。",
+"pattern": false
+},
+{
+"zh": "到這台設定記憶體與欄位",
+"pattern": false
+},
+{
+"zh": "加入碼過期了，請按「重新產生」",
+"pattern": false
+},
+{
+"zh": "那台執行了，但還沒加入成功：{0}",
+"pattern": true
+},
+{
+"zh": "那台執行了，但還沒加入成功",
+"pattern": false
+},
+{
+"zh": "{0} 的設定",
+"pattern": true
+},
+{
+"zh": "的設定",
+"pattern": false
+},
+{
+"zh": "基本",
+"pattern": false
+},
+{
+"zh": "位址",
+"pattern": false
+},
+{
+"zh": "主控台連這台代理用的 IP 或主機名稱；改了會先實際連一次，連不上就不改",
+"pattern": false
+},
+{
+"zh": "代理的埠",
+"pattern": false
+},
+{
+"zh": "信任的代理憑證：{0}…",
+"pattern": true
+},
+{
+"zh": "信任的代理憑證",
+"pattern": false
+},
+{
+"zh": "還沒信任這台的代理憑證",
+"pattern": false
+},
+{
+"zh": "匯入新憑證（代理重裝後用）",
+"pattern": false
+},
+{
+"zh": "這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定。{0}",
+"pattern": true
+},
+{
+"zh": "這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定",
+"pattern": false
+},
+{
+"zh": "預設 {0}",
+"pattern": true
+},
+{
+"zh": "預設",
+"pattern": false
+},
+{
+"zh": "記憶體架構",
+"pattern": false
+},
+{
+"zh": "偵測建議：{0}。{1}",
+"pattern": true
+},
+{
+"zh": "偵測建議",
+"pattern": false
+},
+{
+"zh": "系統記憶體底線（GiB）",
+"pattern": false
+},
+{
+"zh": "載入後系統記憶體至少要剩這麼多；空白＝預設",
+"pattern": false
+},
+{
+"zh": "顯示記憶體底線（GiB）",
+"pattern": false
+},
+{
+"zh": "多張卡時照卡的大小分到每張；空白＝預設",
+"pattern": false
+},
+{
+"zh": "改成偵測建議",
+"pattern": false
+},
+{
+"zh": "卡 {0} {1}{2}",
+"pattern": true
+},
+{
+"zh": "沒有偵測到 GPU",
+"pattern": false
+},
+{
+"zh": "這台：{0}；系統記憶體 {1} GiB",
+"pattern": true
+},
+{
+"zh": "自動偵測（建議）",
+"pattern": false
+},
+{
+"zh": "不用 GPU，只用 CPU",
+"pattern": false
+},
+{
+"zh": "手動指定一張卡",
+"pattern": false
+},
+{
+"zh": "例：AMD Radeon 880M",
+"pattern": false
+},
+{
+"zh": "顯示卡名稱",
+"pattern": false
+},
+{
+"zh": "廠牌",
+"pattern": false
+},
+{
+"zh": "決定裝哪一版推理引擎（AMD／Intel 走 Vulkan）",
+"pattern": false
+},
+{
+"zh": "顯存（GiB）",
+"pattern": false
+},
+{
+"zh": "內顯填專用記憶體；Windows 的內顯另外會借用一半系統記憶體，不必加進來",
+"pattern": false
+},
+{
+"zh": "偵測錯了才改。改了之後推薦、記憶體試算與推理引擎版本都照這裡算",
+"pattern": false
+},
+{
+"zh": "規格書 {0}",
+"pattern": true
+},
+{
+"zh": "規格書",
+"pattern": false
+},
+{
+"zh": "認不出晶片，請填",
+"pattern": false
+},
+{
+"zh": "沒填時假設 50",
+"pattern": false
+},
+{
+"zh": "記憶體頻寬（GB/s）",
+"pattern": false
+},
+{
+"zh": "偵測到：",
+"pattern": false
+},
+{
+"zh": "{0}推薦模型的預估速度照這個算；空白＝用規格書標稱值",
+"pattern": true
+},
+{
+"zh": "推薦模型的預估速度照這個算；空白＝用規格書標稱值",
+"pattern": false
+},
+{
+"zh": "系統記憶體頻寬（GB/s）",
+"pattern": false
+},
+{
+"zh": "只有獨立顯示卡機會用到：放不下的 MoE 專家搬到系統記憶體時，那部分照這個算",
+"pattern": false
+},
+{
+"zh": "模型存放",
+"pattern": false
+},
+{
+"zh": "機械硬碟，大模型載入會很慢",
+"pattern": false
+},
+{
+"zh": "{0}・剩 {1} GiB",
+"pattern": true
+},
+{
+"zh": "預設：{0}{1}",
+"pattern": true
+},
+{
+"zh": "自訂路徑…",
+"pattern": false
+},
+{
+"zh": "例：/media/data/models/gguf",
+"pattern": false
+},
+{
+"zh": "一顆模型一個資料夾；建議放 SSD。換了位置，舊位置的模型不會自動搬過去",
+"pattern": false
+},
+{
+"zh": "找不到",
+"pattern": false
+},
+{
+"zh": "自動挑選（目前：{0}）",
+"pattern": true
+},
+{
+"zh": "自動挑選（目前",
+"pattern": false
+},
+{
+"zh": "・跑不起來",
+"pattern": false
+},
+{
+"zh": "例：/opt/llama.cpp/build/bin/llama-server",
+"pattern": false
+},
+{
+"zh": "GGUF 模型靠它跑；自動挑選會用家目錄下版本最新、有 GPU 加速的那支",
+"pattern": false
+},
+{
+"zh": "還沒安裝",
+"pattern": false
+},
+{
+"zh": "例：/opt/stable-diffusion.cpp/build/bin/sd-cli",
+"pattern": false
+},
+{
+"zh": "sd-cli（畫圖與影片）",
+"pattern": false
+},
+{
+"zh": "畫圖模型放在 {0}（跟存放區同一層）；在模型庫的「畫圖與影片」可以一鍵安裝",
+"pattern": true
+},
+{
+"zh": "畫圖模型放在",
+"pattern": false
+},
+{
+"zh": "跟存放區同一層）；在模型庫的「畫圖與影片」可以一鍵安裝",
+"pattern": false
+},
+{
+"zh": "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。",
+"pattern": false
+},
+{
+"zh": "編譯新版 llama.cpp",
+"pattern": false
+},
+{
+"zh": "在這台編譯 llama.cpp",
+"pattern": false
+},
+{
+"zh": "下載來源",
+"pattern": false
+},
+{
+"zh": "空白＝官方 https://huggingface.co",
+"pattern": false
+},
+{
+"zh": "空白＝直連 GitHub",
+"pattern": false
+},
+{
+"zh": "Hugging Face 鏡像",
+"pattern": false
+},
+{
+"zh": "例：https://hf-mirror.com。走鏡像時不會送出 Hugging Face 令牌（鏡像是第三方）",
+"pattern": false
+},
+{
+"zh": "GitHub 加速字首",
+"pattern": false
+},
+{
+"zh": "例：https://ghfast.top/。只用在下載推理引擎；版本與 sha256 仍直接問 GitHub，對不上就不裝",
+"pattern": false
+},
+{
+"zh": " 允許 Agent 在這台工作（建檔、寫程式、跑指令）",
+"pattern": false
+},
+{
+"zh": "檔案只能動工作資料夾裡面：~/xconsole-agent/ 底下的，或在 Agent 頁連結進來的資料夾（系統資料夾、家目錄本身、.ssh 這類設定夾不能連）。指令以代理的身分執行，每條都要人在網頁上按允許，並寫進記錄。不需要就保持關閉。",
+"pattern": false
+},
+{
+"zh": "操作電腦",
+"pattern": false
+},
+{
+"zh": " 讓模型操作這台的桌面（看螢幕、控制滑鼠鍵盤）",
+"pattern": false
+},
+{
+"zh": "由桌面小幫手代為操作（使用者登入後才有桌面）",
+"pattern": false
+},
+{
+"zh": "代理直接操作這台的桌面",
+"pattern": false
+},
+{
+"zh": "{0}。對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉。",
+"pattern": true
+},
+{
+"zh": "對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉",
+"pattern": false
+},
+{
+"zh": "沒有圖形桌面",
+"pattern": false
+},
+{
+"zh": "這台現在不能操作桌面：{0}",
+"pattern": true
+},
+{
+"zh": "這台現在不能操作桌面",
+"pattern": false
+},
+{
+"zh": "備註",
+"pattern": false
+},
+{
+"zh": "給接手的人看：這台是做什麼的、有什麼要小心",
+"pattern": false
+},
+{
+"zh": "{0} 會從主控台移除，之後不再顯示、不再取樣。那台機器上的代理、模型與欄位都不會被動。",
+"pattern": true
+},
+{
+"zh": "會從主控台移除，之後不再顯示、不再取樣。那台機器上的代理、模型與欄位都不會被動",
+"pattern": false
+},
+{
+"zh": "之後要再加回來，按「加一台機器」在那台重跑一次安裝指令即可，欄位與模型都還在。",
+"pattern": false
+},
+{
+"zh": "已移除 {0}",
+"pattern": true
+},
+{
+"zh": "{0} 新增欄位",
+"pattern": true
+},
+{
+"zh": "{0}・{1} 的設定",
+"pattern": true
+},
+{
+"zh": "之後到模型庫挑一顆 GGUF 放進來，xConsole 會替它建服務、配埠、算記憶體",
+"pattern": false
+},
+{
+"zh": "登記這台已經在跑的服務",
+"pattern": false
+},
+{
+"zh": "例如瀏覽器、語音、代理程式這類 systemd 使用者服務；登記後可以在這裡啟停、看記錄、算進記憶體",
+"pattern": false
+},
+{
+"zh": "這台沒有可以登記的使用者服務（已登記的、xConsole 自己的都不列）",
+"pattern": false
+},
+{
+"zh": "服務",
+"pattern": false
+},
+{
+"zh": "systemctl --user 看得到的服務",
+"pattern": false
+},
+{
+"zh": "例：主腦、嵌入、語音辨識",
+"pattern": false
+},
+{
+"zh": "例：高、低、眼睛",
+"pattern": false
+},
+{
+"zh": "畫面上顯示的名稱",
+"pattern": false
+},
+{
+"zh": "例：文字、看圖（用頓號分開）",
+"pattern": false
+},
+{
+"zh": "埠",
+"pattern": false
+},
+{
+"zh": "這個服務聽的埠（選填）",
+"pattern": false
+},
+{
+"zh": "角色",
+"pattern": false
+},
+{
+"zh": "等級",
+"pattern": false
+},
+{
+"zh": "能力標籤",
+"pattern": false
+},
+{
+"zh": "選填，最多 6 個",
+"pattern": false
+},
+{
+"zh": "預估顯示記憶體（GiB）",
+"pattern": false
+},
+{
+"zh": "放入模型時會自動算，通常不用改",
+"pattern": false
+},
+{
+"zh": "准入試算用，選填",
+"pattern": false
+},
+{
+"zh": "預估系統記憶體（GiB）",
+"pattern": false
+},
+{
+"zh": "這是模型引擎的欄位：埠、上下文、金鑰在「API 串接」頁改，模型用「換模型」換。",
+"pattern": false
+},
+{
+"zh": " 關鍵服務：停止、重啟、換模型前要多確認一次；「全部停止」會略過它",
+"pattern": false
+},
+{
+"zh": "給接手的人看：這格是做什麼的、停掉會影響誰",
+"pattern": false
+},
+{
+"zh": "移除這個欄位",
+"pattern": false
+},
+{
+"zh": "服務還在跑，先停止再移除",
+"pattern": false
+},
+{
+"zh": "會一起刪掉 xConsole 替這格建的 llama.cpp 服務與它的設定、金鑰檔。模型檔留在存放區，不會被刪。",
+"pattern": false
+},
+{
+"zh": "只是取消登記，{0} 這個服務本身不會被動。",
+"pattern": true
+},
+{
+"zh": "只是取消登記",
+"pattern": false
+},
+{
+"zh": "這個服務本身不會被動",
+"pattern": false
+},
+{
+"zh": "這是空欄位，移除後就不會再出現。",
+"pattern": false
+},
+{
+"zh": "移除 {0}・{1}",
+"pattern": true
+},
+{
+"zh": "新增",
+"pattern": false
+},
+{
+"zh": "已新增欄位",
+"pattern": false
+},
+{
+"zh": "情境是一組參數，按一下就把 Strata 欄位切過去（會改設定並重啟，失敗自動還原）。例如寫程式要長上下文、抓料要多並行。",
+"pattern": false
+},
+{
+"zh": "這台還沒有情境。",
+"pattern": false
+},
+{
+"zh": "（目前）",
+"pattern": false
+},
+{
+"zh": "刪除情境「{0}」",
+"pattern": true
+},
+{
+"zh": "刪除情境「",
+"pattern": false
+},
+{
+"zh": "只刪掉這個情境，服務目前的設定不會變。",
+"pattern": false
+},
+{
+"zh": "已刪除",
+"pattern": false
+},
+{
+"zh": "{0} 的情境",
+"pattern": true
+},
+{
+"zh": "的情境",
+"pattern": false
+},
+{
+"zh": "例：寫程式後端",
+"pattern": false
+},
+{
+"zh": "例：Copilot 一輪會送四萬 token，上下文要夠長",
+"pattern": false
+},
+{
+"zh": "為什麼要切到這個情境",
+"pattern": false
+},
+{
+"zh": "給接手的人看",
+"pattern": false
+},
+{
+"zh": "不改（目前 {0}）",
+"pattern": true
+},
+{
+"zh": "不改（目前",
+"pattern": false
+},
+{
+"zh": "不改",
+"pattern": false
+},
+{
+"zh": "開：太長時自動縮輸出上限",
+"pattern": false
+},
+{
+"zh": "關",
+"pattern": false
+},
+{
+"zh": "2,048～1,048,576；套用前會做記憶體試算",
+"pattern": false
+},
+{
+"zh": "並行數",
+"pattern": false
+},
+{
+"zh": "1～16；並行越多，每條能用的上下文越少",
+"pattern": false
+},
+{
+"zh": "自動縮輸出上限",
+"pattern": false
+},
+{
+"zh": "修改情境「{0}」",
+"pattern": true
+},
+{
+"zh": "修改情境「",
+"pattern": false
+},
+{
+"zh": "已儲存情境，按情境按鈕就會套用",
+"pattern": false
+},
+{
+"zh": "{0} 安裝 {1}",
+"pattern": true
+},
+{
+"zh": "安裝",
+"pattern": false
+},
+{
+"zh": "編譯",
+"pattern": false
+},
+{
+"zh": "只用 CPU",
+"pattern": false
+},
+{
+"zh": "會下載 {0} 最新的正式版、在這台編譯 {1}。加速方式：{2}。",
+"pattern": true
+},
+{
+"zh": "會下載",
+"pattern": false
+},
+{
+"zh": "最新的正式版、在這台編譯",
+"pattern": false
+},
+{
+"zh": "加速方式",
+"pattern": false
+},
+{
+"zh": "這台正在安裝 {0}，等它裝完才能裝這個（同時編兩個會把記憶體吃光）。",
+"pattern": true
+},
+{
+"zh": "這台正在安裝",
+"pattern": false
+},
+{
+"zh": "等它裝完才能裝這個（同時編兩個會把記憶體吃光",
+"pattern": false
+},
+{
+"zh": "編譯工具：",
+"pattern": false
+},
+{
+"zh": "這台缺少編譯工具，要先請 IT 用有 sudo 權限的帳號裝好（網頁不代裝系統套件）：",
+"pattern": false
+},
+{
+"zh": "請 IT 執行",
+"pattern": false
+},
+{
+"zh": "已經有的 {0}：",
+"pattern": true
+},
+{
+"zh": "已經有的",
+"pattern": false
+},
+{
+"zh": "{0}中：{1}",
+"pattern": true
+},
+{
+"zh": "中",
+"pattern": false
+},
+{
+"zh": "裝好了：{0}",
+"pattern": true
+},
+{
+"zh": "裝好了",
+"pattern": false
+},
+{
+"zh": "失敗：{0}",
+"pattern": true
+},
+{
+"zh": "裝好了。回模型庫的「畫圖與影片」下載一顆模型就能產圖。",
+"pattern": false
+},
+{
+"zh": "到「這台的設定」的 llama-server 選它，或保留「自動挑選」（會挑版本最新、有 GPU 加速的那支）。",
+"pattern": false
+},
+{
+"zh": "（還沒有輸出）",
+"pattern": false
+},
+{
+"zh": "暫停下載",
+"pattern": false
+},
+{
+"zh": "取消{0}",
+"pattern": true
+},
+{
+"zh": "繼續下載",
+"pattern": false
+},
+{
+"zh": "一鍵安裝（下載幾十到幾百 MB）",
+"pattern": false
+},
+{
+"zh": "開始編譯（約 10～30 分鐘）",
+"pattern": false
+},
+{
+"zh": "開始{0}，可以關掉這個視窗，之後再回來看進度",
+"pattern": true
+},
+{
+"zh": "開始",
+"pattern": false
+},
+{
+"zh": "可以關掉這個視窗，之後再回來看進度",
+"pattern": false
+},
+{
+"zh": "先請 IT 裝好編譯工具",
+"pattern": false
+},
+{
+"zh": "編譯會用掉一半的 CPU 核心，正在跑的模型可能變慢",
+"pattern": false
+},
+{
+"zh": "這台不能連外？改成手動匯入安裝包",
+"pattern": false
+},
+{
+"zh": "在能上網的電腦到 {0} 官方 GitHub 的版本頁，下載這台系統與顯示卡用的壓縮檔",
+"pattern": true
+},
+{
+"zh": "在能上網的電腦到",
+"pattern": false
+},
+{
+"zh": "官方 GitHub 的版本頁，下載這台系統與顯示卡用的壓縮檔",
+"pattern": false
+},
+{
+"zh": "（.zip 或 .tar.gz），在這裡選檔送上去。檔案旁邊的 sha256 一併貼上，送齊後會核對，對不上就不裝。",
+"pattern": false
+},
+{
+"zh": "選填，64 個字元",
+"pattern": false
+},
+{
+"zh": "安裝包",
+"pattern": false
+},
+{
+"zh": "官方的 sha256",
+"pattern": false
+},
+{
+"zh": "不確定就留空，裝完會把算出來的值寫在記錄裡，請自己核對",
+"pattern": false
+},
+{
+"zh": "送上去並安裝",
+"pattern": false
+},
+{
+"zh": "先選安裝包",
+"pattern": false
+},
+{
+"zh": "只收 .zip、.tar.gz、.tgz",
+"pattern": false
+},
+{
+"zh": "sha256 要是 64 個十六進位字元",
+"pattern": false
+},
+{
+"zh": "送齊了，正在核對、解壓縮、試跑；進度看上面",
+"pattern": false
+},
+{
+"zh": "已暫停；再按一次會從斷掉的地方接著送",
+"pattern": false
+},
+{
+"zh": "准入試算照這個算；選錯會放行一個會把整台拖死的載入",
+"pattern": false
+},
+{
+"zh": "一格放一個模型或服務；欄位決定角色、埠與記憶體預估",
+"pattern": false
+},
+{
+"zh": "確認模型存放與 llama.cpp",
+"pattern": false
+},
+{
+"zh": "GGUF 模型放在存放區、靠 llama.cpp 跑；要找得到編好的 llama-server",
+"pattern": false
+},
+{
+"zh": "編譯 llama.cpp",
+"pattern": false
+},
+{
+"zh": "到模型庫下載或手動放入，再到空欄位按「放入」",
+"pattern": false
+},
+{
+"zh": "到 API 串接實測",
+"pattern": false
+},
+{
+"zh": "換完模型會自動帶過去；按「實測一次」確認 IDE 連得上",
+"pattern": false
+},
+{
+"zh": "到 API 串接",
+"pattern": false
+},
+{
+"zh": "即時",
+"pattern": false
+},
+{
+"zh": "更新失敗",
+"pattern": false
+},
+{
+"zh": "（連不上）",
+"pattern": false
+},
+{
+"zh": "目前這台機器",
+"pattern": false
+},
+{
+"zh": "放顯示卡",
+"pattern": false
+},
+{
+"zh": "放系統記憶體",
+"pattern": false
+},
+{
+"zh": "放硬碟",
+"pattern": false
+},
+{
+"zh": "深色＝放顯示卡（最快）、淺色＝放系統記憶體、灰色＝放硬碟（最慢）",
+"pattern": false
+},
+{
+"zh": "放得下",
+"pattern": false
+},
+{
+"zh": "不到 1 tok/s",
+"pattern": false
+},
+{
+"zh": "（依這台實測校正）",
+"pattern": false
+},
+{
+"zh": "還沒有機器",
+"pattern": false
+},
+{
+"zh": "先把一台機器加進來，主控台會讀出它的顯示卡、記憶體與磁碟，算出能跑多大的模型",
+"pattern": false
+},
+{
+"zh": "已連線",
+"pattern": false
+},
+{
+"zh": "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址",
+"pattern": false
+},
+{
+"zh": "現在執行",
+"pattern": false
+},
+{
+"zh": "{0}・埠 {1}",
+"pattern": true
+},
+{
+"zh": "到「執行」選一顆啟動",
+"pattern": false
+},
+{
+"zh": "顯示記憶體可用",
+"pattern": false
+},
+{
+"zh": "記憶體可用",
+"pattern": false
+},
+{
+"zh": "安裝中",
+"pattern": false
+},
+{
+"zh": "第二步一鍵安裝",
+"pattern": false
+},
+{
+"zh": "這台的晶片",
+"pattern": false
+},
+{
+"zh": "偵測到 {0}，建議記憶體架構是「{1}」；確認後推薦與試算才準",
+"pattern": true
+},
+{
+"zh": "依這台的顯示卡自動選加速方式一鍵安裝（macOS、Windows 下載官方預編譯版，Linux 在這台編譯）",
+"pattern": false
+},
+{
+"zh": "llama.cpp 已就緒",
+"pattern": false
+},
+{
+"zh": "下載並啟動一個模型",
+"pattern": false
+},
+{
+"zh": "模型執行中，可以到「對話」直接用，或把 API 網址給 IDE",
+"pattern": false
+},
+{
+"zh": "照這台的記憶體推薦、標好速度與放不放得下；下載完到「執行」按啟動",
+"pattern": false
+},
+{
+"zh": "去對話",
+"pattern": false
+},
+{
+"zh": "生成速度",
+"pattern": false
+},
+{
+"zh": "停止模型",
+"pattern": false
+},
+{
+"zh": "{0} 連不上，換一台或到設定看這台的位址。",
+"pattern": true
+},
+{
+"zh": "連不上，換一台或到設定看這台的位址",
+"pattern": false
+},
+{
+"zh": "還沒有機器。",
+"pattern": false
+},
+{
+"zh": "執行中",
+"pattern": false
+},
+{
+"zh": "準備執行",
+"pattern": false
+},
+{
+"zh": "還沒有已安裝的模型",
+"pattern": false
+},
+{
+"zh": "（執行中）",
+"pattern": false
+},
+{
+"zh": "管理模型",
+"pattern": false
+},
+{
+"zh": "放在",
+"pattern": false
+},
+{
+"zh": "這台還沒有模型。先到「模型」挑一顆推薦的下載，或匯入你已經有的 GGUF。",
+"pattern": false
+},
+{
+"zh": "自動分層規劃",
+"pattern": false
+},
+{
+"zh": "模型先放進最快的那一層，放不下的依序往下放",
+"pattern": false
+},
+{
+"zh": "GPU 那一塊",
+"pattern": false
+},
+{
+"zh": "顯示卡・{0}",
+"pattern": true
+},
+{
+"zh": "模型層放顯示卡，最快",
+"pattern": false
+},
+{
+"zh": "模型放在這一塊，最快",
+"pattern": false
+},
+{
+"zh": "沒有放進這一層",
+"pattern": false
+},
+{
+"zh": "系統那一塊",
+"pattern": false
+},
+{
+"zh": "只給引擎用；吃爆會把整台拖死，所以模型不放這裡",
+"pattern": false
+},
+{
+"zh": "放不下顯示卡的專家層放這裡，比較慢",
+"pattern": false
+},
+{
+"zh": "剩下的保留給系統（至少留 {0} GiB）",
+"pattern": true
+},
+{
+"zh": "剩下的保留給系統（至少留",
+"pattern": false
+},
+{
+"zh": "硬碟・按需讀取",
+"pattern": false
+},
+{
+"zh": "記憶體放不下的部分從硬碟映射，用到才讀；速度取決於硬碟，通常不到 1 tok/s",
+"pattern": false
+},
+{
+"zh": "不需要",
+"pattern": false
+},
+{
+"zh": "還算不出這顆的分層（讀不到模型結構或這台的記憶體），載入前仍會做記憶體試算。",
+"pattern": false
+},
+{
+"zh": "全部放進最快的一層，預估約 {0} tok/s，很順。",
+"pattern": true
+},
+{
+"zh": "全部放進最快的一層，預估約",
+"pattern": false
+},
+{
+"zh": "tok/s，很順",
+"pattern": false
+},
+{
+"zh": "（約 {0} tok/s）",
+"pattern": true
+},
+{
+"zh": "{0} 層專家放系統記憶體，能跑但比較慢{1}。",
+"pattern": true
+},
+{
+"zh": "層專家放系統記憶體，能跑但比較慢",
+"pattern": false
+},
+{
+"zh": "放得下。這台的記憶體頻寬還沒填，算不出速度；到「這台的設定」填了就會標出來。",
+"pattern": false
+},
+{
+"zh": "放得下，但速度偏慢（約 {0} tok/s）。",
+"pattern": true
+},
+{
+"zh": "放得下，但速度偏慢（約",
+"pattern": false
+},
+{
+"zh": "常駐記憶體",
+"pattern": false
+},
+{
+"zh": "MoE 模型依張量分層：注意力與共用權重{0}，{1} 層專家留在記憶體映射，",
+"pattern": true
+},
+{
+"zh": "MoE 模型依張量分層：注意力與共用權重",
+"pattern": false
+},
+{
+"zh": "層專家留在記憶體映射",
+"pattern": false
+},
+{
+"zh": "其中約 {0} GiB 用到才從 SSD 讀",
+"pattern": true
+},
+{
+"zh": "其中約",
+"pattern": false
+},
+{
+"zh": "GiB 用到才從 SSD 讀",
+"pattern": false
+},
+{
+"zh": "全部在記憶體裡",
+"pattern": false
+},
+{
+"zh": "不到 1",
+"pattern": false
+},
+{
+"zh": "；每個字只讀被選中的少數專家，所以比整層搬出去快{0}。",
+"pattern": true
+},
+{
+"zh": "每個字只讀被選中的少數專家，所以比整層搬出去快",
+"pattern": false
+},
+{
+"zh": "這台的記憶體放不下這顆，約 {0} GiB 要從硬碟按需讀取；能跑，但很慢{1}，適合測試。",
+"pattern": true
+},
+{
+"zh": "這台的記憶體放不下這顆，約",
+"pattern": false
+},
+{
+"zh": "GiB 要從硬碟按需讀取；能跑，但很慢",
+"pattern": false
+},
+{
+"zh": "適合測試",
+"pattern": false
+},
+{
+"zh": "顯示卡放不下，部分層改放系統記憶體、權重用記憶體映射載入；能跑但比較慢。",
+"pattern": false
+},
+{
+"zh": "這台放不下這顆。",
+"pattern": false
+},
+{
+"zh": "這顆的存放區在機械硬碟上，從硬碟按需讀取會比 SSD 慢約十倍。建議到「模型 › 存放區」把存放區改到 SSD 再執行。",
+"pattern": false
+},
+{
+"zh": "存放區在 SSD 上，放硬碟的那部分從 SSD 讀。",
+"pattern": false
+},
+{
+"zh": "自動",
+"pattern": false
+},
+{
+"zh": "上下文長度・目前 {0}",
+"pattern": true
+},
+{
+"zh": "上下文長度・目前",
+"pattern": false
+},
+{
+"zh": "KV 約 {0} GiB",
+"pattern": true
+},
+{
+"zh": "用模型的預設",
+"pattern": false
+},
+{
+"zh": "越長能讀越長的文件，但佔記憶體；{0} 個 token 時 KV 約 {1} GiB。",
+"pattern": true
+},
+{
+"zh": "越長能讀越長的文件，但佔記憶體",
+"pattern": false
+},
+{
+"zh": "個 token 時 KV 約",
+"pattern": false
+},
+{
+"zh": "，這顆最長 {0}",
+"pattern": true
+},
+{
+"zh": "這顆最長",
+"pattern": false
+},
+{
+"zh": "「自動」用模型預設{0}。",
+"pattern": true
+},
+{
+"zh": "「自動」用模型預設",
+"pattern": false
+},
+{
+"zh": "先想再答，難題答得比較好但比較慢（只對會思考的模型有用）",
+"pattern": false
+},
+{
+"zh": "讓區網裡的其他電腦（IDE、手機）連得到這個模型；關掉只有這台自己連得到",
+"pattern": false
+},
+{
+"zh": "實測速度",
+"pattern": false
+},
+{
+"zh": "約 ",
+"pattern": false
+},
+{
+"zh": "這顆在這台實際對話量到的",
+"pattern": false
+},
+{
+"zh": "依記憶體頻寬估、乘上這台實測的校正（×{0}）",
+"pattern": true
+},
+{
+"zh": "依記憶體頻寬估、乘上這台實測的校正（×",
+"pattern": false
+},
+{
+"zh": "依記憶體頻寬估算；對話過一次就會改成實測",
+"pattern": false
+},
+{
+"zh": "到這台的設定填記憶體頻寬",
+"pattern": false
+},
+{
+"zh": "第一次載入",
+"pattern": false
+},
+{
+"zh": "約 {0}",
+"pattern": true
+},
+{
+"zh": "依磁碟速度估",
+"pattern": false
+},
+{
+"zh": "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：系統那塊被擠爆會把整台拖死，所以不允許用硬碟補。請換小一點的量化。",
+"pattern": false
+},
+{
+"zh": "套用設定並重新載入",
+"pattern": false
+},
+{
+"zh": "啟動模型",
+"pattern": false
+},
+{
+"zh": "（會用到硬碟，很慢）",
+"pattern": false
+},
+{
+"zh": "這台放不下這顆；可以先把上下文調短",
+"pattern": false
+},
+{
+"zh": "上面的規劃是照 {0} 個 token 算的。調到 {1}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。",
+"pattern": true
+},
+{
+"zh": "上面的規劃是照",
+"pattern": false
+},
+{
+"zh": "個 token 算的。調到",
+"pattern": false
+},
+{
+"zh": "K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你",
+"pattern": false
+},
+{
+"zh": "高階：啟動引數",
+"pattern": false
+},
+{
+"zh": "這顆正在跑，完整的啟動指令（金鑰只放檔案位置，不在指令裡）：",
+"pattern": false
+},
+{
+"zh": "這顆還沒在跑；啟動後這裡會顯示完整的啟動指令。",
+"pattern": false
+},
+{
+"zh": "複製指令",
+"pattern": false
+},
+{
+"zh": "例：-fa on -t 8 --n-cpu-moe 20\n或：-ot \"blk\\.(\\d+)\\.ffn_.*_exps\\.=CPU\"",
+"pattern": false
+},
+{
+"zh": "自訂啟動引數",
+"pattern": false
+},
+{
+"zh": "接在自動產生的參數後面，跟著這顆模型存。模型、監聽位址與埠、金鑰、任何檔案路徑由主控台管，不能在這裡改。",
+"pattern": false
+},
+{
+"zh": "自己寫了 -ngl、-ot、--n-cpu-moe、-ts 時，自動分層就讓位；寫了 -c 時上下文用你的。記憶體試算仍照自動分層算，請自己確認放得下。",
+"pattern": false
+},
+{
+"zh": "已停用自動分層：分層由你寫的參數決定。",
+"pattern": false
+},
+{
+"zh": "儲存引數",
+"pattern": false
+},
+{
+"zh": "llama-server 參數說明",
+"pattern": false
+},
+{
+"zh": "已儲存；按「套用設定並重新載入」才會生效",
+"pattern": false
+},
+{
+"zh": "已儲存；下次啟動這顆時生效",
+"pattern": false
+},
+{
+"zh": "{0} 分 {1} 秒",
+"pattern": true
+},
+{
+"zh": "分",
+"pattern": false
+},
+{
+"zh": "主模型",
+"pattern": false
+},
+{
+"zh": "這台的代理不回報細部進度，載入完成會自動跳到下一步",
+"pattern": false
+},
+{
+"zh": "已啟動 {0}",
+"pattern": true
+},
+{
+"zh": "已啟動",
+"pattern": false
+},
+{
+"zh": "統一記憶體的機器一旦吃爆，不是服務掛掉而是整台卡死，要到現場重開。可以先把上下文調短再試。",
+"pattern": false
+},
+{
+"zh": "我知道風險，仍要啟動",
+"pattern": false
+},
+{
+"zh": "啟動失敗：",
+"pattern": false
+},
+{
+"zh": "準備",
+"pattern": false
+},
+{
+"zh": "讀取模型",
+"pattern": false
+},
+{
+"zh": "分配快取",
+"pattern": false
+},
+{
+"zh": "預熱",
+"pattern": false
+},
+{
+"zh": "正在啟動 {0}",
+"pattern": true
+},
+{
+"zh": "正在啟動",
+"pattern": false
+},
+{
+"zh": "讀取模型資訊…",
+"pattern": false
+},
+{
+"zh": "已用 {0}",
+"pattern": true
+},
+{
+"zh": "讀了 {0} / {1} GiB",
+"pattern": true
+},
+{
+"zh": "讀了",
+"pattern": false
+},
+{
+"zh": "約再 {0}",
+"pattern": true
+},
+{
+"zh": "約再",
+"pattern": false
+},
+{
+"zh": "載入失敗",
+"pattern": false
+},
+{
+"zh": "程式碼",
+"pattern": false
+},
+{
+"zh": "下載 .html",
+"pattern": false
+},
+{
+"zh": "執行預覽",
+"pattern": false
+},
+{
+"zh": "產生中…",
+"pattern": false
+},
+{
+"zh": "預覽失敗：",
+"pattern": false
+},
+{
+"zh": "執行預覽・在沙盒裡執行，拿不到主控台的登入；按 Esc 關閉",
+"pattern": false
+},
+{
+"zh": "開新分頁",
+"pattern": false
+},
+{
+"zh": "選這台的一個資料夾給 Agent 用",
+"pattern": false
+},
+{
+"zh": "用這個資料夾",
+"pattern": false
+},
+{
+"zh": "這個資料夾不能用：{0}",
+"pattern": true
+},
+{
+"zh": "這個資料夾不能用",
+"pattern": false
+},
+{
+"zh": "↑ 上一層",
+"pattern": false
+},
+{
+"zh": "這裡沒有子資料夾。",
+"pattern": false
+},
+{
+"zh": "已連結：{0}",
+"pattern": true
+},
+{
+"zh": "已連結",
+"pattern": false
+},
+{
+"zh": "{0} 連不上。",
+"pattern": true
+},
+{
+"zh": "Agent 還沒在這台開啟",
+"pattern": false
+},
+{
+"zh": "Agent 會在這台機器上建檔、跑指令。為了安全，每台預設關閉，要管理者在「這台的設定」打開；",
+"pattern": false
+},
+{
+"zh": "打開後檔案只能動工作資料夾裡面（~/xconsole-agent/ 底下的，或你連結進來的資料夾），每條指令都要人按允許。",
+"pattern": false
+},
+{
+"zh": "到這台的設定開啟",
+"pattern": false
+},
+{
+"zh": "{0}（本機）",
+"pattern": true
+},
+{
+"zh": "本機",
+"pattern": false
+},
+{
+"zh": "（中國來源）",
+"pattern": false
+},
+{
+"zh": "沒有可用的模型",
+"pattern": false
+},
+{
+"zh": "選擇工作資料夾…",
+"pattern": false
+},
+{
+"zh": "・不能用了",
+"pattern": false
+},
+{
+"zh": "{0}（連結：{1}{2}）",
+"pattern": true
+},
+{
+"zh": "連結",
+"pattern": false
+},
+{
+"zh": "{0}（{1} 個檔案）",
+"pattern": true
+},
+{
+"zh": "個檔案",
+"pattern": false
+},
+{
+"zh": "新增資料夾",
+"pattern": false
+},
+{
+"zh": "連結這台的資料夾",
+"pattern": false
+},
+{
+"zh": "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選",
+"pattern": false
+},
+{
+"zh": "新任務",
+"pattern": false
+},
+{
+"zh": "例：port-morrow-game",
+"pattern": false
+},
+{
+"zh": "資料夾名稱",
+"pattern": false
+},
+{
+"zh": "英數、連字號、底線；會建在 ~/xconsole-agent/ 底下",
+"pattern": false
+},
+{
+"zh": "新增工作資料夾",
+"pattern": false
+},
+{
+"zh": "建立",
+"pattern": false
+},
+{
+"zh": "描述要做的事，越具體越好（Enter 送出，Shift+Enter 換行）",
+"pattern": false
+},
+{
+"zh": "交給 Agent",
+"pattern": false
+},
+{
+"zh": "檔案只能動工作資料夾裡的；每條指令都會先問你",
+"pattern": false
+},
+{
+"zh": "計畫",
+"pattern": false
+},
+{
+"zh": "改動的檔案",
+"pattern": false
+},
+{
+"zh": "工作資料夾",
+"pattern": false
+},
+{
+"zh": "Agent 開始做事後，計畫會顯示在這裡",
+"pattern": false
+},
+{
+"zh": "還沒有改動",
+"pattern": false
+},
+{
+"zh": "新建",
+"pattern": false
+},
+{
+"zh": "還沒選資料夾",
+"pattern": false
+},
+{
+"zh": "取消連結（資料夾本身不動）",
+"pattern": false
+},
+{
+"zh": "交給 Agent 一個任務",
+"pattern": false
+},
+{
+"zh": "它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成。",
+"pattern": false
+},
+{
+"zh": "做一個番茄鐘網頁，打開 index.html 就能用",
+"pattern": false
+},
+{
+"zh": "寫一個 Python 腳本，把資料夾裡的圖片批次縮到 1080p",
+"pattern": false
+},
+{
+"zh": "讀一下這個專案，寫一份 README 說明怎麼執行",
+"pattern": false
+},
+{
+"zh": "整理這個資料夾：照檔案類型分到不同子資料夾",
+"pattern": false
+},
+{
+"zh": "Agent 完成了",
+"pattern": false
+},
+{
+"zh": "Agent 停在錯誤：",
+"pattern": false
+},
+{
+"zh": "Agent 想在 ~/xconsole-agent/{0} 裡執行這條指令，請確認它是安全的再允許：",
+"pattern": true
+},
+{
+"zh": "Agent 想在 ~/xconsole-agent/",
+"pattern": false
+},
+{
+"zh": "裡執行這條指令，請確認它是安全的再允許",
+"pattern": false
+},
+{
+"zh": " 這個任務之後的指令不再詢問",
+"pattern": false
+},
+{
+"zh": "Agent 想執行一條指令",
+"pattern": false
+},
+{
+"zh": "拒絕",
+"pattern": false
+},
+{
+"zh": "允許",
+"pattern": false
+},
+{
+"zh": "先到「執行」啟動一顆模型，或在設定加第三方 API",
+"pattern": false
+},
+{
+"zh": "先選一個工作資料夾（沒有就按「新增資料夾」）",
+"pattern": false
+},
+{
+"zh": "等你允許",
+"pattern": false
+},
+{
+"zh": "已停止",
+"pattern": false
+},
+{
+"zh": "列出檔案",
+"pattern": false
+},
+{
+"zh": "讀檔",
+"pattern": false
+},
+{
+"zh": "寫檔",
+"pattern": false
+},
+{
+"zh": "執行指令",
+"pattern": false
+},
+{
+"zh": "更新計畫",
+"pattern": false
+},
+{
+"zh": "錯誤",
+"pattern": false
+},
+{
+"zh": "（逾時）",
+"pattern": false
+},
+{
+"zh": "結束碼 {0}{1}",
+"pattern": true
+},
+{
+"zh": "結束碼",
+"pattern": false
+},
+{
+"zh": "生成影片",
+"pattern": false
+},
+{
+"zh": "下載畫圖模型",
+"pattern": false
+},
+{
+"zh": "下載影片模型",
+"pattern": false
+},
+{
+"zh": "每台機器的 llama.cpp 與畫圖引擎（stable-diffusion.cpp）；依顯示卡自動選加速方式，一鍵安裝或更新",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>機器</th><th>llama.cpp</th><th>畫圖引擎</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "安裝中…",
+"pattern": false
+},
+{
+"zh": "更新 llama.cpp",
+"pattern": false
+},
+{
+"zh": "安裝 llama.cpp",
+"pattern": false
+},
+{
+"zh": "更新畫圖引擎",
+"pattern": false
+},
+{
+"zh": "已經有自己編好的 llama-server，到「機器 › 這台的設定」指定路徑即可。",
+"pattern": false
+},
+{
+"zh": "本機模型放不下、或要用更強的模型時，接 OpenAI 相容的雲端服務；對話與 Agent 可以在頂部切換本機或這些服務",
+"pattern": false
+},
+{
+"zh": "新增 API",
+"pattern": false
+},
+{
+"zh": "對話內容會送到該服務的伺服器。政府案與含個資的對話請用本機模型；中國來源的服務政府案不得使用。",
+"pattern": false
+},
+{
+"zh": "還沒有第三方 API。",
+"pattern": false
+},
+{
+"zh": "未設預設模型",
+"pattern": false
+},
+{
+"zh": "已設定",
+"pattern": false
+},
+{
+"zh": "未設定",
+"pattern": false
+},
+{
+"zh": "{0}・{1}・金鑰{2}",
+"pattern": true
+},
+{
+"zh": "金鑰會一起刪除，對話與 Agent 就不能再選這個服務。",
+"pattern": false
+},
+{
+"zh": "金鑰只存在主控台這台，以 AES-256-GCM 加密；畫面與記錄永遠不會顯示金鑰內容。",
+"pattern": false
+},
+{
+"zh": "已設定；留空＝不更改",
+"pattern": false
+},
+{
+"zh": "貼上 API Key",
+"pattern": false
+},
+{
+"zh": "取得模型清單",
+"pattern": false
+},
+{
+"zh": "預設模型",
+"pattern": false
+},
+{
+"zh": "已匯入 CA 憑證；留空＝不更改",
+"pattern": false
+},
+{
+"zh": "-----BEGIN CERTIFICATE-----（對方是公開憑證就留空）",
+"pattern": false
+},
+{
+"zh": "從檔案讀取",
+"pattern": false
+},
+{
+"zh": "對方的 CA 憑證（自建 CA 才需要）",
+"pattern": false
+},
+{
+"zh": "PEM 格式；連線時用它驗證對方，不會關掉憑證檢查",
+"pattern": false
+},
+{
+"zh": " 清除已匯入的 CA 憑證",
+"pattern": false
+},
+{
+"zh": "服務商",
+"pattern": false
+},
+{
+"zh": "網址（OpenAI 相容）",
+"pattern": false
+},
+{
+"zh": "要 https；只有內網位址可以用 http",
+"pattern": false
+},
+{
+"zh": "新增第三方 API",
+"pattern": false
+},
+{
+"zh": "中國來源",
+"pattern": false
+},
+{
+"zh": "金鑰可用（{0} 毫秒），有 {1} 個模型可選；點「預設模型」欄就會列出來。",
+"pattern": true
+},
+{
+"zh": "金鑰可用",
+"pattern": false
+},
+{
+"zh": "毫秒），有",
+"pattern": false
+},
+{
+"zh": "個模型可選；點「預設模型」欄就會列出來",
+"pattern": false
+},
+{
+"zh": "列出機器",
+"pattern": false
+},
+{
+"zh": "看這台的狀態",
+"pattern": false
+},
+{
+"zh": "查推薦模型",
+"pattern": false
+},
+{
+"zh": "查已下載的模型",
+"pattern": false
+},
+{
+"zh": "更簡潔",
+"pattern": false
+},
+{
+"zh": "把你上一個回答改寫得更簡潔，保留所有重點，只輸出改寫後的內容。",
+"pattern": false
+},
+{
+"zh": "更詳細",
+"pattern": false
+},
+{
+"zh": "把你上一個回答改寫得更詳細，補充說明與例子，只輸出改寫後的內容。",
+"pattern": false
+},
+{
+"zh": "更正式",
+"pattern": false
+},
+{
+"zh": "把你上一個回答改寫成正式的書面語氣，只輸出改寫後的內容。",
+"pattern": false
+},
+{
+"zh": "更口語",
+"pattern": false
+},
+{
+"zh": "把你上一個回答改寫得更口語、更好懂，只輸出改寫後的內容。",
+"pattern": false
+},
+{
+"zh": "換個說法",
+"pattern": false
+},
+{
+"zh": "用不同的說法重寫你上一個回答，意思不變，只輸出改寫後的內容。",
+"pattern": false
+},
+{
+"zh": "改用英文",
+"pattern": false
+},
+{
+"zh": "越高越有創意、越低越穩定，常用 0.6～1.0",
+"pattern": false
+},
+{
+"zh": "只從累計機率前 P 的詞裡挑，常用 0.8～0.95",
+"pattern": false
+},
+{
+"zh": "只從機率最高的 K 個詞裡挑，常用 20～40",
+"pattern": false
+},
+{
+"zh": "過濾機率太低的詞，常用 0～0.05",
+"pattern": false
+},
+{
+"zh": "重複懲罰",
+"pattern": false
+},
+{
+"zh": "大於 1 減少重複用詞，常用 1.0～1.1",
+"pattern": false
+},
+{
+"zh": "新話題",
+"pattern": false
+},
+{
+"zh": "大於 0 鼓勵聊新的內容，常用 0～1.5",
+"pattern": false
+},
+{
+"zh": "最大回覆長度",
+"pattern": false
+},
+{
+"zh": "單次回答最多幾個 token；空白＝不限",
+"pattern": false
+},
+{
+"zh": "隨機種子",
+"pattern": false
+},
+{
+"zh": "固定種子，同樣的問題會得到一樣的回答；空白＝隨機",
+"pattern": false
+},
+{
+"zh": "本機模型",
+"pattern": false
+},
+{
+"zh": "新對話",
+"pattern": false
+},
+{
+"zh": "已把這個分頁裡的 {0} 則對話存到主控台",
+"pattern": true
+},
+{
+"zh": "已把這個分頁裡的",
+"pattern": false
+},
+{
+"zh": "則對話存到主控台",
+"pattern": false
+},
+{
+"zh": "對話沒存進主控台：",
+"pattern": false
+},
+{
+"zh": "讀不到附圖",
+"pattern": false
+},
+{
+"zh": "【附件：{0}】\n{1}\n【附件結束】\n\n",
+"pattern": true
+},
+{
+"zh": "【附件",
+"pattern": false
+},
+{
+"zh": "\n【附件結束】\n\n",
+"pattern": false
+},
+{
+"zh": "（先前附了「{0}」，內容已經看不到了）\n",
+"pattern": true
+},
+{
+"zh": "先前附了「",
+"pattern": false
+},
+{
+"zh": "」，內容已經看不到了）\n",
+"pattern": false
+},
+{
+"zh": " {0} 張圖",
+"pattern": true
+},
+{
+"zh": "張圖",
+"pattern": false
+},
+{
+"zh": "一段影片",
+"pattern": false
+},
+{
+"zh": "（已產生{0}，提示詞：{1}）",
+"pattern": true
+},
+{
+"zh": "已產生",
+"pattern": false
+},
+{
+"zh": "圖片",
+"pattern": false
+},
+{
+"zh": "（{0}沒有產生成功）",
+"pattern": true
+},
+{
+"zh": "沒有產生成功",
+"pattern": false
+},
+{
+"zh": "完成，",
+"pattern": false
+},
+{
+"zh": "使用者停止",
+"pattern": false
+},
+{
+"zh": "沒有完成，",
+"pattern": false
+},
+{
+"zh": "（操作電腦：{0}；{1}）",
+"pattern": true
+},
+{
+"zh": "以下是這段對話較早部分的摘要，請當作已知的前情：\n{0}",
+"pattern": true
+},
+{
+"zh": "以下是這段對話較早部分的摘要，請當作已知的前情：\n",
+"pattern": false
+},
+{
+"zh": "（先前附了一張圖，已經讀不到了）{0}",
+"pattern": true
+},
+{
+"zh": "先前附了一張圖，已經讀不到了",
+"pattern": false
+},
+{
+"zh": "（先前附了一張圖）{0}",
+"pattern": true
+},
+{
+"zh": "先前附了一張圖",
+"pattern": false
+},
+{
+"zh": "（先前附了一張圖，已經看不到了）{0}",
+"pattern": true
+},
+{
+"zh": "先前附了一張圖，已經看不到了",
+"pattern": false
+},
+{
+"zh": "對話太長，正在把較早的部分整理成摘要…",
+"pattern": false
+},
+{
+"zh": "使用者",
+"pattern": false
+},
+{
+"zh": "助理",
+"pattern": false
+},
+{
+"zh": "你負責把對話整理成摘要，讓之後的對話可以接著進行。用繁體中文（台灣用語）條列，保留人名、數字、日期、做過的決定、使用者的偏好與還沒完成的事；不要加評論。800 字以內。",
+"pattern": false
+},
+{
+"zh": "先前的摘要：\n{0}\n\n接著的對話：\n",
+"pattern": true
+},
+{
+"zh": "先前的摘要：\n",
+"pattern": false
+},
+{
+"zh": "\n\n接著的對話：\n",
+"pattern": false
+},
+{
+"zh": "沒有連得上的機器可以產生",
+"pattern": false
+},
+{
+"zh": "{0} 還沒安裝畫圖引擎（stable-diffusion.cpp）",
+"pattern": true
+},
+{
+"zh": "還沒安裝畫圖引擎（stable-diffusion.cpp",
+"pattern": false
+},
+{
+"zh": "{0} 還沒有下載好的{1}模型",
+"pattern": true
+},
+{
+"zh": "還沒有下載好的",
+"pattern": false
+},
+{
+"zh": "{0}　{1}/{2} 步",
+"pattern": true
+},
+{
+"zh": "還沒有可以對話的模型",
+"pattern": false
+},
+{
+"zh": "到「執行」啟動一顆模型，或請管理者在「設定 › 第三方 API」加一個服務。",
+"pattern": false
+},
+{
+"zh": "去執行",
+"pattern": false
+},
+{
+"zh": "＋ 新對話",
+"pattern": false
+},
+{
+"zh": "搜尋對話（標題與內容）",
+"pattern": false
+},
+{
+"zh": "收起",
+"pattern": false
+},
+{
+"zh": "回答還在產生，先按停止再換對話",
+"pattern": false
+},
+{
+"zh": "刪除這則對話",
+"pattern": false
+},
+{
+"zh": "「{0}」連同附圖會從主控台刪掉，不能復原。",
+"pattern": true
+},
+{
+"zh": "」連同附圖會從主控台刪掉，不能復原",
+"pattern": false
+},
+{
+"zh": "找不到符合的對話。",
+"pattern": false
+},
+{
+"zh": "還沒有存下來的對話。",
+"pattern": false
+},
+{
+"zh": "改名",
+"pattern": false
+},
+{
+"zh": "對話紀錄",
+"pattern": false
+},
+{
+"zh": "（目前沒有執行中的模型，只能看紀錄）",
+"pattern": false
+},
+{
+"zh": "對話設定",
+"pattern": false
+},
+{
+"zh": "匯出",
+"pattern": false
+},
+{
+"zh": "這則對話的模型目前沒有在執行",
+"pattern": false
+},
+{
+"zh": "本機執行・對話不離開這台{0}",
+"pattern": true
+},
+{
+"zh": "本機執行・對話不離開這台",
+"pattern": false
+},
+{
+"zh": "・中國來源，政府案不得使用",
+"pattern": false
+},
+{
+"zh": "第三方 API・對話內容會送到 {0}{1}",
+"pattern": true
+},
+{
+"zh": "第三方 API・對話內容會送到",
+"pattern": false
+},
+{
+"zh": "・上下文 {0}",
+"pattern": true
+},
+{
+"zh": "・已自訂設定",
+"pattern": false
+},
+{
+"zh": "・已壓縮前 {0} 則",
+"pattern": true
+},
+{
+"zh": "已壓縮前",
+"pattern": false
+},
+{
+"zh": "則",
+"pattern": false
+},
+{
+"zh": "有什麼可以幫你？",
+"pattern": false
+},
+{
+"zh": "這個模型在外部服務，對話會送出去。",
+"pattern": false
+},
+{
+"zh": "模型跑在你自己的機器上，對話不會上傳。",
+"pattern": false
+},
+{
+"zh": "用 HTML 做一個會動的時鐘",
+"pattern": false
+},
+{
+"zh": "幫我把這段話改得更正式",
+"pattern": false
+},
+{
+"zh": "畫一張雪地裡的紅色狐狸",
+"pattern": false
+},
+{
+"zh": "解釋什麼是 MoE 模型",
+"pattern": false
+},
+{
+"zh": "前 {0} 則已壓縮成摘要送給模型（原文照留在下面）",
+"pattern": true
+},
+{
+"zh": "前",
+"pattern": false
+},
+{
+"zh": "則已壓縮成摘要送給模型（原文照留在下面",
+"pattern": false
+},
+{
+"zh": "附件",
+"pattern": false
+},
+{
+"zh": "工具",
+"pattern": false
+},
+{
+"zh": "讓看得懂圖的模型看這台的螢幕、控制滑鼠鍵盤，一步一步完成你交代的事；預設每一步都先問你",
+"pattern": false
+},
+{
+"zh": "讓模型呼叫主控台的查詢工具：機器狀態、推薦模型、已下載的模型（只查，不會動作）",
+"pattern": false
+},
+{
+"zh": "第三方 API 不開放主控台的工具",
+"pattern": false
+},
+{
+"zh": "交代電腦要做的事，例：打開記事本，寫一段會議通知並存到桌面。Enter 送出",
+"pattern": false
+},
+{
+"zh": "描述想要的畫面（附一張圖就是改圖）。Enter 送出",
+"pattern": false
+},
+{
+"zh": "描述影片內容（附一張圖當第一格）。Enter 送出",
+"pattern": false
+},
+{
+"zh": "問點什麼，或說「畫一張…」「生成一段…的影片」（Enter 送出，Shift+Enter 換行）",
+"pattern": false
+},
+{
+"zh": "先在上面選一個模型",
+"pattern": false
+},
+{
+"zh": "操作電腦要用看得懂圖的模型（標了「看圖」的）；先在上面換一個",
+"pattern": false
+},
+{
+"zh": "{0} 沒有開「讓模型操作這台的桌面」：請管理者到 設定 › 機器 › 這台的設定 打開",
+"pattern": true
+},
+{
+"zh": "沒有開「讓模型操作這台的桌面」：請管理者到 設定 › 機器 › 這台的設定 打開",
+"pattern": false
+},
+{
+"zh": "打開後，模型可以看 {0} 的螢幕，並控制滑鼠和鍵盤完成任務。預設每一步操作前都會先問你；隨時按「停止」可以中止。",
+"pattern": true
+},
+{
+"zh": "打開後，模型可以看",
+"pattern": false
+},
+{
+"zh": "的螢幕，並控制滑鼠和鍵盤完成任務。預設每一步操作前都會先問你；隨時按「停止」可以中止",
+"pattern": false
+},
+{
+"zh": "建議：先關掉含有隱私的視窗；不要讓它處理付款、轉帳、刪除檔案、輸入密碼。本機模型操作電腦的準確度有限，複雜的事可能做不到。",
+"pattern": false
+},
+{
+"zh": "在同一台電腦上操作時，這個網頁也會出現在螢幕上：可以用手機或另一台電腦開主控台看進度與按允許，或按「這次都允許」後把瀏覽器縮到最小。",
+"pattern": false
+},
+{
+"zh": "允許模型操作這台電腦？",
+"pattern": false
+},
+{
+"zh": "拿掉圖片",
+"pattern": false
+},
+{
+"zh": "{0}（讀取中…）",
+"pattern": true
+},
+{
+"zh": "（太長，只取前段）",
+"pattern": false
+},
+{
+"zh": "{0}・{1} 字{2}",
+"pattern": true
+},
+{
+"zh": "字",
+"pattern": false
+},
+{
+"zh": "拿掉 {0}",
+"pattern": true
+},
+{
+"zh": "附文件（PDF、Word、Excel、PowerPoint、純文字、程式碼）或圖片（看圖、改圖、影片第一格）",
+"pattern": false
+},
+{
+"zh": "圖片最大 4 MB",
+"pattern": false
+},
+{
+"zh": "一則最多附 5 個檔案",
+"pattern": false
+},
+{
+"zh": "{0} 超過 15 MB",
+"pattern": true
+},
+{
+"zh": "超過 15 MB",
+"pattern": false
+},
+{
+"zh": "送出",
+"pattern": false
+},
+{
+"zh": "這則對話的模型目前沒有在執行，先在上面換一個",
+"pattern": false
+},
+{
+"zh": "查了：{0}",
+"pattern": true
+},
+{
+"zh": "查了",
+"pattern": false
+},
+{
+"zh": "沒有用到工具",
+"pattern": false
+},
+{
+"zh": "（沒有回答）",
+"pattern": false
+},
+{
+"zh": "附件還在讀取，等一下再送",
+"pattern": false
+},
+{
+"zh": "這個模型看不懂圖片；要問圖請換一個標了「看圖」的模型，要改圖請說「把…改成…」或按「畫圖」",
+"pattern": false
+},
+{
+"zh": "操作電腦沒有開始：",
+"pattern": false
+},
+{
+"zh": "已完成：{0}",
+"pattern": true
+},
+{
+"zh": "已停止操作電腦",
+"pattern": false
+},
+{
+"zh": "操作電腦沒有完成：{0}",
+"pattern": true
+},
+{
+"zh": "操作電腦沒有完成",
+"pattern": false
+},
+{
+"zh": "已把這張圖放進附件：說「把…改成…」就會照著改",
+"pattern": false
+},
+{
+"zh": "儲存並重新送出",
+"pattern": false
+},
+{
+"zh": "內容不能空白",
+"pattern": false
+},
+{
+"zh": "新的標題",
+"pattern": false
+},
+{
+"zh": "標題",
+"pattern": false
+},
+{
+"zh": "標題不能空白",
+"pattern": false
+},
+{
+"zh": "例：你是一名資深的 Python 工程師，回答簡潔，程式碼要有中文註解。\n或：請用條列方式回答。",
+"pattern": false
+},
+{
+"zh": "系統提示詞",
+"pattern": false
+},
+{
+"zh": "每次對話都會先告訴模型。用來設定角色、語氣、回答格式。留空＝不設定。",
+"pattern": false
+},
+{
+"zh": "進階：模型參數",
+"pattern": false
+},
+{
+"zh": "留空＝用模型自己的預設值（大多數情況下最好）。改了效果不好，按「恢復預設」即可。",
+"pattern": false
+},
+{
+"zh": "　第三方 API 只會送出溫度、Top P、新話題、最大回覆長度與隨機種子。",
+"pattern": false
+},
+{
+"zh": "之後的新對話也用這組設定",
+"pattern": false
+},
+{
+"zh": "恢復預設",
+"pattern": false
+},
+{
+"zh": "的整數",
+"pattern": false
+},
+{
+"zh": "{0} 要在 {1}～{2} 之間{3}",
+"pattern": true
+},
+{
+"zh": "要在",
+"pattern": false
+},
+{
+"zh": "之間",
+"pattern": false
+},
+{
+"zh": "已套用到這則對話",
+"pattern": false
+},
+{
+"zh": "這則對話還是空的",
+"pattern": false
+},
+{
+"zh": "> 系統提示詞：{0}",
+"pattern": true
+},
+{
+"zh": "> 系統提示詞",
+"pattern": false
+},
+{
+"zh": "## 我",
+"pattern": false
+},
+{
+"zh": "## 模型",
+"pattern": false
+},
+{
+"zh": "（附件：{0}）",
+"pattern": true
+},
+{
+"zh": "（附了一張圖）",
+"pattern": false
+},
+{
+"zh": "附加的圖片",
+"pattern": false
+},
+{
+"zh": "這則附的圖當時沒有存下來；要繼續問這張圖請重新附上。",
+"pattern": false
+},
+{
+"zh": "（內容沒存下來，要再問請重新附上）",
+"pattern": false
+},
+{
+"zh": "思考過程",
+"pattern": false
+},
+{
+"zh": "思考中…",
+"pattern": false
+},
+{
+"zh": "重新生成",
+"pattern": false
+},
+{
+"zh": "調整回答",
+"pattern": false
+},
+{
+"zh": "調整回答…",
+"pattern": false
+},
+{
+"zh": "上一個版本",
+"pattern": false
+},
+{
+"zh": "第 {0}/{1} 版",
+"pattern": true
+},
+{
+"zh": "版",
+"pattern": false
+},
+{
+"zh": "下一個版本",
+"pattern": false
+},
+{
+"zh": "正在把描述整理成{0}提示詞…",
+"pattern": true
+},
+{
+"zh": "正在把描述整理成",
+"pattern": false
+},
+{
+"zh": "提示詞…",
+"pattern": false
+},
+{
+"zh": "準備產生{0}…",
+"pattern": true
+},
+{
+"zh": "準備產生",
+"pattern": false
+},
+{
+"zh": "這件{0}已經在畫圖頁刪掉了。",
+"pattern": true
+},
+{
+"zh": "這件",
+"pattern": false
+},
+{
+"zh": "已經在畫圖頁刪掉了",
+"pattern": false
+},
+{
+"zh": "{0}沒有產生成功",
+"pattern": true
+},
+{
+"zh": "去安裝畫圖引擎",
+"pattern": false
+},
+{
+"zh": "去下載{0}模型",
+"pattern": true
+},
+{
+"zh": "去下載",
+"pattern": false
+},
+{
+"zh": "・改圖",
+"pattern": false
+},
+{
+"zh": "{0}{1}・提示詞：{2}",
+"pattern": true
+},
+{
+"zh": "用這張繼續改",
+"pattern": false
+},
+{
+"zh": "讀不到{0}：{1}",
+"pattern": true
+},
+{
+"zh": "到影片頁",
+"pattern": false
+},
+{
+"zh": "到畫圖頁",
+"pattern": false
+},
+{
+"zh": "準備中",
+"pattern": false
+},
+{
+"zh": "沒有完成",
+"pattern": false
+},
+{
+"zh": "操作電腦・{0}・{1}",
+"pattern": true
+},
+{
+"zh": "・已做 {0} 步",
+"pattern": true
+},
+{
+"zh": "已做",
+"pattern": false
+},
+{
+"zh": "這台目前的螢幕",
+"pattern": false
+},
+{
+"zh": "下一步：",
+"pattern": false
+},
+{
+"zh": "這次都允許",
+"pattern": false
+},
+{
+"zh": "步驟（{0}）",
+"pattern": true
+},
+{
+"zh": "步驟",
+"pattern": false
+},
+{
+"zh": "打算：",
+"pattern": false
+},
+{
+"zh": "做了：",
+"pattern": false
+},
+{
+"zh": "被拒絕：",
+"pattern": false
+},
+{
+"zh": "失敗：",
+"pattern": false
+},
+{
+"zh": "完成：",
+"pattern": false
+},
+{
+"zh": "xConsole 模型主控台｜云碩科技",
+"pattern": false
+},
+{
+"zh": "xConsole 模型主控台",
+"pattern": false
+},
+{
+"zh": "云碩科技地端 AI 機群",
+"pattern": false
+},
+{
+"zh": "密碼",
+"pattern": false
+},
+{
+"zh": "云碩科技",
+"pattern": false
+},
+{
+"zh": "連線中",
+"pattern": false
+},
+{
+"zh": "選單",
+"pattern": false
+},
+{
+"zh": "云碩科技地端 AI 機群的模型主控台：看硬體推薦模型、一鍵安裝引擎、啟動與記憶體准入、對話、Agent、畫圖與影片。",
+"pattern": false
+},
+{
+"zh": "立即重新整理",
+"pattern": false
+},
+{
+"zh": "切換深淺色",
+"pattern": false
+},
+{
+"zh": "登出",
+"pattern": false
+},
+{
+"zh": "關閉選單",
+"pattern": false
+},
+{
+"zh": "你是 xConsole 模型主控台的助理，用繁體中文（台灣用語）回答管理者的問題。需要機器或模型的資料時一律呼叫工具查，不要猜；工具查不到就說查不到。你只能查，不能替管理者啟動、停止或下載任何東西；需要動作時，告訴他在網頁哪裡按。回答簡短、條列重點。",
+"pattern": false
+},
+{
+"zh": "[Unit]\nDescription=xConsole 節點代理（模型欄位、准入控制、啟停）\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=/usr/bin/python3 %h/xconsole_agent.py\nRestart=always\nRestartSec=5\nMemoryMax=256M\nCPUQuota=25%\n\n[Install]\nWantedBy=default.target\n",
+"pattern": false
+},
+{
+"zh": "產生。加入碼 30 分鐘內有效、只能用一次。\n# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。\nset -euo pipefail\nC='",
+"pattern": false
+},
+{
+"zh": "</string>\n  <key>ProgramArguments</key><array><string>$PY</string><string>$HOME/xconsole_agent.py</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>KeepAlive</key><true/>\n  <key>ProcessType</key><string>Standard</string>\n  <key>StandardOutPath</key><string>$HOME/.xconsole/agent.log</string>\n  <key>StandardErrorPath</key><string>$HOME/.xconsole/agent.log</string>\n</dict></plist>\nPLIST\n  # 有人在桌面登入就放 gui 網域；只有 SSH、沒有桌面登入的 Mac 沒有 gui 網域，改放 user 網域\n  LDOM=\"gui/$(id -u)\"; launchctl print \"$LDOM\" >/dev/null 2>&1 || LDOM=\"user/$(id -u)\"\n  launchctl bootout \"$LDOM/",
+"pattern": false
+},
+{
+"zh": "\"\n  LOGHINT=\"tail -n 50 ~/.xconsole/agent.log；launchd 的狀態：launchctl print $LDOM/",
+"pattern": false
+},
+{
+"zh": "PY\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | \"$PY\" -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or d.get(\"error\") or d)'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台\"\nexit 0\n",
+"pattern": false
+},
+{
+"zh": "# xConsole 節點代理安裝（Windows）：由主控台",
+"pattern": false
+},
+{
+"zh": "產生。加入碼 30 分鐘內有效、只能用一次。\n# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷\n$ErrorActionPreference = 'Continue'\n$C = '",
+"pattern": false
+},
+{
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑；指令在這個資料夾裡用 {1} 執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。",
+"pattern": true
+},
+{
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「",
+"pattern": false
+},
+{
+"zh": "」的路徑；指令在這個資料夾裡用",
+"pattern": false
+},
+{
+"zh": "執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結",
+"pattern": false
+},
+{
+"zh": "沒有這個工具",
+"pattern": false
+},
+{
+"zh": " 產生。加入碼 30 分鐘內有效、只能用一次。\n# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。\nset -euo pipefail\nC='",
+"pattern": false
+},
+{
+"zh": "# xConsole 節點代理安裝（Windows）：由主控台 ",
+"pattern": false
+},
+{
+"zh": " 產生。加入碼 30 分鐘內有效、只能用一次。\n# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷\n$ErrorActionPreference = 'Continue'\n$C = '",
+"pattern": false
+},
+{
+"zh": "金鑰在 platform.openai.com 的 API keys 頁產生",
+"pattern": false
+},
+{
+"zh": "Gemini 的 OpenAI 相容端點；金鑰在 Google AI Studio 產生",
+"pattern": false
+},
+{
+"zh": "Anthropic 的 OpenAI 相容端點；金鑰在 console.anthropic.com 產生",
+"pattern": false
+},
+{
+"zh": "金鑰在 console.mistral.ai 產生",
+"pattern": false
+},
+{
+"zh": "自訂（OpenAI 相容）",
+"pattern": false
+},
+{
+"zh": "任何講 OpenAI Chat Completions 的服務（vLLM、llama.cpp、Ollama、LiteLLM…）；網址填到 /v1 為止",
+"pattern": false
+},
+{
+"zh": "[已遮罩]",
+"pattern": false
+},
+{
+"zh": "」的路徑；指令在這個資料夾裡用 ",
+"pattern": false
+},
+{
+"zh": " 執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。",
+"pattern": false
+},
+{
+"zh": "沒有 {0} 這個工具",
+"pattern": true
+},
+{
+"zh": "這個工具",
+"pattern": false
+},
+{
+"zh": "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）",
+"pattern": false
+},
+{
+"zh": "對外網址格式不對，主控台不代為實測",
+"pattern": false
+},
+{
+"zh": "對外網址的主機不是這台機器（{0}），主控台不代為實測，免得把金鑰送到別處。請用 IDE 所在的電腦直接測",
+"pattern": true
+},
+{
+"zh": "對外網址的主機不是這台機器",
+"pattern": false
+},
+{
+"zh": "主控台不代為實測，免得把金鑰送到別處。請用 IDE 所在的電腦直接測",
+"pattern": false
+},
+{
+"zh": "{0} 回 {1} 轉址；為了不把金鑰送到別處，實測不跟轉址。請把對外網址改成實際提供 API 的位址",
+"pattern": true
+},
+{
+"zh": "回",
+"pattern": false
+},
+{
+"zh": "轉址；為了不把金鑰送到別處，實測不跟轉址。請把對外網址改成實際提供 API 的位址",
+"pattern": false
+},
+{
+"zh": "從主控台連不到 {0}（{1}）。IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址",
+"pattern": true
+},
+{
+"zh": "從主控台連不到",
+"pattern": false
+},
+{
+"zh": "IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址",
+"pattern": false
+},
+{
+"zh": "從主控台連得到，模型清單有 {0}",
+"pattern": true
+},
+{
+"zh": "從主控台連得到，模型清單有",
+"pattern": false
+},
+{
+"zh": "回 {0}",
+"pattern": true
+},
+{
+"zh": "機器 id 不合法",
+"pattern": false
+},
+{
+"zh": "沒有這台機器",
+"pattern": false
+},
+{
+"zh": "還沒信任 {0} 的代理憑證",
+"pattern": true
+},
+{
+"zh": "還沒信任",
+"pattern": false
+},
+{
+"zh": "列出所有納管的機器：是否在線、記憶體架構、可用記憶體、正在跑的模型",
+"pattern": false
+},
+{
+"zh": "某一台機器的詳細狀態：晶片、記憶體、各欄位跑什麼模型、能跑多大",
+"pattern": false
+},
+{
+"zh": "依某台機器的記憶體與頻寬推薦模型，含預估速度與放不放得下",
+"pattern": false
+},
+{
+"zh": "某台機器存放區裡已下載的模型與剩餘磁碟",
+"pattern": false
+},
+{
+"zh": "{0} 現在連不上",
+"pattern": true
+},
+{
+"zh": "現在連不上",
+"pattern": false
+},
+{
+"zh": "加入碼不對、已經用過、過期了，或另一台正在用它加入；請在主控台重新按「加一台機器」",
+"pattern": false
+},
+{
+"zh": "代理的權杖格式不對",
+"pattern": false
+},
+{
+"zh": "代理的憑證要剛好一張（代理自己產生的那張）",
+"pattern": false
+},
+{
+"zh": "代理的埠不對",
+"pattern": false
+},
+{
+"zh": "已加入主控台：{0}（{1}）。回到網頁就看得到這台。",
+"pattern": true
+},
+{
+"zh": "已加入主控台",
+"pattern": false
+},
+{
+"zh": "回到網頁就看得到這台",
+"pattern": false
+},
+{
+"zh": "沒有 HTML 內容",
+"pattern": false
+},
+{
+"zh": "預覽內容最多 2 MB（這次 {0} MB）",
+"pattern": true
+},
+{
+"zh": "預覽內容最多 2 MB（這次",
+"pattern": false
+},
+{
+"zh": "網址要填，例：https://api.openai.com/v1",
+"pattern": false
+},
+{
+"zh": "網址只收 https://主機/路徑（不能帶帳密、查詢字串）",
+"pattern": false
+},
+{
+"zh": "{0} 回 {1} 轉址；為了不把金鑰送到別處，不跟轉址。請填實際提供 API 的網址",
+"pattern": true
+},
+{
+"zh": "轉址；為了不把金鑰送到別處，不跟轉址。請填實際提供 API 的網址",
+"pattern": false
+},
+{
+"zh": "換新",
+"pattern": false
+},
+{
+"zh": "對話內容不對",
+"pattern": false
+},
+{
+"zh": "請先選模型（這筆第三方 API 沒有設預設模型）",
+"pattern": false
+},
+{
+"zh": "列出工作資料夾（或其中一個子資料夾）裡的檔案",
+"pattern": false
+},
+{
+"zh": "讀一個文字檔（最多 1 MB）",
+"pattern": false
+},
+{
+"zh": "建立或覆寫一個檔案（整份內容，最多 2 MB）；上層資料夾會自動建立",
+"pattern": false
+},
+{
+"zh": "在工作資料夾裡執行一條指令（要使用者按允許才會執行）",
+"pattern": false
+},
+{
+"zh": "更新工作計畫（整份），每一步標 pending、in_progress 或 done",
+"pattern": false
+},
+{
+"zh": "工作完成時呼叫，附上給使用者的總結",
+"pattern": false
+},
+{
+"zh": "沒有 ",
+"pattern": false
+},
+{
+"zh": " 這個工具",
+"pattern": false
+},
+{
+"zh": "模型要是本機欄位或第三方 API",
+"pattern": false
+},
+{
+"zh": "本機 {0}/{1}",
+"pattern": true
+},
+{
+"zh": "沒有這筆第三方 API",
+"pattern": false
+},
+{
+"zh": "這筆第三方 API 沒有設預設模型，請指定模型",
+"pattern": false
+},
+{
+"zh": "還沒設帳密。先跑：python3 xconsole_server.py --set-credentials",
+"pattern": false
+},
+{
+"zh": "已把 {0} 個明文代理權杖轉成密文（fleet.json）",
+"pattern": true
+},
+{
+"zh": "已把",
+"pattern": false
+},
+{
+"zh": "個明文代理權杖轉成密文（fleet.json",
+"pattern": false
+},
+{
+"zh": "；涵蓋 {0}",
+"pattern": true
+},
+{
+"zh": "已設定帳號 {0}",
+"pattern": true
+},
+{
+"zh": "已設定帳號",
+"pattern": false
+},
+{
+"zh": "讀不到設定（{0}）",
+"pattern": true
+},
+{
+"zh": "讀不到設定",
+"pattern": false
+},
+{
+"zh": "對外網址的主機不是這台機器（",
+"pattern": false
+},
+{
+"zh": "），主控台不代為實測，免得把金鑰送到別處。請用 IDE 所在的電腦直接測",
+"pattern": false
+},
+{
+"zh": " 回 ",
+"pattern": false
+},
+{
+"zh": " 轉址；為了不把金鑰送到別處，實測不跟轉址。請把對外網址改成實際提供 API 的位址",
+"pattern": false
+},
+{
+"zh": "從主控台連不到 ",
+"pattern": false
+},
+{
+"zh": "）。IDE 所在的電腦多半也連不到：查防火牆、對外網址與服務綁定的位址",
+"pattern": false
+},
+{
+"zh": "回 401，金鑰不對",
+"pattern": false
+},
+{
+"zh": "從主控台連得到，模型清單有 ",
+"pattern": false
+},
+{
+"zh": "回 ",
+"pattern": false
+},
+{
+"zh": "，金鑰不對",
+"pattern": false
+},
+{
+"zh": "，模型清單裡沒有這個欄位的模型名稱",
+"pattern": false
+},
+{
+"zh": "代理回應太慢",
+"pattern": false
+},
+{
+"zh": "代理回應太大",
+"pattern": false
+},
+{
+"zh": "還沒信任 ",
+"pattern": false
+},
+{
+"zh": " 的代理憑證",
+"pattern": false
+},
+{
+"zh": " 現在連不上",
+"pattern": false
+},
+{
+"zh": "沒有這台機器：{0}",
+"pattern": true
+},
+{
+"zh": "還沒信任 {0} 的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
+"pattern": true
+},
+{
+"zh": "的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
+"pattern": false
+},
+{
+"zh": "失敗次數過多，請 15 分鐘後再試",
+"pattern": false
+},
+{
+"zh": "代理的憑證不能是 CA 憑證",
+"pattern": false
+},
+{
+"zh": "主控台連不到這台的代理（試過 {0}）。請確認防火牆讓主控台連得到這台的 {1} 埠，而且送來的權杖與憑證是這台代理的。",
+"pattern": true
+},
+{
+"zh": "主控台連不到這台的代理（試過",
+"pattern": false
+},
+{
+"zh": "請確認防火牆讓主控台連得到這台的",
+"pattern": false
+},
+{
+"zh": "埠，而且送來的權杖與憑證是這台代理的",
+"pattern": false
+},
+{
+"zh": "已加入主控台：",
+"pattern": false
+},
+{
+"zh": "）。回到網頁就看得到這台。",
+"pattern": false
+},
+{
+"zh": "要附檔名與內容",
+"pattern": false
+},
+{
+"zh": "檔案是空的",
+"pattern": false
+},
+{
+"zh": "附件最大 15 MB",
+"pattern": false
+},
+{
+"zh": "讀不出這個檔案（解析器中止，可能太大或檔案損毀）",
+"pattern": false
+},
+{
+"zh": "預覽內容最多 2 MB（這次 ",
+"pattern": false
+},
+{
+"zh": "埠號不對",
+"pattern": false
+},
+{
+"zh": "http（不加密）只准連區網私有位址或本機；網際網路上的服務請用 https",
+"pattern": false
+},
+{
+"zh": "http 只准連區網私有位址或本機，這個網址現在解析到外部位址，已拒絕",
+"pattern": false
+},
+{
+"zh": "{0} 的憑證驗證不過（{1}）。自建 CA 的服務請在這筆設定匯入對方的 CA 憑證",
+"pattern": true
+},
+{
+"zh": "的憑證驗證不過",
+"pattern": false
+},
+{
+"zh": "自建 CA 的服務請在這筆設定匯入對方的 CA 憑證",
+"pattern": false
+},
+{
+"zh": "連不到 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "連不到",
+"pattern": false
+},
+{
+"zh": " 轉址；為了不把金鑰送到別處，不跟轉址。請填實際提供 API 的網址",
+"pattern": false
+},
+{
+"zh": "金鑰不對或沒有權限",
+"pattern": false
+},
+{
+"zh": "沒有權限（金鑰的權限或帳號方案）",
+"pattern": false
+},
+{
+"zh": "網址或模型名稱不對",
+"pattern": false
+},
+{
+"zh": "被對方限流或額度用完",
+"pattern": false
+},
+{
+"zh": "最多 {0} 筆",
+"pattern": true
+},
+{
+"zh": "最多",
+"pattern": false
+},
+{
+"zh": "筆",
+"pattern": false
+},
+{
+"zh": "名稱要 1～40 個字，不能有 < > 或控制字元",
+"pattern": false
+},
+{
+"zh": "預設模型名稱只能用英數與 . _ : / @ + -，最多 120 字",
+"pattern": false
+},
+{
+"zh": "金鑰格式不對（不能有空白，最多 512 字）",
+"pattern": false
+},
+{
+"zh": "清除",
+"pattern": false
+},
+{
+"zh": "macOS 的 zsh",
+"pattern": false
+},
+{
+"zh": "Linux 的 bash",
+"pattern": false
+},
+{
+"zh": "這筆第三方 API 已經被刪掉了",
+"pattern": false
+},
+{
+"zh": "這筆第三方 API 沒有設預設模型",
+"pattern": false
+},
+{
+"zh": "這是二進位檔，不顯示內容",
+"pattern": false
+},
+{
+"zh": "指令是空的",
+"pattern": false
+},
+{
+"zh": "使用者拒絕執行這條指令。請換別的做法，或說明為什麼需要它",
+"pattern": false
+},
+{
+"zh": "steps 要是清單",
+"pattern": false
+},
+{
+"zh": "任務出錯：{0}",
+"pattern": true
+},
+{
+"zh": "任務出錯",
+"pattern": false
+},
+{
+"zh": "本機模型要指定欄位",
+"pattern": false
+},
+{
+"zh": "本機 ",
+"pattern": false
+},
+{
+"zh": "請寫要交代的事（最多 8000 字）",
+"pattern": false
+},
+{
+"zh": "模型要是本機欄位（kind=local, slot）或第三方 API（kind=provider, id）",
+"pattern": false
+},
+{
+"zh": "沒有「{0}」這個工作資料夾，請先建立",
+"pattern": true
+},
+{
+"zh": "沒有「",
+"pattern": false
+},
+{
+"zh": "」這個工作資料夾，請先建立",
+"pattern": false
+},
+{
+"zh": "（沒有結論）",
+"pattern": false
+},
+{
+"zh": "未分類",
+"pattern": false
+},
+{
+"zh": "已把 ",
+"pattern": false
+},
+{
+"zh": " 個明文代理權杖轉成密文（fleet.json）",
+"pattern": false
+},
+{
+"zh": "xConsole 聽在 https://0.0.0.0:{0}；憑證：{1}",
+"pattern": true
+},
+{
+"zh": "xConsole 聽在 https://0.0.0.0:",
+"pattern": false
+},
+{
+"zh": "憑證",
+"pattern": false
+},
+{
+"zh": "；涵蓋 ",
+"pattern": false
+},
+{
+"zh": "密碼：",
+"pattern": false
+},
+{
+"zh": "密碼至少 8 碼",
+"pattern": false
+},
+{
+"zh": "已設定帳號 ",
+"pattern": false
+},
+{
+"zh": "讀不到設定（",
+"pattern": false
+},
+{
+"zh": "連得到，沒帶金鑰回 401（金鑰保護有效）。要連對話一起驗，請在下面貼上金鑰再測一次",
+"pattern": false
+},
+{
+"zh": "設了金鑰，但沒帶金鑰打對話端點回 {0}，沒有被擋",
+"pattern": true
+},
+{
+"zh": "設了金鑰，但沒帶金鑰打對話端點回",
+"pattern": false
+},
+{
+"zh": "沒有被擋",
+"pattern": false
+},
+{
+"zh": "沒有這台機器：",
+"pattern": false
+},
+{
+"zh": " 的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
+"pattern": false
+},
+{
+"zh": "連不上 {0} 的代理：{1}",
+"pattern": true
+},
+{
+"zh": "的代理",
+"pattern": false
+},
+{
+"zh": "系統",
+"pattern": false
+},
+{
+"zh": "取樣失敗：{0}",
+"pattern": true
+},
+{
+"zh": "取樣失敗",
+"pattern": false
+},
+{
+"zh": "主控台連不到這台的代理（試過 ",
+"pattern": false
+},
+{
+"zh": "）。請確認防火牆讓主控台連得到這台的 ",
+"pattern": false
+},
+{
+"zh": " 埠，而且送來的權杖與憑證是這台代理的。",
+"pattern": false
+},
+{
+"zh": "檔案內容不是有效的 base64",
+"pattern": false
+},
+{
+"zh": "這個檔案 30 秒內讀不完（太大或結構異常），請拆小一點再附",
+"pattern": false
+},
+{
+"zh": "解析不到 {0}",
+"pattern": true
+},
+{
+"zh": "解析不到",
+"pattern": false
+},
+{
+"zh": " 的憑證驗證不過（",
+"pattern": false
+},
+{
+"zh": "）。自建 CA 的服務請在這筆設定匯入對方的 CA 憑證",
+"pattern": false
+},
+{
+"zh": "連不到 ",
+"pattern": false
+},
+{
+"zh": "對方回 {0}",
+"pattern": true
+},
+{
+"zh": "對方回",
+"pattern": false
+},
+{
+"zh": "對方回應太大",
+"pattern": false
+},
+{
+"zh": "最多 ",
+"pattern": false
+},
+{
+"zh": " 筆",
+"pattern": false
+},
+{
+"zh": "保留",
+"pattern": false
+},
+{
+"zh": "任務已停止",
+"pattern": false
+},
+{
+"zh": "使用者拒絕執行這條指令",
+"pattern": false
+},
+{
+"zh": "已達 {0} 步上限，任務停止；可以看已完成的部分，再交代下一件事",
+"pattern": true
+},
+{
+"zh": "已達",
+"pattern": false
+},
+{
+"zh": "步上限，任務停止；可以看已完成的部分，再交代下一件事",
+"pattern": false
+},
+{
+"zh": "已超過 30 分鐘上限，任務停止",
+"pattern": false
+},
+{
+"zh": "模型回 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "模型回",
+"pattern": false
+},
+{
+"zh": "Agent 任務出錯：\n",
+"pattern": false
+},
+{
+"zh": "任務出錯：",
+"pattern": false
+},
+{
+"zh": "已經有一個 Agent 任務在進行，請等它做完或按停止",
+"pattern": false
+},
+{
+"zh": "還沒有上傳 Logo",
+"pattern": false
+},
+{
+"zh": "分塊的位置或大小不對",
+"pattern": false
+},
+{
+"zh": "沒有問題",
+"pattern": false
+},
+{
+"zh": "{0}：照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭",
+"pattern": true
+},
+{
+"zh": "照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭",
+"pattern": false
+},
+{
+"zh": "只接受 application/json",
+"pattern": false
+},
+{
+"zh": "請求內容太大",
+"pattern": false
+},
+{
+"zh": "已變更，請用新密碼重新登入",
+"pattern": false
+},
+{
+"zh": "；憑證：",
+"pattern": false
+},
+{
+"zh": "（剛產生）",
+"pattern": false
+},
+{
+"zh": "設了金鑰，但沒帶金鑰打對話端點回 ",
+"pattern": false
+},
+{
+"zh": "，沒有被擋",
+"pattern": false
+},
+{
+"zh": "{0} 送出的憑證跟當初信任的不同，已拒絕連線（可能是代理重裝，或有人冒充）。確認後請重新執行 deploy_console.sh",
+"pattern": true
+},
+{
+"zh": "送出的憑證跟當初信任的不同，已拒絕連線（可能是代理重裝，或有人冒充）。確認後請重新執行 deploy_console.sh",
+"pattern": false
+},
+{
+"zh": "連不上 ",
+"pattern": false
+},
+{
+"zh": " 的代理：",
+"pattern": false
+},
+{
+"zh": "代理回 {0}",
+"pattern": true
+},
+{
+"zh": "代理回",
+"pattern": false
+},
+{
+"zh": "取樣失敗：",
+"pattern": false
+},
+{
+"zh": "解析不到 ",
+"pattern": false
+},
+{
+"zh": "對方回 ",
+"pattern": false
+},
+{
+"zh": "對方回的不是 JSON（網址可能不是 OpenAI 相容的 API）",
+"pattern": false
+},
+{
+"zh": "子資料夾的相對路徑，空白＝整個工作資料夾",
+"pattern": false
+},
+{
+"zh": "秒，預設 120、最多 600",
+"pattern": false
+},
+{
+"zh": "已達 ",
+"pattern": false
+},
+{
+"zh": " 步上限，任務停止；可以看已完成的部分，再交代下一件事",
+"pattern": false
+},
+{
+"zh": "模型回 {0}",
+"pattern": true
+},
+{
+"zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息：{0}",
+"pattern": true
+},
+{
+"zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息",
+"pattern": false
+},
+{
+"zh": "模型回 ",
+"pattern": false
+},
+{
+"zh": "模型一直沒有呼叫工具，可能不支援工具呼叫（tools）；請換一個支援的模型",
+"pattern": false
+},
+{
+"zh": "請用提供的工具動手做（先 update_plan），全部做完呼叫 finish。",
+"pattern": false
+},
+{
+"zh": "（{0} 字）",
+"pattern": true
+},
+{
+"zh": "上傳的請求格式不對",
+"pattern": false
+},
+{
+"zh": "連不上那台的代理：{0}",
+"pattern": true
+},
+{
+"zh": "連不上那台的代理",
+"pattern": false
+},
+{
+"zh": "找不到這個預覽，或已經過期（預覽保留 30 分鐘）。\n",
+"pattern": false
+},
+{
+"zh": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。",
+"pattern": false
+},
+{
+"zh": "這個剛剛已經查過了，結果在前面；請直接回答",
+"pattern": false
+},
+{
+"zh": "{0}：檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
+"pattern": true
+},
+{
+"zh": "檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
+"pattern": false
+},
+{
+"zh": "：照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭",
+"pattern": false
+},
+{
+"zh": "未預期的錯誤：\n",
+"pattern": false
+},
+{
+"zh": "沒有這個加入碼",
+"pattern": false
+},
+{
+"zh": "沒有這個任務",
+"pattern": false
+},
+{
+"zh": "找不到這張圖",
+"pattern": false
+},
+{
+"zh": "目前沒有待配對的 CSR",
+"pattern": false
+},
+{
+"zh": "要重新安裝的那台不在納管清單裡",
+"pattern": false
+},
+{
+"zh": "主控台位址格式不對，例：140.135.107.216:9400（埠要在 1～65535）",
+"pattern": false
+},
+{
+"zh": "主控台找不到代理程式檔，請重新部署主控台",
+"pattern": false
+},
+{
+"zh": "名稱要 1～40 個字",
+"pattern": false
+},
+{
+"zh": "群組最多 30 個字",
+"pattern": false
+},
+{
+"zh": "位址格式不對，填 IP 或主機名稱（不含埠）",
+"pattern": false
+},
+{
+"zh": "代理的埠要在 1～65535",
+"pattern": false
+},
+{
+"zh": "沒有這則對話",
+"pattern": false
+},
+{
+"zh": "這個任務現在沒有在等核准",
+"pattern": false
+},
+{
+"zh": "清單裡沒有這個模型",
+"pattern": false
+},
+{
+"zh": "推薦清單裡沒有這個模型",
+"pattern": false
+},
+{
+"zh": "請填主要網址（CN）",
+"pattern": false
+},
+{
+"zh": "目前是正式憑證，換回暫用自簽會讓使用者看到安全警告；確定要換請再確認一次",
+"pattern": false
+},
+{
+"zh": "沒有收到檔案",
+"pattern": false
+},
+{
+"zh": "只接受 PNG、JPEG、WebP 圖檔（不收 SVG）",
+"pattern": false
+},
+{
+"zh": "圖片尺寸 {0}×{1} 不合用，寬高要在 16～4096 像素之間",
+"pattern": true
+},
+{
+"zh": "圖片尺寸",
+"pattern": false
+},
+{
+"zh": "不合用，寬高要在 16～4096 像素之間",
+"pattern": false
+},
+{
+"zh": "舊密碼不對",
+"pattern": false
+},
+{
+"zh": "目前的密碼不對",
+"pattern": false
+},
+{
+"zh": "新密碼至少 8 碼",
+"pattern": false
+},
+{
+"zh": "Hugging Face 令牌的格式是 hf_ 開頭的一串英數字（在 huggingface.co 的 Settings › Access Tokens 建立，選 Read 權限就夠）",
+"pattern": false
+},
+{
+"zh": " 送出的憑證跟當初信任的不同，已拒絕連線（可能是代理重裝，或有人冒充）。確認後請重新執行 deploy_console.sh",
+"pattern": false
+},
+{
+"zh": "代理回 ",
+"pattern": false
+},
+{
+"zh": "CA 憑證讀不出來：",
+"pattern": false
+},
+{
+"zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息：",
+"pattern": false
+},
+{
+"zh": " 字）",
+"pattern": false
+},
+{
+"zh": "連不上那台的代理：",
+"pattern": false
+},
+{
+"zh": "\n\n使用者另外的指示：{0}",
+"pattern": true
+},
+{
+"zh": "\n\n使用者另外的指示",
+"pattern": false
+},
+{
+"zh": "（模型沒有給出回答）",
+"pattern": false
+},
+{
+"zh": "：檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
+"pattern": false
+},
+{
+"zh": "伺服器內部錯誤，已記錄",
+"pattern": false
+},
+{
+"zh": "加入碼不對、已經用過或過期了，請在主控台重新按「加一台機器」。\n",
+"pattern": false
+},
+{
+"zh": "主控台找不到代理程式檔，請重新部署主控台。\n",
+"pattern": false
+},
+{
+"zh": "登入失敗次數過多，請 15 分鐘後再試",
+"pattern": false
+},
+{
+"zh": "帳號或密碼不對",
+"pattern": false
+},
+{
+"zh": "新位址連不到這台的代理，已改回原本的位址。{0}",
+"pattern": true
+},
+{
+"zh": "新位址連不到這台的代理，已改回原本的位址",
+"pattern": false
+},
+{
+"zh": "清單裡沒有這顆或這個量化，請重新整理",
+"pattern": false
+},
+{
+"zh": "檔案格式不對",
+"pattern": false
+},
+{
+"zh": "至少要有一個網址",
+"pattern": false
+},
+{
+"zh": "{0}要 1～40 個字，不能有 < > 或控制字元",
+"pattern": true
+},
+{
+"zh": "要 1～40 個字，不能有 < > 或控制字元",
+"pattern": false
+},
+{
+"zh": "檔案內容讀不到",
+"pattern": false
+},
+{
+"zh": "圖片尺寸 ",
+"pattern": false
+},
+{
+"zh": " 不合用，寬高要在 16～4096 像素之間",
+"pattern": false
+},
+{
+"zh": "「{0}」不是數字",
+"pattern": true
+},
+{
+"zh": "」不是數字",
+"pattern": false
+},
+{
+"zh": "帳號（預設 admin）：",
+"pattern": false
+},
+{
+"zh": "對方回的不是 JSON",
+"pattern": false
+},
+{
+"zh": "\n\n使用者另外的指示：",
+"pattern": false
+},
+{
+"zh": "新位址連不到這台的代理，已改回原本的位址。",
+"pattern": false
+},
+{
+"zh": "有檔案讀不出來",
+"pattern": false
+},
+{
+"zh": "能跑",
+"pattern": false
+},
+{
+"zh": "沒有連得上的機器可以讀 Hugging Face",
+"pattern": false
+},
+{
+"zh": "檔案",
+"pattern": false
+},
+{
+"zh": "{0} 要是文字",
+"pattern": true
+},
+{
+"zh": "要是文字",
+"pattern": false
+},
+{
+"zh": "{0} 太長（上限 {1} 字）",
+"pattern": true
+},
+{
+"zh": "太長（上限",
+"pattern": false
+},
+{
+"zh": "對話設定格式不對",
+"pattern": false
+},
+{
+"zh": "回答版本格式不對",
+"pattern": false
+},
+{
+"zh": "畫圖結果格式不對",
+"pattern": false
+},
+{
+"zh": "畫圖結果的機器不對",
+"pattern": false
+},
+{
+"zh": "畫圖結果的工作編號不對",
+"pattern": false
+},
+{
+"zh": "畫圖結果的種類不對",
+"pattern": false
+},
+{
+"zh": "張數不對",
+"pattern": false
+},
+{
+"zh": "操作電腦的紀錄格式不對",
+"pattern": false
+},
+{
+"zh": "訊息格式不對（最多 {0} 則）",
+"pattern": true
+},
+{
+"zh": "訊息格式不對（最多",
+"pattern": false
+},
+{
+"zh": "摘要格式不對",
+"pattern": false
+},
+{
+"zh": " 要是文字",
+"pattern": false
+},
+{
+"zh": " 太長（上限 ",
+"pattern": false
+},
+{
+"zh": "{0} 要是數字",
+"pattern": true
+},
+{
+"zh": "要是數字",
+"pattern": false
+},
+{
+"zh": "{0} 要是{1}",
+"pattern": true
+},
+{
+"zh": "要是",
+"pattern": false
+},
+{
+"zh": "{0} 要在 {1}～{2} 之間",
+"pattern": true
+},
+{
+"zh": "訊息格式不對（最多 ",
+"pattern": false
+},
+{
+"zh": " 則）",
+"pattern": false
+},
+{
+"zh": "訊息格式不對",
+"pattern": false
+},
+{
+"zh": "摘要",
+"pattern": false
+},
+{
+"zh": "訊息引用了不存在的附圖",
+"pattern": false
+},
+{
+"zh": "這則對話太大了（上限 32 MB）；請開新對話",
+"pattern": false
+},
+{
+"zh": " 要是數字",
+"pattern": false
+},
+{
+"zh": " 要是",
+"pattern": false
+},
+{
+"zh": " 要在 ",
+"pattern": false
+},
+{
+"zh": " 之間",
+"pattern": false
+},
+{
+"zh": "訊息",
+"pattern": false
+},
+{
+"zh": "附圖格式不對",
+"pattern": false
+},
+{
+"zh": "附件內容",
+"pattern": false
+},
+{
+"zh": "回答版本最多 10 個",
+"pattern": false
+},
+{
+"zh": "對話編號不對",
+"pattern": false
+},
+{
+"zh": "回答",
+"pattern": false
+},
+{
+"zh": "統計",
+"pattern": false
+},
+{
+"zh": "附圖只收 PNG、JPEG、WebP",
+"pattern": false
+},
+{
+"zh": "附圖最大 6 MB",
+"pattern": false
+},
+{
+"zh": "附件格式不對",
+"pattern": false
+},
+{
+"zh": "整數",
+"pattern": false
+},
+{
+"zh": "數字",
+"pattern": false
+},
+{
+"zh": "附圖內容壞了",
+"pattern": false
+},
+{
+"zh": "附件名稱",
+"pattern": false
+},
+{
+"zh": "你在操作一台電腦的桌面，替使用者完成一件事。每一輪會給你目前的螢幕截圖（寬 {w}、高 {h} 像素，左上角是 (0,0)）。一次只做一個動作，只輸出一個 JSON 物件，不要任何其他文字。格式：\n{{\"thought\": \"看到什麼、打算做什麼（一句話）\", \"action\": \"click|double_click|right_click|move|drag|type|key|scroll|wait|done\", \"x\": 數字, \"y\": 數字, \"x2\": 數字, \"y2\": 數字, \"text\": \"要打的字\", \"keys\": \"ctrl+c 這種按鍵組合\", \"dy\": 捲動格數（正數往下）, \"result\": \"完成或做不到時，給使用者的說明\"}}\n規則：座標用截圖上的像素；要打字前先點輸入框；系統是 {os}（{mod} 是主要的組合鍵）。螢幕上如果看到 xConsole 主控台的網頁，那是控制你的介面，不要點它、不要關掉它。事情完成、或發現做不到，就用 done 並在 result 說明。不要做付款、轉帳、刪除檔案、輸入或讀取密碼、關機；遇到這些就用 done 說明需要使用者自己來。",
+"pattern": false
+},
+{
+"zh": "從（{0}, {1}）拖到（{2}, {3}）",
+"pattern": true
+},
+{
+"zh": "從",
+"pattern": false
+},
+{
+"zh": "拖到",
+"pattern": false
+},
+{
+"zh": "打字：{0}",
+"pattern": true
+},
+{
+"zh": "打字",
+"pattern": false
+},
+{
+"zh": "按鍵：{0}",
+"pattern": true
+},
+{
+"zh": "按鍵",
+"pattern": false
+},
+{
+"zh": "等一下",
+"pattern": false
+},
+{
+"zh": "（沒有動作）",
+"pattern": false
+},
+{
+"zh": "從（",
+"pattern": false
+},
+{
+"zh": "）拖到（",
+"pattern": false
+},
+{
+"zh": "打字：",
+"pattern": false
+},
+{
+"zh": "按鍵：",
+"pattern": false
+},
+{
+"zh": "捲動 {0} 格",
+"pattern": true
+},
+{
+"zh": "捲動",
+"pattern": false
+},
+{
+"zh": "捲動 ",
+"pattern": false
+},
+{
+"zh": " 格",
+"pattern": false
+},
+{
+"zh": "（在 {0}, {1}）",
+"pattern": true
+},
+{
+"zh": "這台沒有開「讓模型操作這台的桌面」，請管理者到這台的設定打開",
+"pattern": false
+},
+{
+"zh": "（還沒有做任何動作）",
+"pattern": false
+},
+{
+"zh": "請說清楚要電腦做什麼（2～2000 字）",
+"pattern": false
+},
+{
+"zh": "（在 ",
+"pattern": false
+},
+{
+"zh": "已經做了 {0} 步還沒完成，先停下來；可以把事情拆小一點再交代",
+"pattern": true
+},
+{
+"zh": "已經做了",
+"pattern": false
+},
+{
+"zh": "步還沒完成，先停下來；可以把事情拆小一點再交代",
+"pattern": false
+},
+{
+"zh": "超過 15 分鐘還沒完成，先停下來",
+"pattern": false
+},
+{
+"zh": "模型回錯：{0}",
+"pattern": true
+},
+{
+"zh": "模型回錯",
+"pattern": false
+},
+{
+"zh": "已經有一個操作電腦的任務在進行，等它做完或按停止",
+"pattern": false
+},
+{
+"zh": "現在沒有等待允許的動作",
+"pattern": false
+},
+{
+"zh": "這個動作已經過期了，畫面上有新的一步",
+"pattern": false
+},
+{
+"zh": "點一下",
+"pattern": false
+},
+{
+"zh": "點兩下",
+"pattern": false
+},
+{
+"zh": "按右鍵",
+"pattern": false
+},
+{
+"zh": "移動滑鼠到",
+"pattern": false
+},
+{
+"zh": "已經做了 ",
+"pattern": false
+},
+{
+"zh": " 步還沒完成，先停下來；可以把事情拆小一點再交代",
+"pattern": false
+},
+{
+"zh": "截不到螢幕（代理回 {0}）",
+"pattern": true
+},
+{
+"zh": "截不到螢幕（代理回",
+"pattern": false
+},
+{
+"zh": "模型回錯：",
+"pattern": false
+},
+{
+"zh": "模型這一輪沒有給出看得懂的動作，再問一次",
+"pattern": false
+},
+{
+"zh": "模型連續三次給不出看得懂的動作；這顆模型可能不適合操作電腦，請換一顆看圖能力強一點的",
+"pattern": false
+},
+{
+"zh": "{0}（使用者拒絕了，換個做法）",
+"pattern": true
+},
+{
+"zh": "使用者拒絕了，換個做法",
+"pattern": false
+},
+{
+"zh": "（失敗：{0}）",
+"pattern": true
+},
+{
+"zh": "截不到螢幕（代理回 ",
+"pattern": false
+},
+{
+"zh": "（使用者拒絕了，換個做法）",
+"pattern": false
+},
+{
+"zh": "（失敗：",
+"pattern": false
+},
+{
+"zh": "要完成的事：{0}\n\n已經做過的動作：\n{1}\n\n這是現在的螢幕，下一步要做什麼？只回 JSON。",
+"pattern": true
+},
+{
+"zh": "要完成的事",
+"pattern": false
+},
+{
+"zh": "\n\n已經做過的動作：\n",
+"pattern": false
+},
+{
+"zh": "\n\n這是現在的螢幕，下一步要做什麼？只回 JSON",
+"pattern": false
+},
+{
+"zh": "要完成的事：",
+"pattern": false
+},
+{
+"zh": "\n\n這是現在的螢幕，下一步要做什麼？只回 JSON。",
+"pattern": false
+},
+{
+"zh": "文字編碼器（LLM）",
+"pattern": false
+},
+{
+"zh": "注意力與共用權重放{0}，{1} 層專家留在檔案映射",
+"pattern": true
+},
+{
+"zh": "注意力與共用權重放",
+"pattern": false
+},
+{
+"zh": "層專家留在檔案映射",
+"pattern": false
+},
+{
+"zh": "有 {0} GiB 權重放不進記憶體，執行時從硬碟按需讀（很慢）",
+"pattern": true
+},
+{
+"zh": "GiB 權重放不進記憶體，執行時從硬碟按需讀（很慢",
+"pattern": false
+},
+{
+"zh": "全部放進系統記憶體（CPU 執行）",
+"pattern": false
+},
+{
+"zh": " 層專家留在檔案映射",
+"pattern": false
+},
+{
+"zh": "，其中 {0} GiB 從 SSD 按需讀",
+"pattern": true
+},
+{
+"zh": "其中",
+"pattern": false
+},
+{
+"zh": "GiB 從 SSD 按需讀",
+"pattern": false
+},
+{
+"zh": "（全部在記憶體裡）",
+"pattern": false
+},
+{
+"zh": "有 ",
+"pattern": false
+},
+{
+"zh": " GiB 權重放不進記憶體，執行時從硬碟按需讀（很慢）",
+"pattern": false
+},
+{
+"zh": "以檔案映射載入，權重留在頁快取",
+"pattern": false
+},
+{
+"zh": "顯示卡放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統記憶體",
+"pattern": true
+},
+{
+"zh": "顯示卡放",
+"pattern": false
+},
+{
+"zh": "GiB，其餘",
+"pattern": false
+},
+{
+"zh": "GiB 以檔案映射留在系統記憶體",
+"pattern": false
+},
+{
+"zh": "Hugging Face 名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF",
+"pattern": false
+},
+{
+"zh": "政府案不得使用中國來源模型，不列入推薦清單（內部測試可以直接到「從 Hugging Face 下載」）",
+"pattern": false
+},
+{
+"zh": "顯示名稱要 1～60 字",
+"pattern": false
+},
+{
+"zh": "標籤最多 6 個、每個 12 字以內",
+"pattern": false
+},
+{
+"zh": "「檔名要含」只能填英數、底線、點、加號與連字號，最多 60 字",
+"pattern": false
+},
+{
+"zh": "全部放進顯示卡",
+"pattern": false
+},
+{
+"zh": "寬與高要在 64～2048 之間，而且是 16 的倍數",
+"pattern": false
+},
+{
+"zh": "步數 1～150、引導強度 0～30",
+"pattern": false
+},
+{
+"zh": "影格數 1～241 且是 8 的倍數加 1，每秒格數 1～60",
+"pattern": false
+},
+{
+"zh": "主體的 Hugging Face 名稱格式是「作者/模型」，例：leejet/FLUX.1-schnell-gguf",
+"pattern": false
+},
+{
+"zh": "種類只能是畫圖或影片",
+"pattern": false
+},
+{
+"zh": "要有、而且只能有一個主體（完整模型或擴散模型）",
+"pattern": false
+},
+{
+"zh": "主體的 repo 要跟清單項目的 Hugging Face 名稱一樣",
+"pattern": false
+},
+{
+"zh": "最多 8 個元件",
+"pattern": false
+},
+{
+"zh": "含中國來源的元件（{0}），政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆）",
+"pattern": true
+},
+{
+"zh": "含中國來源的元件",
+"pattern": false
+},
+{
+"zh": "政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆",
+"pattern": false
+},
+{
+"zh": "GPU 與系統共用同一塊記憶體；載入前會先試算，不夠就擋下，不會把整台拖死",
+"pattern": false
+},
+{
+"zh": "，其中 ",
+"pattern": false
+},
+{
+"zh": " GiB 從 SSD 按需讀",
+"pattern": false
+},
+{
+"zh": "顯示卡放 ",
+"pattern": false
+},
+{
+"zh": " GiB，其餘 ",
+"pattern": false
+},
+{
+"zh": " GiB 以檔案映射留在系統記憶體",
+"pattern": false
+},
+{
+"zh": "用途只能是：",
+"pattern": false
+},
+{
+"zh": "{0}最多 {1} 字，不能有控制字元",
+"pattern": true
+},
+{
+"zh": "字，不能有控制字元",
+"pattern": false
+},
+{
+"zh": "尺寸、步數、引導強度要是數字",
+"pattern": false
+},
+{
+"zh": "取樣方法只能是：",
+"pattern": false
+},
+{
+"zh": "元件種類不合法或重複：{0}",
+"pattern": true
+},
+{
+"zh": "元件種類不合法或重複",
+"pattern": false
+},
+{
+"zh": "{0}的 Hugging Face 名稱格式是「作者/模型」",
+"pattern": true
+},
+{
+"zh": "的 Hugging Face 名稱格式是「作者/模型」",
+"pattern": false
+},
+{
+"zh": "{0}要填「檔名」或「檔名開頭」其中一個（只能有英數與 . _ - / +）",
+"pattern": true
+},
+{
+"zh": "要填「檔名」或「檔名開頭」其中一個（只能有英數與 . _ - / +",
+"pattern": false
+},
+{
+"zh": "{0}的檔名只收 .gguf、.safetensors、.sft",
+"pattern": true
+},
+{
+"zh": "的檔名只收 .gguf、.safetensors、.sft",
+"pattern": false
+},
+{
+"zh": "含中國來源的元件（",
+"pattern": false
+},
+{
+"zh": "），政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆）",
+"pattern": false
+},
+{
+"zh": "BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，吃爆會把整台拖死，所以另外盯",
+"pattern": false
+},
+{
+"zh": "分到 {0} 張卡",
+"pattern": true
+},
+{
+"zh": "分到",
+"pattern": false
+},
+{
+"zh": "張卡",
+"pattern": false
+},
+{
+"zh": " 字，不能有控制字元",
+"pattern": false
+},
+{
+"zh": "全部放進統一記憶體",
+"pattern": false
+},
+{
+"zh": "全部放進 GPU 那一塊",
+"pattern": false
+},
+{
+"zh": "權重放系統記憶體，輪流搬進顯示卡算（慢一些）",
+"pattern": false
+},
+{
+"zh": "要約 {0} GiB，這台最多 {1} GiB",
+"pattern": true
+},
+{
+"zh": "GiB，這台最多",
+"pattern": false
+},
+{
+"zh": "元件種類不合法或重複：",
+"pattern": false
+},
+{
+"zh": "要填「檔名」或「檔名開頭」其中一個（只能有英數與 . _ - / +）",
+"pattern": false
+},
+{
+"zh": "保留給系統",
+"pattern": false
+},
+{
+"zh": "這台沒有偵測到可用的 GPU：模型放系統記憶體、用 CPU 算，速度看記憶體頻寬。偵測錯了可以在這台的設定手動指定顯示卡",
+"pattern": false
+},
+{
+"zh": "分到 ",
+"pattern": false
+},
+{
+"zh": " 張卡",
+"pattern": false
+},
+{
+"zh": "{0} 層專家放系統記憶體",
+"pattern": true
+},
+{
+"zh": "要約 ",
+"pattern": false
+},
+{
+"zh": " GiB，這台最多 ",
+"pattern": false
+},
+{
+"zh": "顯示卡放不下的 MoE 模型，會自動把部分專家層放到系統記憶體繼續跑，只是比較慢",
+"pattern": false
+},
+{
+"zh": "這台沒有偵測到 GPU",
+"pattern": false
+},
+{
+"zh": " 層專家放系統記憶體",
+"pattern": false
+},
+{
+"zh": "管理者設定",
+"pattern": false
+},
+{
+"zh": "假設值",
+"pattern": false
+},
+{
+"zh": "系統記憶體（CPU 執行）",
+"pattern": false
+},
+{
+"zh": "（這台 BIOS 把記憶體切成兩塊，不能用硬碟執行）",
+"pattern": false
+},
+{
+"zh": "顯示卡 × {0}",
+"pattern": true
+},
+{
+"zh": "顯示卡 ×",
+"pattern": false
+},
+{
+"zh": "顯示卡 × ",
+"pattern": false
+},
+{
+"zh": "檔案裡的 {0} 解開後超過 64 MB，不處理",
+"pattern": true
+},
+{
+"zh": "檔案裡的",
+"pattern": false
+},
+{
+"zh": "解開後超過 64 MB，不處理",
+"pattern": false
+},
+{
+"zh": "## 工作表：{0}",
+"pattern": true
+},
+{
+"zh": "## 工作表",
+"pattern": false
+},
+{
+"zh": "這份 PDF 抽不出文字（可能是掃描的圖片）。請改附圖片給看得懂圖的模型，或先做 OCR",
+"pattern": false
+},
+{
+"zh": "檔案裡沒有文字",
+"pattern": false
+},
+{
+"zh": "檔案裡的 ",
+"pattern": false
+},
+{
+"zh": " 解開後超過 64 MB，不處理",
+"pattern": false
+},
+{
+"zh": "## 工作表：",
+"pattern": false
+},
+{
+"zh": "## 第 {0} 頁",
+"pattern": true
+},
+{
+"zh": "## 第",
+"pattern": false
+},
+{
+"zh": "頁",
+"pattern": false
+},
+{
+"zh": "這份 PDF 損毀或不完整，讀不出來",
+"pattern": false
+},
+{
+"zh": "這份 PDF 有密碼保護，請先解除再附上",
+"pattern": false
+},
+{
+"zh": "頁\n",
+"pattern": false
+},
+{
+"zh": "讀不出這個檔案（{0}），檔案可能損毀",
+"pattern": true
+},
+{
+"zh": "讀不出這個檔案",
+"pattern": false
+},
+{
+"zh": "檔案可能損毀",
+"pattern": false
+},
+{
+"zh": "## 第 ",
+"pattern": false
+},
+{
+"zh": " 頁",
+"pattern": false
+},
+{
+"zh": " 頁\n",
+"pattern": false
+},
+{
+"zh": "檔案內容不是 Office 格式（副檔名對不上）",
+"pattern": false
+},
+{
+"zh": "舊版 Office 格式（.doc／.xls／.ppt）讀不了，請另存成 .docx／.xlsx／.pptx",
+"pattern": false
+},
+{
+"zh": "讀不出這個檔案（",
+"pattern": false
+},
+{
+"zh": "），檔案可能損毀",
+"pattern": false
+},
+{
+"zh": "不支援 .{0}：可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼",
+"pattern": true
+},
+{
+"zh": "不支援 .",
+"pattern": false
+},
+{
+"zh": "可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼",
+"pattern": false
+},
+{
+"zh": "這看起來是二進位檔，不是文字",
+"pattern": false
+},
+{
+"zh": "：可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼",
+"pattern": false
+},
+{
+"zh": "這是 PFX／P12 檔，請輸入匯出時設定的密碼",
+"pattern": false
+},
+{
+"zh": "PFX 密碼不對。請確認是匯出這個檔案時設定的密碼，不是電腦或帳號的密碼",
+"pattern": false
+},
+{
+"zh": "私鑰有加密，請輸入私鑰的密碼",
+"pattern": false
+},
+{
+"zh": "私鑰的密碼不對",
+"pattern": false
+},
+{
+"zh": "有 {0} 張憑證跟這張網站憑證無關，已略過",
+"pattern": true
+},
+{
+"zh": "張憑證跟這張網站憑證無關，已略過",
+"pattern": false
+},
+{
+"zh": "憑證還沒生效，要到 {0}（台北時間）才開始有效",
+"pattern": true
+},
+{
+"zh": "憑證還沒生效，要到",
+"pattern": false
+},
+{
+"zh": "台北時間）才開始有效",
+"pattern": false
+},
+{
+"zh": "憑證已在 {0}（台北時間）過期",
+"pattern": true
+},
+{
+"zh": "憑證已在",
+"pattern": false
+},
+{
+"zh": "台北時間）過期",
+"pattern": false
+},
+{
+"zh": "憑證沒有主體別名（SAN）。現在的瀏覽器只看 SAN，不看 CN，這張會被瀏覽器拒絕",
+"pattern": false
+},
+{
+"zh": "這是自簽憑證，瀏覽器會出現安全警告；正式上線請改用憑證廠商或貴單位 CA 簽發的憑證",
+"pattern": false
+},
+{
+"zh": "金鑰強度不足（{0} {1}），至少要 RSA 2048 或 ECC 256",
+"pattern": true
+},
+{
+"zh": "金鑰強度不足",
+"pattern": false
+},
+{
+"zh": "至少要 RSA 2048 或 ECC 256",
+"pattern": false
+},
+{
+"zh": "金鑰強度足夠（{0} {1}）",
+"pattern": true
+},
+{
+"zh": "金鑰強度足夠",
+"pattern": false
+},
+{
+"zh": "簽章演算法是 {0}，已被瀏覽器淘汰",
+"pattern": true
+},
+{
+"zh": "簽章演算法是",
+"pattern": false
+},
+{
+"zh": "已被瀏覽器淘汰",
+"pattern": false
+},
+{
+"zh": "不認得的加密格式",
+"pattern": false
+},
+{
+"zh": "{0} 超過 1 MB，不像憑證檔",
+"pattern": true
+},
+{
+"zh": "超過 1 MB，不像憑證檔",
+"pattern": false
+},
+{
+"zh": "沒有找到憑證。請上傳 .pfx／.p12，或 .cer／.crt／.pem 加上私鑰",
+"pattern": false
+},
+{
+"zh": "私鑰和憑證不是同一對。請確認私鑰就是當初申請這張憑證時產生的那一把",
+"pattern": false
+},
+{
+"zh": "私鑰和憑證成對",
+"pattern": false
+},
+{
+"zh": " 張憑證跟這張網站憑證無關，已略過",
+"pattern": false
+},
+{
+"zh": "憑證還沒生效，要到 ",
+"pattern": false
+},
+{
+"zh": "（台北時間）才開始有效",
+"pattern": false
+},
+{
+"zh": "憑證已在 ",
+"pattern": false
+},
+{
+"zh": "（台北時間）過期",
+"pattern": false
+},
+{
+"zh": "憑證只剩 {0} 天，{1}（台北時間）到期，請盡快向廠商續約",
+"pattern": true
+},
+{
+"zh": "憑證只剩",
+"pattern": false
+},
+{
+"zh": "台北時間）到期，請盡快向廠商續約",
+"pattern": false
+},
+{
+"zh": "效期內，剩 {0} 天，{1}（台北時間）到期",
+"pattern": true
+},
+{
+"zh": "效期內，剩",
+"pattern": false
+},
+{
+"zh": "。使用者用這些網址連線會看到憑證錯誤",
+"pattern": false
+},
+{
+"zh": "沒有附上中繼憑證。電腦瀏覽器通常會自己補，但手機、Java、curl 等可能連不上。請向憑證廠商下載中繼憑證一起上傳",
+"pattern": false
+},
+{
+"zh": "憑證鏈完整（{0} 張）",
+"pattern": true
+},
+{
+"zh": "憑證鏈完整",
+"pattern": false
+},
+{
+"zh": "金鑰強度不足（",
+"pattern": false
+},
+{
+"zh": "），至少要 RSA 2048 或 ECC 256",
+"pattern": false
+},
+{
+"zh": "金鑰強度足夠（",
+"pattern": false
+},
+{
+"zh": "簽章演算法是 ",
+"pattern": false
+},
+{
+"zh": "，已被瀏覽器淘汰",
+"pattern": false
+},
+{
+"zh": "目前是暫用自簽或憑證已過期，不能開 HSTS——開了之後使用者連「略過警告」都沒有",
+"pattern": false
+},
+{
+"zh": "已關閉",
+"pattern": false
+},
+{
+"zh": "套用後實際送出的憑證指紋不符（送出 {0}），已換回原本那張",
+"pattern": true
+},
+{
+"zh": "套用後實際送出的憑證指紋不符（送出",
+"pattern": false
+},
+{
+"zh": "已換回原本那張",
+"pattern": false
+},
+{
+"zh": "已套用，新連線立即使用新憑證，不必重開服務",
+"pattern": false
+},
+{
+"zh": "檢查結果已過期（10 分鐘），請重新上傳檢查",
+"pattern": false
+},
+{
+"zh": "沒有上一張可以還原",
+"pattern": false
+},
+{
+"zh": "已還原上一張憑證",
+"pattern": false
+},
+{
+"zh": " 超過 1 MB，不像憑證檔",
+"pattern": false
+},
+{
+"zh": "這張憑證不是用本系統產生的 CSR 申請的，請一併上傳私鑰",
+"pattern": false
+},
+{
+"zh": "缺少私鑰。請一併上傳 .key 檔，或改傳含私鑰的 .pfx；若當初是在本系統產生 CSR，請先產生 CSR 再上傳廠商簽回的憑證",
+"pattern": false
+},
+{
+"zh": "（對上本系統產生的 CSR）",
+"pattern": false
+},
+{
+"zh": "憑證只剩 ",
+"pattern": false
+},
+{
+"zh": " 天，",
+"pattern": false
+},
+{
+"zh": "（台北時間）到期，請盡快向廠商續約",
+"pattern": false
+},
+{
+"zh": "效期內，剩 ",
+"pattern": false
+},
+{
+"zh": "（台北時間）到期",
+"pattern": false
+},
+{
+"zh": "憑證沒有涵蓋這些網址：",
+"pattern": false
+},
+{
+"zh": "涵蓋所有使用者會打的網址：",
+"pattern": false
+},
+{
+"zh": "憑證鏈完整（",
+"pattern": false
+},
+{
+"zh": " 張）",
+"pattern": false
+},
+{
+"zh": "套用後實際送出的憑證指紋不符（送出 ",
+"pattern": false
+},
+{
+"zh": "），已換回原本那張",
+"pattern": false
+},
+{
+"zh": "沒有找到憑證",
+"pattern": false
+},
+{
+"zh": "新憑證載入測試失敗，沒有換：{0}",
+"pattern": true
+},
+{
+"zh": "新憑證載入測試失敗，沒有換",
+"pattern": false
+},
+{
+"zh": "新憑證載入測試失敗，沒有換：",
+"pattern": false
+},
+{
+"zh": "{0} 是 CSR（憑證申請檔），不是憑證；請上傳廠商簽回來的憑證",
+"pattern": true
+},
+{
+"zh": "是 CSR（憑證申請檔），不是憑證；請上傳廠商簽回來的憑證",
+"pattern": false
+},
+{
+"zh": "{0} 裡的私鑰讀不出來",
+"pattern": true
+},
+{
+"zh": "裡的私鑰讀不出來",
+"pattern": false
+},
+{
+"zh": " 是 CSR（憑證申請檔），不是憑證；請上傳廠商簽回來的憑證",
+"pattern": false
+},
+{
+"zh": " 裡的私鑰讀不出來",
+"pattern": false
+},
+{
+"zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：用硬碟執行時，檔案映射的頁快取吃的是系統那一小塊，擠爆會把整台拖死（連代理與 SSH 一起），所以一律不允許。請換小一點的量化，或縮短上下文",
+"pattern": false
+},
+{
+"zh": "啟動中",
+"pattern": false
+},
+{
+"zh": "停止中",
+"pattern": false
+},
+{
+"zh": "未啟動",
+"pattern": false
+},
+{
+"zh": "逾時",
+"pattern": false
+},
+{
+"zh": "[Unit]\nDescription=xConsole 欄位 {0}：llama.cpp\nAfter=network.target\n\n[Service]\nType=simple\nExecStart={1} {2} --launch-llama {3}\nRestart=on-failure\nRestartSec=10\nStandardOutput=append:{4}\nStandardError=inherit\n\n[Install]\nWantedBy=default.target\n",
+"pattern": true
+},
+{
+"zh": "[Unit]\nDescription=xConsole 欄位",
+"pattern": false
+},
+{
+"zh": "先停掉一個模型、改小尺寸，或換小一級的量化",
+"pattern": false
+},
+{
+"zh": "DNS 解析",
+"pattern": false
+},
+{
+"zh": "印表機服務",
+"pattern": false
+},
+{
+"zh": "遠端桌面",
+"pattern": false
+},
+{
+"zh": "主控台",
+"pattern": false
+},
+{
+"zh": "xConsole 主控台",
+"pattern": false
+},
+{
+"zh": "xConsole 代理",
+"pattern": false
+},
+{
+"zh": "容器執行階段",
+"pattern": false
+},
+{
+"zh": "推論服務",
+"pattern": false
+},
+{
+"zh": "保底估計",
+"pattern": false
+},
+{
+"zh": "已套用並重啟，用新設定實際打過一次 /v1/models",
+"pattern": false
+},
+{
+"zh": "只有 CPU",
+"pattern": false
+},
+{
+"zh": "[Unit]\nDescription=xConsole 欄位 ",
+"pattern": false
+},
+{
+"zh": "統一記憶體，GPU 與系統共用同一個池",
+"pattern": false
+},
+{
+"zh": "這版 CUDA 編譯器不認得 sm_{0}，改編 sm_{1}，執行時由驅動即時轉換（第一次載入會慢一點）",
+"pattern": true
+},
+{
+"zh": "這版 CUDA 編譯器不認得 sm_",
+"pattern": false
+},
+{
+"zh": "改編 sm_",
+"pattern": false
+},
+{
+"zh": "執行時由驅動即時轉換（第一次載入會慢一點",
+"pattern": false
+},
+{
+"zh": "C++ 編譯器",
+"pattern": false
+},
+{
+"zh": "沒有偵測到 GPU，只用 CPU",
+"pattern": false
+},
+{
+"zh": "核對與解壓縮",
+"pattern": false
+},
+{
+"zh": "核對",
+"pattern": false
+},
+{
+"zh": "解壓縮",
+"pattern": false
+},
+{
+"zh": "試跑",
+"pattern": false
+},
+{
+"zh": "沒有偵測到 GPU；先照獨立顯存算，確認後可以改",
+"pattern": false
+},
+{
+"zh": "不能直接用整個家目錄、包含家目錄的上層、或別人的家目錄；請選家目錄底下的一個資料夾",
+"pattern": false
+},
+{
+"zh": "這個資料夾含 xConsole 自己的狀態與金鑰",
+"pattern": false
+},
+{
+"zh": "沒有這個資料夾",
+"pattern": false
+},
+{
+"zh": "代理帳號對這個資料夾沒有讀寫權限",
+"pattern": false
+},
+{
+"zh": "載入模型中",
+"pattern": false
+},
+{
+"zh": "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）",
+"pattern": false
+},
+{
+"zh": "這台沒有可以送滑鼠鍵盤事件的工具：sudo apt install xdotool（Wayland 桌面請改用 X11 工作階段）",
+"pattern": false
+},
+{
+"zh": "xconsole-agent 聽在 https://0.0.0.0:{0}（憑證 {1}，權杖在 {2}）",
+"pattern": true
+},
+{
+"zh": "xconsole-agent 聽在 https://0.0.0.0:",
+"pattern": false
+},
+{
+"zh": "權杖在",
+"pattern": false
+},
+{
+"zh": "sh() 只收參數清單，不收整條指令字串",
+"pattern": false
+},
+{
+"zh": "對不到這些卡的 HIP 序號：{0}",
+"pattern": true
+},
+{
+"zh": "對不到這些卡的 HIP 序號",
+"pattern": false
+},
+{
+"zh": "gpus 要是卡號清單",
+"pattern": false
+},
+{
+"zh": "這台沒有這些卡：{0}（偵測到 {1}）",
+"pattern": true
+},
+{
+"zh": "這台沒有這些卡",
+"pattern": false
+},
+{
+"zh": "規格書標稱值",
+"pattern": false
+},
+{
+"zh": "服務名稱格式不對：{0}",
+"pattern": true
+},
+{
+"zh": "服務名稱格式不對",
+"pattern": false
+},
+{
+"zh": "推自現用模型",
+"pattern": false
+},
+{
+"zh": "找不到模型目錄，請在欄位登錄填 model_root",
+"pattern": false
+},
+{
+"zh": "服務在跑但 :{0} 還沒回應",
+"pattern": true
+},
+{
+"zh": "服務在跑但 :",
+"pattern": false
+},
+{
+"zh": "還沒回應",
+"pattern": false
+},
+{
+"zh": "{0} 載不起來（{1}），正在還原",
+"pattern": true
+},
+{
+"zh": "載不起來",
+"pattern": false
+},
+{
+"zh": "正在還原",
+"pattern": false
+},
+{
+"zh": "套用後服務起不來（{0}）",
+"pattern": true
+},
+{
+"zh": "套用後服務起不來",
+"pattern": false
+},
+{
+"zh": "套用後用新設定打不通（/v1/models 回 {0}，模型清單 {1}）",
+"pattern": true
+},
+{
+"zh": "套用後用新設定打不通（/v1/models 回",
+"pattern": false
+},
+{
+"zh": "模型清單",
+"pattern": false
+},
+{
+"zh": "模型清單 /v1/models",
+"pattern": false
+},
+{
+"zh": "路徑不在 {0} 內",
+"pattern": true
+},
+{
+"zh": "路徑不在",
+"pattern": false
+},
+{
+"zh": "內",
+"pattern": false
+},
+{
+"zh": "欄位 id 不合法",
+"pattern": false
+},
+{
+"zh": "啟動引數太長（上限 2,000 字）",
+"pattern": false
+},
+{
+"zh": "啟動引數最多 40 個",
+"pattern": false
+},
+{
+"zh": "{0} 載不起來（{1}{2}）",
+"pattern": true
+},
+{
+"zh": "；已換回原本的 llama.cpp 模型",
+"pattern": false
+},
+{
+"zh": "，但它還沒起來，請查記錄",
+"pattern": false
+},
+{
+"zh": "Hugging Face 名稱或檔名不合法",
+"pattern": false
+},
+{
+"zh": "資料夾只能用英數、底線、點、連字號；檔名要以 .gguf 結尾",
+"pattern": false
+},
+{
+"zh": "沒有這個欄位",
+"pattern": false
+},
+{
+"zh": "這個欄位沒有 API 埠",
+"pattern": false
+},
+{
+"zh": "BIOS 把記憶體切成兩塊：GPU 拿走大的，系統只剩小的。會把整台拖死的是系統這一塊",
+"pattern": false
+},
+{
+"zh": "每張卡各自的顯存，另外一塊系統記憶體",
+"pattern": false
+},
+{
+"zh": "上下文 {0}×{1}、KV {2} 理論要 {3} GiB，但有 --kv-grow，會向 expert cache 借、不另外預留",
+"pattern": true
+},
+{
+"zh": "理論要",
+"pattern": false
+},
+{
+"zh": "GiB，但有 --kv-grow，會向 expert cache 借、不另外預留",
+"pattern": false
+},
+{
+"zh": "上下文 {0}×{1}、KV {2} 要先預留 {3} GiB（沒有 --kv-grow）",
+"pattern": true
+},
+{
+"zh": "要先預留",
+"pattern": false
+},
+{
+"zh": "GiB（沒有 --kv-grow",
+"pattern": false
+},
+{
+"zh": "讀不到顯示卡的運算能力，交給編譯器自己偵測",
+"pattern": false
+},
+{
+"zh": "照顯示卡編：sm_{0}",
+"pattern": true
+},
+{
+"zh": "照顯示卡編：sm_",
+"pattern": false
+},
+{
+"zh": "編譯器太舊，交給它自己偵測",
+"pattern": false
+},
+{
+"zh": "，改編 sm_",
+"pattern": false
+},
+{
+"zh": "，執行時由驅動即時轉換（第一次載入會慢一點）",
+"pattern": false
+},
+{
+"zh": "這台的設定指定不用 GPU，只用 CPU",
+"pattern": false
+},
+{
+"zh": "這台的設定指定 {0}，用 Vulkan 加速",
+"pattern": true
+},
+{
+"zh": "這台的設定指定",
+"pattern": false
+},
+{
+"zh": "用 Vulkan 加速",
+"pattern": false
+},
+{
+"zh": "NVIDIA 顯示卡，用 CUDA {0}（驅動 {1}）",
+"pattern": true
+},
+{
+"zh": "NVIDIA 顯示卡，用 CUDA",
+"pattern": false
+},
+{
+"zh": "驅動",
+"pattern": false
+},
+{
+"zh": "AMD／Intel 顯示卡，用 Vulkan 加速",
+"pattern": false
+},
+{
+"zh": "[100%] 完成：{0}",
+"pattern": true
+},
+{
+"zh": "[100%] 完成",
+"pattern": false
+},
+{
+"zh": "安裝包要是 .zip、.tar.gz 或 .tgz，檔名只能用英數、底線、點、加號、連字號",
+"pattern": false
+},
+{
+"zh": "試跑成功：{0}",
+"pattern": true
+},
+{
+"zh": "試跑成功",
+"pattern": false
+},
+{
+"zh": "手動匯入",
+"pattern": false
+},
+{
+"zh": "Apple Silicon：CPU 與 GPU 共用同一塊統一記憶體（GPU 預設最多只能用到約 2/3～3/4）",
+"pattern": false
+},
+{
+"zh": "偵測到 Jetson（/etc/nv_tegra_release），GPU 與系統共用同一塊記憶體",
+"pattern": false
+},
+{
+"zh": "nvidia-smi 回報不出顯存總量（DGX Spark 這類統一記憶體機就是這樣）",
+"pattern": false
+},
+{
+"zh": "Intel 內建顯示晶片：跟系統共用同一塊記憶體",
+"pattern": false
+},
+{
+"zh": "Windows 上的內建顯示晶片（AMD APU／Intel）：除了 BIOS 切的專用記憶體，Windows 還會讓 GPU 借用最多一半的系統記憶體（共用 GPU 記憶體），所以當成一個池算，走 Vulkan 版引擎",
+"pattern": false
+},
+{
+"zh": "AMD APU（例 Ryzen AI 395）：BIOS 切一塊給 GPU，系統只剩另一塊，兩塊都要盯",
+"pattern": false
+},
+{
+"zh": "偵測到 {0} 張獨立顯示卡，各自有顯存，系統記憶體另外一塊",
+"pattern": true
+},
+{
+"zh": "張獨立顯示卡，各自有顯存，系統記憶體另外一塊",
+"pattern": false
+},
+{
+"zh": "存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）",
+"pattern": false
+},
+{
+"zh": "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）",
+"pattern": false
+},
+{
+"zh": "{0} 是系統目錄，不能當存放區",
+"pattern": true
+},
+{
+"zh": "是系統目錄，不能當存放區",
+"pattern": false
+},
+{
+"zh": "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡",
+"pattern": false
+},
+{
+"zh": "代理的帳號寫不進 {0}，請先調整這個資料夾的權限",
+"pattern": true
+},
+{
+"zh": "代理的帳號寫不進",
+"pattern": false
+},
+{
+"zh": "請先調整這個資料夾的權限",
+"pattern": false
+},
+{
+"zh": "要指到編好的 llama-server{0} 執行檔",
+"pattern": true
+},
+{
+"zh": "要指到編好的 llama-server",
+"pattern": false
+},
+{
+"zh": "執行檔",
+"pattern": false
+},
+{
+"zh": "這支 llama-server 跑不起來（--version 失敗），可能缺函式庫",
+"pattern": false
+},
+{
+"zh": "要指到編好的 sd-cli 執行檔（檔名就是 sd-cli）",
+"pattern": false
+},
+{
+"zh": "這支 sd-cli 跑不起來（--help 失敗），可能缺函式庫",
+"pattern": false
+},
+{
+"zh": "角色名稱要 1～12 個字",
+"pattern": false
+},
+{
+"zh": "等級最多 12 個字",
+"pattern": false
+},
+{
+"zh": "能力標籤最多 6 個，每個 1～12 個字",
+"pattern": false
+},
+{
+"zh": "備註最多 300 字",
+"pattern": false
+},
+{
+"zh": "這台沒有開 Agent 模式。請到「設定 → 機器 → 這台的設定」打開",
+"pattern": false
+},
+{
+"zh": "不能直接用整顆磁碟",
+"pattern": false
+},
+{
+"zh": "{0} 是系統資料夾",
+"pattern": true
+},
+{
+"zh": "是系統資料夾",
+"pattern": false
+},
+{
+"zh": "AppData 放的是程式設定與登入資料，不能給 Agent",
+"pattern": false
+},
+{
+"zh": "{0} 是隱藏的設定資料夾（可能有金鑰或登入資料）",
+"pattern": true
+},
+{
+"zh": "是隱藏的設定資料夾（可能有金鑰或登入資料",
+"pattern": false
+},
+{
+"zh": "家目錄",
+"pattern": false
+},
+{
+"zh": "資料夾",
+"pattern": false
+},
+{
+"zh": "資料夾名稱只能用中英文、數字、空白、點、底線與連字號，1～64 字",
+"pattern": false
+},
+{
+"zh": "資料夾只能在工作根目錄的第一層",
+"pattern": false
+},
+{
+"zh": "沒有這個工作資料夾：{0}",
+"pattern": true
+},
+{
+"zh": "沒有這個工作資料夾",
+"pattern": false
+},
+{
+"zh": "路徑要是資料夾裡的相對路徑，不能有 .. 或以 / 開頭",
+"pattern": false
+},
+{
+"zh": "路徑太長",
+"pattern": false
+},
+{
+"zh": "產不出代理憑證（{0}），停止啟動，不退回明文 http。請安裝 Python 的 cryptography 套件（安裝程式會自動裝），或安裝 openssl",
+"pattern": true
+},
+{
+"zh": "產不出代理憑證",
+"pattern": false
+},
+{
+"zh": "停止啟動，不退回明文 http。請安裝 Python 的 cryptography 套件（安裝程式會自動裝），或安裝 openssl",
+"pattern": false
+},
+{
+"zh": "步數要在 1～150 之間",
+"pattern": false
+},
+{
+"zh": "引導強度要在 0～30 之間",
+"pattern": false
+},
+{
+"zh": "影格數要在 1～241 之間，而且是 8 的倍數加 1（例：17、33、49、121）",
+"pattern": false
+},
+{
+"zh": "每秒格數要在 1～60 之間",
+"pattern": false
+},
+{
+"zh": "參考圖格式不對",
+"pattern": false
+},
+{
+"zh": "參考圖只收 PNG、JPEG、WebP，最大 4 MB",
+"pattern": false
+},
+{
+"zh": "不支援的動作：{0}",
+"pattern": true
+},
+{
+"zh": "不支援的動作",
+"pattern": false
+},
+{
+"zh": "（憑證 ",
+"pattern": false
+},
+{
+"zh": "，權杖在 ",
+"pattern": false
+},
+{
+"zh": "對不到這些卡的 HIP 序號：",
+"pattern": false
+},
+{
+"zh": "這台沒有這些卡：",
+"pattern": false
+},
+{
+"zh": "（偵測到 ",
+"pattern": false
+},
+{
+"zh": "埠 {0}",
+"pattern": true
+},
+{
+"zh": "服務名稱格式不對：",
+"pattern": false
+},
+{
+"zh": "沒有這個服務：{0}",
+"pattern": true
+},
+{
+"zh": "沒有這個服務",
+"pattern": false
+},
+{
+"zh": " 還沒回應",
+"pattern": false
+},
+{
+"zh": "檢查記憶體、準備設定",
+"pattern": false
+},
+{
+"zh": "{0} 沒有可改的設定檔",
+"pattern": true
+},
+{
+"zh": "沒有可改的設定檔",
+"pattern": false
+},
+{
+"zh": "這個組合不在本機掃到的模型清單內",
+"pattern": false
+},
+{
+"zh": "{0} 的 pack 裡沒有 tokenizer，換過去會起不來",
+"pattern": true
+},
+{
+"zh": "的 pack 裡沒有 tokenizer，換過去會起不來",
+"pattern": false
+},
+{
+"zh": "{0} 沒有對應的 strata-<名稱>.json 設定檔。換模型要換的是一整份設定（--ple-gguf、--expert-profile 每顆都不同），請先用 setup.sh 安裝這顆模型產生它。",
+"pattern": true
+},
+{
+"zh": "沒有對應的 strata-<名稱>.json 設定檔。換模型要換的是一整份設定（--ple-gguf、--expert-profile 每顆都不同），請先用 setup.sh 安裝這顆模型產生它",
+"pattern": false
+},
+{
+"zh": "讀不到現用設定檔",
+"pattern": false
+},
+{
+"zh": "擋下來了，設定已還原",
+"pattern": false
+},
+{
+"zh": " 載不起來（",
+"pattern": false
+},
+{
+"zh": "），正在還原",
+"pattern": false
+},
+{
+"zh": "這個欄位沒有對外的 API 埠",
+"pattern": false
+},
+{
+"zh": "對外網址格式不對，例：http://192.168.11.26:8081/v1",
+"pattern": false
+},
+{
+"zh": "這個欄位的服務不是由 xConsole 管理設定檔，只能改對外網址",
+"pattern": false
+},
+{
+"zh": "套用後服務起不來（",
+"pattern": false
+},
+{
+"zh": "套用後用新設定打不通（/v1/models 回 ",
+"pattern": false
+},
+{
+"zh": "，模型清單 ",
+"pattern": false
+},
+{
+"zh": "設了金鑰但沒帶金鑰也打得進去（回 {0}），引擎沒有吃到金鑰",
+"pattern": true
+},
+{
+"zh": "設了金鑰但沒帶金鑰也打得進去（回",
+"pattern": false
+},
+{
+"zh": "引擎沒有吃到金鑰",
+"pattern": false
+},
+{
+"zh": "存放區裡沒有這顆",
+"pattern": false
+},
+{
+"zh": "沒帶金鑰要被擋下",
+"pattern": false
+},
+{
+"zh": "一般對話 /v1/chat/completions",
+"pattern": false
+},
+{
+"zh": "工具呼叫（IDE 代理模式要用）",
+"pattern": false
+},
+{
+"zh": "路徑不在 ",
+"pattern": false
+},
+{
+"zh": " 內",
+"pattern": false
+},
+{
+"zh": "啟動引數的引號沒有成對",
+"pattern": false
+},
+{
+"zh": "讀不到 ",
+"pattern": false
+},
+{
+"zh": "沒有這個欄位：{0}",
+"pattern": true
+},
+{
+"zh": "思考模式只能是 auto、on、off",
+"pattern": false
+},
+{
+"zh": "區網存取要是 true 或 false",
+"pattern": false
+},
+{
+"zh": "欄位 id 只能用英數、底線與連字號，才能替它建 llama.cpp 服務",
+"pattern": false
+},
+{
+"zh": "這個欄位跑的不是語言模型引擎，不能換成 GGUF",
+"pattern": false
+},
+{
+"zh": "這顆不在存放區掃到的模型清單內",
+"pattern": false
+},
+{
+"zh": "這台找不到 llama-server。請先編好 llama.cpp，或在登錄檔 machine.llama_server 指定路徑",
+"pattern": false
+},
+{
+"zh": "這台的顯示卡（Windows 的 AMD／Intel，或 Apple）不能指定用哪幾張，請改回自動",
+"pattern": false
+},
+{
+"zh": "找不到可用的埠",
+"pattern": false
+},
+{
+"zh": "記憶體不夠",
+"pattern": false
+},
+{
+"zh": "/v1/models 回 {0}，模型清單 {1}",
+"pattern": true
+},
+{
+"zh": "/v1/models 回",
+"pattern": false
+},
+{
+"zh": "這個欄位沒有記錄原本的 Strata 服務，無法切回",
+"pattern": false
+},
+{
+"zh": "切回 Strata 失敗",
+"pattern": false
+},
+{
+"zh": "名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF",
+"pattern": false
+},
+{
+"zh": "Hugging Face 回 {0}",
+"pattern": true
+},
+{
+"zh": "Hugging Face 回",
+"pattern": false
+},
+{
+"zh": "這個 repo 裡沒有{0} GGUF 主模型檔",
+"pattern": true
+},
+{
+"zh": "這個 repo 裡沒有",
+"pattern": false
+},
+{
+"zh": "GGUF 主模型檔",
+"pattern": false
+},
+{
+"zh": "關鍵字 1～80 字，只能有英數、空白與 . _ + - /",
+"pattern": false
+},
+{
+"zh": "{0}/{1} 已經在了，要換掉請先在已安裝的清單刪除",
+"pattern": true
+},
+{
+"zh": "已經在了，要換掉請先在已安裝的清單刪除",
+"pattern": false
+},
+{
+"zh": "這個量化不在這個 repo 的檔案清單內",
+"pattern": false
+},
+{
+"zh": "這個 mmproj 不在這個 repo 的檔案清單內",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：要 {0} GiB，存放區只剩 {1} GiB（另需保留 10 GiB）",
+"pattern": true
+},
+{
+"zh": "磁碟不夠：要",
+"pattern": false
+},
+{
+"zh": "GiB，存放區只剩",
+"pattern": false
+},
+{
+"zh": "GiB（另需保留 10 GiB",
+"pattern": false
+},
+{
+"zh": "沒有這個下載",
+"pattern": false
+},
+{
+"zh": "存放區沒有這顆",
+"pattern": false
+},
+{
+"zh": "有欄位正在使用這顆，先換成別的模型再刪",
+"pattern": false
+},
+{
+"zh": "只能刪存放區第一層的模型資料夾",
+"pattern": false
+},
+{
+"zh": "上下文 ",
+"pattern": false
+},
+{
+"zh": " 理論要 ",
+"pattern": false
+},
+{
+"zh": " GiB，但有 --kv-grow，會向 expert cache 借、不另外預留",
+"pattern": false
+},
+{
+"zh": " 要先預留 ",
+"pattern": false
+},
+{
+"zh": " GiB（沒有 --kv-grow）",
+"pattern": false
+},
+{
+"zh": "；用硬碟執行：權重以檔案映射載入，不算進准入，只算 KV、計算緩衝與放進 GPU 的層",
+"pattern": false
+},
+{
+"zh": "超過 GPU 能用的上限：這顆要約 {0} GiB，這台 GPU 最多只能用 {1} GiB（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）",
+"pattern": true
+},
+{
+"zh": "超過 GPU 能用的上限：這顆要約",
+"pattern": false
+},
+{
+"zh": "GiB，這台 GPU 最多只能用",
+"pattern": false
+},
+{
+"zh": "GiB（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高",
+"pattern": false
+},
+{
+"zh": "統一記憶體不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
+"pattern": true
+},
+{
+"zh": "統一記憶體不足：需要約",
+"pattern": false
+},
+{
+"zh": "GiB，現在只剩",
+"pattern": false
+},
+{
+"zh": "GiB，載下去會剩",
+"pattern": false
+},
+{
+"zh": "GiB（低於",
+"pattern": false
+},
+{
+"zh": "GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
+"pattern": false
+},
+{
+"zh": "，這台曾因為系統記憶體耗盡整台卡死",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線{4}）",
+"pattern": true
+},
+{
+"zh": "系統記憶體不足：需要約",
+"pattern": false
+},
+{
+"zh": "GiB 底線",
+"pattern": false
+},
+{
+"zh": "可以載，但載完系統記憶體只剩 {0} GiB，長請求時要留意",
+"pattern": true
+},
+{
+"zh": "可以載，但載完系統記憶體只剩",
+"pattern": false
+},
+{
+"zh": "GiB，長請求時要留意",
+"pattern": false
+},
+{
+"zh": "沒有這個欄位或它沒有對應的服務：{0}",
+"pattern": true
+},
+{
+"zh": "沒有這個欄位或它沒有對應的服務",
+"pattern": false
+},
+{
+"zh": "「{0}」標記為關鍵服務，要動它請明確確認",
+"pattern": true
+},
+{
+"zh": "」標記為關鍵服務，要動它請明確確認",
+"pattern": false
+},
+{
+"zh": "沒有這個情境：{0}",
+"pattern": true
+},
+{
+"zh": "沒有這個情境",
+"pattern": false
+},
+{
+"zh": "{0} 現在跑的是 llama.cpp，情境裡的參數是給 Strata 的，這一項略過",
+"pattern": true
+},
+{
+"zh": "現在跑的是 llama.cpp，情境裡的參數是給 Strata 的，這一項略過",
+"pattern": false
+},
+{
+"zh": "{0} 套用失敗，已還原設定並重啟",
+"pattern": true
+},
+{
+"zh": "套用失敗，已還原設定並重啟",
+"pattern": false
+},
+{
+"zh": "情境名稱要 1～20 個字",
+"pattern": false
+},
+{
+"zh": "說明最多 200 字",
+"pattern": false
+},
+{
+"zh": "changes 要是清單",
+"pattern": false
+},
+{
+"zh": "至少要調一個欄位的一項參數，否則這個情境套用了也沒有作用",
+"pattern": false
+},
+{
+"zh": "這台是 {0}，直接下載 {1} 官方預編譯版：{2}。下載後核對官方公布的 sha256，對不上就不裝",
+"pattern": true
+},
+{
+"zh": "這台是",
+"pattern": false
+},
+{
+"zh": "直接下載",
+"pattern": false
+},
+{
+"zh": "官方預編譯版",
+"pattern": false
+},
+{
+"zh": "下載後核對官方公布的 sha256，對不上就不裝",
+"pattern": false
+},
+{
+"zh": "有 NVIDIA 顯示卡但沒有 CUDA 編譯器（nvcc），會編成只用 CPU。要用 GPU 請 IT 安裝 CUDA Toolkit（nvidia-cuda-toolkit 或 NVIDIA 官方套件）",
+"pattern": false
+},
+{
+"zh": "代理重啟過，編譯中斷；再按一次會接著下載好的原始碼繼續",
+"pattern": false
+},
+{
+"zh": "{0}失敗（結束碼 {1}），請看下面的記錄",
+"pattern": true
+},
+{
+"zh": "失敗（結束碼",
+"pattern": false
+},
+{
+"zh": "請看下面的記錄",
+"pattern": false
+},
+{
+"zh": "下載原始碼",
+"pattern": false
+},
+{
+"zh": "還原原始碼",
+"pattern": false
+},
+{
+"zh": "清掉舊檔",
+"pattern": false
+},
+{
+"zh": "{0} 的原始碼跟官方 {1} 對不上，不編譯。請把這個資料夾移走再按一次",
+"pattern": true
+},
+{
+"zh": "的原始碼跟官方",
+"pattern": false
+},
+{
+"zh": "對不上，不編譯。請把這個資料夾移走再按一次",
+"pattern": false
+},
+{
+"zh": "編好了但跑不起來（{0} 失敗），可能缺 GPU 函式庫",
+"pattern": true
+},
+{
+"zh": "編好了但跑不起來",
+"pattern": false
+},
+{
+"zh": "失敗），可能缺 GPU 函式庫",
+"pattern": false
+},
+{
+"zh": "Windows on ARM 沒有官方預編譯版",
+"pattern": false
+},
+{
+"zh": "NVIDIA 顯示卡，用 CUDA 12",
+"pattern": false
+},
+{
+"zh": "Apple Silicon，用 Metal 加速",
+"pattern": false
+},
+{
+"zh": "Intel Mac，只用 CPU",
+"pattern": false
+},
+{
+"zh": "這台的設定指定 ",
+"pattern": false
+},
+{
+"zh": "，用 Vulkan 加速",
+"pattern": false
+},
+{
+"zh": "NVIDIA 顯示卡，用 CUDA ",
+"pattern": false
+},
+{
+"zh": "（驅動 ",
+"pattern": false
+},
+{
+"zh": "{0} 的 sha256 跟官方公布的不一樣，已刪除，不安裝",
+"pattern": true
+},
+{
+"zh": "的 sha256 跟官方公布的不一樣，已刪除，不安裝",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡找不到 {0}，官方的檔案結構可能改了",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡找不到",
+"pattern": false
+},
+{
+"zh": "官方的檔案結構可能改了",
+"pattern": false
+},
+{
+"zh": "裝好了但跑不起來（{0} 失敗）：{1}",
+"pattern": true
+},
+{
+"zh": "裝好了但跑不起來",
+"pattern": false
+},
+{
+"zh": "[100%] 完成：",
+"pattern": false
+},
+{
+"zh": "{0}，{1} 在這台只能自己編譯後把 {2} 放進家目錄",
+"pattern": true
+},
+{
+"zh": "在這台只能自己編譯後把",
+"pattern": false
+},
+{
+"zh": "放進家目錄",
+"pattern": false
+},
+{
+"zh": "最近幾版 {0} 都沒有 {1} 的預編譯檔",
+"pattern": true
+},
+{
+"zh": "最近幾版",
+"pattern": false
+},
+{
+"zh": "都沒有",
+"pattern": false
+},
+{
+"zh": "的預編譯檔",
+"pattern": false
+},
+{
+"zh": "安裝包最大 4 GiB",
+"pattern": false
+},
+{
+"zh": "sha256 跟你填的不一樣（算出來是 {0}），可能下載不完整或被改過，不安裝",
+"pattern": true
+},
+{
+"zh": "sha256 跟你填的不一樣（算出來是",
+"pattern": false
+},
+{
+"zh": "可能下載不完整或被改過，不安裝",
+"pattern": false
+},
+{
+"zh": "沒有填官方的 sha256：請自己到官方版本頁核對上面這串",
+"pattern": false
+},
+{
+"zh": "安裝包裡找不到 {0}{1}。請確認是 {2} 這台系統用的版本",
+"pattern": true
+},
+{
+"zh": "安裝包裡找不到",
+"pattern": false
+},
+{
+"zh": "請確認是",
+"pattern": false
+},
+{
+"zh": "這台系統用的版本",
+"pattern": false
+},
+{
+"zh": "裝好了但跑不起來（{0} 失敗），可能不是這台系統或顯示卡用的版本：{1}",
+"pattern": true
+},
+{
+"zh": "失敗），可能不是這台系統或顯示卡用的版本",
+"pattern": false
+},
+{
+"zh": "試跑成功：",
+"pattern": false
+},
+{
+"zh": "sha256 要是 64 個十六進位字元（官方版本頁每個檔案旁邊那串），不確定就留空",
+"pattern": false
+},
+{
+"zh": "這個安裝包還沒送齊",
+"pattern": false
+},
+{
+"zh": "偵測到 ",
+"pattern": false
+},
+{
+"zh": " 張獨立顯示卡，各自有顯存，系統記憶體另外一塊",
+"pattern": false
+},
+{
+"zh": " 是系統目錄，不能當存放區",
+"pattern": false
+},
+{
+"zh": "建不了 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "建不了",
+"pattern": false
+},
+{
+"zh": "代理的帳號寫不進 ",
+"pattern": false
+},
+{
+"zh": "，請先調整這個資料夾的權限",
+"pattern": false
+},
+{
+"zh": "llama-server 要在家目錄、/opt 或 /usr/local 底下",
+"pattern": false
+},
+{
+"zh": "llama-server.exe 要在代理的家目錄底下",
+"pattern": false
+},
+{
+"zh": " 執行檔",
+"pattern": false
+},
+{
+"zh": "sd-cli 要在家目錄、/opt 或 /usr/local 底下",
+"pattern": false
+},
+{
+"zh": "sd-cli.exe 要在代理的家目錄底下",
+"pattern": false
+},
+{
+"zh": "只收 https:// 開頭、不帶帳密與查詢字串的網址",
+"pattern": false
+},
+{
+"zh": "備註最多 300 字，不能有控制字元",
+"pattern": false
+},
+{
+"zh": "預估記憶體要在 0～1024 GiB 之間",
+"pattern": false
+},
+{
+"zh": "顯示名稱最多 60 個字",
+"pattern": false
+},
+{
+"zh": "type 只能是 empty（空欄位）或 service（登記已在跑的服務）",
+"pattern": false
+},
+{
+"zh": "這個欄位的服務還在跑，先停止再移除",
+"pattern": false
+},
+{
+"zh": " 是系統資料夾",
+"pattern": false
+},
+{
+"zh": "這是系統資料夾",
+"pattern": false
+},
+{
+"zh": "請選裡面的資料夾",
+"pattern": false
+},
+{
+"zh": " 是隱藏的設定資料夾（可能有金鑰或登入資料）",
+"pattern": false
+},
+{
+"zh": "路徑不對",
+"pattern": false
+},
+{
+"zh": "連結的資料夾不能用了：{0}",
+"pattern": true
+},
+{
+"zh": "連結的資料夾不能用了",
+"pattern": false
+},
+{
+"zh": "沒有這個工作資料夾：",
+"pattern": false
+},
+{
+"zh": "資料夾名稱只能用中英文、數字、空白、點、底線與連字號，1～64 字，不能以點開頭",
+"pattern": false
+},
+{
+"zh": "已經有 {0} 這個資料夾",
+"pattern": true
+},
+{
+"zh": "已經有",
+"pattern": false
+},
+{
+"zh": "這個資料夾",
+"pattern": false
+},
+{
+"zh": "沒有這個檔案：{0}",
+"pattern": true
+},
+{
+"zh": "沒有這個檔案",
+"pattern": false
+},
+{
+"zh": "內容要是文字",
+"pattern": false
+},
+{
+"zh": "一次最多寫 2 MB（這次 {0} MB）",
+"pattern": true
+},
+{
+"zh": "一次最多寫 2 MB（這次",
+"pattern": false
+},
+{
+"zh": "{0} 是資料夾",
+"pattern": true
+},
+{
+"zh": "是資料夾",
+"pattern": false
+},
+{
+"zh": "路徑不在工作資料夾內",
+"pattern": false
+},
+{
+"zh": "指令是空的、太長（最多 8000 字）或含不合法的字元",
+"pattern": false
+},
+{
+"zh": "產不出代理憑證（",
+"pattern": false
+},
+{
+"zh": "），停止啟動，不退回明文 http。請安裝 Python 的 cryptography 套件（安裝程式會自動裝），或安裝 openssl",
+"pattern": false
+},
+{
+"zh": "尺寸、步數、引導強度、影格數要是數字",
+"pattern": false
+},
+{
+"zh": "模型代號只能有英數、底線、連字號（最多 64 字）",
+"pattern": false
+},
+{
+"zh": "要有顯示名稱",
+"pattern": false
+},
+{
+"zh": "要有、而且只能有一個主體（完整模型或擴散模型），最多 8 個檔",
+"pattern": false
+},
+{
+"zh": "名稱格式是「作者/模型」",
+"pattern": false
+},
+{
+"zh": "這顆含中國來源的元件（{0}），政府案不得使用；內部測試要勾「內部測試」才能下載",
+"pattern": true
+},
+{
+"zh": "這顆含中國來源的元件",
+"pattern": false
+},
+{
+"zh": "政府案不得使用；內部測試要勾「內部測試」才能下載",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：還要下載 {0} GiB，存放區只剩 {1} GiB（另需保留 10 GiB）",
+"pattern": true
+},
+{
+"zh": "磁碟不夠：還要下載",
+"pattern": false
+},
+{
+"zh": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿",
+"pattern": false
+},
+{
+"zh": "這顆正在產圖，等它產完或取消再刪",
+"pattern": false
+},
+{
+"zh": "這顆正在下載，先取消下載再刪",
+"pattern": false
+},
+{
+"zh": "統一記憶體不足：產這一件要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB 底線）。統一記憶體吃爆會把整台拖死；{4}",
+"pattern": true
+},
+{
+"zh": "統一記憶體不足：產這一件要約",
+"pattern": false
+},
+{
+"zh": "GiB，產的時候會剩",
+"pattern": false
+},
+{
+"zh": "GiB 底線）。統一記憶體吃爆會把整台拖死",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB 底線{4}）",
+"pattern": true
+},
+{
+"zh": "系統記憶體不足：要約",
+"pattern": false
+},
+{
+"zh": "產的時候系統記憶體只剩 {0} GiB（低於 {1} GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"pattern": true
+},
+{
+"zh": "產的時候系統記憶體只剩",
+"pattern": false
+},
+{
+"zh": "GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"pattern": false
+},
+{
+"zh": "參考圖不是有效的 base64",
+"pattern": false
+},
+{
+"zh": "沒有這顆畫圖／影片模型",
+"pattern": false
+},
+{
+"zh": "這顆還沒下載完整，到「推薦模型」按下載把缺的檔補齊",
+"pattern": false
+},
+{
+"zh": "這台還沒安裝 stable-diffusion.cpp，先按「安裝畫圖引擎」",
+"pattern": false
+},
+{
+"zh": "要寫提示詞",
+"pattern": false
+},
+{
+"zh": "種子要在 0～2147483647 之間（-1＝隨機）",
+"pattern": false
+},
+{
+"zh": "沒有這件",
+"pattern": false
+},
+{
+"zh": "這件沒有產出",
+"pattern": false
+},
+{
+"zh": "沒有這一張",
+"pattern": false
+},
+{
+"zh": "產出的檔案不見了",
+"pattern": false
+},
+{
+"zh": "檔案超過 20 MB，請到這台的 ~/.xconsole/gen/ 取",
+"pattern": false
+},
+{
+"zh": "這件沒有在產",
+"pattern": false
+},
+{
+"zh": "還在產，先取消",
+"pattern": false
+},
+{
+"zh": "需要 Bearer 權杖",
+"pattern": false
+},
+{
+"zh": "這台的代理以系統服務身分執行，看不到桌面；請在這台重新執行一次安裝程式，裝上「桌面小幫手」",
+"pattern": false
+},
+{
+"zh": "桌面小幫手還沒啟動：請用 {0} 登入這台的桌面（登入後會自動啟動）",
+"pattern": true
+},
+{
+"zh": "桌面小幫手還沒啟動：請用",
+"pattern": false
+},
+{
+"zh": "登入這台的桌面（登入後會自動啟動",
+"pattern": false
+},
+{
+"zh": "擷取不到螢幕（可能在登入畫面、鎖定畫面或 UAC 確認視窗）",
+"pattern": false
+},
+{
+"zh": "擷取不到螢幕：請到「系統設定 › 隱私權與安全性 › 螢幕錄製」允許執行代理的 Python",
+"pattern": false
+},
+{
+"zh": "這台沒有截圖工具：sudo apt install imagemagick xdotool（Wayland 桌面另裝 grim ydotool）",
+"pattern": false
+},
+{
+"zh": "擷取不到螢幕",
+"pattern": false
+},
+{
+"zh": "不支援的動作：",
+"pattern": false
+},
+{
+"zh": "要打的字要是 1～{0} 字",
+"pattern": true
+},
+{
+"zh": "要打的字要是 1～",
+"pattern": false
+},
+{
+"zh": "不認得的按鍵組合：{0}",
+"pattern": true
+},
+{
+"zh": "不認得的按鍵組合",
+"pattern": false
+},
+{
+"zh": "缺少截圖尺寸，請先截一張圖",
+"pattern": false
+},
+{
+"zh": "Intel Arc 顯示卡",
+"pattern": false
+},
+{
+"zh": "Intel 內建顯示晶片",
+"pattern": false
+},
+{
+"zh": "埠 ",
+"pattern": false
+},
+{
+"zh": "沒有這個服務：",
+"pattern": false
+},
+{
+"zh": "缺同名的 pack（內含 tokenizer），無法啟動",
+"pattern": false
+},
+{
+"zh": "只有 pack、沒有權重檔",
+"pattern": false
+},
+{
+"zh": "缺 strata-<名稱>.json 設定檔，請用 setup.sh 重新安裝這顆",
+"pattern": false
+},
+{
+"zh": "服務起來了，還在載入",
+"pattern": false
+},
+{
+"zh": " 沒有可改的設定檔",
+"pattern": false
+},
+{
+"zh": " 的 pack 裡沒有 tokenizer，換過去會起不來",
+"pattern": false
+},
+{
+"zh": " 沒有對應的 strata-<名稱>.json 設定檔。換模型要換的是一整份設定（--ple-gguf、--expert-profile 每顆都不同），請先用 setup.sh 安裝這顆模型產生它。",
+"pattern": false
+},
+{
+"zh": "{0} 載不起來（{1}），已還原成原本的模型",
+"pattern": true
+},
+{
+"zh": "已還原成原本的模型",
+"pattern": false
+},
+{
+"zh": "模型名稱只能用英數字與 . _ - : /，1～80 字",
+"pattern": false
+},
+{
+"zh": "上下文長度要在 2,048～1,048,576 之間",
+"pattern": false
+},
+{
+"zh": "思考模式與區網存取只有 llama.cpp 的欄位能在這裡改",
+"pattern": false
+},
+{
+"zh": "自訂啟動引數只有 llama.cpp 的欄位能設",
+"pattern": false
+},
+{
+"zh": "上下文調大之後記憶體不夠，設定已還原",
+"pattern": false
+},
+{
+"zh": "設了金鑰但沒帶金鑰也打得進去（回 ",
+"pattern": false
+},
+{
+"zh": "），引擎沒有吃到金鑰",
+"pattern": false
+},
+{
+"zh": "回 401，金鑰保護有效",
+"pattern": false
+},
+{
+"zh": "回 {0}，沒有被擋",
+"pattern": true
+},
+{
+"zh": "呼叫了 {0}（{1}）",
+"pattern": true
+},
+{
+"zh": "呼叫了",
+"pattern": false
+},
+{
+"zh": "回 {0}，模型沒有呼叫工具",
+"pattern": true
+},
+{
+"zh": "模型沒有呼叫工具",
+"pattern": false
+},
+{
+"zh": "不接受 {0}：這裡只收調校效能與取樣的參數（模型、監聽位址、金鑰、任何檔案路徑由主控台管）",
+"pattern": true
+},
+{
+"zh": "不接受",
+"pattern": false
+},
+{
+"zh": "這裡只收調校效能與取樣的參數（模型、監聽位址、金鑰、任何檔案路徑由主控台管",
+"pattern": false
+},
+{
+"zh": "{0} 的值有不允許的字元",
+"pattern": true
+},
+{
+"zh": "的值有不允許的字元",
+"pattern": false
+},
+{
+"zh": "「{0}」不像參數值：不能放檔案路徑或特殊字元",
+"pattern": true
+},
+{
+"zh": "」不像參數值：不能放檔案路徑或特殊字元",
+"pattern": false
+},
+{
+"zh": "沒有這個欄位：",
+"pattern": false
+},
+{
+"zh": "（用硬碟執行也放不下：KV、計算緩衝與放 GPU 的層仍要占記憶體）",
+"pattern": false
+},
+{
+"zh": "/v1/models 回 ",
+"pattern": false
+},
+{
+"zh": "Hugging Face 回 ",
+"pattern": false
+},
+{
+"zh": "連不到 Hugging Face：{0}",
+"pattern": true
+},
+{
+"zh": "連不到 Hugging Face",
+"pattern": false
+},
+{
+"zh": " GGUF 主模型檔",
+"pattern": false
+},
+{
+"zh": "讀檔頭失敗：{0}",
+"pattern": true
+},
+{
+"zh": "讀檔頭失敗",
+"pattern": false
+},
+{
+"zh": " 已經在了，要換掉請先在已安裝的清單刪除",
+"pattern": false
+},
+{
+"zh": "要從已收到的位置接著送",
+"pattern": false
+},
+{
+"zh": "上傳完了，但這不是 GGUF 檔（檔頭不對），已刪除",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：要 ",
+"pattern": false
+},
+{
+"zh": " GiB，存放區只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB（另需保留 10 GiB）",
+"pattern": false
+},
+{
+"zh": "{0} 大小不對（{1}／{2}），可能連線中斷，重新下載會接續",
+"pattern": true
+},
+{
+"zh": "大小不對",
+"pattern": false
+},
+{
+"zh": "可能連線中斷，重新下載會接續",
+"pattern": false
+},
+{
+"zh": "路徑不在存放區內",
+"pattern": false
+},
+{
+"zh": "超過 GPU 能用的上限：這顆要約 ",
+"pattern": false
+},
+{
+"zh": " GiB，這台 GPU 最多只能用 ",
+"pattern": false
+},
+{
+"zh": " GiB（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）",
+"pattern": false
+},
+{
+"zh": "統一記憶體不足：需要約 ",
+"pattern": false
+},
+{
+"zh": " GiB，現在只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB，載下去會剩 ",
+"pattern": false
+},
+{
+"zh": " GiB（低於 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
+"pattern": false
+},
+{
+"zh": "可以載，但載完只剩 {0} GiB，長請求時要留意",
+"pattern": true
+},
+{
+"zh": "可以載，但載完只剩",
+"pattern": false
+},
+{
+"zh": "顯存不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線）",
+"pattern": true
+},
+{
+"zh": "顯存不足：需要約",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：需要約 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線",
+"pattern": false
+},
+{
+"zh": "可以載，但載完系統記憶體只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB，長請求時要留意",
+"pattern": false
+},
+{
+"zh": "沒有這個欄位或它沒有對應的服務：",
+"pattern": false
+},
+{
+"zh": "沒有這個情境：",
+"pattern": false
+},
+{
+"zh": " 現在跑的是 llama.cpp，情境裡的參數是給 Strata 的，這一項略過",
+"pattern": false
+},
+{
+"zh": " 套用失敗，已還原設定並重啟",
+"pattern": false
+},
+{
+"zh": "changes 的每一項要是物件",
+"pattern": false
+},
+{
+"zh": "{0} 不是 Strata 欄位，情境只能調 Strata 的參數",
+"pattern": true
+},
+{
+"zh": "不是 Strata 欄位，情境只能調 Strata 的參數",
+"pattern": false
+},
+{
+"zh": "這台是 ",
+"pattern": false
+},
+{
+"zh": "，直接下載 ",
+"pattern": false
+},
+{
+"zh": " 官方預編譯版：",
+"pattern": false
+},
+{
+"zh": "。下載後核對官方公布的 sha256，對不上就不裝",
+"pattern": false
+},
+{
+"zh": "用 ROCm 編，目標 {0}",
+"pattern": true
+},
+{
+"zh": "用 ROCm 編，目標",
+"pattern": false
+},
+{
+"zh": "沒有偵測到 GPU，編成只用 CPU",
+"pattern": false
+},
+{
+"zh": "失敗（結束碼 ",
+"pattern": false
+},
+{
+"zh": "），請看下面的記錄",
+"pattern": false
+},
+{
+"zh": "還原子模組",
+"pattern": false
+},
+{
+"zh": " 的原始碼跟官方 ",
+"pattern": false
+},
+{
+"zh": " 對不上，不編譯。請把這個資料夾移走再按一次",
+"pattern": false
+},
+{
+"zh": "編好了但跑不起來（",
+"pattern": false
+},
+{
+"zh": " 失敗），可能缺 GPU 函式庫",
+"pattern": false
+},
+{
+"zh": "Intel Mac 沒有官方預編譯版",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有不安全的路徑",
+"pattern": false
+},
+{
+"zh": " 的 sha256 跟官方公布的不一樣，已刪除，不安裝",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡找不到 ",
+"pattern": false
+},
+{
+"zh": "，官方的檔案結構可能改了",
+"pattern": false
+},
+{
+"zh": "裝好了但跑不起來（",
+"pattern": false
+},
+{
+"zh": " 失敗）：",
+"pattern": false
+},
+{
+"zh": " 在這台只能自己編譯後把 ",
+"pattern": false
+},
+{
+"zh": " 放進家目錄",
+"pattern": false
+},
+{
+"zh": "連不到 GitHub 取 {0} 的版本清單（{1}）；這台要能連外，或把 {2} 複製進家目錄",
+"pattern": true
+},
+{
+"zh": "連不到 GitHub 取",
+"pattern": false
+},
+{
+"zh": "的版本清單",
+"pattern": false
+},
+{
+"zh": "這台要能連外，或把",
+"pattern": false
+},
+{
+"zh": "複製進家目錄",
+"pattern": false
+},
+{
+"zh": "最近幾版 ",
+"pattern": false
+},
+{
+"zh": " 都沒有 ",
+"pattern": false
+},
+{
+"zh": " 的預編譯檔",
+"pattern": false
+},
+{
+"zh": "送完了，但這不是 zip 或 tar.gz（檔頭不對），已刪除",
+"pattern": false
+},
+{
+"zh": "sha256 跟你填的不一樣（算出來是 ",
+"pattern": false
+},
+{
+"zh": "），可能下載不完整或被改過，不安裝",
+"pattern": false
+},
+{
+"zh": "安裝包裡找不到 ",
+"pattern": false
+},
+{
+"zh": "。請確認是 ",
+"pattern": false
+},
+{
+"zh": " 這台系統用的版本",
+"pattern": false
+},
+{
+"zh": " 失敗），可能不是這台系統或顯示卡用的版本：",
+"pattern": false
+},
+{
+"zh": "這台正在安裝，等它裝完再匯入",
+"pattern": false
+},
+{
+"zh": "這台缺少編譯工具，請 IT 先執行：{0}",
+"pattern": true
+},
+{
+"zh": "這台缺少編譯工具，請 IT 先執行",
+"pattern": false
+},
+{
+"zh": "連不到 GitHub 取 {0} 的版本清單；這台要能連外，或把編好的 {1} 複製進來",
+"pattern": true
+},
+{
+"zh": "的版本清單；這台要能連外，或把編好的",
+"pattern": false
+},
+{
+"zh": "複製進來",
+"pattern": false
+},
+{
+"zh": "系統記憶體只剩 {0} GiB，扣掉 {1} GiB 底線後不夠編譯。請先停掉一個模型再編",
+"pattern": true
+},
+{
+"zh": "GiB，扣掉",
+"pattern": false
+},
+{
+"zh": "GiB 底線後不夠編譯。請先停掉一個模型再編",
+"pattern": false
+},
+{
+"zh": "沒有正在進行的編譯",
+"pattern": false
+},
+{
+"zh": "建不了 ",
+"pattern": false
+},
+{
+"zh": "記憶體架構只能是 ",
+"pattern": false
+},
+{
+"zh": "底線要在 0～256 GiB 之間",
+"pattern": false
+},
+{
+"zh": "記憶體頻寬要在 1～20000 GB/s 之間",
+"pattern": false
+},
+{
+"zh": "操作電腦要是 true 或 false",
+"pattern": false
+},
+{
+"zh": "Agent 模式要是 true 或 false",
+"pattern": false
+},
+{
+"zh": "預估記憶體要填數字（GiB）",
+"pattern": false
+},
+{
+"zh": "埠要填 1～65535 的數字",
+"pattern": false
+},
+{
+"zh": "{0} 不是這台可以登記的服務（要是使用者層、還沒登記過的 systemd 服務）",
+"pattern": true
+},
+{
+"zh": "不是這台可以登記的服務（要是使用者層、還沒登記過的 systemd 服務",
+"pattern": false
+},
+{
+"zh": "關鍵服務，略過（要動它請單獨操作）",
+"pattern": false
+},
+{
+"zh": "打不開這個資料夾：{0}",
+"pattern": true
+},
+{
+"zh": "打不開這個資料夾",
+"pattern": false
+},
+{
+"zh": "外接磁碟",
+"pattern": false
+},
+{
+"zh": "資料夾名稱只能用中英文、數字、空白、點、底線與連字號",
+"pattern": false
+},
+{
+"zh": "沒有這個連結的資料夾",
+"pattern": false
+},
+{
+"zh": "連結的資料夾不能用了：",
+"pattern": false
+},
+{
+"zh": "已經有 ",
+"pattern": false
+},
+{
+"zh": " 這個資料夾",
+"pattern": false
+},
+{
+"zh": "沒有這個檔案：",
+"pattern": false
+},
+{
+"zh": "一次最多寫 2 MB（這次 ",
+"pattern": false
+},
+{
+"zh": " 是資料夾",
+"pattern": false
+},
+{
+"zh": "寫不進 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "寫不進",
+"pattern": false
+},
+{
+"zh": "\n…（中間省略 {0} 位元組）…\n",
+"pattern": true
+},
+{
+"zh": "\n…（中間省略",
+"pattern": false
+},
+{
+"zh": "位元組）…\n",
+"pattern": false
+},
+{
+"zh": "逾時要填秒數",
+"pattern": false
+},
+{
+"zh": "指令起不來：{0}",
+"pattern": true
+},
+{
+"zh": "指令起不來",
+"pattern": false
+},
+{
+"zh": "預編譯 {0}",
+"pattern": true
+},
+{
+"zh": "預編譯",
+"pattern": false
+},
+{
+"zh": "Hugging Face 名稱格式是「作者/模型」：{0}",
+"pattern": true
+},
+{
+"zh": "Hugging Face 名稱格式是「作者/模型」",
+"pattern": false
+},
+{
+"zh": "檔名不合法（只收 .gguf、.safetensors、.sft）：{0}",
+"pattern": true
+},
+{
+"zh": "檔名不合法（只收 .gguf、.safetensors、.sft",
+"pattern": false
+},
+{
+"zh": "量化",
+"pattern": false
+},
+{
+"zh": "這顆含中國來源的元件（",
+"pattern": false
+},
+{
+"zh": "），政府案不得使用；內部測試要勾「內部測試」才能下載",
+"pattern": false
+},
+{
+"zh": "{0} 裡沒有 {1}",
+"pattern": true
+},
+{
+"zh": "裡沒有",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：還要下載 ",
+"pattern": false
+},
+{
+"zh": "沒有這顆",
+"pattern": false
+},
+{
+"zh": "超過 GPU 能用的上限：產這一件要約 {0} GiB，這台 GPU 最多只能用 {1} GiB（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）",
+"pattern": true
+},
+{
+"zh": "超過 GPU 能用的上限：產這一件要約",
+"pattern": false
+},
+{
+"zh": "統一記憶體不足：產這一件要約 ",
+"pattern": false
+},
+{
+"zh": " GiB，產的時候會剩 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線）。統一記憶體吃爆會把整台拖死；",
+"pattern": false
+},
+{
+"zh": "卡 {0} 放不下全部權重，改成權重放系統記憶體、輪流搬進顯示卡算（會慢一些）",
+"pattern": true
+},
+{
+"zh": "放不下全部權重，改成權重放系統記憶體、輪流搬進顯示卡算（會慢一些",
+"pattern": false
+},
+{
+"zh": "{0}不夠：產這一件要約 {1} GiB，現在只剩 {2} GiB，產的時候會剩 {3} GiB（低於 {4} GiB 底線）；{5}",
+"pattern": true
+},
+{
+"zh": "不夠：產這一件要約",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：要約 ",
+"pattern": false
+},
+{
+"zh": "產的時候系統記憶體只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"pattern": false
+},
+{
+"zh": "解碼中",
+"pattern": false
+},
+{
+"zh": "解碼與編碼影片中",
+"pattern": false
+},
+{
+"zh": "一次可以產 1～4 張",
+"pattern": false
+},
+{
+"zh": "一次只產一件：前一件還在產，等它完成或取消",
+"pattern": false
+},
+{
+"zh": "這件沒有參考圖",
+"pattern": false
+},
+{
+"zh": "參考圖不見了",
+"pattern": false
+},
+{
+"zh": "桌面小幫手還沒啟動：請用 ",
+"pattern": false
+},
+{
+"zh": " 登入這台的桌面（登入後會自動啟動）",
+"pattern": false
+},
+{
+"zh": "{0}={1} 超出截圖範圍（0～{2}）",
+"pattern": true
+},
+{
+"zh": "超出截圖範圍（0～",
+"pattern": false
+},
+{
+"zh": " 字",
+"pattern": false
+},
+{
+"zh": "不認得的按鍵組合：",
+"pattern": false
+},
+{
+"zh": "捲動量要是整數",
+"pattern": false
+},
+{
+"zh": "沒有卡",
+"pattern": false
+},
+{
+"zh": "），已還原成原本的模型",
+"pattern": false
+},
+{
+"zh": "，但原本那顆也還沒起來，請查記錄",
+"pattern": false
+},
+{
+"zh": "單次輸出上限要在 256～131,072 之間，而且要小於上下文長度",
+"pattern": false
+},
+{
+"zh": "金鑰的選項不對",
+"pattern": false
+},
+{
+"zh": "，已換回原本的設定",
+"pattern": false
+},
+{
+"zh": "，但原本的也還沒起來，請查記錄",
+"pattern": false
+},
+{
+"zh": "呼叫了 ",
+"pattern": false
+},
+{
+"zh": "，模型沒有呼叫工具",
+"pattern": false
+},
+{
+"zh": "不支援的巢狀陣列",
+"pattern": false
+},
+{
+"zh": "分片不齊：有 {0} 個，應有 {1} 個（下載可能還沒完成）",
+"pattern": true
+},
+{
+"zh": "分片不齊：有",
+"pattern": false
+},
+{
+"zh": "個，應有",
+"pattern": false
+},
+{
+"zh": "個（下載可能還沒完成",
+"pattern": false
+},
+{
+"zh": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載",
+"pattern": false
+},
+{
+"zh": "不接受 ",
+"pattern": false
+},
+{
+"zh": "：這裡只收調校效能與取樣的參數（模型、監聽位址、金鑰、任何檔案路徑由主控台管）",
+"pattern": false
+},
+{
+"zh": " 的值有不允許的字元",
+"pattern": false
+},
+{
+"zh": "{0}，不能綁卡；請改回自動",
+"pattern": true
+},
+{
+"zh": "不能綁卡；請改回自動",
+"pattern": false
+},
+{
+"zh": "，但原本的服務還沒起來，請查記錄",
+"pattern": false
+},
+{
+"zh": "（停用中的 Strata）",
+"pattern": false
+},
+{
+"zh": "要登入才看得到（請貼 Hugging Face 權杖）",
+"pattern": false
+},
+{
+"zh": "要先到 Hugging Face 頁面同意授權條款",
+"pattern": false
+},
+{
+"zh": "找不到這個 repo",
+"pattern": false
+},
+{
+"zh": "連不到 Hugging Face：",
+"pattern": false
+},
+{
+"zh": "讀不到 {0} 的檔頭",
+"pattern": true
+},
+{
+"zh": "的檔頭",
+"pattern": false
+},
+{
+"zh": "讀檔頭失敗：",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：檔案 {0} GiB，存放區只剩 {1} GiB（另需保留 10 GiB）",
+"pattern": true
+},
+{
+"zh": "磁碟不夠：檔案",
+"pattern": false
+},
+{
+"zh": " 大小不對（",
+"pattern": false
+},
+{
+"zh": "），可能連線中斷，重新下載會接續",
+"pattern": false
+},
+{
+"zh": "可以載，但載完只剩 ",
+"pattern": false
+},
+{
+"zh": "卡 {0} 顯存不足：這張要放約 {1} GiB，現在只剩 {2} GiB，載下去會剩 {3} GiB（低於這張分到的 {4} GiB 底線）",
+"pattern": true
+},
+{
+"zh": "顯存不足：這張要放約",
+"pattern": false
+},
+{
+"zh": "GiB（低於這張分到的",
+"pattern": false
+},
+{
+"zh": "顯存不足：需要約 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線）",
+"pattern": false
+},
+{
+"zh": " 不是 Strata 欄位，情境只能調 Strata 的參數",
+"pattern": false
+},
+{
+"zh": "{0}要在 {1}～{2}",
+"pattern": true
+},
+{
+"zh": "用 ROCm 編，目標 ",
+"pattern": false
+},
+{
+"zh": "有 AMD 顯示卡但沒有 ROCm（hipcc），改用 Vulkan 編（比 ROCm 慢一些）。要更快請 IT 安裝 ROCm",
+"pattern": false
+},
+{
+"zh": "有 AMD 顯示卡但沒有 ROCm（hipcc），會編成只用 CPU。要用 GPU 請 IT 安裝 ROCm，或安裝 Vulkan 開發套件改用 Vulkan：sudo apt install libvulkan-dev glslc",
+"pattern": false
+},
+{
+"zh": "Intel 顯示卡，用 Vulkan 編",
+"pattern": false
+},
+{
+"zh": "有 Intel 顯示卡但沒有 Vulkan 開發套件，會編成只用 CPU。要用 GPU 請 IT 執行：sudo apt install libvulkan-dev glslc mesa-vulkan-drivers",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：",
+"pattern": false
+},
+{
+"zh": "下載站不支援續傳，{0} 從頭下載",
+"pattern": true
+},
+{
+"zh": "下載站不支援續傳",
+"pattern": false
+},
+{
+"zh": "從頭下載",
+"pattern": false
+},
+{
+"zh": "已暫停；再按「繼續下載」會從斷掉的位置接著下載",
+"pattern": false
+},
+{
+"zh": "連不到 GitHub 取 ",
+"pattern": false
+},
+{
+"zh": " 的版本清單（",
+"pattern": false
+},
+{
+"zh": "）；這台要能連外，或把 ",
+"pattern": false
+},
+{
+"zh": " 複製進家目錄",
+"pattern": false
+},
+{
+"zh": "已經在安裝了",
+"pattern": false
+},
+{
+"zh": "這台正在安裝 {0}，等它裝完再裝",
+"pattern": true
+},
+{
+"zh": "等它裝完再裝",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：安裝包 {0} GiB，解開要約三倍空間，這台只剩 {1} GiB",
+"pattern": true
+},
+{
+"zh": "磁碟不夠：安裝包",
+"pattern": false
+},
+{
+"zh": "GiB，解開要約三倍空間，這台只剩",
+"pattern": false
+},
+{
+"zh": "已經在編譯了",
+"pattern": false
+},
+{
+"zh": "這台正在編譯 {0}，等它編完再編（同時編兩個會把記憶體吃光）",
+"pattern": true
+},
+{
+"zh": "這台正在編譯",
+"pattern": false
+},
+{
+"zh": "等它編完再編（同時編兩個會把記憶體吃光",
+"pattern": false
+},
+{
+"zh": "這台缺少編譯工具，請 IT 先執行：",
+"pattern": false
+},
+{
+"zh": " 的版本清單；這台要能連外，或把編好的 ",
+"pattern": false
+},
+{
+"zh": " 複製進來",
+"pattern": false
+},
+{
+"zh": "系統記憶體只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB，扣掉 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線後不夠編譯。請先停掉一個模型再編",
+"pattern": false
+},
+{
+"zh": "底線要填數字（GiB）",
+"pattern": false
+},
+{
+"zh": "記憶體頻寬要填數字（GB/s）",
+"pattern": false
+},
+{
+"zh": " 不是這台可以登記的服務（要是使用者層、還沒登記過的 systemd 服務）",
+"pattern": false
+},
+{
+"zh": "打不開這個資料夾：",
+"pattern": false
+},
+{
+"zh": "寫不進 ",
+"pattern": false
+},
+{
+"zh": "\n…（中間省略 ",
+"pattern": false
+},
+{
+"zh": " 位元組）…\n",
+"pattern": false
+},
+{
+"zh": "指令起不來：",
+"pattern": false
+},
+{
+"zh": "預編譯 ",
+"pattern": false
+},
+{
+"zh": "在這台編譯",
+"pattern": false
+},
+{
+"zh": "Hugging Face 名稱格式是「作者/模型」：",
+"pattern": false
+},
+{
+"zh": "檔名不合法（只收 .gguf、.safetensors、.sft）：",
+"pattern": false
+},
+{
+"zh": " 裡沒有 ",
+"pattern": false
+},
+{
+"zh": "超過 GPU 能用的上限：產這一件要約 ",
+"pattern": false
+},
+{
+"zh": " 放不下全部權重，改成權重放系統記憶體、輪流搬進顯示卡算（會慢一些）",
+"pattern": false
+},
+{
+"zh": "卡 {0}",
+"pattern": true
+},
+{
+"zh": "不夠：產這一件要約 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線）；",
+"pattern": false
+},
+{
+"zh": "sd-cli 結束碼 {0}：",
+"pattern": true
+},
+{
+"zh": "sd-cli 結束碼",
+"pattern": false
+},
+{
+"zh": "種子、張數、重繪強度要是數字",
+"pattern": false
+},
+{
+"zh": "重繪強度要在 0.05～1 之間（越大改越多）",
+"pattern": false
+},
+{
+"zh": "連不到模型服務：{0}",
+"pattern": true
+},
+{
+"zh": "連不到模型服務",
+"pattern": false
+},
+{
+"zh": "這台沒有開「讓模型操作這台的桌面」，請到這台的設定打開",
+"pattern": false
+},
+{
+"zh": "一次最多送 64 MB",
+"pattern": false
+},
+{
+"zh": "這個欄位沒有可辨識的模型",
+"pattern": false
+},
+{
+"zh": "只能打開模型存放區或 Agent 工作資料夾底下的資料夾",
+"pattern": false
+},
+{
+"zh": " 超出截圖範圍（0～",
+"pattern": false
+},
+{
+"zh": "連不上桌面小幫手（{0}）：請確認有人登入這台的桌面",
+"pattern": true
+},
+{
+"zh": "連不上桌面小幫手",
+"pattern": false
+},
+{
+"zh": "請確認有人登入這台的桌面",
+"pattern": false
+},
+{
+"zh": "需要權杖",
+"pattern": false
+},
+{
+"zh": "思考模式只能是 on、off、auto",
+"pattern": false
+},
+{
+"zh": "台北現在幾點？請用工具查。",
+"pattern": false
+},
+{
+"zh": "分片不齊：有 ",
+"pattern": false
+},
+{
+"zh": " 個，應有 ",
+"pattern": false
+},
+{
+"zh": " 個（下載可能還沒完成）",
+"pattern": false
+},
+{
+"zh": "，不能綁卡；請改回自動",
+"pattern": false
+},
+{
+"zh": "，欄位維持空的",
+"pattern": false
+},
+{
+"zh": " 的檔頭",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：檔案 ",
+"pattern": false
+},
+{
+"zh": " 顯存不足：這張要放約 ",
+"pattern": false
+},
+{
+"zh": " GiB（低於這張分到的 ",
+"pattern": false
+},
+{
+"zh": "已送出",
+"pattern": false
+},
+{
+"zh": "上下文長度與並行數要填整數",
+"pattern": false
+},
+{
+"zh": "要在 ",
+"pattern": false
+},
+{
+"zh": "下載站不支援續傳，",
+"pattern": false
+},
+{
+"zh": " 從頭下載",
+"pattern": false
+},
+{
+"zh": "接著上次的 {0} MB 繼續下載 {1}",
+"pattern": true
+},
+{
+"zh": "接著上次的",
+"pattern": false
+},
+{
+"zh": "MB 繼續下載",
+"pattern": false
+},
+{
+"zh": "這台正在安裝 ",
+"pattern": false
+},
+{
+"zh": "，等它裝完再裝",
+"pattern": false
+},
+{
+"zh": "磁碟不夠：安裝包 ",
+"pattern": false
+},
+{
+"zh": " GiB，解開要約三倍空間，這台只剩 ",
+"pattern": false
+},
+{
+"zh": "這台正在編譯 ",
+"pattern": false
+},
+{
+"zh": "，等它編完再編（同時編兩個會把記憶體吃光）",
+"pattern": false
+},
+{
+"zh": "\n----- 服務自己的 log -----\n",
+"pattern": false
+},
+{
+"zh": "手動指定顯示卡的格式不對",
+"pattern": false
+},
+{
+"zh": "sd-cli 啟動失敗：{0}",
+"pattern": true
+},
+{
+"zh": "sd-cli 啟動失敗",
+"pattern": false
+},
+{
+"zh": "sd-cli 結束碼 ",
+"pattern": false
+},
+{
+"zh": "沒有輸出",
+"pattern": false
+},
+{
+"zh": "連不到模型服務：",
+"pattern": false
+},
+{
+"zh": "連不上桌面小幫手（",
+"pattern": false
+},
+{
+"zh": "）：請確認有人登入這台的桌面",
+"pattern": false
+},
+{
+"zh": "服務退出",
+"pattern": false
+},
+{
+"zh": "查某個城市現在的時間",
+"pattern": false
+},
+{
+"zh": "」的",
+"pattern": false
+},
+{
+"zh": "自動偵測",
+"pattern": false
+},
+{
+"zh": "接著上次的 ",
+"pattern": false
+},
+{
+"zh": " MB 繼續下載 ",
+"pattern": false
+},
+{
+"zh": "已暫停",
+"pattern": false
+},
+{
+"zh": "[{0}%] 下載 {1}　{2} / {3} MB",
+"pattern": true
+},
+{
+"zh": "%] 下載",
+"pattern": false
+},
+{
+"zh": "顯示卡名稱要 1～80 個字",
+"pattern": false
+},
+{
+"zh": "顯存要在 0.5～4096 GiB 之間",
+"pattern": false
+},
+{
+"zh": "（沒填）",
+"pattern": false
+},
+{
+"zh": "sd-cli 啟動失敗：",
+"pattern": false
+},
+{
+"zh": "模型服務回 {0}",
+"pattern": true
+},
+{
+"zh": "模型服務回",
+"pattern": false
+},
+{
+"zh": "桌面小幫手回 {0}",
+"pattern": true
+},
+{
+"zh": "桌面小幫手回",
+"pattern": false
+},
+{
+"zh": "檔名含「",
+"pattern": false
+},
+{
+"zh": "%] 下載 ",
+"pattern": false
+},
+{
+"zh": "顯示卡廠牌只能是 ",
+"pattern": false
+},
+{
+"zh": "顯存要填數字（GiB）",
+"pattern": false
+},
+{
+"zh": "模型服務回 ",
+"pattern": false
+},
+{
+"zh": "桌面小幫手回 ",
+"pattern": false
+},
+{
+"zh": "不認得的按鍵：{0}",
+"pattern": true
+},
+{
+"zh": "不認得的按鍵",
+"pattern": false
+},
+{
+"zh": "不認得的按鍵：",
+"pattern": false
+}
+]

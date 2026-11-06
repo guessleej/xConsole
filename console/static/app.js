@@ -3497,7 +3497,7 @@ function viewLogs() {
 
 const SETTINGS_TABS = [
   ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
-  ["logs", "記錄"], ["account", "帳號與安全"], ["brand", "品牌與外觀"],
+  ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
 
 function viewSettings() {
@@ -3508,7 +3508,162 @@ function viewSettings() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   ({ machines: settingsMachines, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
-     account: settingsAccount, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+     account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+}
+
+/* ---------------------------------------------------------------- 版本與更新
+   主控台：檢查 GitHub 上的新版 → 一鍵更新（核對 sha256、先備份、失敗自動還原）→ 主控台重新啟動後自動重新整理。
+   不能連外的機器：在別台下載安裝包，這裡手動上傳並貼上 sha256。可以退回上一版。
+   各機代理：跟主控台隨附的那一份比，不一樣就可以在這裡推過去。 */
+async function settingsUpdate(wrap) {
+  const v = S.view;
+  const c = card("版本與更新", "主控台與各機代理的版本；更新前一律核對 sha256 並先備份");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  loading(body);
+  let ov;
+  try { ov = await api("/api/update"); } catch (ex) { errNote(body, ex.message); return; }
+  if (S.view !== v) return;
+  body.textContent = "";
+  body.appendChild(el("div", "tiles light", null));
+  const tiles = body.lastChild;
+  tiles.append(tileOf("主控台版本", ov.current || "未知", `來源：github.com/${ov.repo}`),
+    tileOf("各機代理", `${ov.nodes.filter((n) => n.current).length}/${ov.nodes.length} 台是最新`, "跟主控台隨附的那一份比"));
+  const jobBox = el("div");
+  body.appendChild(jobBox);
+  const drawJob = (job) => {
+    jobBox.textContent = "";
+    if (!job?.state) return;
+    const msg = { checking: "檢查更新包…", downloading: `下載中…${job.got ? `（${fmt(job.got / 1048576, 1)} MB）` : ""}`, installing: "安裝相依套件…",
+      applying: "備份並換上新版…", restarting: `換好了，主控台重新啟動中（備份 ${job.backup || ""}）…`, failed: `更新沒有成功：${job.error}` }[job.state] || job.state;
+    jobBox.appendChild(el("p", "note " + (job.state === "failed" ? "bad" : "warn"), msg));
+  };
+  drawJob(ov.job);
+  const watchJob = async () => {
+    for (;;) {
+      await new Promise((ok) => setTimeout(ok, 2000));
+      let r;
+      try { r = await api("/api/update"); } catch (_) { r = null; }
+      if (!r) { jobBox.textContent = ""; jobBox.appendChild(el("p", "note warn", "主控台重新啟動中，等它回來…")); continue; }
+      if (r.job?.state === "restarting") { drawJob(r.job); continue; }
+      if (r.current !== ov.current || (!r.job?.state && ov.job?.state === "restarting")) { toast(`已更新到 ${r.current}，重新載入頁面`, "ok"); setTimeout(() => location.reload(), 1200); return; }
+      drawJob(r.job);
+      if (!["checking", "downloading", "installing", "applying"].includes(r.job?.state)) return;
+    }
+  };
+
+  // ---- 檢查新版
+  body.appendChild(el("h4", "pick-h", "主控台"));
+  const chk = el("div");
+  const chkBtn = el("button", "btn primary", "檢查新版");
+  body.append(chkBtn, chk);
+  chkBtn.onclick = async () => {
+    chk.textContent = "";
+    loading(chk);
+    let r;
+    try { r = await api("/api/update/check", { method: "POST", body: {} }); } catch (ex) { chk.textContent = ""; errNote(chk, ex.message); return; }
+    chk.textContent = "";
+    chk.appendChild(el("p", "note " + (r.newer ? "warn" : ""), r.newer ? `有新版 ${r.latest}（目前 ${r.current}）${r.published ? "，" + new Date(r.published).toLocaleDateString("zh-TW") + " 發布" : ""}` : `目前就是最新版（${r.current}）`));
+    if (r.notes) { const pre = el("pre", "code-pre small upd-notes"); pre.textContent = r.notes; chk.appendChild(pre); }
+    if (r.newer && r.asset) {
+      chk.appendChild(el("p", "small muted", `安裝包 ${r.asset.name}（${fmt((r.asset.size || 0) / 1048576, 1)} MB），sha256 ${r.asset.sha256 ? r.asset.sha256.slice(0, 16) + "…" : "GitHub 沒有提供，不能自動更新"}`));
+      const go = el("button", "btn primary", `更新到 ${r.latest}`);
+      go.disabled = !r.asset.sha256;
+      go.onclick = () => modal({ title: `更新到 ${r.latest}`, bodyNode: el("p", null, "會先備份目前的檔，換上新版後主控台重新啟動（大約十幾秒，頁面會自動重新載入）。正在跑的模型不受影響。"),
+        confirmText: "開始更新", onConfirm: async () => {
+          try { await api("/api/update/apply", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+          drawJob({ state: "checking" });
+          watchJob();
+        } });
+      chk.appendChild(go);
+    }
+  };
+
+  // ---- 手動上傳
+  const up = el("details", "upd-manual");
+  up.appendChild(el("summary", null, "不能連外：手動上傳更新包"));
+  const fFile = el("input");
+  fFile.type = "file";
+  fFile.accept = ".gz,.tgz,application/gzip";
+  const fSha = textInput("", "從 GitHub 版本頁抄 sha256（64 碼）");
+  fSha.maxLength = 64;
+  const upBtn = el("button", "btn sm primary", "上傳並更新");
+  const upErr = el("div");
+  up.append(el("p", "small muted", `在能上網的電腦到 github.com/${ov.repo}/releases 下載 xconsole-版本.tar.gz，並抄下它的 sha256；兩樣都對了才會更新。`),
+    fieldBox("更新包", fFile), fieldBox("sha256", fSha), upBtn, upErr);
+  body.appendChild(up);
+  upBtn.onclick = async () => {
+    errNote(upErr, "");
+    const f = fFile.files[0];
+    if (!f) { errNote(upErr, "先選更新包"); return; }
+    if (!/^[0-9a-f]{64}$/i.test(fSha.value.trim())) { errNote(upErr, "sha256 要是 64 碼的十六進位"); return; }
+    if (f.size > 64 * 1024 * 1024) { errNote(upErr, "更新包要在 64 MB 以內"); return; }
+    upBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/update/upload?sha256=${fSha.value.trim().toLowerCase()}`, { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" }, body: f });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `伺服器回 ${res.status}`);
+    } catch (ex) { errNote(upErr, ex.message); upBtn.disabled = false; return; }
+    drawJob({ state: "checking" });
+    watchJob();
+  };
+
+  // ---- 退回上一版
+  if (ov.backups?.length) {
+    const b = ov.backups[0];
+    const rb = el("button", "btn sm", `退回上一版（${b.version}，${new Date(b.at * 1000).toLocaleString("zh-TW", { hour12: false })} 備份）`);
+    rb.onclick = () => modal({ title: "退回上一版", bodyNode: el("p", null, `把主控台換回 ${b.version}，然後重新啟動。各機代理不會跟著退，需要的話在下面個別處理。`),
+      confirmText: "退回", danger: true, onConfirm: async () => {
+        try { await api("/api/update/rollback", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+        drawJob({ state: "restarting" });
+        watchJob();
+      } });
+    body.appendChild(rb);
+  }
+
+  // ---- 各機代理
+  body.appendChild(el("h4", "pick-h", "各機代理"));
+  const tb = el("table", "api-table");
+  tb.innerHTML = "<thead><tr><th>機器</th><th>狀態</th><th></th></tr></thead>";
+  const tbody = el("tbody");
+  ov.nodes.forEach((n) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, n.name));
+    const stTd = el("td", "small " + (n.current ? "ok-t" : "warn-t"), !n.online ? (n.old_agent ? "代理太舊（沒有線上更新），請用安裝程式或部署腳本更新一次" : "連不上")
+      : n.current ? "最新" : `跟主控台隨附的不同（${(n.sha256 || "").slice(0, 8)}）`);
+    tr.appendChild(stTd);
+    const td = el("td", "row-acts");
+    if (n.online && !n.current) {
+      const b = el("button", "btn sm primary", "更新這台代理");
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api(`/api/update/agent/${n.id}`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); b.disabled = false; return; }
+        stTd.textContent = "已送出新版，代理重新啟動中…";
+        // 只更新這一列：等代理回來再問一次它的版本
+        for (let i = 0; i < 20; i++) {
+          await new Promise((ok) => setTimeout(ok, 3000));
+          let r;
+          try { r = await api("/api/update"); } catch (_) { continue; }
+          const me = r.nodes.find((x) => x.id === n.id);
+          if (me?.online) {
+            stTd.textContent = me.current ? "最新" : "已重新啟動，但版本還是不同";
+            stTd.className = "small " + (me.current ? "ok-t" : "warn-t");
+            b.remove();
+            return;
+          }
+        }
+        stTd.textContent = "代理一分鐘內沒有回來，請到那台看服務狀態";
+      };
+      td.appendChild(b);
+    }
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+  tb.appendChild(tbody);
+  body.appendChild(tb);
+  if (["checking", "downloading", "installing", "applying", "restarting"].includes(ov.job?.state)) watchJob();
 }
 
 function card(title, sub) {
@@ -4984,10 +5139,13 @@ window.addEventListener("scroll", () => {
 }, { passive: true });
 
 (async function boot() {
+  await i18nInit();                          // 選了別的語言就先載字典，畫面一出來就是那個語言
+  ["langpick-top", "langpick-login", "langpick-m"].forEach((id) => { const h = document.getElementById(id); if (h) h.appendChild(i18nPicker()); });
   try {
     await api("/api/me");
     start();
   } catch (_) {
     showLogin();
   }
+  i18nStart();
 })();

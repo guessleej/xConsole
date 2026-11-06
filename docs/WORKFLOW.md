@@ -30,18 +30,19 @@
 
 **管理者（多一台、多台）**
 
-7. 設定：機器（加一台、這台的設定、移除）、推理引擎、第三方 API、HTTPS 與憑證、服務使用報告、記錄、帳號、品牌。
+7. 設定：機器（加一台、這台的設定、移除）、推理引擎、第三方 API、HTTPS 與憑證、服務使用報告、記錄、帳號、版本與更新、品牌。
+   介面語言（繁體中文、English、日本語、한국어、跟隨系統）在頂列與登入畫面切換，記在這個瀏覽器。
    推理引擎下載可以暫停、斷線後接著下載；不能連外的機器改成手動匯入官方安裝包（送齊後核對 sha256）。
 
 ## 二、頂部導覽（禁左側欄）
 
-第一列：品牌｜概覽｜模型｜執行｜對話｜Agent｜畫圖｜影片｜設定｜（右側）目前這台機器 ▾、即時、重新整理、深淺色、登出。
+第一列：品牌｜概覽｜模型｜執行｜對話｜Agent｜畫圖｜影片｜設定｜（右側）目前這台機器 ▾、即時、重新整理、語言、深淺色、登出。
 
 - 「目前這台機器」是全站共用的選擇：概覽、模型、執行、Agent、畫圖、影片都只看這一台。只有一台時不顯示下拉，只顯示名稱。
 - 第二列只在有分頁的頁面出現：
   - 模型：推薦模型｜已安裝｜畫圖與影片模型｜搜尋 Hugging Face｜存放區（右側按鈕：匯入本機 GGUF）
   - 執行：執行模型｜角色欄位（進階）｜API 串接
-  - 設定：機器｜推理引擎｜第三方 API｜HTTPS 與憑證｜服務使用報告｜記錄｜帳號｜品牌
+  - 設定：機器｜推理引擎｜第三方 API｜HTTPS 與憑證｜服務使用報告｜記錄｜帳號｜版本與更新｜品牌
 - 概覽有「全部機器」切換：多台時第二列出現「這台｜全部機器」。
 
 ## 三、每一頁的骨架
@@ -111,6 +112,13 @@
 16. **操作電腦**：`GET /api/node/{n}/desktop/status` → `{enabled, available, how, why, os}`；`POST /api/computer/tasks {node, model, goal}`、
     `GET /api/computer/tasks/{id}?after=<截圖編號>`、`POST .../decide {allow, always, pending}`、`POST .../stop`；
     `POST /api/node/{n}/desktop/open {path}`（只開模型存放區與 Agent 工作資料夾底下）。
+17. **線上更新**：`GET /api/update` → `{current, job, backups, agent_sha256, nodes: [{id, name, online, sha256, current, old_agent}]}`；
+    `POST /api/update/check`（問 GitHub 最新正式版）、`POST /api/update/apply`（網址與 sha256 由主控台自己問 GitHub，不收畫面送的）、
+    `POST /api/update/upload?sha256=`（本文是 .tar.gz，`application/octet-stream`＋`X-XConsole-Upload: 1`，64 MB 內）、
+    `POST /api/update/rollback`、`POST /api/update/agent/{node}`（把隨附的代理推過去）。代理端 `GET /self`、`POST /self/update {code, sha256}`。
+    正式版由 `.github/workflows/release.yml` 在打 `v*` 標籤時建立（`VERSION` 要跟標籤一致）。
+18. **介面語言**：`console/static/i18n.js` 依選的語言把畫面文字換成 `i18n-{en,ja,ko}.json`；字典由 `scripts/i18n_extract.py` 抽字串、
+    `scripts/i18n_translations.json` 是翻譯真本、`scripts/i18n_build.py` 產生字典。模型回答、程式碼、路徑不翻。
 13. **取樣參數**：本機對話（`/api/node/{n}/chat/{s}`）與助理（`/api/assistant` 的 `sampling`）收 `temperature` 0～2、`top_p` 0～1、
     `top_k` 0～1000 整數、`min_p` 0～1、`repeat_penalty` 0.5～2、`presence_penalty` -2～2、`max_tokens` 1～131072、`seed` -1～2^31-1（-1＝隨機，不送）；
     第三方 API 只轉送 `temperature`、`top_p`、`presence_penalty`、`max_tokens`、`seed`。助理另收 `system`（接在主控台的助理指示後面）。

@@ -16,6 +16,7 @@ node_agent 沒有的那一層：角色欄位與模型、准入控制、啟停、
 import base64
 import functools
 import glob
+import hashlib
 import io
 import json
 import math
@@ -7003,6 +7004,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*slot_progress(m.group(1)))
         if path == "/agent/folders":
             return self._send(*agent_folders())
+        if path == "/self":
+            return self._send(200, {"sha256": agent_sha(), "os": OS, "python": sys.version.split()[0]})
         if path == "/desktop/status":
             return self._send(*desktop_status())
         if path == "/desktop/screenshot":
@@ -7129,6 +7132,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*agent_folder_create(body.get("name")))
         if path == "/llama/args":
             return self._send(*llama_args_set(str(body.get("model") or ""), body.get("args")))
+        if path == "/self/update":
+            return self._send(*self_update(body))
         if path == "/desktop/act":
             if not desktop_enabled():
                 return self._send(403, {"error": "這台沒有開「讓模型操作這台的桌面」，請到這台的設定打開", "disabled": True})
@@ -7713,6 +7718,59 @@ def desktop_status():
     return 200, {"enabled": desktop_enabled(), "available": how is not None, "how": how, "why": why if how is None else None, "os": OS}
 
 
+AGENT_FILE = os.path.abspath(__file__)
+
+
+def agent_sha():
+    try:
+        with open(AGENT_FILE, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def self_update(body):
+    """主控台推來的新版代理：核對 sha256、先編譯一次，舊的留 .bak，再換上；回應送出後結束，由服務管理員重新帶起。
+    Windows 的桌面小幫手那一份也一起換（它自己發現檔案換了會重新啟動）。"""
+    import py_compile
+    try:
+        data = base64.b64decode(str(body.get("code") or ""), validate=True)
+    except (ValueError, TypeError):
+        return 400, {"error": "程式內容格式不對"}
+    want = str(body.get("sha256") or "").lower()
+    if not data or len(data) > 4 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != want:
+        return 400, {"error": "程式內容的 sha256 對不上，不更新"}
+    if b"xconsole-agent" not in data:
+        return 400, {"error": "這不像 xConsole 的代理程式"}
+    tmp = AGENT_FILE + ".new"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    try:
+        py_compile.compile(tmp, doraise=True, cfile=tmp + "c")
+    except py_compile.PyCompileError as ex:
+        os.remove(tmp)
+        return 400, {"error": f"新版編譯不過，不更新：{str(ex)[:200]}"}
+    finally:
+        if os.path.exists(tmp + "c"):
+            os.remove(tmp + "c")
+    shutil.copy2(AGENT_FILE, AGENT_FILE + ".bak")
+    os.replace(tmp, AGENT_FILE)
+    if OS == "windows":
+        user = (load_text(os.path.join(STATE_DIR, "desktop-user.txt")) or "").strip()
+        hp = os.path.join(desktop_user_dir(user), "desktop", "xconsole_agent.py") if user else None
+        if hp and os.path.isfile(hp):
+            try:
+                shutil.copy2(AGENT_FILE, hp)
+            except OSError:
+                pass
+
+    def bye():
+        time.sleep(1.5)
+        os._exit(3)                       # 不是 0：Windows 排程要「失敗」才會重新啟動；systemd／launchd 一律重啟
+    threading.Thread(target=bye, daemon=True).start()
+    return 200, {"ok": True, "sha256": want, "restarting": True}
+
+
 def run_desktop_helper():
     """桌面小幫手：使用者登入後以使用者身分啟動，只聽 127.0.0.1、要權杖。權杖與埠寫在使用者自己的資料夾給代理讀。"""
     d = desktop_user_dir()
@@ -7757,6 +7815,23 @@ def run_desktop_helper():
     with open(tmp, "w", encoding="utf-8") as fh:
         json.dump({"port": srv.server_address[1], "token": tok, "pid": os.getpid()}, fh)
     os.replace(tmp, p)
+
+    def watch():
+        # 代理更新時會把這份程式換掉：發現檔案變了就用新版重新啟動自己（排程只在登入時帶一次，不會幫忙重啟）
+        try:
+            mt = os.path.getmtime(AGENT_FILE)
+        except OSError:
+            return
+        while True:
+            time.sleep(20)
+            try:
+                if os.path.getmtime(AGENT_FILE) != mt:
+                    kw = {"creationflags": 0x00000008 | 0x00000200} if OS == "windows" else {"start_new_session": True}
+                    subprocess.Popen([sys.executable, AGENT_FILE, "--desktop-helper"], **kw)
+                    os._exit(0)
+            except OSError:
+                continue
+    threading.Thread(target=watch, daemon=True).start()
     srv.serve_forever()
 
 
