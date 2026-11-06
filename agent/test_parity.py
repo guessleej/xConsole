@@ -196,6 +196,18 @@ def main():
     finally:
         A._profile_cached = real_prof
 
+    # ---- 9. 桌面小幫手的權杖不出這台
+    import json as _j
+    real_route = A.desktop_route
+    A.desktop_route = lambda: ("helper", (54321, "HELPER-SECRET-TOKEN"))
+    try:
+        info = _j.dumps(A.machine_info(), ensure_ascii=False)
+        case("機器資訊不含桌面小幫手的埠與權杖", "HELPER-SECRET-TOKEN" not in info and "54321" not in info)
+        eq("  只回怎麼操作", A.machine_info()["desktop"], {"how": "helper", "why": None})
+    finally:
+        A.desktop_route = real_route
+    eq("顯示卡名稱帶 (TM) 也對得到頻寬", A.spec_bandwidth("AMD Radeon(TM) 890M Graphics"), 89.6)
+
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)
 
