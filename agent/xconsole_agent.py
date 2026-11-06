@@ -4328,8 +4328,15 @@ def _gh_json(path):
     if re.fullmatch(r"[\w-]{20,255}", tok):
         h["Authorization"] = "Bearer " + tok
     req = urllib.request.Request(GH_API + path, headers=h)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.load(resp)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as ex:
+        lim, reset = ex.headers.get("X-RateLimit-Limit"), ex.headers.get("X-RateLimit-Reset")
+        if ex.code in (403, 429) and ex.headers.get("X-RateLimit-Remaining") == "0":
+            when = time.strftime("%H:%M", time.localtime(int(reset))) if (reset or "").isdigit() else "一小時內"
+            raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{'有' if 'Authorization' in h else '沒有'}帶權杖，{when} 後恢復）") from ex
+        raise
 
 
 def pick_release(releases, variant, extra, kind="llama"):
