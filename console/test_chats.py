@@ -88,19 +88,22 @@ def main():
     check("沒登入看不到對話紀錄", st == 401)
     req("POST", "/api/login", {"username": "admin", "password": "chat-test-pw"})
 
-    msgs = [{"role": "user", "content": f"請記住：{SECRET}", "image": f"data:image/png;base64,{PNG}"},
+    msgs = [{"role": "user", "content": f"請記住：{SECRET}", "image": f"data:image/png;base64,{PNG}",
+             "docs": [{"name": "會議記錄.pdf", "text": "附件裡才有的字：海龜湯", "chars": 10}]},
             {"role": "assistant", "content": "好的，記住了。", "alts": [{"content": "第一版"}, {"content": "好的，記住了。"}], "alt": 1}]
-    st, out, _ = req("POST", "/api/chats/save", {"title": "測試對話", "target": "slot:n1:s1", "msgs": msgs,
+    st, out, _ = req("POST", "/api/chats/save", {"title": "標題也機密-客戶甲", "target": "slot:n1:s1", "msgs": msgs,
                                                  "settings": {"system": "用條列", "temperature": 0.7, "top_k": 40}})
     check("新增對話：回編號與附圖對應", st == 200 and len(out.get("id", "")) == 12 and out["images"].get("0", "").startswith("blob:"), out)
     cid, ref = out["id"], out["images"]["0"]
 
     row = x.STORE.chat_get("admin", cid)
     check("  資料庫裡內容是 enc:v1: 密文", row["body"].startswith("enc:v1:") and SECRET not in row["body"])
+    check("  標題也是 enc:v1: 密文（取自第一句話，一樣是使用者內容）", row["title"].startswith("enc:v1:") and "客戶甲" not in row["title"])
     blob = x.STORE.blob_get("admin", ref[5:])
     check("  附圖也是 enc:v1: 密文", blob["data"].startswith("enc:v1:"))
     files = glob.glob(os.path.join(TMP, ".xconsole", "xconsole.db*"))
-    check("  資料庫檔案（含 WAL）找不到明文", files and not any(SECRET.encode() in open(f, "rb").read() for f in files), files)
+    check("  資料庫檔案（含 WAL）找不到明文（內容與標題）", files and not any(SECRET.encode() in open(f, "rb").read()
+                                                       or "客戶甲".encode() in open(f, "rb").read() for f in files), files)
     try:
         x.STORE.chat_put("admin", {"id": "0" * 12, "body": "plain"})
         check("  儲存層拒收沒加密的內容", False)
@@ -115,20 +118,25 @@ def main():
 
     st, out, _ = req("GET", "/api/chats?q=" + urllib.parse.quote("客戶名單"))
     check("搜尋找得到內容（解密後比對）並帶摘錄", st == 200 and [i["id"] for i in out["items"]] == [cid] and "客戶名單" in out["items"][0]["snippet"], out)
+    st, out, _ = req("GET", "/api/chats?q=" + urllib.parse.quote("海龜湯"))
+    check("  附件抽出的文字也搜得到", [i["id"] for i in out["items"]] == [cid], out)
+    st, out, _ = req("GET", "/api/chats?q=" + urllib.parse.quote("客戶甲"))
+    check("  搜得到標題（解密後比對），列表回的是明文標題", [i["title"] for i in out["items"]] == ["標題也機密-客戶甲"], out)
     st, out, _ = req("GET", "/api/chats?q=" + urllib.parse.quote("不存在的字"))
     check("  找不到就是空的", out["items"] == [])
     st, out, _ = req("GET", "/api/chats")
     check("列表不回內容（只有標題、時間、則數）", st == 200 and "body" not in out["items"][0] and out["items"][0]["n_msgs"] == 2, out)
 
     st, out, _ = req("POST", f"/api/chats/{cid}/rename", {"title": "改過的標題"})
-    check("改名", st == 200 and x.STORE.chat_get("admin", cid)["title"] == "改過的標題")
+    check("改名（存的是密文、讀回是新標題）", st == 200 and x.STORE.chat_get("admin", cid)["title"].startswith("enc:v1:")
+          and req("GET", f"/api/chats/{cid}")[1]["title"] == "改過的標題")
 
     # ---- 別人的對話
-    x.STORE.chat_put("alice", {"id": "a" * 12, "title": "alice 的", "body": x.chat_seal(b'{"msgs":[]}')})
+    x.STORE.chat_put("alice", {"id": "a" * 12, "title": x.chat_seal("alice 的".encode()), "body": x.chat_seal(b'{"msgs":[]}')})
     st, out, _ = req("GET", "/api/chats/" + "a" * 12)
     check("別人的對話讀不到（當作不存在）", st == 404)
     st, out, _ = req("POST", "/api/chats/save", {"id": "a" * 12, "msgs": [{"role": "user", "content": "蓋掉"}]})
-    check("  也蓋不掉", st == 404 and x.STORE.chat_get("alice", "a" * 12)["title"] == "alice 的")
+    check("  也蓋不掉", st == 404 and x.chat_unseal(x.STORE.chat_get("alice", "a" * 12)["title"]).decode() == "alice 的")
     st, _, _ = req("POST", "/api/chats/" + "a" * 12 + "/delete", {})
     check("  也刪不掉", st == 404 and x.STORE.chat_get("alice", "a" * 12))
     x.STORE.blob_put("alice", "a" * 12, "b" * 16, "image/png", x.chat_seal(b"x"))
@@ -154,9 +162,24 @@ def main():
 
     # ---- 上限：每人 500 則，超過刪最舊的
     for i in range(chats.KEEP_PER_USER + 3):
-        x.STORE.chat_put("bob", {"id": f"{i:012x}", "title": str(i), "body": x.chat_seal(b"{}")}, keep=chats.KEEP_PER_USER)
+        x.STORE.chat_put("bob", {"id": f"{i:012x}", "title": x.chat_seal(str(i).encode()), "body": x.chat_seal(b"{}")}, keep=chats.KEEP_PER_USER)
     left = x.STORE.chat_list("bob")
-    check("每人最多 500 則，超過刪最舊的", len(left) == chats.KEEP_PER_USER and "0" not in {r["title"] for r in left})
+    check("每人最多 500 則，超過刪最舊的", len(left) == chats.KEEP_PER_USER and "0" * 12 not in {r["id"] for r in left})
+
+    # ---- 附圖總量上限（一個帳號不能把主控台的磁碟塞滿）
+    real_pc = chats.BLOB_PER_CHAT
+    chats.BLOB_PER_CHAT = 500
+    try:
+        st, out, _ = req("POST", "/api/chats/save", {"id": cid, "msgs": [{"role": "user", "content": "x", "image": f"data:image/png;base64,{PNG}"},
+                                                                       {"role": "user", "content": "y", "image": f"data:image/png;base64,{PNG}"}]})
+        check("附圖超過這則對話的總量上限：拒收", st == 413, out)
+    finally:
+        chats.BLOB_PER_CHAT = real_pc
+    try:
+        x.STORE.chat_put("admin", {"id": cid, "title": "plain", "body": x.chat_seal(b"{}")})
+        check("儲存層拒收沒加密的標題", False)
+    except ValueError:
+        check("儲存層拒收沒加密的標題", True)
 
     st, out, _ = req("POST", f"/api/chats/{cid}/delete", {})
     check("刪除", st == 200 and x.STORE.chat_get("admin", cid) is None)

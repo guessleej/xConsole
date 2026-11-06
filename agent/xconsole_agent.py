@@ -4624,7 +4624,10 @@ def prebuilt_variant(kind="llama"):
             return ("macos-arm64", None, "Apple Silicon，用 Metal 加速") if arm else (None, None, "Intel Mac 沒有官方預編譯版")
         if arm:
             return None, None, "Windows on ARM 沒有官方預編譯版"
-        if has_nvidia():
+        ov = gpu_override()
+        if ov == "cpu":
+            return "win-cpu-x64", None, "這台的設定指定不用 GPU，只用 CPU"
+        if (isinstance(ov, dict) and ov.get("vendor") == "nvidia") or (not isinstance(ov, dict) and has_nvidia()):
             return "win-cuda12-x64", "cudart-sd-bin-win-cu12-x64.zip", "NVIDIA 顯示卡，用 CUDA 12"
         if probe_win_adapters():
             return "win-vulkan-x64", None, "AMD／Intel 顯示卡，用 Vulkan 加速"
@@ -4639,7 +4642,7 @@ def prebuilt_variant(kind="llama"):
         return f"win-cpu-{a}", None, "這台的設定指定不用 GPU，只用 CPU"
     if isinstance(ov, dict) and ov.get("vendor") in ("amd", "intel"):
         return f"win-vulkan-{a}", None, f"這台的設定指定 {ov['name']}，用 Vulkan 加速"
-    if has_nvidia():
+    if (isinstance(ov, dict) and ov.get("vendor") == "nvidia") or has_nvidia():   # 偵測失敗時，手動指定 NVIDIA 也要裝 CUDA 版
         _, out, _ = sh(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], timeout=15)
         m = re.match(r"(\d+)", out.strip())
         drv = int(m.group(1)) if m else 0
@@ -5402,7 +5405,6 @@ def check_sd_cli(raw):
     return p, None
 
 
-@_locked
 def check_mirror(v, kind):
     """Hugging Face 鏡像／GitHub 加速字首：只收 https、不帶帳密與查詢字串。空白＝不用。"""
     v = str(v or "").strip()
@@ -5415,6 +5417,7 @@ def check_mirror(v, kind):
     return (v.rstrip("/") if kind == "hf_mirror" else (v if v.endswith("/") else v + "/")), None
 
 
+@_locked
 def save_machine(body):
     reg = registry()
     m = reg["machine"]
@@ -5745,6 +5748,8 @@ def agent_link_denied(path):
             return f"{parts[0]} 是系統資料夾"
         if parts[0].lower() == "users" and len(parts) <= 2:
             return "不能直接用整個使用者資料夾；請選裡面的一個資料夾（例：文件、桌面底下的專案）"
+        if parts[0].lower() == "users" and parts[1].lower() not in win_own_users():
+            return f"{parts[1]} 是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾"
         if len(parts) >= 3 and parts[0].lower() == "users" and parts[2].lower() == "appdata":
             return "AppData 放的是程式設定與登入資料，不能給 Agent"
         if len(parts) >= 3 and parts[0].lower() == "users" and parts[2].startswith("."):
@@ -5756,8 +5761,10 @@ def agent_link_denied(path):
             return "這是系統資料夾"
         if low in ROOT_ONLY_DENY:
             return "請選裡面的資料夾"
-    if full == home or home.startswith(full + os.sep) or \
-            (os.path.dirname(full) == os.path.dirname(home) and not full.startswith(home + os.sep)):
+    parent = os.path.dirname(home)
+    other = OS != "windows" and parent not in ("/", "") and full.startswith(parent + os.sep) \
+        and not full.startswith(home + os.sep) and full.split(os.sep)[len(parent.split(os.sep))] != "Shared"
+    if full == home or home.startswith(full + os.sep) or other:
         return "不能直接用整個家目錄、包含家目錄的上層、或別人的家目錄；請選家目錄底下的一個資料夾"
     st = os.path.realpath(STATE_DIR)
     if full == st or full.startswith(st + os.sep) or st.startswith(full + os.sep):
@@ -5771,6 +5778,22 @@ def agent_link_denied(path):
     if not os.access(full, os.R_OK | os.W_OK | os.X_OK):
         return "代理帳號對這個資料夾沒有讀寫權限"
     return None
+
+
+def win_own_users():
+    """Windows：代理可以碰的使用者資料夾名稱（小寫）。以 SYSTEM 執行時只有安裝時記下的桌面使用者；
+    其他人的 C:\\Users\\<名字> 底下一律不給（SYSTEM 讀得到所有人的檔案）。Public 是共用資料夾，可以。"""
+    own = {"public"}
+    du = (load_text(os.path.join(STATE_DIR, "desktop-user.txt")) or "").strip()
+    if du:
+        own.add(du.lower())
+    parts = [x for x in re.split(r"[\\/]+", os.path.splitdrive(os.path.realpath(HOME))[1]) if x]
+    if len(parts) >= 2 and parts[0].lower() == "users":
+        own.add(parts[1].lower())
+    me = os.environ.get("USERNAME") or ""
+    if me and not me.endswith("$") and me.upper() != "SYSTEM":
+        own.add(me.lower())
+    return own
 
 
 def agent_links(reg=None):
@@ -7344,9 +7367,14 @@ def desktop_route():
         return "helper", (int(info["port"]), str(info["token"]))
     if OS == "darwin":
         return "direct", None
-    if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY") or _linux_display_env():
-        return "direct", None
-    return None, "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）"
+    # ponytail: 只做 X11（xdotool）；純 Wayland 截得到圖但點不了，所以照實說不能用，要支援再補 ydotool
+    if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY") or _linux_display_env()):
+        return None, "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）"
+    if not _linux_env().get("DISPLAY"):
+        return None, "這台是純 Wayland 桌面，滑鼠鍵盤送不進去；請登入時改選 X11（Xorg）工作階段"
+    if not shutil.which("xdotool"):
+        return None, "這台沒有送滑鼠鍵盤事件的工具：sudo apt install xdotool"
+    return "direct", None
 
 
 def _linux_display_env():
@@ -7609,7 +7637,7 @@ def _mac_act(a, x, y, x2, y2, text, keys, dy):
             post(ev)
 
 
-# ---- Linux：grim／ImageMagick 截圖、xdotool／ydotool 送事件
+# ---- Linux：grim／ImageMagick 截圖、xdotool 送事件（X11）
 def _linux_env():
     return {**os.environ, **_linux_display_env(), **{k: v for k, v in os.environ.items() if k in ("DISPLAY", "WAYLAND_DISPLAY")}}
 
@@ -7626,7 +7654,7 @@ def _linux_capture(max_w):
                 if os.path.exists(p) and os.path.getsize(p) > 100:
                     break
         else:
-            raise RuntimeError("這台沒有截圖工具：sudo apt install imagemagick xdotool（Wayland 桌面另裝 grim ydotool）")
+            raise RuntimeError("這台沒有截圖工具：sudo apt install imagemagick xdotool")
         if not os.path.exists(p):
             raise RuntimeError("擷取不到螢幕")
         sw, sh_ = _png_size(p)
