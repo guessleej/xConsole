@@ -2656,7 +2656,7 @@ class Handler(BaseHTTPRequestHandler):
             title = str(body.get("title") or "").strip()[:80]
             if not title:
                 return self._json(400, {"error": "標題不能空白"})
-            ok = STORE.chat_rename(self.user, cid, title)
+            ok = STORE.chat_rename(self.user, cid, chat_seal(title.encode()))
             return self._json(200 if ok else 404, {"ok": True, "title": title} if ok else {"error": "沒有這則對話"})
         if path == "/api/chats/delete-all":
             n = 0

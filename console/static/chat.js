@@ -66,13 +66,16 @@ async function migrateOldChats() {
   try { old = JSON.parse(sessionStorage.getItem("xconsole-chats") || "[]"); } catch (_) { old = []; }
   if (!Array.isArray(old) || !old.length) return;
   let n = 0;
+  const left = [];
   for (const s of old) {
     const msgs = (s.msgs || []).filter((m) => m && (m.role === "user" || m.role === "assistant"));
     if (!msgs.length) continue;
-    try { await api("/api/chats/save", { method: "POST", body: { title: s.title || "新對話", target: s.target || "", msgs: msgs.map(packMsg), settings: {} } }); n += 1; } catch (_) { /* 一則壞掉不擋其他則 */ }
+    try { await api("/api/chats/save", { method: "POST", body: { title: s.title || "新對話", target: s.target || "", msgs: msgs.map(packMsg), settings: {} } }); n += 1; }
+    catch (_) { left.push(s); }                  // 沒搬成功的留著，下次進來再試，不能直接丟掉
   }
-  try { sessionStorage.removeItem("xconsole-chats"); } catch (_) { /* 無痕 */ }
+  try { if (left.length) sessionStorage.setItem("xconsole-chats", JSON.stringify(left)); else sessionStorage.removeItem("xconsole-chats"); } catch (_) { /* 無痕 */ }
   if (n) toast(`已把這個分頁裡的 ${n} 則對話存到主控台`, "ok");
+  if (left.length) toast(`還有 ${left.length} 則舊對話沒搬成功，下次打開對話頁會再試`, "bad");
 }
 
 function packMsg(m) {
@@ -165,8 +168,8 @@ function sampleBody(cur, t) {
   const st = cur.settings || {};
   const out = {};
   (t.local ? CHAT_PARAMS.map((p) => p[0]) : STD_PARAMS).forEach((k) => { if (st[k] !== undefined && st[k] !== null && st[k] !== "") out[k] = st[k]; });
-  if (out.max_tokens === undefined) out.max_tokens = 8192;
-  if (t.ctx && out.max_tokens > t.ctx / 2) out.max_tokens = Math.max(256, Math.floor(t.ctx / 2));
+  // 空白＝不限（交給模型服務自己的預設）；有填才送，而且不超過上下文的一半
+  if (out.max_tokens !== undefined && t.ctx && out.max_tokens > t.ctx / 2) out.max_tokens = Math.max(256, Math.floor(t.ctx / 2));
   return out;
 }
 
@@ -183,7 +186,7 @@ async function maybeCompress(cur, t, msgs, note) {
   const ctx = t.ctx || 32768;
   const hist = await buildHistory(cur, msgs, t);
   const used = hist.reduce((a, m) => a + estTokens(typeof m.content === "string" ? m.content : m.content[0].text) + (Array.isArray(m.content) ? 800 : 0), 0);
-  const reserve = Math.min(sampleBody(cur, t).max_tokens, Math.floor(ctx / 4));
+  const reserve = Math.min(sampleBody(cur, t).max_tokens || 4096, Math.floor(ctx / 4));
   const from = cur.summary?.upto || 0;
   if (used + reserve <= ctx * 0.75 || msgs.length - from <= 6) return hist;
   let upto = msgs.length - 4;
@@ -298,6 +301,7 @@ async function runGen(cur, t, reply, text, intent, initImage, paint) {
   g.model = model.id; g.title = model.title;
   g.state = "prompt"; paint();
   g.prompt = await genPrompt(t, text, intent.kind, intent.edit);
+  if (cur._genStop) { Object.assign(g, { state: "failed", error: "已停止" }); return; }
   const d = model.defaults || {};
   const body = { model: model.id, prompt: g.prompt, negative: "", width: d.width || 1024, height: d.height || 1024,
     steps: d.steps ?? 20, cfg: d.cfg ?? 1, seed: -1, sampler: d.sampler || "euler",
@@ -308,6 +312,7 @@ async function runGen(cur, t, reply, text, intent, initImage, paint) {
     Object.assign(g, { state: "failed", error: ex.data?.admit ? ex.data.admit.reasons.join("；") : ex.message }); return;
   }
   Object.assign(g, { job: r.id, state: "running", _watch: true });
+  if (cur._genStop) { api(`/api/node/${n.id}/sd/jobs/${r.id}/cancel`, { method: "POST", body: {} }).catch(() => {}); }
   await saveChat(cur);
   await watchChatGen(g, paint);
 }
@@ -604,12 +609,13 @@ async function viewChat() {
   inputRow.append(docsRow, ta, tools);
   drawDocs();
   mainCol.append(noteRow, inputRow);
-  sel.onchange = () => { cur.target = sel.value; syncMode(); syncStatus(); };
+  sel.onchange = () => { cur.target = sel.value; syncMode(); syncStatus(); if (cur.id) saveChat(cur); };
   syncMode();
   syncStatus();
 
   const lock = (on) => {
     cur.busy = on; send.disabled = on; stopB.hidden = !on;
+    if (on) cur._genStop = false;
     box.querySelectorAll(".msg-acts button, .msg-acts select").forEach((b) => { if (!b.closest(".pc-pending")) b.disabled = on; });
   };
   const paintOf = (m) => () => paintReply(m, box, false, acts);
@@ -631,10 +637,14 @@ async function viewChat() {
       let history = await maybeCompress(cur, t, msgsForCtx, setNote);
       if (cur.summary !== before) { drawAll(); syncStatus(); }
       if (extra) history = history.concat(extra);
-      if (cur.settings?.tools && t.local) {
+      const hasImg = history.some((m) => Array.isArray(m.content));
+      if (cur.settings?.tools && t.local && hasImg) setNote("這一則有附圖：工具只能處理文字，這次改用一般對話回答（看得到圖）");
+      if (cur.settings?.tools && t.local && !hasImg) {
+        // 系統提示詞與長對話的摘要都在 system 那一則：一起交給助理，壓縮過的前情才不會掉
+        const sys = history.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
         const r = await api("/api/assistant", { method: "POST", signal: cur.ctl.signal, body: { node: t.n.id, slot: t.s.id,
-          messages: history.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content : m.content[0].text })),
-          system: cur.settings?.system || "", sampling: sampleBody(cur, t) } });
+          messages: history.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
+          system: sys, sampling: sampleBody(cur, t) } });
         Object.assign(reply, { content: r.content, reasoning: r.reasoning, pending: false,
           stat: [r.steps?.length ? `查了：${r.steps.map((x) => TOOL_LABEL[x.tool] || x.tool).join("、")}` : "沒有用到工具",
             `${fmt((performance.now() - t0) / 1000, 1)} 秒`].filter(Boolean).join("・") });
@@ -654,7 +664,11 @@ async function viewChat() {
       cur.ctl = null;
       if (!reply.content && !reply.error && reply.stat !== "已停止") reply.content = "（沒有回答）";
       reply.pending = false;
-      if (reply.alts) { reply.alts.push({ content: reply.content, reasoning: reply.reasoning, stat: reply.stat }); reply.alt = reply.alts.length - 1; }
+      if (reply.alts) {
+        reply.alts.push({ content: reply.content, reasoning: reply.reasoning, stat: reply.stat });
+        if (reply.alts.length > 10) reply.alts.splice(0, reply.alts.length - 10);     // 主控台最多存 10 個版本：丟最舊的
+        reply.alt = reply.alts.length - 1;
+      }
       setNote("");
       lock(false);
       paintReply(reply, box, true, acts);
@@ -733,7 +747,7 @@ async function viewChat() {
     }
     reply.content = cp.state === "done" ? `已完成：${cp.result || ""}` : cp.state === "stopped" ? "已停止操作電腦" : `操作電腦沒有完成：${cp.error || ""}`;
     cur.pcTask = null;
-    stopB.onclick = () => cur.ctl?.abort();
+    stopB.onclick = stopAll;
     lock(false);
     paintReply(reply, box, true, acts);
     saveChat(cur);
@@ -745,11 +759,13 @@ async function viewChat() {
     copy: (m) => copyText(m.content || ""),
     regen: (i) => {
       const m = cur.msgs[i];
+      if (cur.summary && i < cur.summary.upto) cur.summary = null;     // 改的是壓縮進摘要的那段：摘要作廢，下次再重算
       if (m.gen) return regenMedia(i);
       answer(m, cur.msgs.slice(0, i), null, true);
     },
     rewrite: (i, kind) => {
       const m = cur.msgs[i];
+      if (cur.summary && i < cur.summary.upto) cur.summary = null;
       const rw = REWRITE.find((x) => x[0] === kind);
       answer(m, cur.msgs.slice(0, i + 1), [{ role: "user", content: rw[2] }], true);
     },
@@ -847,7 +863,14 @@ async function viewChat() {
 
   drawAll();
   send.onclick = submit;
-  stopB.onclick = () => cur.ctl?.abort();
+  // 停止：文字回答中斷串流；畫圖、影片取消那台的產生工作（還在準備就不送出）
+  const stopAll = () => {
+    cur.ctl?.abort();
+    cur._genStop = true;
+    const g = [...cur.msgs].reverse().find((m) => m.gen)?.gen;
+    if (g?.job && g.state === "running") api(`/api/node/${g.node}/sd/jobs/${g.job}/cancel`, { method: "POST", body: {} }).catch(() => {});
+  };
+  stopB.onclick = stopAll;
   imeGuard(ta, submit, { shiftNewline: true });
   ta.focus();
 }
