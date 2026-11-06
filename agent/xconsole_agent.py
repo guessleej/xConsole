@@ -501,8 +501,8 @@ _TYPEPERF = {"at": 0.0, "val": 0}
 
 
 def _win_gpu_used():
-    """GPU 專用記憶體已用量（typeperf 起一次要 2 秒，頁面每次載入會問好幾次）：快取 10 秒。"""
-    if time.time() - _TYPEPERF["at"] < 10:
+    """GPU 專用記憶體已用量（typeperf 起一次要 2 秒，頁面每次載入會問好幾次）：快取 30 秒。"""
+    if time.time() - _TYPEPERF["at"] < 30:
         return _TYPEPERF["val"]
     _, out, _ = sh(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"], timeout=15)
     rows = [ln for ln in out.splitlines() if ln.startswith('"') and "/" in ln[:15]]
@@ -639,9 +639,30 @@ def hardware():
     return {**hw, "gpu": g, "gpu_manual": True}
 
 
+_PORT_SEEN = {}
+
+
+def _port_open(url, ttl=60):
+    """本機那個埠有沒有人在聽：先用 0.3 秒試連，沒有就記 60 秒。
+    Windows 連沒人聽的本機埠不會馬上被拒絕，會重送到約 2 秒才放棄（HP 實測：每頁多等 4 秒）。"""
+    u = urllib.parse.urlparse(url)
+    hit = _PORT_SEEN.get(u.netloc)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    try:
+        socket.create_connection((u.hostname, u.port), timeout=0.3).close()
+        ok = True
+    except OSError:
+        ok = False
+    _PORT_SEEN[u.netloc] = (time.time(), ok)
+    return ok
+
+
 def _hardware_raw():
     """先用同機已在跑的 node_agent，拿不到才自己量。拿不到就老實標未知，不假裝零。"""
-    for url in NODE_AGENTS:
+    for url in () if DESKTOP_AGENT else NODE_AGENTS:      # 桌面版（一般人的電腦）不會有機房的監控程式
+        if not _port_open(url):
+            continue
         try:
             with LOCAL.open(url, timeout=4) as resp:
                 data = json.load(resp)
@@ -3009,7 +3030,7 @@ def llama_server_exe(reg=None):
         return expand(want)
     best, best_ver = None, -1
     for cand in llama_globs():
-        rc, out, err = sh([cand, "--version"], timeout=15)
+        rc, out, err = exe_version(cand)
         ver = llama_build_no(cand, out + err)
         score = ver + (10 ** 6 if llama_backend(cand) != "只有 CPU" else 0)
         if rc == 0 and score > best_ver:
@@ -5398,10 +5419,26 @@ def storage_choices():
     return sorted(out, key=lambda x: (x["hdd"] is True, -x["free_gib"]))
 
 
+_VERSION_CACHE = {}
+
+
+def exe_version(path):
+    """跑一次 `<執行檔> --version`，依「路徑＋修改時間＋大小」快取：同一支執行檔結果不會變，
+    Windows 的 llama-server 一啟動就初始化 Vulkan，每問一次要 2 秒（頁面每次載入會問好幾次）。"""
+    try:
+        st = os.stat(path)
+        key = (path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return 1, "", "找不到"
+    if key not in _VERSION_CACHE:
+        _VERSION_CACHE[key] = sh([path, "--version"], timeout=15)
+    return _VERSION_CACHE[key]
+
+
 def llama_candidates():
     out = []
     for cand in llama_globs():
-        rc, o, e = sh([cand, "--version"], timeout=15)
+        rc, o, e = exe_version(cand)
         out.append({"path": cand, "ok": rc == 0, "build": llama_build_no(cand, o + e) or None,
                     "backend": llama_backend(cand)})
     return out
@@ -8086,6 +8123,15 @@ def run_desktop_helper():
 
 
 
+def _warm_caches():
+    """代理一啟動就在背景把慢的查詢先跑一次（磁碟種類、llama-server 版本、顯示卡用量），使用者第一次開頁不用等。"""
+    for fn in (storage_choices, llama_candidates, probe_gpus):
+        try:
+            fn()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 @_locked
 def desktop_first_run():
     """桌面版第一次啟動：記憶體架構還沒確認過就直接套用偵測結果（之後在「這台的設定」照樣能改）。"""
@@ -8129,6 +8175,7 @@ def main():
     ensure_cert()
     if DESKTOP_AGENT:
         desktop_first_run()
+    threading.Thread(target=_warm_caches, daemon=True).start()
     if not SYSTEMD:
         SUP.boot()
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
