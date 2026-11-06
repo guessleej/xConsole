@@ -4328,16 +4328,25 @@ def _gh_json(path):
     if re.fullmatch(r"[\w-]{20,255}", tok):
         h["Authorization"] = "Bearer " + tok
     req = urllib.request.Request(GH_API + path, headers=h)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp)
-    except urllib.error.HTTPError as ex:
-        lim, reset = ex.headers.get("X-RateLimit-Limit"), ex.headers.get("X-RateLimit-Reset")
-        if ex.code in (403, 429) and ex.headers.get("X-RateLimit-Remaining") == "0":
-            when = time.strftime("%H:%M", time.localtime(int(reset))) if (reset or "").isdigit() else "一小時內"
-            tk = "有帶權杖" if "Authorization" in h else "沒有帶權杖"
-            raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{tk}，{when} 後恢復）") from ex
-        raise
+    for i in range(3):                    # GitHub 偶爾回 502／503／504（版本清單很大時常見）：等一下再問，最多三次
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as ex:
+            if ex.code in (502, 503, 504) and i < 2:
+                time.sleep(3 * (i + 1))
+                continue
+            _gh_limit_error(ex, h)
+            raise
+
+
+def _gh_limit_error(ex, h):
+    """次數用完就換成講人話的錯誤；其他錯誤照原樣往上丟。"""
+    lim, reset = ex.headers.get("X-RateLimit-Limit"), ex.headers.get("X-RateLimit-Reset")
+    if ex.code in (403, 429) and ex.headers.get("X-RateLimit-Remaining") == "0":
+        when = time.strftime("%H:%M", time.localtime(int(reset))) if (reset or "").isdigit() else "一小時內"
+        tk = "有帶權杖" if "Authorization" in h else "沒有帶權杖"
+        raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{tk}，{when} 後恢復）") from ex
 
 
 def pick_release(releases, variant, extra, kind="llama"):
