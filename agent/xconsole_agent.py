@@ -5727,7 +5727,10 @@ def in_browse_roots(path):
     for root in browse_roots():
         r = os.path.realpath(root)
         base = r if r.endswith(os.sep) else r + os.sep
-        if full == r or full.startswith(base):
+        # 分開寫：剛好是根目錄就回根目錄本身（不是使用者給的字串），其餘要 startswith 通過才回（CodeQL 認得這個檢查）
+        if full == r:
+            return r
+        if full.startswith(base):
             return full
     return None
 
