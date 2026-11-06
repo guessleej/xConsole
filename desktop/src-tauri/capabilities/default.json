@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "啟動畫面不需要任何權限；主控台頁面是 http://127.0.0.1 的遠端內容，也不給呼叫應用程式的權限",
+  "windows": [],
+  "permissions": []
+}

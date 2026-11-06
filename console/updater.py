@@ -21,16 +21,18 @@ import tarfile
 import tempfile
 import threading
 import time
+import urllib.parse
 import urllib.request
 
 REPO = os.environ.get("XCONSOLE_UPDATE_REPO", "guessleej/xConsole")
 GH_API = os.environ.get("XCONSOLE_GH_API", "https://api.github.com")
 HERE = os.path.dirname(os.path.abspath(__file__))
 MAX_PKG = 64 * 1024 * 1024
+MAX_INSTALLER = 400 * 1024 * 1024
 MAX_FILES = 2000
 MAX_UNPACKED = 256 * 1024 * 1024
 KEEP_BACKUPS = 10
-BUSY = ("downloading", "checking", "installing", "applying", "restarting", "rolling_back")
+BUSY = ("downloading", "checking", "installing", "applying", "restarting", "rolling_back")   # installer_ready 不算：裝到一半取消可以再按一次
 VER_RX = re.compile(r"v?\d{1,4}(\.\d{1,4}){1,3}([-.][\w.]{1,20})?")
 STATE = {"job": None}
 LOCK = threading.Lock()
@@ -63,12 +65,68 @@ def check(timeout=20):
                      "current": current_version()}
     tag = str(rel.get("tag_name") or "")
     asset = next((a for a in rel.get("assets") or [] if re.fullmatch(r"xconsole-.+\.tar\.gz", a.get("name") or "")), None)
+    inst = next((a for a in rel.get("assets") or [] if re.fullmatch(installer_pattern(), a.get("name") or "")), None)
     digest = str((asset or {}).get("digest") or "")
     cur = current_version()
     return 200, {"current": cur, "latest": tag.lstrip("v"), "newer": _ver_key(tag) > _ver_key(cur) if cur != "未知" else True,
                  "notes": str(rel.get("body") or "")[:20000], "published": rel.get("published_at"), "url": rel.get("html_url"),
                  "asset": {"name": asset["name"], "size": asset.get("size"), "url": asset.get("browser_download_url"),
-                           "sha256": digest.split(":", 1)[1] if digest.startswith("sha256:") else None} if asset else None}
+                           "sha256": digest.split(":", 1)[1] if digest.startswith("sha256:") else None} if asset else None,
+                 "installer": _asset_info(inst)}
+
+
+def _asset_info(a):
+    if not a:
+        return None
+    dg = str(a.get("digest") or "")
+    return {"name": a["name"], "size": a.get("size"), "url": a.get("browser_download_url"),
+            "sha256": dg.split(":", 1)[1] if dg.startswith("sha256:") else None}
+
+
+def installer_pattern():
+    """這台該用哪一個桌面版安裝檔（GitHub 正式版的附件）。"""
+    import platform
+    arm = platform.machine().lower() in ("arm64", "aarch64")
+    if os.name == "nt":
+        return r"xConsole_[\d.]+_(x64|arm64)-setup\.exe" if not arm else r"xConsole_[\d.]+_arm64-setup\.exe"
+    if sys.platform == "darwin":
+        return r"xConsole_[\d.]+_" + ("aarch64" if arm else "x64") + r"\.dmg"
+    arch = "arm64" if arm else "amd64"
+    if os.environ.get("APPIMAGE"):             # 從 AppImage 跑的就換 AppImage；用 .deb 裝的就下載 .deb 交給系統裝
+        return r"xConsole_[\d.]+_" + ("aarch64" if arm else "amd64") + r"\.AppImage"
+    return r"xConsole_[\d.]+_" + arch + r"\.deb"
+
+
+def start_installer(state_dir, url, sha256, version, opener):
+    """桌面版的更新：下載新版安裝檔、核對 GitHub 公布的 sha256，再打開它（Windows 的安裝程式會請使用者關掉 xConsole 再換上）。
+    opener(路徑)＝用系統打開檔案。"""
+    sha256 = str(sha256 or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        return 400, {"error": "這一版的安裝檔沒有可以核對的 sha256，不下載"}
+    with LOCK:
+        if STATE.get("job") and STATE["job"].get("state") in BUSY:
+            return 409, {"error": "已經在更新了"}
+        STATE["job"] = {"state": "downloading", "at": time.time(), "version": version}
+
+    def run():
+        try:
+            d = os.path.join(state_dir, "updates")
+            os.makedirs(d, exist_ok=True)
+            name = os.path.basename(urllib.parse.urlparse(url).path)
+            if not re.fullmatch(installer_pattern(), name):
+                raise ValueError("安裝檔名稱不對，不下載")
+            data = _download(url, sha256, max_bytes=MAX_INSTALLER)
+            path = os.path.join(d, name)
+            # 建立的當下就只有自己能讀寫執行（不是先用預設權限建好再 chmod，中間會有一段別的帳號讀得到）
+            with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o700), "wb") as fh:
+                fh.write(data)
+            os.chmod(path, 0o700)                     # 檔案原本就在時 os.open 不會改權限，再設一次
+            _job("installer_ready", message="安裝檔已下載並核對過，請照安裝程式的畫面完成更新", path=path)
+            opener(path)
+        except Exception as ex:  # noqa: BLE001
+            _job("failed", error=str(ex)[:500])
+    threading.Thread(target=run, daemon=True).start()
+    return 200, {"ok": True}
 
 
 def _job(state, **kw):
@@ -81,16 +139,17 @@ def status():
         return dict(STATE.get("job") or {}), current_version()
 
 
-def _download(url, want_sha, timeout=600):
+def _download(url, want_sha, timeout=600, max_bytes=None):
     req = urllib.request.Request(url, headers={"User-Agent": "xconsole-updater"})
     h, buf = hashlib.sha256(), io.BytesIO()
+    lim = max_bytes or MAX_PKG
     with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout) as r:
         while True:
             chunk = r.read(1 << 20)
             if not chunk:
                 break
-            if buf.tell() + len(chunk) > MAX_PKG:
-                raise ValueError("更新包太大（上限 64 MB）")
+            if buf.tell() + len(chunk) > lim:
+                raise ValueError(f"更新包太大（上限 {lim >> 20} MB）")
             h.update(chunk)
             buf.write(chunk)
             _job("downloading", got=buf.tell())

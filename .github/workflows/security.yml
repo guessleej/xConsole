@@ -55,6 +55,10 @@ jobs:
         run: cd agent && python test_parity.py
       - name: 線上更新（sha256 核對、擋惡意壓縮檔、備份與退回、代理自我更新）
         run: cd console && python test_updater.py
+      - name: 桌面版（本機通道擋 DNS rebinding、鑰匙進入、第一次設密碼、區網存取開關）
+        run: cd console && python test_desktop.py
+      - name: 對話回答的 Markdown 排版（標題、清單、表格、連結只收 http／https、不用 innerHTML）
+        run: node console/test_markdown.js
       - name: 介面語言（字典格式、佔位符、涵蓋率 95% 以上、翻譯函式實跑）
         run: cd console && python test_i18n.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）

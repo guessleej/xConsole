@@ -24,7 +24,7 @@ const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLoc
 function toast(msg, kind) {
   const t = el("div", "toast" + (kind ? " " + kind : ""), msg);
   $("#toasts").appendChild(t);
-  setTimeout(() => t.remove(), kind === "bad" ? 9000 : 4500);
+  setTimeout(() => t.remove(), kind === "bad" || kind === "warn" ? 9000 : 4500);
 }
 
 async function api(path, opts = {}) {
@@ -266,8 +266,10 @@ function renderNav() {
   }
   // 第二列：設定頁的分頁（依管理者實際的先後；記錄與帳號在後、品牌只在交機時設一次放最後）
   if (active === "settings") {
-    SETTINGS_TABS.forEach(([key, label]) => {
-      subBtn(label, "settings", (v === "logs" ? "logs" : (S.settingsTab || "machines")) === key,
+    const tabs = settingsTabs();
+    const curTab = tabs.some(([k]) => k === S.settingsTab) ? S.settingsTab : tabs[0][0];
+    tabs.forEach(([key, label]) => {
+      subBtn(label, "settings", (v === "logs" ? "logs" : curTab) === key,
         () => { S.settingsTab = key; go("settings"); });
     });
   }
@@ -943,7 +945,7 @@ function libDownloadCard(ok, only) {
   form.appendChild(w2);
   // 不知道完整名稱時先用關鍵字找（照下載數排），點一下就帶進上面的名稱並列出量化
   const sRow = el("div", "search-row");
-  const fQ = textInput("", "用關鍵字找 GGUF，例：gemma 4、gpt-oss、granite");
+  const fQ = textInput("", "關鍵字（例：gemma 4、gpt-oss），或直接貼 Hugging Face 網址");
   const sBtn = el("button", "btn sm", "搜尋");
   sRow.append(fQ, sBtn);
   const sOut = el("div", "hf-results");
@@ -952,6 +954,9 @@ function libDownloadCard(ok, only) {
   const search = async () => {
     const q = fQ.value.trim();
     if (!q) return;
+    // 貼的是網址或「作者/模型」：直接列出這個 repo 的量化，不用先搜尋
+    const direct = hfRepoOf(q);
+    if (direct) { fRepo.value = direct; sOut.hidden = true; listBtn.click(); return; }
     sOut.hidden = false;
     loading(sOut);
     let r;
@@ -983,7 +988,9 @@ function libDownloadCard(ok, only) {
     choices.appendChild(el("p", "small muted", "查詢中…"));
     let r;
     const stale = () => fNode.value !== nodeId;   // 查詢途中換了目標機器：舊結果丟掉，免得下載按鈕綁在上一台
-    try { r = await api(`/api/node/${nodeId}/library/hf`, { method: "POST", body: { repo: fRepo.value.trim(), token: fTok.value } }); } catch (ex) {
+    const repo = hfRepoOf(fRepo.value) || fRepo.value.trim();
+    fRepo.value = repo;
+    try { r = await api(`/api/node/${nodeId}/library/hf`, { method: "POST", body: { repo, token: fTok.value } }); } catch (ex) {
       if (stale()) return;
       choices.textContent = "";
       choices.appendChild(el("p", "note bad", ex.message));
@@ -991,7 +998,28 @@ function libDownloadCard(ok, only) {
     }
     if (stale()) return;
     choices.textContent = "";
-    if (!r.choices.length) { choices.appendChild(el("p", "note warn", "這個 repo 沒有 GGUF 檔。llama.cpp 只吃 GGUF，請找名稱帶 GGUF 的 repo。")); return; }
+    if (!r.choices.length) {
+      // 原始權重（safetensors）的 repo：推理引擎只吃 GGUF，自動找別人轉好的 GGUF 版本給人挑
+      choices.appendChild(el("p", "note", `${repo} 是原始權重，沒有 GGUF 檔。下面是別人轉好的 GGUF 版本（照下載數排），點一下列出量化：`));
+      const alt = el("div", "hf-results");
+      choices.appendChild(alt);
+      loading(alt);
+      const name = repo.split("/").pop().replace(/-(GGUF|gguf)$/, "");
+      let found = [];
+      try { found = (await api(`/api/node/${nodeId}/library/hf/search`, { method: "POST", body: { q: name.slice(0, 80), token: fTok.value } })).results; } catch (_) { found = []; }
+      if (stale()) return;
+      alt.textContent = "";
+      if (!found.length) { alt.appendChild(el("p", "small muted", "還沒有人轉成 GGUF。可以換一個名稱搜尋，或等社群轉好再來。")); return; }
+      found.forEach((x) => {
+        const b = el("button", "hf-hit");
+        b.appendChild(el("span", "mono", x.repo));
+        if (x.cn_origin) b.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+        b.appendChild(el("span", "small muted", `下載 ${int(x.downloads)}・${x.updated || ""}`));
+        b.onclick = () => { fRepo.value = x.repo; listBtn.click(); };
+        alt.appendChild(b);
+      });
+      return;
+    }
     if (r.choices.some((c) => c.cn_origin)) choices.appendChild(el("p", "note warn", "這是中國來源的模型：內部測試可以用，政府案不得使用。"));
     let mm = null;
     if (r.mmproj.length) {
@@ -1540,7 +1568,7 @@ function recRow(n, it, lib, ctx) {
 
 function recDownload(n, it, p, mm, ctx) {
   const d = el("div");
-  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""}（${fmt(p.size_gib)} GiB${mm ? `，含看圖用的 mmproj ${fmt(mm.gib)} GiB` : ""}）下載到 ${n.name}？`));
+  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""}（${fmt(p.size_gib)} GiB${mm ? `，含看圖用的元件 ${fmt(mm.gib)} GiB` : ""}）下載到 ${n.name}？`));
   d.appendChild(el("p", "small muted", `${p.place}，預估約 ${p.tok_s != null ? fmt(p.tok_s, 0) + " tok/s" : "（速度未知）"}。下載在背景進行，中斷了再按一次會接續；完成後在清單上按「換上」。`));
   modal({ title: "下載模型", bodyNode: d, confirmText: "開始下載", onConfirm: async () => {
     try {
@@ -1735,7 +1763,9 @@ const SD_SIZES = {
   image: [[1024, 1024], [768, 1024], [1024, 768], [720, 1280], [1280, 720], [512, 512], [768, 768]],
   video: [[768, 512], [512, 768], [1024, 576], [576, 1024], [1280, 720], [720, 1280], [512, 320], [320, 512]],
 };
-function sizeLabel(w, h) {
+function sizeLabel(w, h, kind) {
+  // 影片用 480P／720P 加橫式／直式來說（一般人看得懂的說法）
+  if (kind === "video") return `${Math.min(w, h)}P ${w > h ? "橫式" : w < h ? "直式" : "方形"}（${w}×${h}）`;
   const g = (a, b) => (b ? g(b, a % b) : a);
   const d = g(w, h);
   const r = { "1:1": "方形", "3:4": "直式", "9:16": "直式", "2:3": "直式", "4:3": "橫式", "16:9": "橫式", "3:2": "橫式", "8:5": "橫式", "5:8": "直式" }[`${w / d}:${h / d}`];
@@ -2020,7 +2050,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
   }
   const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・內部測試" : ""}）`]), S.sdModel);
   const fPrompt = el("textarea");
-  fPrompt.placeholder = "想要的畫面，英文描述效果最好。例：a red fox sitting in fresh snow, morning light, photo";
+  fPrompt.placeholder = "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格";
   fPrompt.maxLength = 2000;
   const fNeg = el("textarea", "short");
   fNeg.placeholder = "不要出現的內容（選填）。例：blurry, text, watermark";
@@ -2077,8 +2107,14 @@ function sdGen(n, rec, redraw, toRec, kind) {
   const initBox = fieldBox("參考圖（選填）", initRow, "在這張圖上面照提示詞重畫");
   const countBox = fieldBox("張數", fCount, "同一組設定一次產幾張，種子依序加一");
   const fr = el("div", "form-row");
-  const framesBox = fieldBox("影格數", fFrames, "8 的倍數加 1；越多越長、越吃記憶體");
+  const framesBox = fieldBox("長度", fFrames, "越長越吃記憶體、產得越久");
   const fpsBox = fieldBox("每秒格數", fFps);
+  // 長度用秒數說（LocModel 的說法），格數放括號；每秒格數改了就重算
+  const relabelFrames = () => {
+    const fps = Math.max(1, Number(fFps.value) || 24);
+    [...fFrames.options].forEach((o) => { const v = Number(o.value); o.textContent = `約 ${((v - 1) / fps).toFixed(1)} 秒（${v} 格）`; });
+  };
+  fFps.oninput = relabelFrames;
   fr.append(fieldBox("畫幅", fSize), countBox, fieldBox("步數", fSteps, "清單的預設通常就是最佳值"), fieldBox("引導強度", fCfg, "FLUX 類設 1"),
     fieldBox("種子", fSeed, "-1＝隨機；同種子同設定會產出同一張"), fieldBox("取樣方法", fSampler), framesBox, fpsBox);
   const admit = el("div", "sd-admit small");
@@ -2095,7 +2131,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fSize.textContent = "";
     const sizes = SD_SIZES[m.kind].slice();
     if (!sizes.some(([w, h]) => w === d.width && h === d.height)) sizes.unshift([d.width, d.height]);
-    sizes.forEach(([w, h]) => { const o = el("option", null, `${sizeLabel(w, h)}${w === d.width && h === d.height ? "・預設" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
+    sizes.forEach(([w, h]) => { const o = el("option", null, `${sizeLabel(w, h, m.kind)}${w === d.width && h === d.height ? "・預設" : ""}`); o.value = `${w}x${h}`; fSize.appendChild(o); });
     fSize.value = `${d.width}x${d.height}`;
     fSteps.value = d.steps ?? 20;
     fCfg.value = d.cfg ?? 1;
@@ -2104,6 +2140,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     if (![...fFrames.options].some((o) => o.value === fr)) { const o = el("option", null, `${fr} 格`); o.value = fr; fFrames.prepend(o); }
     fFrames.value = fr;
     fFps.value = d.fps || 24;
+    relabelFrames();
     framesBox.hidden = fpsBox.hidden = m.kind !== "video";
     countBox.hidden = m.kind === "video";
     initBox.querySelector("label.field").textContent = m.kind === "video" ? "第一格畫面（選填）" : "參考圖（選填）";
@@ -2144,6 +2181,23 @@ function sdGen(n, rec, redraw, toRec, kind) {
   go.onclick = async () => {
     errNote(err, "");
     go.disabled = true;
+    // 中文提示詞：這台有執行中的對話模型就先翻成英文（多數畫圖、影片模型看英文效果最好），翻好的放回框裡讓人看得到
+    if (/[\u3400-\u9fff]/.test(fPrompt.value)) {
+      const chat = (n.state?.slots || []).find((x) => (x.kind === "llama" || x.kind === "strata") && x.busy && (x.caps || ["文字"]).includes("文字"));
+      if (chat) {
+        const zh = fPrompt.value;
+        go.textContent = "翻譯提示詞中…";
+        try {
+          const out = await api(`/api/node/${n.id}/chat/${chat.id}`, { method: "POST", body: { stream: false, max_tokens: 300, temperature: 0.2,
+            messages: [{ role: "system", content: "You write prompts for " + (model()?.kind === "video" ? "text-to-video" : "text-to-image")
+              + " models. Rewrite the user's request as ONE concise English prompt made of comma-separated descriptive phrases "
+              + "(subject, setting, style, lighting, camera). Output only the prompt." }, { role: "user", content: zh }] } });
+          const en = String(out.choices?.[0]?.message?.content || "").replace(/^["'「]|["'」]$/g, "").split("\n").find((x) => x.trim()) || "";
+          if (en.trim().length >= 3) { fPrompt.value = en.trim(); toast("已把中文提示詞翻成英文（原文：" + zh.slice(0, 40) + "）", "ok"); }
+        } catch (_) { /* 翻不了就用原文 */ }
+        go.textContent = model()?.kind === "video" ? "產生影片" : "產生圖片";
+      } else toast("這台沒有執行中的對話模型，提示詞照中文送出；FLUX、LTX 這類模型看英文效果比較好", "warn");
+    }
     let r;
     try { r = await api(`/api/node/${n.id}/sd/generate`, { method: "POST", body: params() }); } catch (ex) {
       errNote(err, ex.data?.admit ? ex.data.admit.reasons.join("；") : ex.message);
@@ -2167,7 +2221,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     fSteps.value = j.steps;
     fCfg.value = j.cfg;
     fSampler.value = j.sampler;
-    if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; }
+    if (j.frames) { pick(fFrames, String(j.frames), `${j.frames} 格`); fFps.value = j.fps; relabelFrames(); }
     fCount.value = String(j.count || 1);
     if (j.strength) fStrength.value = j.strength;
     setInit(null);
@@ -3496,13 +3550,31 @@ function viewLogs() {
    分頁順序照管理者實際的先後：先確認機器都連得上 → 處理憑證 → 看使用報告 → 帳號；
    品牌只在交機時設一次，放最後。 */
 
+// 使用者貼的 Hugging Face 網址或名稱 → 「作者/模型」；不是這兩種回 null
+function hfRepoOf(text) {
+  const t = String(text || "").trim();
+  const u = t.match(/^(?:https?:\/\/)?(?:www\.)?(?:huggingface\.co|hf\.co)\/([A-Za-z0-9][\w.-]{0,95})\/([A-Za-z0-9][\w.-]{0,95})/);
+  if (u) return `${u[1]}/${u[2]}`;
+  return /^[A-Za-z0-9][\w.-]{0,95}\/[A-Za-z0-9][\w.-]{0,95}$/.test(t) ? t : null;
+}
+
 const SETTINGS_TABS = [
   ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
   ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
+// 桌面版（一般人單機用）：只留會用到的，照先後排；機群、使用報告、品牌是管理一群機器才用的。
+// HTTPS 與憑證只在打開區網存取（別台電腦要連進來）時才有意義
+const DESKTOP_TABS = ["account", "engine", "update", "providers", "logs"];
+
+function settingsTabs() {
+  if (!S.appWindow) return SETTINGS_TABS;
+  const keys = DESKTOP_TABS.concat(S.lanOn ? ["tls"] : []);
+  return keys.map((k) => SETTINGS_TABS.find(([key]) => key === k));
+}
 
 function viewSettings() {
-  const tab = S.settingsTab || "machines";
+  const tabs = settingsTabs();
+  const tab = tabs.some(([k]) => k === S.settingsTab) ? S.settingsTab : tabs[0][0];
   if (tab === "logs") return viewLogs();
   const main = $("#main");
   main.textContent = "";
@@ -3704,6 +3776,10 @@ async function checkTlsBanner() {
   const b = $("#tls-banner");
   try {
     const me = await api("/api/me");
+    S.appWindow = !!me.app_window;
+    S.lanOn = !!me.lan_access;
+    const lo = $("#logout");
+    if (lo) lo.hidden = S.appWindow;           // 應用程式的視窗不用登入，也就不放登出（別台電腦連進來的照樣有）
     const t = me.tls || {};
     if (t.level === "urgent" || t.level === "expired") {
       b.textContent = t.daysLeft < 0
@@ -4206,27 +4282,50 @@ async function settingsReport(wrap) {
 
 /* ---------------------------------------------------------------- 4 帳號與安全 */
 
+// 桌面版：區網存取開關（照 LocModel：預設只有這台自己用；打開才讓別台電腦連進來，走 HTTPS＋密碼）
+function settingsLan(wrap, me) {
+  const c = card("區網存取", me.lan_access ? `別台電腦可以用 https://這台的位址:${me.https_port} 連進來（要登入）`
+    : "目前只有這台電腦自己能用");
+  const row = el("div", "slot-actions");
+  const b = el("button", "btn sm" + (me.lan_access ? "" : " primary"), me.lan_access ? "關閉區網存取" : "打開區網存取");
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await api("/api/settings/lan", { method: "POST", body: { on: !me.lan_access } });
+      toast(me.lan_access ? "已關閉，主控台重新啟動中" : "已打開，主控台重新啟動中", "ok");
+      setTimeout(() => location.reload(), 4000);
+    } catch (ex) { toast(ex.message, "bad"); b.disabled = false; }
+  };
+  row.appendChild(b);
+  c.appendChild(row);
+  if (me.password_unset) c.appendChild(el("p", "small muted", "要先在下面設一組密碼，才能打開區網存取。"));
+  wrap.appendChild(c);
+}
+
 async function settingsAccount(wrap) {
   let me = {};
   try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
-  const c = card("變更密碼", `目前登入：${me.username || "admin"}`);
+  if (me.desktop) { S.lanOn = !!me.lan_access; settingsLan(wrap, me); }
+  const first = me.app_window && me.password_unset;
+  const c = card(first ? "設定密碼" : "變更密碼", first ? "這台的視窗不用密碼；別台電腦連進來（區網存取）時要用這組密碼登入"
+    : `目前登入：${me.username || "admin"}`);
   const fr = el("div", "form-row");
   const mk = (label) => { const d = el("div"); d.appendChild(el("label", null, label)); const i = Object.assign(el("input"), { type: "password", autocomplete: "new-password" }); d.appendChild(i); fr.appendChild(d); return i; };
-  const o = mk("目前的密碼");
+  const o = first ? { value: "" } : mk("目前的密碼");
   const n1 = mk("新密碼（至少 8 碼）");
   const n2 = mk("再輸入一次新密碼");
   c.appendChild(fr);
-  const b = el("button", "btn sm primary", "變更密碼");
+  const b = el("button", "btn sm primary", first ? "設定密碼" : "變更密碼");
   const go2 = async () => {
     if (n1.value !== n2.value) { toast("兩次輸入的新密碼不一樣", "bad"); return; }
     try {
       const r = await api("/api/account/password", { method: "POST", body: { old: o.value, new: n1.value } });
       toast(r.message, "ok");
-      setTimeout(showLogin, 800);
+      if (me.app_window) { n1.value = n2.value = ""; render(); } else setTimeout(showLogin, 800);
     } catch (ex) { toast(ex.message, "bad"); }
   };
   b.onclick = go2;
-  [o, n1, n2].forEach((x) => imeGuard(x, go2));
+  [o, n1, n2].filter((x) => x.tagName).forEach((x) => imeGuard(x, go2));
   const br = el("div", "slot-actions"); br.appendChild(b); c.appendChild(br);
   c.appendChild(el("p", "small muted", "密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。變更後所有已登入的裝置都會被登出。"));
   wrap.appendChild(c);
@@ -4532,7 +4631,11 @@ async function openMachineSettings(nid) {
   if (n.online) { try { info = await machineInfo(nid, true); } catch (ex) { infoErr = ex.message; } }
   body.textContent = "";
 
-  body.appendChild(el("h4", "pick-h", "基本"));
+  // 桌面版（一般人單機用）：位址、埠、代理憑證是管理一群機器才會動的，收起來（值照樣送回，不影響儲存）
+  const basic = el("div");
+  basic.hidden = !!S.appWindow;
+  body.appendChild(basic);
+  basic.appendChild(el("h4", "pick-h", "基本"));
   const f1 = el("div", "form-row");
   const fName = textInput(rec.name);
   const [fGroup, dl] = groupInput(rec.group);
@@ -4540,14 +4643,14 @@ async function openMachineSettings(nid) {
   const fPort = numInput(rec.agent_port || 9401);
   f1.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("位址", fHost, "主控台連這台代理用的 IP 或主機名稱；改了會先實際連一次，連不上就不改"),
     fieldBox("代理的埠", fPort));
-  body.append(f1, dl);
+  basic.append(f1, dl);
   const tr = el("div", "slot-actions");
   tr.appendChild(el("span", "small muted", rec.trusted ? `信任的代理憑證：${(rec.trust_fingerprint || "").slice(0, 23)}…` : "還沒信任這台的代理憑證"));
   tr.appendChild(el("span", "spacer"));
   const tb = el("button", "btn sm", "匯入新憑證（代理重裝後用）");
   tb.onclick = () => importTrust(rec);
   tr.appendChild(tb);
-  body.appendChild(tr);
+  basic.appendChild(tr);
 
   let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent, fGpuMode, fGpuName, fGpuVendor, fGpuVram, fHfMirror, fGhProxy, fDesk;
   if (!info) {
@@ -4643,10 +4746,11 @@ async function openMachineSettings(nid) {
     body.appendChild(f3);
     const bb = el("div", "slot-actions");
     if (!info.llama.length && !st.llama_server) {
-      bb.appendChild(el("span", "small bad-t", "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。"));
+      bb.appendChild(el("span", "small bad-t", "這台還沒有安裝推理引擎（llama.cpp），模型還不能啟動。"));
     }
     bb.appendChild(el("span", "spacer"));
-    const bbtn = el("button", "btn sm", info.llama.length ? "編譯新版 llama.cpp" : "在這台編譯 llama.cpp");
+    // Windows／macOS 是下載官方預編譯版、Linux 才在這台編譯：按鈕不說「編譯」，交給安裝視窗依系統說明
+    const bbtn = el("button", "btn sm" + (info.llama.length ? "" : " primary"), info.llama.length ? "更新推理引擎" : "安裝推理引擎");
     bbtn.onclick = () => openEngineBuild(nid);
     bb.appendChild(bbtn);
     body.appendChild(bb);
@@ -4932,8 +5036,18 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
   body.appendChild(prog);
   const head = el("p", "note");
   const log = el("pre", "log build-log");
+  const closeBtn = ov.querySelector(".actions .btn");          // 視窗本身的「取消」：裝好之後改成「完成」
   const draw = (j, tail, running) => {
     prog.textContent = "";
+    // 按鈕的顯示在最前面處理：還沒裝過（沒有狀態）時也不能出現「取消安裝」
+    startBtn.hidden = running;
+    startBtn.className = "btn " + (j.state === "done" ? "" : "primary");
+    cancelBtn.hidden = !running;
+    imp.hidden = running || j.state === "done";
+    if (closeBtn) {
+      closeBtn.textContent = j.state === "done" ? "完成" : "取消";
+      closeBtn.className = "btn" + (j.state === "done" ? " primary" : "");
+    }
     if (!j.state) return;
     const v = j.mode === "import" ? "匯入" : verb;
     const label = { running: `${v}中：${j.phase}`, done: `裝好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消",
@@ -4942,17 +5056,21 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
     head.textContent = `${j.tag || ""}　${label}`;
     prog.appendChild(head);
     if (j.state === "done") prog.appendChild(el("p", "small muted", kind === "sd" ? "裝好了。回模型庫的「畫圖與影片」下載一顆模型就能產圖。"
-      : "到「這台的設定」的 llama-server 選它，或保留「自動挑選」（會挑版本最新、有 GPU 加速的那支）。"));
+      : "裝好了，按「完成」回去，接著到「模型」下載一顆推薦的模型。"));
     log.textContent = (tail || []).join("\n") || "（還沒有輸出）";
-    prog.appendChild(log);
+    // 裝好之後下載記錄收進「詳細記錄」，畫面只留結果
+    if (j.state === "done") {
+      const det = el("details", "build-detail");
+      det.appendChild(el("summary", "small muted", "詳細記錄"));
+      det.appendChild(log);
+      prog.appendChild(det);
+    } else prog.appendChild(log);
     log.scrollTop = log.scrollHeight;
-    startBtn.hidden = running;
-    cancelBtn.hidden = !running;
     // 預編譯版下載中可以暫停；暫停或下載到一半失敗，再按會從斷掉的位置接著下載
     const dlNow = running && j.mode === "prebuilt" && j.phase === "下載";
     cancelBtn.textContent = dlNow ? "暫停下載" : `取消${v}`;
-    if (dl) startBtn.textContent = j.state === "paused" || (j.state === "failed" && j.resumable) ? "繼續下載" : startLabel;
-    imp.hidden = running;
+    if (dl) startBtn.textContent = j.state === "paused" || (j.state === "failed" && j.resumable) ? "繼續下載"
+      : j.state === "done" ? "更新到最新版" : startLabel;
   };
   const startLabel = dl ? "一鍵安裝（下載幾十到幾百 MB）" : "開始編譯（約 10～30 分鐘）";
   const startBtn = formButton(ov, startLabel, "primary", async () => {
@@ -5142,6 +5260,12 @@ window.addEventListener("scroll", () => {
 (async function boot() {
   await i18nInit();                          // 選了別的語言就先載字典，畫面一出來就是那個語言
   ["langpick-top", "langpick-login", "langpick-m"].forEach((id) => { const h = document.getElementById(id); if (h) h.appendChild(i18nPicker()); });
+  // xConsole 應用程式開的視窗：鑰匙放在網址 # 後面（不會送到伺服器），換成登入後馬上從網址拿掉
+  const dk = location.hash.match(/^#desktop=([\w-]{32,128})$/);
+  if (dk) {
+    history.replaceState(null, "", location.pathname);
+    try { await api("/api/desktop/enter", { method: "POST", body: { key: dk[1] } }); } catch (_) { /* 失敗就走一般登入 */ }
+  }
   try {
     await api("/api/me");
     start();

@@ -11,6 +11,10 @@ permissions:
 env:
   PYTHONUTF8: '1'          # Windows 的主控台預設 cp1252，測試印中文會例外
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   selftest:
     name: 跨平台自我檢查（${{ matrix.os }}／Python ${{ matrix.py }}）

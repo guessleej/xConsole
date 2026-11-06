@@ -28,3 +28,8 @@ dist-report/
 
 # macOS／iCloud 同步衝突產生的「檔名 2.ext」副本
 * 2.*
+
+# 桌面版建置產物
+desktop/build/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/

@@ -1,0 +1,174 @@
+# 桌面版安裝檔（照 LocModel：點兩下就裝好，不用系統管理員、不用先裝 Python）
+# - Windows：xConsole_<版本>_x64-setup.exe（NSIS，裝在使用者自己的 AppData，開始功能表與桌面捷徑、可從「應用程式」解除安裝）
+# - macOS：xConsole_<版本>_aarch64.dmg
+# - Linux：.AppImage 與 .deb
+# 每個平台都在自己的機器上建（Python 相依有編譯過的套件）；Windows 再實際靜默安裝、啟動、確認主控台起得來。
+# 打 v 開頭的標籤時，把安裝檔附到同一個正式版。
+name: desktop
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+permissions:
+  contents: read
+env:
+  PYTHONUTF8: '1'
+  TAURI_CLI: '@tauri-apps/cli@2.11.2'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: 桌面版安裝檔（${{ matrix.os }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            bundles: nsis
+          - os: macos-15
+            bundles: app,dmg
+          - os: ubuntu-24.04
+            bundles: appimage,deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with: { python-version: '3.12' }
+      - name: Linux 建置相依（WebKitGTK、系統匣）
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
+      - name: 版本號跟 VERSION 一致
+        shell: bash
+        run: |
+          V=$(cat VERSION)
+          grep -q "\"version\": \"$V\"" desktop/src-tauri/tauri.conf.json || { echo "tauri.conf.json 的版本不是 $V"; exit 1; }
+          grep -q "^version = \"$V\"" desktop/src-tauri/Cargo.toml || { echo "Cargo.toml 的版本不是 $V"; exit 1; }
+      - name: 準備內含的 Python 與程式
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python desktop/scripts/prepare_payload.py
+      - name: Windows 程式碼簽章憑證（有設才簽；沒有簽章，SmartScreen 第一次會擋）
+        if: runner.os == 'Windows'
+        id: sign
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
+          PFX_PW: ${{ secrets.WINDOWS_SIGN_PFX_PASSWORD }}
+        run: |
+          if (-not $env:PFX_B64) { Write-Host '沒有設簽章憑證（WINDOWS_SIGN_PFX_BASE64），這次的安裝檔不簽章'; exit 0 }
+          $f = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($env:PFX_B64))
+          $pw = ConvertTo-SecureString $env:PFX_PW -AsPlainText -Force
+          $c = Import-PfxCertificate -FilePath $f -CertStoreLocation Cert:\CurrentUser\My -Password $pw
+          Remove-Item $f -Force
+          $cfg = @{ bundle = @{ windows = @{ certificateThumbprint = $c.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5 -Compress
+          Set-Content -Path (Join-Path $env:RUNNER_TEMP 'sign.json') -Value $cfg -Encoding ascii
+          "config=$env:RUNNER_TEMP\sign.json" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "會用這張憑證簽章：$($c.Subject)（到期 $($c.NotAfter)）"
+      - name: 建安裝檔
+        shell: bash
+        working-directory: desktop/src-tauri
+        env:
+          SIGN_CONFIG: ${{ steps.sign.outputs.config }}
+        run: |
+          rustup default stable
+          if [ -n "$SIGN_CONFIG" ]; then
+            npx --yes "$TAURI_CLI" build --bundles ${{ matrix.bundles }} --config "$SIGN_CONFIG"
+          else
+            npx --yes "$TAURI_CLI" build --bundles ${{ matrix.bundles }}
+          fi
+      - name: 整理產物
+        shell: bash
+        run: |
+          mkdir -p dist
+          B=desktop/src-tauri/target/release/bundle
+          find "$B" -maxdepth 2 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist/ \;
+          ls -la dist
+          # Windows 的 Git Bash 沒有 shasum：用 Python 算，三個平台同一套
+          python -c "import hashlib,os,sys; [print(hashlib.sha256(open(os.path.join('dist',f),'rb').read()).hexdigest()+'  '+f) for f in sorted(os.listdir('dist'))]" | tee "SHA256SUMS-${{ runner.os }}"
+          mv "SHA256SUMS-${{ runner.os }}" dist/
+      - name: Windows：用微軟 Defender 實際掃描安裝檔與裝好的程式（被判有問題就不放行）
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $st = Get-MpComputerStatus -ErrorAction SilentlyContinue
+          if (-not $st -or -not $st.AntivirusEnabled) {
+            Write-Host '::warning::這台 CI 機器的 Defender 沒有開，掃不了；請在實機（例如 HP）上另外掃描'
+            exit 0
+          }
+          Update-MpSignature -ErrorAction SilentlyContinue
+          Write-Host "Defender 病毒碼 $((Get-MpComputerStatus).AntivirusSignatureVersion)"
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          foreach ($f in Get-ChildItem dist\*.exe) {
+            & $mp -Scan -ScanType 3 -File $f.FullName -DisableRemediation | Out-Host
+            if ($LASTEXITCODE -eq 2) { throw "Defender 判定 $($f.Name) 有問題" }
+            Write-Host "Defender 掃描 $($f.Name)：沒有發現威脅"
+          }
+          $sig = Get-AuthenticodeSignature (Get-ChildItem dist\*-setup.exe | Select-Object -First 1).FullName
+          Write-Host "安裝檔簽章狀態：$($sig.Status) $($sig.SignerCertificate.Subject)"
+      - name: Windows：靜默安裝、啟動、確認主控台與代理起得來
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist\*-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'xConsole\xConsole.exe'
+          if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA 'xConsole') -EA SilentlyContinue; throw "裝完找不到 $exe" }
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          if ((Get-MpComputerStatus -ErrorAction SilentlyContinue).AntivirusEnabled) {
+            & $mp -Scan -ScanType 3 -File (Join-Path $env:LOCALAPPDATA 'xConsole') -DisableRemediation | Out-Host
+            if ($LASTEXITCODE -eq 2) { throw 'Defender 判定裝好的程式有問題' }
+            Write-Host 'Defender 掃描安裝資料夾：沒有發現威脅'
+          }
+          $p = Start-Process $exe -ArgumentList '--hidden' -PassThru
+          $log = Join-Path $env:LOCALAPPDATA 'tw.xcloudinfo.xconsole\.xconsole\console.log'
+          $ok = $false
+          foreach ($i in 1..90) { Start-Sleep 2; if ((Test-Path $log) -and (Select-String -Path $log -Pattern '桌面版：視窗走' -Quiet)) { $ok = $true; break } }
+          Get-Content $log -EA SilentlyContinue | Select-Object -Last 20
+          Get-Content (Join-Path $env:LOCALAPPDATA 'tw.xcloudinfo.xconsole\.xconsole\agent.log') -EA SilentlyContinue | Select-Object -Last 10
+          if (-not $ok) { throw '主控台沒有起來' }
+          $code = & curl.exe -sk -o NUL -w '%{http_code}' https://127.0.0.1:9400/
+          Write-Host "HTTPS 首頁 $code"
+          if ($code -ne '200') { throw '主控台 HTTPS 沒有回應' }
+          $fleet = Get-Content (Join-Path $env:LOCALAPPDATA 'tw.xcloudinfo.xconsole\.xconsole\fleet.json') -Raw | ConvertFrom-Json
+          if (-not ($fleet.nodes | Where-Object { $_.host -eq '127.0.0.1' })) { throw '這台的代理沒有登記進主控台' }
+          Write-Host '代理已登記：' ($fleet.nodes | ForEach-Object { $_.name })
+          Stop-Process -Id $p.Id -Force
+          Start-Sleep 6
+          $left = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*xconsole_server.py*' -or $_.CommandLine -like '*xconsole_agent.py*' }
+          if ($left) { $left | Select-Object ProcessId, CommandLine | Format-List; throw '應用程式結束後還留著主控台或代理' }
+          Write-Host '應用程式結束後，主控台與代理都跟著結束'
+          $un = Join-Path $env:LOCALAPPDATA 'xConsole\uninstall.exe'
+          Start-Process $un -ArgumentList '/S' -Wait
+          if (Test-Path $exe) { throw '解除安裝後程式還在' }
+          Write-Host '解除安裝 OK'
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: xconsole-desktop-${{ runner.os }}
+          path: dist/
+          retention-days: 14
+
+  attach:
+    name: 安裝檔附到正式版
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with: { path: dist, merge-multiple: true }
+      - name: 等正式版建好再附上
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 30); do gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 && break; sleep 10; done
+          cat dist/SHA256SUMS-* > dist/SHA256SUMS-desktop && rm dist/SHA256SUMS-Windows dist/SHA256SUMS-macOS dist/SHA256SUMS-Linux
+          gh release upload "$GITHUB_REF_NAME" dist/* -R "$GITHUB_REPOSITORY" --clobber

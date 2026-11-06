@@ -103,7 +103,8 @@ def capacity(state):
     elif not sum(c.get("total_gib") or 0 for c in pools.get("gpus") or []):
         # 沒有 GPU（或讀不到顯存）：模型全在系統記憶體、用 CPU 算，速度照系統記憶體頻寬
         r = (pools.get("ram") or {}).get("total_gib") or 0
-        fast = max(0.0, r - fl.get("ram", 8) - 2.5)
+        # 底線之外再留一點給引擎與其他程式；小筆電留少一點（8 GB 的機器多扣 2.5 GB 就什麼都放不下），大機器照舊 2.5 GB
+        fast = max(0.0, r - fl.get("ram", 8) - min(2.5, r * 0.05))
         out.update(fast=fast, slow=0.0, cpu_only=True,
                    bandwidth_gbs=chip.get("bandwidth_gbs") or chip.get("ram_bandwidth_gbs") or DEFAULT_RAM_BW,
                    bandwidth_src=chip.get("bandwidth_src") or ("管理者設定" if chip.get("ram_bandwidth_gbs") else "假設值"),
@@ -135,12 +136,34 @@ def capacity(state):
     return out
 
 
+CTX_STEPS = (32768, 16384, 8192)    # 跟 LocModel 一樣：放不下先把上下文縮到 16K、8K，再考慮放硬碟
+
+
 def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
+    """先用 32K 上下文試；放不下就縮到 16K、8K（一般對話夠用），還是放不下才走分層／硬碟。"""
+    first = None
+    for ctx in CTX_STEPS:
+        p = _plan_quant(cap, prof, q, mmproj_gib, hdd, guess, ctx)
+        first = first or p
+        if p["level"] in ("smooth", "ok"):
+            if ctx < CTX_STEPS[0]:
+                p["ctx_reduced"] = True
+                p["place"] += f"（上下文縮到 {ctx // 1024}K 才放得下）"
+            return p
+    # 縮到 8K 還是要用硬碟：照 8K 的硬碟方案（比 32K 的快）；連硬碟都不行就回 32K 的說明
+    if p["level"] == "disk":
+        if p["ctx"] < first["ctx"]:
+            p["ctx_reduced"] = True
+        return p
+    return first
+
+
+def _plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False, ctx_want=CTX):
     """一個量化放在這台：等級（流暢／能跑／要用硬碟／放不下）、放在哪、要多少、估計速度、自動分層幾層，
     以及分層（split：放顯示卡／系統記憶體／硬碟各幾 GiB，畫面的三色條照這個畫）。
     hdd：存放區是不是機械硬碟（只影響「要用硬碟」那一級的速度）。guess：模型結構是猜的（稠密假設）。"""
     size = q["size_gib"]
-    ctx = min(CTX, prof.get("ctx_train") or CTX)
+    ctx = min(ctx_want, prof.get("ctx_train") or ctx_want)
     kv = kv_gib(prof, ctx)
     need = size + mmproj_gib + ENGINE_OVERHEAD + kv
     act = prof.get("active_frac") or 1.0
@@ -306,8 +329,9 @@ def pick(plans):
     1. 4～6 位元裡流暢的，挑位元數最高、同位元偏好 K 系列（Q6 以上品質差異已很小，卻要多一倍下載與慢一倍）；
     2. 這個 repo 根本沒有 4～6 位元時，才考慮流暢的 8 位元；
     3. 都不流暢，退到放得下的 4 位元裡最小的（求快）；
-    4. 再不行挑放得下的最大一個。全放不下回 None。"""
-    # 「要用硬碟」不推薦下載：那是管理者自己勾選才開的模式，不是建議
+    4. 再不行挑放得下的最大一個；
+    5. 記憶體放不下、只能用硬碟跑的（跟 LocModel 一樣照樣能跑，只是慢）：挑最小、最快的那個。全都不行回 None。"""
+    disk = [p for p in plans if p["level"] == "disk"]
     plans = [p for p in plans if p["level"] != "disk"]
     usable = [p for p in plans if p["level"] != "no" and p["bits"] and p["bits"] <= 8]
     key = lambda p: (p["bits"], quant_pref(p["quant"]), p["size_gib"])  # noqa: E731
@@ -325,7 +349,9 @@ def pick(plans):
         return max(usable, key=lambda p: p["size_gib"])
     # repo 只放了 F16／BF16（沒有任何量化）：放得下就推它，不要整顆標成放不下
     wide = [p for p in plans if p["level"] != "no"]
-    return min(wide, key=lambda p: p["size_gib"]) if wide else None
+    if wide:
+        return min(wide, key=lambda p: p["size_gib"])
+    return min(disk, key=lambda p: (-(p["tok_s"] or 0), p["size_gib"])) if disk else None
 
 
 def guess_profile(choices):
@@ -431,7 +457,15 @@ def recommend(state, library, catalog):
     rank = {"smooth": 0, "ok": 1, "disk": 2, "no": 3, "unknown": 4}
     order = sorted(items, key=lambda x: (rank[x["level"]], x["order"]))
     featured = next((x for x in order if x["level"] == "smooth"), None)
-    return {"capacity": cap, "items": items, "top": [x["repo"] for x in order if x["level"] in ("smooth", "ok")][:3],
+    top = [x["repo"] for x in order if x["level"] in ("smooth", "ok")][:3]
+    if not top:
+        # 這台記憶體小，沒有放得進記憶體的：照樣推薦用硬碟跑得最快的幾個（一般人的電腦也要跑得起來，慢沒關係）
+        def speed(x):
+            p = next((p for p in x["plans"] if p["stem"] == x["pick"]), None)
+            return (p or {}).get("tok_s") or 0
+        disk = sorted((x for x in items if x["level"] == "disk" and x["pick"]), key=lambda x: -speed(x))
+        top = [x["repo"] for x in disk][:3]
+    return {"capacity": cap, "items": items, "top": top,
             "featured": featured["repo"] if featured else None,
             "assumptions": {"efficiency": EFFICIENCY, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}}
 
