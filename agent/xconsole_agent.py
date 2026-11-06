@@ -2828,7 +2828,7 @@ def _scan_folder(full, folder, id_prefix, models, problems, external=None):
         files = sorted(f for f in os.listdir(full) if f.lower().endswith(".gguf"))
     except OSError:
         return
-    mmproj = next((os.path.join(full, f) for f in files if is_mmproj(f)), None)
+    projs = [f for f in files if is_mmproj(f)]
     groups = {}
     for f in files:
         if is_mmproj(f) or AUX_GGUF_RX.search(f[:-5]):
@@ -2840,6 +2840,7 @@ def _scan_folder(full, folder, id_prefix, models, problems, external=None):
     for stem, parts in groups.items():
         want = parts[0][1]
         paths = [os.path.join(full, f) for f, _ in sorted(parts)]
+        mmproj = _pick_mmproj(full, projs, stem, len(groups), shared=bool(external) or not folder)
         size = sum(os.path.getsize(p) for p in paths if os.path.exists(p))
         mm_size = os.path.getsize(mmproj) if mmproj else 0
         name, quant = pretty_model(paths[0])
@@ -2861,6 +2862,20 @@ def _scan_folder(full, folder, id_prefix, models, problems, external=None):
             "path": paths[0], "shards": want, "size_gib": round(size / GIB, 1),
             "mmproj": mmproj, "mmproj_gib": round(mm_size / GIB, 1), "vision": bool(mmproj),
             **prof})
+
+
+def _pick_mmproj(full, projs, stem, n_models, shared):
+    """這顆模型配哪個看圖投影檔。存放區一顆模型一個資料夾，資料夾裡的 mmproj 就是它的。
+    其他模型資料夾、存放區根目錄（shared）常是好幾顆模型平放在一起：只有一顆模型時才直接用，
+    否則要 mmproj 的檔名含這顆模型的名稱（mmproj-Muse-Glimmer-30B-BF16 → Muse-Glimmer-30B-*），認不出來寧可不配，
+    配錯的投影檔會讓模型起不來。"""
+    if not projs:
+        return None
+    if not shared or n_models == 1:
+        return os.path.join(full, projs[0])           # 資料夾裡只有這顆模型：投影檔都是它的（有好幾種精度取第一個）
+    base = pretty_model(stem + ".gguf")[0].lower()
+    hit = [f for f in projs if base and base in f.lower()]
+    return os.path.join(full, hit[0]) if hit else None
 
 
 def _walk_dirs(base, depth, skip=()):
@@ -4213,16 +4228,17 @@ def delete_model(model_id):
             return 400, {"error": "只能刪存放區第一層的模型資料夾"}
     removed, freed = [], 0
     for f in os.listdir(full):
-        base = f[:-5] if f.endswith(".gguf") else f[:-10] if f.endswith(".gguf.part") else None
+        low = f.lower()                                   # 跟掃描一樣不分大小寫（MODEL.GGUF 也列得出來，就要刪得掉）
+        base = f[:-5] if low.endswith(".gguf") else f[:-10] if low.endswith(".gguf.part") else None
         if base is not None and SHARD_RX.sub("", base) == stem:
             p = inside(full, f)
             freed += os.path.getsize(p)
             os.remove(p)
             removed.append(f)
-    rest = [f for f in os.listdir(full) if f.endswith(".gguf") and not is_mmproj(f)]
+    rest = [f for f in os.listdir(full) if f.lower().endswith(".gguf") and not is_mmproj(f)]
     if not rest:
         for f in os.listdir(full):
-            if is_mmproj(f) and f.endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
+            if is_mmproj(f) and f.lower().endswith(".gguf"):      # 只刪 mmproj 的 GGUF，同名的其他檔不動
                 p = inside(full, f)
                 freed += os.path.getsize(p)
                 os.remove(p)
@@ -6102,10 +6118,10 @@ def browse_roots():
     return roots
 
 
-def in_browse_roots(path):
+def in_browse_roots(path, roots=None):
     """正規化之後要落在某個允許的根目錄底下，才回正規化後的路徑；否則回 None。"""
     full = os.path.realpath(os.path.expanduser(str(path or "")))
-    for root in browse_roots():
+    for root in roots or browse_roots():
         r = os.path.realpath(root)
         base = r if r.endswith(os.sep) else r + os.sep
         # 分開寫：剛好是根目錄就回根目錄本身（不是使用者給的字串），其餘要 startswith 通過才回（CodeQL 認得這個檢查）
@@ -6192,16 +6208,19 @@ def agent_browse(path=""):
 
 
 def model_dir_browse(path=""):
-    """資料夾瀏覽器（加入其他模型資料夾用）：能不能選照 check_model_dir 判斷。"""
-    return browse_dirs(path, lambda p: check_model_dir(p)[1])
+    """資料夾瀏覽器（加入其他模型資料夾用）：能不能選照 check_model_dir 判斷；
+    瀏覽範圍跟 check_model_dir 收的一樣（Linux 的 /models、/opt、另外掛的資料碟也看得到）。"""
+    extra = [d for d in data_bases() if os.path.isdir(d)]
+    return browse_dirs(path, lambda p: check_model_dir(p)[1], [*browse_roots(), *extra], extra)
 
 
-def browse_dirs(path, denied):
-    """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個用 denied(路徑) 標出能不能選。沒給路徑＝從家目錄開始。"""
+def browse_dirs(path, denied, allowed=None, extra_roots=()):
+    """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個用 denied(路徑) 標出能不能選。沒給路徑＝從家目錄開始。
+    allowed：能瀏覽的根目錄（預設 browse_roots）；extra_roots：另外列成快捷鍵的根目錄。"""
     path = str(path or "").strip() or HOME
     if "\x00" in path or len(path) > 1000:
         return 400, {"error": "路徑不對"}
-    full = in_browse_roots(path)
+    full = in_browse_roots(path, allowed)
     if full is None:
         return 400, {"error": "只能瀏覽家目錄、資料磁碟或外接碟"}
     if not os.path.isdir(full):
@@ -6224,8 +6243,11 @@ def browse_dirs(path, denied):
         roots.append({"name": "外接磁碟", "path": "/Volumes"})
     else:
         roots += [{"name": d, "path": d} for d in ("/mnt", "/media", "/data", "/srv") if os.path.isdir(d)]
+    have = {r["path"] for r in roots}
+    roots += [{"name": d, "path": d} for d in extra_roots
+              if OS == "linux" and d not in have and os.path.realpath(d) != os.path.realpath(HOME)]
     parent = os.path.dirname(full)
-    parent = parent if parent != full and in_browse_roots(parent) else None
+    parent = parent if parent != full and in_browse_roots(parent, allowed) else None
     return 200, {"path": full, "parent": parent, "dirs": dirs, "roots": roots,
                  "ok": denied(full) is None, "why": denied(full)}
 

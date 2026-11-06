@@ -102,7 +102,8 @@ A.set_model_dirs({"remove": sub})
 lib = {"gguf": ms, "downloads": []}
 cat = [{"repo": "unsloth/granite-4.2-30b-GGUF", "title": "g", "use": "chat",
         "profile": {"arch": "t", "layers": 32, "kv_full_bpt": 1000, "active_frac": 1.0, "ctx_train": 8192},
-        "quants": [{"stem": "granite-4.2-30b-Q4_K_M", "quant": "Q4_K_M", "size_gib": 17.0}]}]
+        "quants": [{"stem": "granite-4.2-30b-Q4_K_M", "quant": "Q4_K_M",
+                    "size_gib": next(m["size_gib"] for m in exts if "granite" in m["path"])}]}]
 st = {"pools": {"memory_model": "unified_single", "unified": {"total_gib": 64, "used_gib": 4}, "ram": {"total_gib": 64, "free_gib": 60}},
       "machine": {"memory_model": "unified_single"}, "chip": {"bandwidth_gbs": 120}, "slots": []}
 rec = recommend.recommend(st, lib, cat)
@@ -133,6 +134,51 @@ case("   移出後檔案還在", code == 200 and os.path.exists(e["path"]), (cod
 case("   移出不在清單的回 404", A.set_model_dirs({"remove": os.path.join(H, "zzz")})[0] == 404)
 case("   瀏覽器：LM Studio 資料夾可以選、.ssh 不行",
      A.model_dir_browse(lms)[1]["ok"] and not A.model_dir_browse(os.path.join(H, ".ssh"))[1]["ok"])
+
+# ---- Codex 審查補的幾種情況
+flat = os.path.join(H, "AI-Models")                                           # 好幾顆平放、只有一個投影檔
+gguf(os.path.join(flat, "Muse-Glimmer-30B-UD-Q4_K_XL.gguf"))
+gguf(os.path.join(flat, "Llama-3.2-3B-Instruct-Q4_K_M.gguf"))
+gguf(os.path.join(flat, "mmproj-Muse-Glimmer-30B-BF16.gguf"), mb=1)
+A.set_model_dirs({"add": flat})
+_, ms3, _ = A.scan_gguf()
+mm = {os.path.basename(m["path"]): os.path.basename(m["mmproj"] or "") for m in ms3 if m.get("external") == os.path.realpath(flat)}
+case("7. 平放的資料夾：投影檔只配給檔名對得上的那顆", mm == {"Muse-Glimmer-30B-UD-Q4_K_XL.gguf": "mmproj-Muse-Glimmer-30B-BF16.gguf",
+                                                     "Llama-3.2-3B-Instruct-Q4_K_M.gguf": ""}, mm)
+one = os.path.join(lms, "solo")                                               # 資料夾裡只有一顆：投影檔就是它的
+gguf(os.path.join(one, "gemma-3-4b-it-Q4_K_M.gguf"))
+gguf(os.path.join(one, "mmproj-F16.gguf"), mb=1)
+_, ms3, _ = A.scan_gguf()
+case("   資料夾裡只有一顆模型：投影檔照配", any(m["path"].endswith("gemma-3-4b-it-Q4_K_M.gguf") and m["mmproj"] for m in ms3))
+
+same = os.path.join(H, "same")                                                # 同名不同顆：只看檔名會配錯
+gguf(os.path.join(same, "model-Q4_K_M.gguf"), mb=2048)
+A.set_model_dirs({"add": same})
+gguf(os.path.join(root, "rootonly-Q6_K.gguf"), mb=1024)                       # 存放區根目錄的散檔
+_, ms4, _ = A.scan_gguf()
+prof = {"arch": "t", "layers": 32, "kv_full_bpt": 1000, "active_frac": 1.0, "ctx_train": 8192}
+cat2 = [{"repo": f"x/{n}-GGUF", "title": n, "use": "chat", "profile": prof,
+         "quants": [{"stem": "model-Q4_K_M", "quant": "Q4_K_M", "size_gib": g}]} for n, g in (("a", 3.0), ("b", 2.0), ("c", 5.0))]
+cat2.append({"repo": "x/rootonly-GGUF", "title": "r", "use": "chat", "profile": prof,
+             "quants": [{"stem": "rootonly-Q6_K", "quant": "Q6_K", "size_gib": 1.0}]})
+rec2 = recommend.recommend(st, {"gguf": ms4, "downloads": []}, cat2)
+got = {it["repo"]: any(p["installed_id"] for p in it["plans"]) for it in rec2["items"]}
+case("   同名不同顆：只有大小對得上的那顆算已安裝", got == {"x/a-GGUF": False, "x/b-GGUF": True, "x/c-GGUF": False, "x/rootonly-GGUF": True}, got)
+
+up = os.path.join(root, "upper")
+gguf(os.path.join(up, "SHOUT-Q4_K_M.GGUF"))
+code, out = A.delete_model("upper/SHOUT-Q4_K_M")
+case("8. 大寫副檔名 .GGUF：刪得掉", code == 200 and not os.path.exists(os.path.join(up, "SHOUT-Q4_K_M.GGUF")), (code, out))
+
+outside = tempfile.mkdtemp(prefix="xc-mnt-")                                  # 像 Linux 的 /models、另外掛的資料碟
+orig_bases = A.data_bases
+A.data_bases = lambda: [H, outside]
+os.makedirs(os.path.join(outside, "llm"), exist_ok=True)
+code, out = A.model_dir_browse(outside)
+case("9. 瀏覽器：check_model_dir 收的位置都瀏覽得到", code == 200 and any(d["name"] == "llm" for d in out["dirs"]), (code, out))
+code, _ = A.agent_browse(outside) if A.agent_enabled() else (400, None)
+case("   Agent 資料夾的瀏覽範圍沒跟著放寬", code != 200)
+A.data_bases = orig_bases
 
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

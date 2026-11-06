@@ -424,8 +424,16 @@ def recommend(state, library, catalog):
     cap = capacity(state)
     lib = library or {}
     installed = {m["id"]: m for m in lib.get("gguf") or []}
-    # 其他模型資料夾（LM Studio、C:\models）裡的檔名跟清單上的量化一樣，也算已經有了，不必再下載一份
-    by_stem = {m["id"].rsplit("/", 1)[-1].lower(): m for m in lib.get("gguf") or [] if m.get("external")}
+    # 其他模型資料夾（LM Studio、C:\models）或存放區根目錄的散檔，檔名跟清單上的量化一樣、大小也對得上，才算已經有了。
+    # 只看檔名不夠：xVITA 31B、TAIDE 26B、Granite 30B 的檔都叫 model-Q4_K_M，只有大小分得出是哪一顆
+    by_stem = {}
+    for m in lib.get("gguf") or []:
+        if m.get("external") or m["id"].startswith("./"):
+            by_stem.setdefault(m["id"].rsplit("/", 1)[-1].lower(), []).append(m)
+
+    def loose(q):
+        hit = [m for m in by_stem.get(q["stem"].lower(), []) if abs((m.get("size_gib") or 0) - q["size_gib"]) <= 0.15]
+        return hit[0] if len(hit) == 1 else None
     jobs = lib.get("downloads") or []
     items = []
     for i, e in enumerate(catalog):
@@ -439,7 +447,7 @@ def recommend(state, library, catalog):
         plans = []
         for q in e["quants"]:
             p = plan_quant(cap, prof, q, mm, lib.get("hdd"))
-            got = installed.get(f"{folder}/{q['stem']}") or by_stem.get(q["stem"].lower())
+            got = installed.get(f"{folder}/{q['stem']}") or loose(q)
             p["installed_id"] = got["id"] if got else None
             p["in_use"] = got.get("in_use") if got else None
             p["fits_disk"] = lib.get("free_gib") is None or q["size_gib"] + mm + 10 < lib["free_gib"]
