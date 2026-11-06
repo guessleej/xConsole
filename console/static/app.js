@@ -24,7 +24,7 @@ const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLoc
 function toast(msg, kind) {
   const t = el("div", "toast" + (kind ? " " + kind : ""), msg);
   $("#toasts").appendChild(t);
-  setTimeout(() => t.remove(), kind === "bad" ? 9000 : 4500);
+  setTimeout(() => t.remove(), kind === "bad" || kind === "warn" ? 9000 : 4500);
 }
 
 async function api(path, opts = {}) {
@@ -266,8 +266,10 @@ function renderNav() {
   }
   // 第二列：設定頁的分頁（依管理者實際的先後；記錄與帳號在後、品牌只在交機時設一次放最後）
   if (active === "settings") {
-    SETTINGS_TABS.forEach(([key, label]) => {
-      subBtn(label, "settings", (v === "logs" ? "logs" : (S.settingsTab || "machines")) === key,
+    const tabs = settingsTabs();
+    const curTab = tabs.some(([k]) => k === S.settingsTab) ? S.settingsTab : tabs[0][0];
+    tabs.forEach(([key, label]) => {
+      subBtn(label, "settings", (v === "logs" ? "logs" : curTab) === key,
         () => { S.settingsTab = key; go("settings"); });
     });
   }
@@ -1540,7 +1542,7 @@ function recRow(n, it, lib, ctx) {
 
 function recDownload(n, it, p, mm, ctx) {
   const d = el("div");
-  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""}（${fmt(p.size_gib)} GiB${mm ? `，含看圖用的 mmproj ${fmt(mm.gib)} GiB` : ""}）下載到 ${n.name}？`));
+  d.appendChild(el("p", null, `把 ${it.title} ${p.quant || ""}（${fmt(p.size_gib)} GiB${mm ? `，含看圖用的元件 ${fmt(mm.gib)} GiB` : ""}）下載到 ${n.name}？`));
   d.appendChild(el("p", "small muted", `${p.place}，預估約 ${p.tok_s != null ? fmt(p.tok_s, 0) + " tok/s" : "（速度未知）"}。下載在背景進行，中斷了再按一次會接續；完成後在清單上按「換上」。`));
   modal({ title: "下載模型", bodyNode: d, confirmText: "開始下載", onConfirm: async () => {
     try {
@@ -3500,9 +3502,19 @@ const SETTINGS_TABS = [
   ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
   ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
+// 桌面版（一般人單機用）：只留會用到的，照先後排；機群、使用報告、品牌是管理一群機器才用的。
+// HTTPS 與憑證只在打開區網存取（別台電腦要連進來）時才有意義
+const DESKTOP_TABS = ["account", "engine", "update", "providers", "logs"];
+
+function settingsTabs() {
+  if (!S.appWindow) return SETTINGS_TABS;
+  const keys = DESKTOP_TABS.concat(S.lanOn ? ["tls"] : []);
+  return keys.map((k) => SETTINGS_TABS.find(([key]) => key === k));
+}
 
 function viewSettings() {
-  const tab = S.settingsTab || "machines";
+  const tabs = settingsTabs();
+  const tab = tabs.some(([k]) => k === S.settingsTab) ? S.settingsTab : tabs[0][0];
   if (tab === "logs") return viewLogs();
   const main = $("#main");
   main.textContent = "";
@@ -3705,6 +3717,7 @@ async function checkTlsBanner() {
   try {
     const me = await api("/api/me");
     S.appWindow = !!me.app_window;
+    S.lanOn = !!me.lan_access;
     const lo = $("#logout");
     if (lo) lo.hidden = S.appWindow;           // 應用程式的視窗不用登入，也就不放登出（別台電腦連進來的照樣有）
     const t = me.tls || {};
@@ -4232,7 +4245,7 @@ function settingsLan(wrap, me) {
 async function settingsAccount(wrap) {
   let me = {};
   try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
-  if (me.desktop) settingsLan(wrap, me);
+  if (me.desktop) { S.lanOn = !!me.lan_access; settingsLan(wrap, me); }
   const first = me.app_window && me.password_unset;
   const c = card(first ? "設定密碼" : "變更密碼", first ? "這台的視窗不用密碼；別台電腦連進來（區網存取）時要用這組密碼登入"
     : `目前登入：${me.username || "admin"}`);
@@ -4242,7 +4255,7 @@ async function settingsAccount(wrap) {
   const n1 = mk("新密碼（至少 8 碼）");
   const n2 = mk("再輸入一次新密碼");
   c.appendChild(fr);
-  const b = el("button", "btn sm primary", "變更密碼");
+  const b = el("button", "btn sm primary", first ? "設定密碼" : "變更密碼");
   const go2 = async () => {
     if (n1.value !== n2.value) { toast("兩次輸入的新密碼不一樣", "bad"); return; }
     try {
@@ -4558,7 +4571,11 @@ async function openMachineSettings(nid) {
   if (n.online) { try { info = await machineInfo(nid, true); } catch (ex) { infoErr = ex.message; } }
   body.textContent = "";
 
-  body.appendChild(el("h4", "pick-h", "基本"));
+  // 桌面版（一般人單機用）：位址、埠、代理憑證是管理一群機器才會動的，收起來（值照樣送回，不影響儲存）
+  const basic = el("div");
+  basic.hidden = !!S.appWindow;
+  body.appendChild(basic);
+  basic.appendChild(el("h4", "pick-h", "基本"));
   const f1 = el("div", "form-row");
   const fName = textInput(rec.name);
   const [fGroup, dl] = groupInput(rec.group);
@@ -4566,14 +4583,14 @@ async function openMachineSettings(nid) {
   const fPort = numInput(rec.agent_port || 9401);
   f1.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("位址", fHost, "主控台連這台代理用的 IP 或主機名稱；改了會先實際連一次，連不上就不改"),
     fieldBox("代理的埠", fPort));
-  body.append(f1, dl);
+  basic.append(f1, dl);
   const tr = el("div", "slot-actions");
   tr.appendChild(el("span", "small muted", rec.trusted ? `信任的代理憑證：${(rec.trust_fingerprint || "").slice(0, 23)}…` : "還沒信任這台的代理憑證"));
   tr.appendChild(el("span", "spacer"));
   const tb = el("button", "btn sm", "匯入新憑證（代理重裝後用）");
   tb.onclick = () => importTrust(rec);
   tr.appendChild(tb);
-  body.appendChild(tr);
+  basic.appendChild(tr);
 
   let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent, fGpuMode, fGpuName, fGpuVendor, fGpuVram, fHfMirror, fGhProxy, fDesk;
   if (!info) {
@@ -4669,10 +4686,11 @@ async function openMachineSettings(nid) {
     body.appendChild(f3);
     const bb = el("div", "slot-actions");
     if (!info.llama.length && !st.llama_server) {
-      bb.appendChild(el("span", "small bad-t", "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。"));
+      bb.appendChild(el("span", "small bad-t", "這台還沒有安裝推理引擎（llama.cpp），模型還不能啟動。"));
     }
     bb.appendChild(el("span", "spacer"));
-    const bbtn = el("button", "btn sm", info.llama.length ? "編譯新版 llama.cpp" : "在這台編譯 llama.cpp");
+    // Windows／macOS 是下載官方預編譯版、Linux 才在這台編譯：按鈕不說「編譯」，交給安裝視窗依系統說明
+    const bbtn = el("button", "btn sm" + (info.llama.length ? "" : " primary"), info.llama.length ? "更新推理引擎" : "安裝推理引擎");
     bbtn.onclick = () => openEngineBuild(nid);
     bb.appendChild(bbtn);
     body.appendChild(bb);
@@ -4958,8 +4976,18 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
   body.appendChild(prog);
   const head = el("p", "note");
   const log = el("pre", "log build-log");
+  const closeBtn = ov.querySelector(".actions .btn");          // 視窗本身的「取消」：裝好之後改成「完成」
   const draw = (j, tail, running) => {
     prog.textContent = "";
+    // 按鈕的顯示在最前面處理：還沒裝過（沒有狀態）時也不能出現「取消安裝」
+    startBtn.hidden = running;
+    startBtn.className = "btn " + (j.state === "done" ? "" : "primary");
+    cancelBtn.hidden = !running;
+    imp.hidden = running || j.state === "done";
+    if (closeBtn) {
+      closeBtn.textContent = j.state === "done" ? "完成" : "取消";
+      closeBtn.className = "btn" + (j.state === "done" ? " primary" : "");
+    }
     if (!j.state) return;
     const v = j.mode === "import" ? "匯入" : verb;
     const label = { running: `${v}中：${j.phase}`, done: `裝好了：${j.exe}`, failed: `失敗：${j.error || ""}`, cancelled: "已取消",
@@ -4968,17 +4996,21 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
     head.textContent = `${j.tag || ""}　${label}`;
     prog.appendChild(head);
     if (j.state === "done") prog.appendChild(el("p", "small muted", kind === "sd" ? "裝好了。回模型庫的「畫圖與影片」下載一顆模型就能產圖。"
-      : "到「這台的設定」的 llama-server 選它，或保留「自動挑選」（會挑版本最新、有 GPU 加速的那支）。"));
+      : "裝好了，按「完成」回去，接著到「模型」下載一顆推薦的模型。"));
     log.textContent = (tail || []).join("\n") || "（還沒有輸出）";
-    prog.appendChild(log);
+    // 裝好之後下載記錄收進「詳細記錄」，畫面只留結果
+    if (j.state === "done") {
+      const det = el("details", "build-detail");
+      det.appendChild(el("summary", "small muted", "詳細記錄"));
+      det.appendChild(log);
+      prog.appendChild(det);
+    } else prog.appendChild(log);
     log.scrollTop = log.scrollHeight;
-    startBtn.hidden = running;
-    cancelBtn.hidden = !running;
     // 預編譯版下載中可以暫停；暫停或下載到一半失敗，再按會從斷掉的位置接著下載
     const dlNow = running && j.mode === "prebuilt" && j.phase === "下載";
     cancelBtn.textContent = dlNow ? "暫停下載" : `取消${v}`;
-    if (dl) startBtn.textContent = j.state === "paused" || (j.state === "failed" && j.resumable) ? "繼續下載" : startLabel;
-    imp.hidden = running;
+    if (dl) startBtn.textContent = j.state === "paused" || (j.state === "failed" && j.resumable) ? "繼續下載"
+      : j.state === "done" ? "更新到最新版" : startLabel;
   };
   const startLabel = dl ? "一鍵安裝（下載幾十到幾百 MB）" : "開始編譯（約 10～30 分鐘）";
   const startBtn = formButton(ov, startLabel, "primary", async () => {

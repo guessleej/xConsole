@@ -79,6 +79,9 @@ if OS == "windows":
 REGISTRY = os.path.join(STATE_DIR, "registry.json")
 TOKEN_FILE = os.path.join(STATE_DIR, "token")
 PORT = int(os.environ.get("XCONSOLE_AGENT_PORT", "9401"))
+# 桌面版（xConsole 應用程式帶起來的）：給一般人單機用。新模型預設只給這台自己用（不會跳防火牆詢問）、
+# 預設不先思考（回答快）；第一次啟動直接套用偵測到的記憶體架構（一般人不會也不必懂這個）
+DESKTOP_AGENT = os.environ.get("XCONSOLE_DESKTOP") == "1"
 NODE_AGENTS = ("http://127.0.0.1:9300/metrics", "http://127.0.0.1:9301/metrics")
 GIB = 1024 ** 3
 
@@ -95,6 +98,11 @@ DEFAULT_FLOORS = {
 
 # ---------------------------------------------------------------- 工具
 
+# 外部指令輸出的編碼：Windows 的命令列工具（typeperf、PowerShell、tasklist…）用系統的 OEM 字碼頁（繁中 Windows 是 cp950），
+# 桌面版用 UTF-8 模式跑 Python，照 UTF-8 解會整段例外、讀數變 0（HP 實機踩到：顯示卡已用量永遠 0）。解不出的字換掉，不丟例外
+CMD_TEXT = {"encoding": "oem", "errors": "replace"} if os.name == "nt" else {"errors": "replace"}
+
+
 def sh(argv, timeout=20):
     """跑一條指令，回 (returncode, stdout, stderr)。失敗不丟例外。
     一律傳參數清單、不經過 shell：服務名稱、路徑、主機名稱這些值不管長怎樣都不會被當成指令解讀
@@ -102,7 +110,7 @@ def sh(argv, timeout=20):
     if not isinstance(argv, (list, tuple)):
         raise TypeError("sh() 只收參數清單，不收整條指令字串")
     try:
-        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run([str(a) for a in argv], capture_output=True, text=True, **CMD_TEXT, timeout=timeout)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "逾時"
@@ -485,12 +493,25 @@ def probe_win_adapters():
     except OSError:
         return None
     if cards:
-        _, out, _ = sh(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"], timeout=15)
-        rows = [ln for ln in out.splitlines() if ln.startswith('"') and "/" in ln[:15]]
-        if rows:
-            vals = [float(x.strip('"')) for x in rows[-1].split(",")[1:] if re.fullmatch(r'"[\d.]+"', x.strip())]
-            cards[0]["vram_used"] = int(max(vals)) if vals else 0     # 計數器以 LUID 命名對不回登錄檔，取最大那張
+        cards[0]["vram_used"] = _win_gpu_used()
     return cards or None
+
+
+_TYPEPERF = {"at": 0.0, "val": 0}
+
+
+def _win_gpu_used():
+    """GPU 專用記憶體已用量（typeperf 起一次要 2 秒，頁面每次載入會問好幾次）：快取 10 秒。"""
+    if time.time() - _TYPEPERF["at"] < 10:
+        return _TYPEPERF["val"]
+    _, out, _ = sh(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"], timeout=15)
+    rows = [ln for ln in out.splitlines() if ln.startswith('"') and "/" in ln[:15]]
+    val = 0
+    if rows:
+        vals = [float(x.strip('"')) for x in rows[-1].split(",")[1:] if re.fullmatch(r'"[\d.]+"', x.strip())]
+        val = int(max(vals)) if vals else 0                         # 計數器以 LUID 命名對不回登錄檔，取最大那張
+    _TYPEPERF.update(at=time.time(), val=val)
+    return val
 
 
 def probe_gpus():
@@ -924,11 +945,48 @@ def unit_name(unit):
 UNITS_FILE = os.path.join(STATE_DIR, "units.json")
 
 
+def _win_proc(pid):
+    """Windows：直接問系統這個 PID 的程式名稱與記憶體（tasklist 起一次要 0.7 秒，頁面每次載入要問好幾個 PID）。
+    回 (名稱小寫, 工作集位元組) ；行程不在回 ("", 0)；問不到（權限、舊系統）回 None，呼叫端改用 tasklist。"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        h = k32.OpenProcess(0x1000 | 0x0010, False, int(pid)) or k32.OpenProcess(0x1000, False, int(pid))
+        if not h:
+            # 87＝參數不對：這個 PID 不存在；其他（例如 5 存取被拒）交給 tasklist 再問一次
+            return ("", 0) if k32.GetLastError() == 87 else None
+        try:
+            code = wintypes.DWORD()
+            if k32.GetExitCodeProcess(h, ctypes.byref(code)) and code.value != 259:
+                return "", 0                                         # 已經結束（STILL_ACTIVE＝259）
+            buf = ctypes.create_unicode_buffer(1024)
+            n = wintypes.DWORD(1024)
+            name = os.path.basename(buf.value).lower() if k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) else ""
+
+            class PMC(ctypes.Structure):
+                _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD)] + \
+                    [(f, ctypes.c_size_t) for f in ("PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
+                                                     "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
+                                                     "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
+            pmc = PMC()
+            pmc.cb = ctypes.sizeof(PMC)
+            ws = pmc.WorkingSetSize if k32.K32GetProcessMemoryInfo(h, ctypes.byref(pmc), pmc.cb) else 0
+            return (name or None), ws
+        finally:
+            k32.CloseHandle(h)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def proc_image(pid):
     """這個 PID 的程式名稱（不含路徑、小寫）；不存在回空字串。"""
     if not pid:
         return ""
     if OS == "windows":
+        got = _win_proc(pid)
+        if got is not None and got[0] is not None:
+            return got[0]
         _, out, _ = sh(["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"], timeout=10)
         return out.split(",")[0].strip('"').lower() if out.startswith('"') else ""
     try:
@@ -951,6 +1009,9 @@ def proc_rss_gib(pid):
     if not pid:
         return 0.0
     if OS == "windows":
+        got = _win_proc(pid)
+        if got is not None and got[0] is not None:
+            return round(got[1] / GIB, 2)
         _, out, _ = sh(["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"], timeout=10)
         m = re.search(r'"([\d,.]+) K"', out)
         return round(int(re.sub(r"[,.]", "", m.group(1))) * 1024 / GIB, 2) if m else 0.0
@@ -3092,7 +3153,7 @@ def llama_cmd_text(raw, reg=None):
 @functools.lru_cache(maxsize=8)
 def _llama_help(exe):
     try:
-        p = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=20, env=llama_launch_env(exe))
+        p = subprocess.run([exe, "--help"], capture_output=True, text=True, **CMD_TEXT, timeout=20, env=llama_launch_env(exe))
         return p.stdout + p.stderr
     except Exception:  # noqa: BLE001
         return ""
@@ -3117,7 +3178,7 @@ def no_mmap_args(exe):
     # 用跟啟動時一樣的環境去問：靠 LD_LIBRARY_PATH 或 llama_env 才載得起來的那支，裸跑 --help 會失敗，
     # 結果就退回帶舊旗標，新版照樣起不來
     try:
-        p = subprocess.run([exe, "--help"], capture_output=True, text=True, timeout=20, env=llama_launch_env(exe))
+        p = subprocess.run([exe, "--help"], capture_output=True, text=True, **CMD_TEXT, timeout=20, env=llama_launch_env(exe))
         text = p.stdout + p.stderr
     except Exception:  # noqa: BLE001
         text = ""
@@ -3279,8 +3340,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     # 思考模式與區網存取：這次有帶就用帶的，沒帶就沿用欄位原本的（換引擎也一樣）；全新的欄位預設 auto、區網開
     prev_raw = (load_json(slot["config"], {}) or {}) if slot.get("config") and slot.get("kind") in ("llama", "strata") else {}
     if thinking is None:
-        thinking = (prev_raw.get("reasoning") if slot.get("kind") == "llama" else None) or "auto"
-    host = ("0.0.0.0" if lan else "127.0.0.1") if lan is not None else (prev_raw.get("host") or "0.0.0.0")
+        thinking = (prev_raw.get("reasoning") if slot.get("kind") == "llama" else None) or ("off" if DESKTOP_AGENT else "auto")
+    host = ("0.0.0.0" if lan else "127.0.0.1") if lan is not None else \
+        (prev_raw.get("host") or ("127.0.0.1" if DESKTOP_AGENT else "0.0.0.0"))
     alias = slot.get("api_model_name") or _slug(f"{m['name']}-{m['quant']}" if m.get("quant") else m["name"])
     os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
     cfg_path = engine_file(slot_id, "-llama.json")
@@ -3383,6 +3445,29 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
                  "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
                  "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
             verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
+    auto_ctx = None
+    if not verdict["allow"] and not force and ctx is None:
+        # 使用者沒指定上下文：跟 LocModel 一樣先把上下文縮短再試（一般對話 8K 夠用），不要直接說放不下
+        for c in (16384, 8192):
+            if c >= want_ctx:
+                continue
+            base_raw["ctx"] = c
+            if base_raw.get("max_tokens") and base_raw["max_tokens"] >= c:
+                base_raw["max_tokens"] = None
+            ly = llama_layout(m, reg["machine"], cards, gpu_ids, c, par, back)
+            raw = raw_for(ly)
+            save_json(cfg_path, raw)
+            os.chmod(cfg_path, 0o600)
+            put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
+                 "port": int(port), "est_vram_gib": ly["est_vram"], "est_ram_gib": ly["est_ram"],
+                 "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
+                 "model": m["name"], "quant": m.get("quant"), "cpu_moe": ly["cpu_moe"] or None})
+            v2 = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
+            if v2["allow"]:
+                verdict, lay, want_ctx, auto_ctx = v2, ly, c, c
+                est = {"vram": ly["est_vram"], "ram": ly["est_ram"], "kv": ly["kv"], "moved_gib": ly["moved_gib"]}
+                cpu_moe = ly["cpu_moe"]
+                break
     if not verdict["allow"] and not force:
         return undo("記憶體不夠" + ("（用硬碟執行也放不下：KV、計算緩衝與放 GPU 的層仍要占記憶體）"
                                    if lay["mode"] == "disk" else ""), 409, {"admit": verdict})
@@ -3423,7 +3508,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
                  "kv_gib": est["kv"], "est_vram_gib": est["vram"], "gpus": gpu_ids,
                  "cpu_moe": cpu_moe, "moved_gib": est["moved_gib"],
                  "disk_mode": lay["mode"] == "disk", "ngl": lay["ngl"], "split": lay["split"],
-                 "thinking": thinking, "lan": host != "127.0.0.1"}
+                 "thinking": thinking, "lan": host != "127.0.0.1", "ctx_auto": auto_ctx,
+                 "warnings": verdict.get("warnings") or []}
 
 
 def _usage_reclaim(old_slot):
@@ -4079,6 +4165,15 @@ def pools(reg, hw):
     return out
 
 
+# Windows／macOS：記憶體不夠時作業系統會改用硬碟分頁（變慢），不會像 Linux 統一記憶體機（DGX、Jetson、AI 395）那樣整台卡死。
+# 所以底線在這兩個系統是「建議留」，低於它只提醒；真的剩不到 HARD_MIN_GIB 才擋（一般人的電腦也要跑得起來，慢沒關係）。
+SOFT_FLOOR = OS in ("windows", "darwin")
+HARD_MIN_GIB = 1.5
+def soft_note(worst, floor):
+    return (f"載完只剩約 {worst} GiB（建議留 {floor} GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，"
+            f"會變慢但不會當機；要快一點可以先關掉其他程式")
+
+
 def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None, cfg_override=None):
     """這台還塞不塞得下這個欄位的模型。用「載下去之後最壞剩多少」判斷，不是「現在剩多少」。"""
     reg = reg or registry()
@@ -4144,11 +4239,14 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None, cfg_o
         if lim and need_vram > lim:
             reasons.append(f"超過 GPU 能用的上限：這顆要約 {need_vram:.0f} GiB，這台 GPU 最多只能用 {lim:.0f} GiB"
                            "（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）")
-        if need and worst < fl["ram"]:
+        if need and worst < fl["ram"] and SOFT_FLOOR and worst >= HARD_MIN_GIB:
+            warnings.append(soft_note(worst, fl["ram"]))
+        elif need and worst < fl["ram"]:
             reasons.append(
-                f"統一記憶體不足：需要約 {need:.0f} GiB，現在只剩 {free:.0f} GiB，"
-                f"載下去會剩 {worst} GiB（低於 {fl['ram']} GiB 底線）。"
-                f"這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉")
+                f"記憶體不夠：需要約 {need:.0f} GiB，現在只剩 {free:.0f} GiB，"
+                f"載下去會剩 {worst} GiB（低於 {fl['ram'] if not SOFT_FLOOR else HARD_MIN_GIB} GiB）。"
+                + ("先關掉一些程式，或換小一點的模型" if SOFT_FLOOR else
+                   "這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉"))
         elif need and worst < fl["ram"] + 4:
             warnings.append(f"可以載，但載完只剩 {worst} GiB，長請求時要留意")
     else:
@@ -4185,7 +4283,9 @@ def admit(slot_id, reg=None, hw=None, extra_free=None, reclaim_cards=None, cfg_o
             reasons.append(
                 f"顯存不足：需要約 {need_vram:.0f} GiB，現在只剩 {vfree:.0f} GiB，"
                 f"載下去會剩 {wv} GiB（低於 {fl['vram']} GiB 底線）")
-        if need_ram and wr < fl["ram"]:
+        if need_ram and wr < fl["ram"] and SOFT_FLOOR and mm != "unified_split" and wr >= HARD_MIN_GIB:
+            warnings.append(soft_note(wr, fl["ram"]))
+        elif need_ram and wr < fl["ram"]:
             extra = ("，這台曾因為系統記憶體耗盡整台卡死"
                      if mm == "unified_split" else "")
             reasons.append(
@@ -4845,7 +4945,7 @@ def _prebuilt_run(st, log, kind="llama"):
             os.chmod(exe, 0o700)               # 只有代理自己（同一個使用者）要執行它
         flag = "--version" if kind == "llama" else "--help"
         try:
-            vp = subprocess.run([exe, flag], capture_output=True, text=True, timeout=60,
+            vp = subprocess.run([exe, flag], capture_output=True, text=True, **CMD_TEXT, timeout=60,
                                 env=llama_launch_env(exe) if kind == "llama" else None)
             rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
         except (OSError, subprocess.TimeoutExpired) as ex:
@@ -5034,7 +5134,7 @@ def _import_run(st, log, kind):
         save_json(eng["file"], st)
         flag = "--version" if kind == "llama" else "--help"
         try:
-            vp = subprocess.run([exe, flag], capture_output=True, text=True, timeout=60,
+            vp = subprocess.run([exe, flag], capture_output=True, text=True, **CMD_TEXT, timeout=60,
                                 env=llama_launch_env(exe) if kind == "llama" else None)
             rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
         except (OSError, subprocess.TimeoutExpired) as ex:
@@ -6647,9 +6747,12 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
             if need > lim:
                 reasons.append(f"超過 GPU 能用的上限：產這一件要約 {need:.0f} GiB，這台 GPU 最多只能用 {lim:.0f} GiB"
                                "（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高）")
-        if worst < fl["ram"]:
-            reasons.append(f"統一記憶體不足：產這一件要約 {need + SD_RAM_SELF:.0f} GiB，現在只剩 {free:.0f} GiB，"
-                           f"產的時候會剩 {worst} GiB（低於 {fl['ram']} GiB 底線）。統一記憶體吃爆會把整台拖死；{tip}")
+        if worst < fl["ram"] and SOFT_FLOOR and worst >= HARD_MIN_GIB:
+            warnings.append(soft_note(worst, fl["ram"]))
+        elif worst < fl["ram"]:
+            reasons.append(f"記憶體不夠：產這一件要約 {need + SD_RAM_SELF:.0f} GiB，現在只剩 {free:.0f} GiB，"
+                           f"產的時候會剩 {worst} GiB（低於 {HARD_MIN_GIB if SOFT_FLOOR else fl['ram']} GiB）。"
+                           + ("" if SOFT_FLOOR else "統一記憶體吃爆會把整台拖死；") + tip)
     else:
         rfree = p["ram"]["free_gib"]
         if mm == "discrete" and p["gpus"]:
@@ -6676,7 +6779,9 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
                                f"產的時候會剩 {wv} GiB（低於 {vfl} GiB 底線）；{tip}")
         wr = round(rfree - rneed, 1)
         detail["ram"] = {"free": rfree, "need": round(rneed, 1), "worst": wr, "floor": fl["ram"]}
-        if wr < fl["ram"]:
+        if wr < fl["ram"] and SOFT_FLOOR and mm != "unified_split" and wr >= HARD_MIN_GIB:
+            warnings.append(soft_note(wr, fl["ram"]))
+        elif wr < fl["ram"]:
             extra = "，這台曾因為系統記憶體耗盡整台卡死" if mm == "unified_split" else ""
             reasons.append(f"系統記憶體不足：要約 {rneed:.0f} GiB，現在只剩 {rfree:.0f} GiB，"
                            f"產的時候會剩 {wr} GiB（低於 {fl['ram']} GiB 底線{extra}）")
@@ -6775,8 +6880,9 @@ def _gen_run(j, argv, env, mm, fl):
             peak_r = max(peak_r, r0 - rf)
             peak_g = max(peak_g, max((g.get(k, 0) - g0.get(k, 0) for k in g), default=0.0))
             # 看門狗：系統記憶體跌破底線就中止。統一記憶體機（兩種）系統這塊被吃光整台會卡死；獨立顯卡機也一樣會拖垮系統
-            if rf < fl["ram"] and not killed:
-                killed = (f"產的時候系統記憶體只剩 {rf:.1f} GiB（低於 {fl['ram']} GiB 底線），已中止，避免整台被拖死。"
+            # Windows／macOS 不會整台卡死（改用硬碟分頁）：只在剩不到硬下限時才中止
+            if rf < (HARD_MIN_GIB if SOFT_FLOOR else fl["ram"]) and not killed:
+                killed = (f"產的時候系統記憶體只剩 {rf:.1f} GiB，已中止，避免整台被拖死。"
                           "請改小尺寸、換小一級的量化，或先停掉一個模型")
             if j["_cancel"] and not killed:
                 killed = "已取消"
@@ -7980,6 +8086,23 @@ def run_desktop_helper():
 
 
 
+@_locked
+def desktop_first_run():
+    """桌面版第一次啟動：記憶體架構還沒確認過就直接套用偵測結果（之後在「這台的設定」照樣能改）。"""
+    reg = registry()
+    m = reg["machine"]
+    if m.get("confirmed"):
+        return
+    try:
+        sug, _ = suggest_memory_model()
+    except Exception:  # noqa: BLE001  偵測失敗就照舊，網頁上會請人確認
+        return
+    if sug:
+        m["memory_model"], m["confirmed"] = sug, True
+        save_json(REGISTRY, reg)
+        print(f"桌面版第一次啟動：記憶體架構自動套用偵測結果 {sug}", flush=True)
+
+
 def _watch_parent(pid):
     """父行程（xConsole 應用程式）不在了就停掉自己帶起來的模型服務並結束。"""
     while True:
@@ -8004,6 +8127,8 @@ def main():
         sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "agent.log"), "a", encoding="utf-8", buffering=1)
     registry()
     ensure_cert()
+    if DESKTOP_AGENT:
+        desktop_first_run()
     if not SYSTEMD:
         SUP.boot()
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

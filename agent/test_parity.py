@@ -243,6 +243,18 @@ def main():
         A.OS, A._linux_display_env = saved[0], saved[1]
         for k, v in (("DISPLAY", saved[2]), ("WAYLAND_DISPLAY", saved[3])):
             os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+    real_sug = A.suggest_memory_model
+    try:
+        A.suggest_memory_model = lambda gpus=None: ("unified_single", "測試")
+        r = A.registry(); r["machine"].pop("confirmed", None); r["machine"]["memory_model"] = "discrete"; A.save_json(A.REGISTRY, r)
+        A.desktop_first_run()
+        m = A.registry()["machine"]
+        case("桌面版第一次啟動：直接套用偵測到的記憶體架構（一般人不必懂）", (m["memory_model"], m.get("confirmed")) == ("unified_single", True), m)
+        r = A.registry(); r["machine"]["memory_model"] = "discrete"; A.save_json(A.REGISTRY, r)
+        A.desktop_first_run()
+        eq("  使用者確認過的不再覆蓋", A.registry()["machine"]["memory_model"], "discrete")
+    finally:
+        A.suggest_memory_model = real_sug
     eq("顯示卡名稱帶 (TM) 也對得到頻寬", A.spec_bandwidth("AMD Radeon(TM) 890M Graphics"), 89.6)
     real_rp = A.ram_pool
     try:

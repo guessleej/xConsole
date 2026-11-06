@@ -338,7 +338,8 @@ async function viewRun() {
   if (rs) statusHolder.appendChild(statusBar(n, rs));
 
   // thinking／lan 先顯示欄位現在的設定；使用者沒動過就不送，代理沿用原本的（不會悄悄改成 0.0.0.0）
-  const st = { ctx: null, thinking: "auto", lan: true, disk: false, base: null, touched: {} };
+  // 應用程式的視窗（一般人單機用）：新模型預設只給這台自己用、不先思考，跟代理的桌面版預設一致
+  const st = { ctx: null, thinking: S.appWindow ? "off" : "auto", lan: !S.appWindow, disk: false, base: null, touched: {} };
   let infoFor = null;
   const draw = () => {
     const m = models.find((x) => x.id === sel.value);
@@ -375,7 +376,7 @@ async function viewRun() {
     statusHolder.replaceChildren(b);
   };
   sel.onchange = () => { st.ctx = null; st.touched.ctx = false; st.disk = false; draw(); };
-  if (slotSel) slotSel.onchange = () => { S.runSlot = slotSel.value; st.base = null; st.touched = {}; st.thinking = "auto"; st.lan = true; draw(); };
+  if (slotSel) slotSel.onchange = () => { S.runSlot = slotSel.value; st.base = null; st.touched = {}; st.thinking = S.appWindow ? "off" : "auto"; st.lan = !S.appWindow; draw(); };
   draw();
   reveal(holder);
 }
@@ -599,7 +600,8 @@ async function startModel(n, m, slot, st, btn, err, prog, statusHolder, force = 
     const r = await api(`/api/node/${n.id}/slot/${s.id}/model`, { method: "POST", body: { ...req, force } });
     done = true;
     pc.update({ state: "ready", stage: "done", pct: 100 });
-    toast(`已啟動 ${r.model}`, "ok");
+    toast(`已啟動 ${r.model}` + (r.ctx_auto ? `（記憶體不太夠，上下文自動縮到 ${r.ctx_auto / 1024}K）` : ""), "ok");
+    (r.warnings || []).forEach((w) => toast(w, "warn"));
   } catch (ex) {
     done = true;
     pc.el.remove();
@@ -607,10 +609,13 @@ async function startModel(n, m, slot, st, btn, err, prog, statusHolder, force = 
     if (v && !force) {
       const d = el("div");
       v.reasons.forEach((x) => d.appendChild(el("p", "note bad", x)));
-      if (v.kv_note) d.appendChild(el("p", "note", v.kv_note));
-      d.appendChild(el("p", "small muted", "統一記憶體的機器一旦吃爆，不是服務掛掉而是整台卡死，要到現場重開。可以先把上下文調短再試。"));
-      modal({ title: `擋下來了：${m.name} 放不下`, bodyNode: d, confirmText: "我知道風險，仍要啟動", danger: true,
+      d.appendChild(el("p", "small muted", "上下文已經自動縮到 8K 試過了。可以先關掉其他程式、換小一點的量化，或到「模型」挑小一點的模型。"));
+      // 這裡不重畫頁面：使用者按「仍要啟動」時，進度卡要接在現在這一頁上（之前重畫後才確認，進度卡掛在舊頁面上看不到）
+      S.busy.delete(key);
+      btn.disabled = false;
+      modal({ title: `${m.name} 放不下`, bodyNode: d, confirmText: "我知道會很慢，仍要啟動", danger: true,
         onConfirm: () => startModel(n, m, s, st, btn, err, prog, statusHolder, true) });
+      return;
     } else errNote(err, "啟動失敗：" + ex.message);
   }
   S.busy.delete(key);
@@ -661,7 +666,7 @@ function renderRich(box, text, streaming) {
   const parts = text.split(/^```/m);
   parts.forEach((seg, i) => {
     if (i % 2 === 0) {
-      if (seg.trim()) box.appendChild(el("div", "msg-text", seg.replace(/^\n+|\n+$/g, "")));
+      if (seg.trim()) box.appendChild(mdBlock(seg.replace(/^\n+|\n+$/g, "")));
       return;
     }
     const nl = seg.indexOf("\n");
@@ -669,6 +674,109 @@ function renderRich(box, text, streaming) {
     const code = nl >= 0 ? seg.slice(nl + 1).replace(/\n$/, "") : "";
     box.appendChild(codeBlock(lang, code, streaming && i === parts.length - 1));
   });
+}
+
+// 模型回答的 Markdown 排版：標題、清單、引用、分隔線、表格、粗體、斜體、行內程式碼、連結。
+// 全部用 DOM 節點與 textContent 組出來（不用 innerHTML），模型吐什麼都不會變成可執行的內容
+function mdBlock(text) {
+  const root = el("div", "msg-text md");
+  const lines = text.split("\n");
+  let i = 0;
+  const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    let mt;
+    if ((mt = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/))) {
+      root.appendChild(mdInline(el("h" + Math.min(6, mt[1].length + 2)), mt[2].replace(/\s+#+\s*$/, "")));
+      i++; continue;
+    }
+    if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { root.appendChild(el("hr")); i++; continue; }
+    if (isTableRow(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const t = el("table", "md-table");
+      const tr = el("tr");
+      cells(line).forEach((c) => tr.appendChild(mdInline(el("th"), c)));
+      t.appendChild(el("thead")).appendChild(tr);
+      const tb = t.appendChild(el("tbody"));
+      i += 2;
+      while (i < lines.length && isTableRow(lines[i])) {
+        const r = el("tr");
+        cells(lines[i]).forEach((c) => r.appendChild(mdInline(el("td"), c)));
+        tb.appendChild(r);
+        i++;
+      }
+      const wrap = el("div", "md-table-wrap");
+      wrap.appendChild(t);
+      root.appendChild(wrap);
+      continue;
+    }
+    if (/^\s*>/.test(line)) {
+      const q = el("blockquote");
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) { buf.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
+      q.appendChild(mdBlock(buf.join("\n")));
+      root.appendChild(q);
+      continue;
+    }
+    if ((mt = line.match(/^(\s*)([-*+]|\d{1,3}[.)])\s+/))) {
+      const ordered = /\d/.test(mt[2]);
+      const list = el(ordered ? "ol" : "ul");
+      if (ordered) list.start = parseInt(mt[2], 10) || 1;
+      const base = mt[1].length;
+      while (i < lines.length) {
+        const m2 = lines[i].match(/^(\s*)([-*+]|\d{1,3}[.)])\s+(.*)$/);
+        if (!m2 || m2[1].length < base || /\d/.test(m2[2]) !== ordered) {
+          // 縮排較深的接續行或子清單：併到上一項（保留換行）
+          if (lines[i].trim() && /^\s{2,}/.test(lines[i]) && list.lastChild) {
+            list.lastChild.appendChild(mdBlock(lines[i].trim()));
+            i++; continue;
+          }
+          break;
+        }
+        if (m2[1].length > base && list.lastChild) { list.lastChild.appendChild(mdBlock(lines[i].trim())); i++; continue; }
+        list.appendChild(mdInline(el("li"), m2[3]));
+        i++;
+      }
+      root.appendChild(list);
+      continue;
+    }
+    const buf = [];
+    while (i < lines.length && lines[i].trim() && !/^\s{0,3}(#{1,6}\s|>|([-*+]|\d{1,3}[.)])\s)/.test(lines[i]) && !isTableRow(lines[i])) {
+      buf.push(lines[i]); i++;
+    }
+    if (!buf.length) { buf.push(lines[i]); i++; }
+    const p = el("p");
+    buf.forEach((b, k) => { if (k) p.appendChild(document.createElement("br")); mdInline(p, b); });
+    root.appendChild(p);
+  }
+  return root;
+}
+
+function mdInline(node, text) {
+  // 依序找最先出現的記號：`程式碼`、**粗體**、*斜體*／_斜體_、[文字](網址)
+  // 不用 lookbehind（macOS 12 的 WebView 不支援，整支程式會載不起來）：斜體前面那個字元另外抓出來原樣放回
+  const rx = /`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|(^|[^\w*])\*(?!\s)([^*\n]+?)\*(?![\w*])|(^|[^\w_])_(?!\s)([^_\n]+?)_(?![\w_])|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let last = 0, mt;
+  while ((mt = rx.exec(text))) {
+    if (mt.index > last) node.appendChild(document.createTextNode(text.slice(last, mt.index)));
+    if (mt[1] != null) node.appendChild(el("code", null, mt[1]));
+    else if (mt[2] != null || mt[3] != null) node.appendChild(mdInline(el("strong"), mt[2] ?? mt[3]));
+    else if (mt[5] != null || mt[7] != null) {
+      const pre = mt[4] ?? mt[6];
+      if (pre) node.appendChild(document.createTextNode(pre));
+      node.appendChild(mdInline(el("em"), mt[5] ?? mt[7]));
+    } else {
+      const a = el("a", null, mt[8]);
+      a.href = mt[9];
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      node.appendChild(a);
+    }
+    last = rx.lastIndex;
+  }
+  if (last < text.length) node.appendChild(document.createTextNode(text.slice(last)));
+  return node;
 }
 
 function codeBlock(lang, code, open) {

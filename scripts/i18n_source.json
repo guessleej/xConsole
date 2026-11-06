@@ -1488,11 +1488,11 @@
 "pattern": false
 },
 {
-"zh": "，含看圖用的 mmproj {0} GiB",
+"zh": "，含看圖用的元件 {0} GiB",
 "pattern": true
 },
 {
-"zh": "含看圖用的 mmproj",
+"zh": "含看圖用的元件",
 "pattern": false
 },
 {
@@ -5252,15 +5252,11 @@
 "pattern": false
 },
 {
-"zh": "這台還沒有編好的 llama.cpp，GGUF 模型還不能啟動。",
+"zh": "這台還沒有安裝推理引擎（llama.cpp），模型還不能啟動。",
 "pattern": false
 },
 {
-"zh": "編譯新版 llama.cpp",
-"pattern": false
-},
-{
-"zh": "在這台編譯 llama.cpp",
+"zh": "更新推理引擎",
 "pattern": false
 },
 {
@@ -5684,11 +5680,15 @@
 "pattern": false
 },
 {
-"zh": "到「這台的設定」的 llama-server 選它，或保留「自動挑選」（會挑版本最新、有 GPU 加速的那支）。",
+"zh": "裝好了，按「完成」回去，接著到「模型」下載一顆推薦的模型。",
 "pattern": false
 },
 {
 "zh": "（還沒有輸出）",
+"pattern": false
+},
+{
+"zh": "詳細記錄",
 "pattern": false
 },
 {
@@ -5701,6 +5701,10 @@
 },
 {
 "zh": "繼續下載",
+"pattern": false
+},
+{
+"zh": "更新到最新版",
 "pattern": false
 },
 {
@@ -6376,11 +6380,23 @@
 "pattern": false
 },
 {
-"zh": "統一記憶體的機器一旦吃爆，不是服務掛掉而是整台卡死，要到現場重開。可以先把上下文調短再試。",
+"zh": "（記憶體不太夠，上下文自動縮到 {0}K）",
+"pattern": true
+},
+{
+"zh": "記憶體不太夠，上下文自動縮到",
 "pattern": false
 },
 {
-"zh": "我知道風險，仍要啟動",
+"zh": "上下文已經自動縮到 8K 試過了。可以先關掉其他程式、換小一點的量化，或到「模型」挑小一點的模型。",
+"pattern": false
+},
+{
+"zh": "{0} 放不下",
+"pattern": true
+},
+{
+"zh": "我知道會很慢，仍要啟動",
 "pattern": false
 },
 {
@@ -9044,7 +9060,7 @@
 "pattern": false
 },
 {
-"zh": "先在「帳號」設一組密碼，別台電腦登入要用",
+"zh": "先在下面「設定密碼」設一組密碼，別台電腦登入要用",
 "pattern": false
 },
 {
@@ -10808,6 +10824,22 @@
 "pattern": false
 },
 {
+"zh": "載完只剩約 {0} GiB（建議留 {1} GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式",
+"pattern": true
+},
+{
+"zh": "載完只剩約",
+"pattern": false
+},
+{
+"zh": "GiB（建議留",
+"pattern": false
+},
+{
+"zh": "GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式",
+"pattern": false
+},
+{
 "zh": "先停掉一個模型、改小尺寸，或換小一級的量化",
 "pattern": false
 },
@@ -10857,6 +10889,18 @@
 },
 {
 "zh": "統一記憶體，GPU 與系統共用同一個池",
+"pattern": false
+},
+{
+"zh": "載完只剩約 ",
+"pattern": false
+},
+{
+"zh": " GiB（建議留 ",
+"pattern": false
+},
+{
+"zh": " GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式",
 "pattern": false
 },
 {
@@ -11448,6 +11492,14 @@
 "pattern": true
 },
 {
+"zh": "桌面版第一次啟動：記憶體架構自動套用偵測結果 {0}",
+"pattern": true
+},
+{
+"zh": "桌面版第一次啟動：記憶體架構自動套用偵測結果",
+"pattern": false
+},
+{
 "zh": "--bind 只收 0.0.0.0 或 127.0.0.1",
 "pattern": false
 },
@@ -11777,46 +11829,6 @@
 },
 {
 "zh": "GiB（macOS 預設只給 GPU 統一記憶體的 2/3～3/4；可用 sudo sysctl iogpu.wired_limit_mb 調高",
-"pattern": false
-},
-{
-"zh": "統一記憶體不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
-"pattern": true
-},
-{
-"zh": "統一記憶體不足：需要約",
-"pattern": false
-},
-{
-"zh": "GiB，現在只剩",
-"pattern": false
-},
-{
-"zh": "GiB，載下去會剩",
-"pattern": false
-},
-{
-"zh": "GiB（低於",
-"pattern": false
-},
-{
-"zh": "GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
-"pattern": false
-},
-{
-"zh": "，這台曾因為系統記憶體耗盡整台卡死",
-"pattern": false
-},
-{
-"zh": "系統記憶體不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線{4}）",
-"pattern": true
-},
-{
-"zh": "系統記憶體不足：需要約",
-"pattern": false
-},
-{
-"zh": "GiB 底線",
 "pattern": false
 },
 {
@@ -12368,31 +12380,7 @@
 "pattern": false
 },
 {
-"zh": "統一記憶體不足：產這一件要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB 底線）。統一記憶體吃爆會把整台拖死；{4}",
-"pattern": true
-},
-{
-"zh": "統一記憶體不足：產這一件要約",
-"pattern": false
-},
-{
-"zh": "GiB，產的時候會剩",
-"pattern": false
-},
-{
-"zh": "GiB 底線）。統一記憶體吃爆會把整台拖死",
-"pattern": false
-},
-{
-"zh": "系統記憶體不足：要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB 底線{4}）",
-"pattern": true
-},
-{
-"zh": "系統記憶體不足：要約",
-"pattern": false
-},
-{
-"zh": "產的時候系統記憶體只剩 {0} GiB（低於 {1} GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"zh": "產的時候系統記憶體只剩 {0} GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
 "pattern": true
 },
 {
@@ -12400,7 +12388,7 @@
 "pattern": false
 },
 {
-"zh": "GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"zh": "GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
 "pattern": false
 },
 {
@@ -12525,6 +12513,10 @@
 },
 {
 "zh": "這不像 xConsole 的代理程式",
+"pattern": false
+},
+{
+"zh": "桌面版第一次啟動：記憶體架構自動套用偵測結果 ",
 "pattern": false
 },
 {
@@ -12748,34 +12740,6 @@
 "pattern": false
 },
 {
-"zh": "統一記憶體不足：需要約 ",
-"pattern": false
-},
-{
-"zh": " GiB，現在只剩 ",
-"pattern": false
-},
-{
-"zh": " GiB，載下去會剩 ",
-"pattern": false
-},
-{
-"zh": " GiB（低於 ",
-"pattern": false
-},
-{
-"zh": " GiB 底線）。這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
-"pattern": false
-},
-{
-"zh": "可以載，但載完只剩 {0} GiB，長請求時要留意",
-"pattern": true
-},
-{
-"zh": "可以載，但載完只剩",
-"pattern": false
-},
-{
 "zh": "顯存不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線）",
 "pattern": true
 },
@@ -12784,11 +12748,31 @@
 "pattern": false
 },
 {
-"zh": "系統記憶體不足：需要約 ",
+"zh": "GiB，現在只剩",
 "pattern": false
 },
 {
-"zh": " GiB 底線",
+"zh": "GiB，載下去會剩",
+"pattern": false
+},
+{
+"zh": "GiB（低於",
+"pattern": false
+},
+{
+"zh": "GiB 底線",
+"pattern": false
+},
+{
+"zh": "，這台曾因為系統記憶體耗盡整台卡死",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB 底線{4}）",
+"pattern": true
+},
+{
+"zh": "系統記憶體不足：需要約",
 "pattern": false
 },
 {
@@ -13204,18 +13188,6 @@
 "pattern": false
 },
 {
-"zh": "統一記憶體不足：產這一件要約 ",
-"pattern": false
-},
-{
-"zh": " GiB，產的時候會剩 ",
-"pattern": false
-},
-{
-"zh": " GiB 底線）。統一記憶體吃爆會把整台拖死；",
-"pattern": false
-},
-{
 "zh": "卡 {0} 放不下全部權重，改成權重放系統記憶體、輪流搬進顯示卡算（會慢一些）",
 "pattern": true
 },
@@ -13232,7 +13204,15 @@
 "pattern": false
 },
 {
-"zh": "系統記憶體不足：要約 ",
+"zh": "GiB，產的時候會剩",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB 底線{4}）",
+"pattern": true
+},
+{
+"zh": "系統記憶體不足：要約",
 "pattern": false
 },
 {
@@ -13240,7 +13220,7 @@
 "pattern": false
 },
 {
-"zh": " GiB 底線），已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
+"zh": " GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型",
 "pattern": false
 },
 {
@@ -13440,7 +13420,19 @@
 "pattern": false
 },
 {
-"zh": "可以載，但載完只剩 ",
+"zh": "記憶體不夠：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB）。",
+"pattern": true
+},
+{
+"zh": "記憶體不夠：需要約",
+"pattern": false
+},
+{
+"zh": "可以載，但載完只剩 {0} GiB，長請求時要留意",
+"pattern": true
+},
+{
+"zh": "可以載，但載完只剩",
 "pattern": false
 },
 {
@@ -13460,7 +13452,27 @@
 "pattern": false
 },
 {
+"zh": " GiB，現在只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB，載下去會剩 ",
+"pattern": false
+},
+{
+"zh": " GiB（低於 ",
+"pattern": false
+},
+{
 "zh": " GiB 底線）",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：需要約 ",
+"pattern": false
+},
+{
+"zh": " GiB 底線",
 "pattern": false
 },
 {
@@ -13660,7 +13672,15 @@
 "pattern": false
 },
 {
+"zh": " GiB，產的時候會剩 ",
+"pattern": false
+},
+{
 "zh": " GiB 底線）；",
+"pattern": false
+},
+{
+"zh": "系統記憶體不足：要約 ",
 "pattern": false
 },
 {
@@ -13764,6 +13784,22 @@
 "pattern": false
 },
 {
+"zh": "記憶體不夠：需要約 ",
+"pattern": false
+},
+{
+"zh": "先關掉一些程式，或換小一點的模型",
+"pattern": false
+},
+{
+"zh": "這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉",
+"pattern": false
+},
+{
+"zh": "可以載，但載完只剩 ",
+"pattern": false
+},
+{
 "zh": " 顯存不足：這張要放約 ",
 "pattern": false
 },
@@ -13833,6 +13869,14 @@
 },
 {
 "zh": "手動指定顯示卡的格式不對",
+"pattern": false
+},
+{
+"zh": "記憶體不夠：產這一件要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB）。",
+"pattern": true
+},
+{
+"zh": "記憶體不夠：產這一件要約",
 "pattern": false
 },
 {
@@ -13909,6 +13953,14 @@
 },
 {
 "zh": "（沒填）",
+"pattern": false
+},
+{
+"zh": "記憶體不夠：產這一件要約 ",
+"pattern": false
+},
+{
+"zh": "統一記憶體吃爆會把整台拖死；",
 "pattern": false
 },
 {

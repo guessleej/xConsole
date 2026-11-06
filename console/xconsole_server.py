@@ -2393,7 +2393,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/me":
             cur = CERTS.current() or {}
-            return self._json(200, {"user": self.user, "app_window": bool(getattr(self, "loopback", False)), "tls": {
+            return self._json(200, {"user": self.user, "app_window": bool(getattr(self, "loopback", False)),
+                                    "lan_access": bool(fleet().get("lan_access")) if DESKTOP else True, "tls": {
                 "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
                 "validToTaipei": cur.get("validToTaipei"), "selfSigned": cur.get("selfSigned")}})
         if path == "/api/nodes":
@@ -3199,7 +3200,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "只有桌面版有這個開關（伺服器版本來就讓區網連）"})
             on = body.get("on") is True
             if on and fleet().get("desktop_pw_unset"):
-                return self._json(400, {"error": "先在「帳號」設一組密碼，別台電腦登入要用", "need_password": True})
+                return self._json(400, {"error": "先在下面「設定密碼」設一組密碼，別台電腦登入要用", "need_password": True})
             update_fleet(lambda c: c.__setitem__("lan_access", on))
             self._audit("settings.lan", "", True, {"on": on})
             threading.Timer(0.8, restart_console).start()

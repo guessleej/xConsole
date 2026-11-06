@@ -95,6 +95,7 @@ fn spawn_agent(rt: &Runtime) -> std::io::Result<Child> {
     // Linux 也由代理自己帶起、看著模型服務（不走 systemd --user）：資料放在應用程式的資料夾，
     // systemd 找不到那裡的服務檔；而且應用程式結束時要停得掉模型
     c.env("XCONSOLE_SUPERVISOR", "1");
+    c.env("XCONSOLE_DESKTOP", "1");
     c.stdin(Stdio::null());
     c.spawn()
 }
@@ -223,12 +224,30 @@ fn show(app: &AppHandle) {
         .build();
 }
 
+/// 第一次關視窗時跳一則系統通知：程式還在背景、模型照常服務、怎麼完全結束（只說一次，記在資料夾裡）。
+fn tray_hint_once(app: &AppHandle) {
+    use tauri_plugin_notification::NotificationExt;
+    let rt = app.state::<Arc<Runtime>>();
+    let flag = rt.data.join(".xconsole").join("tray-hint-shown");
+    if flag.exists() {
+        return;
+    }
+    let _ = app
+        .notification()
+        .builder()
+        .title("xConsole 還在背景執行")
+        .body("模型照常服務。要完全結束，請在工作列右下角的 xConsole 圖示按右鍵，選「結束 xConsole」。")
+        .show();
+    let _ = fs::write(flag, b"1");
+}
+
 fn main() {
     let hidden = std::env::args().any(|a| a == "--hidden"); // 開機自動啟動：只放系統匣，不開視窗
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             let data = app.path().app_local_data_dir()?;
             fs::create_dir_all(&data)?;
@@ -286,6 +305,7 @@ fn main() {
                 // 關視窗只是縮到系統匣：模型繼續服務，別的程式照樣呼叫得到
                 api.prevent_close();
                 let _ = w.hide();
+                tray_hint_once(w.app_handle());
             }
         })
         .build(tauri::generate_context!())

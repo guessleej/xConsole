@@ -40,6 +40,7 @@ def case(name, got, want):
 
 
 def main():
+    A.SOFT_FLOOR = False          # 預設照 Linux 的硬底線測；Windows／macOS 的放寬另外測
     ok = True
 
     # 1. Strix Halo：VRAM 很鬆，但系統 RAM 只剩 16 GiB，再吃 14 就跌破 15 的底線 → 必須擋
@@ -244,7 +245,21 @@ def main():
     ok &= case("只有 CPU：放得下就放行（權重算進系統記憶體）", (v["allow"], v["pools"]["ram"]["need"]), (True, 5.5))
     v = A.admit("c", reg=reg_for("discrete", [{"id": "c", "est_vram_gib": 12, "est_ram_gib": 2.5}], 32, 20),
                 hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
-    ok &= case("只有 CPU：系統記憶體不夠照樣擋", v["allow"], False)
+    ok &= case("只有 CPU：系統記憶體不夠照樣擋（Linux：底線是硬的）", v["allow"], False)
+    A.SOFT_FLOOR = True
+    try:
+        v = A.admit("c", reg=reg_for("discrete", [{"id": "c", "est_vram_gib": 12, "est_ram_gib": 2.5}], 32, 20),
+                    hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+        ok &= case("Windows／macOS：低於建議底線但還剩 1.5 GiB 以上：放行並提醒（會變慢、不會當機）",
+                   (v["allow"], any("不會當機" in w for w in v["warnings"])), (True, True))
+        v = A.admit("c", reg=reg_for("discrete", [{"id": "c", "est_vram_gib": 18, "est_ram_gib": 2}], 32, 20),
+                    hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+        ok &= case("  剩不到 1.5 GiB：照樣擋", v["allow"], False)
+        reg = reg_for("unified_split", [{"id": "c", "est_vram_gib": 2, "est_ram_gib": 14}], 32, 20)
+        v = A.admit("c", reg=reg, hw={"gpu": {"gpus": [], "vram_total": 0, "vram_used": 0}, "cpu": {}, "ram": {}})
+        ok &= case("  BIOS 切兩塊的機器：系統那塊不放寬", v["allow"], False)
+    finally:
+        A.SOFT_FLOOR = False
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])

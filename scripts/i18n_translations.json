@@ -17483,5 +17483,180 @@
 "en": "K to fit)",
 "ja": "K に縮めると収まります）",
 "ko": "K로 줄이면 들어갑니다)"
+},
+"，含看圖用的元件 {0} GiB": {
+"en": ", including the vision component {0} GiB",
+"ja": "、画像認識用のコンポーネント {0} GiB を含む",
+"ko": ", 이미지 인식용 구성 요소 {0} GiB 포함"
+},
+"含看圖用的元件": {
+"en": "including the vision component",
+"ja": "画像認識用のコンポーネントを含む",
+"ko": "이미지 인식용 구성 요소 포함"
+},
+"這台還沒有安裝推理引擎（llama.cpp），模型還不能啟動。": {
+"en": "No inference engine (llama.cpp) is installed yet, so models can't start.",
+"ja": "推論エンジン（llama.cpp）がまだインストールされていないため、モデルを起動できません。",
+"ko": "추론 엔진(llama.cpp)이 아직 설치되지 않아 모델을 시작할 수 없습니다."
+},
+"更新推理引擎": {
+"en": "Update inference engine",
+"ja": "推論エンジンを更新",
+"ko": "추론 엔진 업데이트"
+},
+"裝好了，按「完成」回去，接著到「模型」下載一顆推薦的模型。": {
+"en": "Installed. Press Done, then download a recommended model under Models.",
+"ja": "インストールしました。「完了」を押して、「モデル」でおすすめのモデルをダウンロードしてください。",
+"ko": "설치했습니다. '완료'를 누른 뒤 '모델'에서 추천 모델을 내려받으세요."
+},
+"詳細記錄": {
+"en": "Details",
+"ja": "詳細ログ",
+"ko": "자세한 기록"
+},
+"更新到最新版": {
+"en": "Update to latest",
+"ja": "最新版に更新",
+"ko": "최신 버전으로 업데이트"
+},
+"（記憶體不太夠，上下文自動縮到 {0}K）": {
+"en": " (memory is tight; context reduced to {0}K automatically)",
+"ja": "（メモリが少ないため、コンテキストを自動で {0}K に縮めました）",
+"ko": "(메모리가 부족해 컨텍스트를 {0}K로 자동 축소)"
+},
+"記憶體不太夠，上下文自動縮到": {
+"en": "memory is tight; context reduced to",
+"ja": "メモリが少ないため、コンテキストを自動で",
+"ko": "메모리가 부족해 컨텍스트를 자동으로"
+},
+"上下文已經自動縮到 8K 試過了。可以先關掉其他程式、換小一點的量化，或到「模型」挑小一點的模型。": {
+"en": "Context was already reduced to 8K automatically. Close other programs, pick a smaller quantization, or choose a smaller model under Models.",
+"ja": "コンテキストはすでに 8K まで自動で縮めて試しました。他のプログラムを閉じるか、小さい量子化か、「モデル」で小さいモデルを選んでください。",
+"ko": "컨텍스트를 이미 8K까지 자동으로 줄여 봤습니다. 다른 프로그램을 닫거나 더 작은 양자화, 또는 '모델'에서 더 작은 모델을 고르세요."
+},
+"{0} 放不下": {
+"en": "{0} does not fit",
+"ja": "{0} が収まりません",
+"ko": "{0}이(가) 들어가지 않습니다"
+},
+"我知道會很慢，仍要啟動": {
+"en": "Start anyway (it will be slow)",
+"ja": "遅くなるのを承知で起動",
+"ko": "느려도 시작"
+},
+"先在下面「設定密碼」設一組密碼，別台電腦登入要用": {
+"en": "First set a password under Set password below; other computers need it to log in",
+"ja": "先に下の「パスワードを設定」でパスワードを決めてください。他のコンピューターのログインに使います",
+"ko": "먼저 아래 '비밀번호 설정'에서 비밀번호를 정하세요. 다른 컴퓨터 로그인에 필요합니다"
+},
+"載完只剩約 {0} GiB（建議留 {1} GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式": {
+"en": "About {0} GiB will be left after loading ({1} GiB recommended). On Windows/macOS the system pages to disk when memory runs short, so it gets slower but won't freeze; close other programs to speed it up",
+"ja": "読み込み後の残りは約 {0} GiB（推奨 {1} GiB）。Windows／macOS ではメモリ不足時にディスクへページングするため、遅くはなりますがフリーズしません。速くしたい場合は他のプログラムを閉じてください",
+"ko": "로드 후 약 {0} GiB가 남습니다(권장 {1} GiB). Windows/macOS는 메모리가 부족하면 디스크 페이징을 쓰므로 느려지지만 멈추지 않습니다. 빠르게 하려면 다른 프로그램을 닫으세요"
+},
+"載完只剩約": {
+"en": "About",
+"ja": "読み込み後の残りは約",
+"ko": "로드 후 약"
+},
+"GiB（建議留": {
+"en": "GiB left (recommended",
+"ja": "GiB（推奨",
+"ko": "GiB 남음(권장"
+},
+"GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式": {
+"en": "GiB). On Windows/macOS it gets slower when memory runs short but won't freeze",
+"ja": "GiB）。Windows／macOS では遅くなりますがフリーズしません",
+"ko": "GiB). Windows/macOS에서는 느려지지만 멈추지 않습니다"
+},
+"載完只剩約 ": {
+"en": "About ",
+"ja": "読み込み後の残りは約 ",
+"ko": "로드 후 약 "
+},
+" GiB（建議留 ": {
+"en": " GiB left (recommended ",
+"ja": " GiB（推奨 ",
+"ko": " GiB 남음(권장 "
+},
+" GiB）。這台是 Windows／macOS，記憶體不夠時會改用硬碟分頁，會變慢但不會當機；要快一點可以先關掉其他程式": {
+"en": " GiB). On Windows/macOS it gets slower when memory runs short but won't freeze",
+"ja": " GiB）。Windows／macOS では遅くなりますがフリーズしません",
+"ko": " GiB). Windows/macOS에서는 느려지지만 멈추지 않습니다"
+},
+"桌面版第一次啟動：記憶體架構自動套用偵測結果 {0}": {
+"en": "Desktop first run: memory architecture set to the detected {0}",
+"ja": "デスクトップ版の初回起動：メモリ構成を検出結果 {0} に自動設定",
+"ko": "데스크톱판 첫 실행: 메모리 구조를 감지 결과 {0}(으)로 자동 설정"
+},
+"桌面版第一次啟動：記憶體架構自動套用偵測結果": {
+"en": "Desktop first run: memory architecture set to the detected",
+"ja": "デスクトップ版の初回起動：メモリ構成を検出結果に自動設定",
+"ko": "데스크톱판 첫 실행: 메모리 구조를 감지 결과로 자동 설정"
+},
+"桌面版第一次啟動：記憶體架構自動套用偵測結果 ": {
+"en": "Desktop first run: memory architecture set to the detected ",
+"ja": "デスクトップ版の初回起動：メモリ構成を検出結果 ",
+"ko": "데스크톱판 첫 실행: 메모리 구조를 감지 결과 "
+},
+"產的時候系統記憶體只剩 {0} GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型": {
+"en": "System memory dropped to {0} GiB during generation, so it was stopped to keep the machine responsive. Use a smaller size, a smaller quantization, or stop a model first",
+"ja": "生成中にシステムメモリが {0} GiB まで減ったため、マシン全体が固まらないよう中止しました。サイズを小さくする、量子化を一段小さくする、またはモデルを一つ止めてください",
+"ko": "생성 중 시스템 메모리가 {0} GiB까지 줄어 기기 전체가 멈추지 않도록 중지했습니다. 크기를 줄이거나 더 작은 양자화를 쓰거나 모델 하나를 먼저 멈추세요"
+},
+"GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型": {
+"en": "GiB, so it was stopped. Use a smaller size or quantization, or stop a model first",
+"ja": "GiB のため中止しました。サイズか量子化を小さくするか、モデルを一つ止めてください",
+"ko": "GiB라 중지했습니다. 크기나 양자화를 줄이거나 모델 하나를 멈추세요"
+},
+" GiB，已中止，避免整台被拖死。請改小尺寸、換小一級的量化，或先停掉一個模型": {
+"en": " GiB, so it was stopped. Use a smaller size or quantization, or stop a model first",
+"ja": " GiB のため中止しました。サイズか量子化を小さくするか、モデルを一つ止めてください",
+"ko": " GiB라 중지했습니다. 크기나 양자화를 줄이거나 모델 하나를 멈추세요"
+},
+"記憶體不夠：需要約 {0} GiB，現在只剩 {1} GiB，載下去會剩 {2} GiB（低於 {3} GiB）。": {
+"en": "Not enough memory: needs about {0} GiB, only {1} GiB free, which would leave {2} GiB (below {3} GiB). ",
+"ja": "メモリ不足：約 {0} GiB 必要ですが空きは {1} GiB、読み込むと残り {2} GiB（{3} GiB 未満）になります。",
+"ko": "메모리 부족: 약 {0} GiB 필요, 남은 {1} GiB, 로드하면 {2} GiB 남음({3} GiB 미만). "
+},
+"記憶體不夠：需要約": {
+"en": "Not enough memory: needs about",
+"ja": "メモリ不足：必要量は約",
+"ko": "메모리 부족: 필요량 약"
+},
+"記憶體不夠：需要約 ": {
+"en": "Not enough memory: needs about ",
+"ja": "メモリ不足：必要量は約 ",
+"ko": "메모리 부족: 필요량 약 "
+},
+"先關掉一些程式，或換小一點的模型": {
+"en": "Close some programs or choose a smaller model",
+"ja": "他のプログラムを閉じるか、小さいモデルを選んでください",
+"ko": "프로그램을 몇 개 닫거나 더 작은 모델을 고르세요"
+},
+"這台是統一記憶體，吃爆會把整台拖死，不是只有服務掛掉": {
+"en": "This machine has unified memory: running out freezes the whole machine, not just the service",
+"ja": "このマシンは統合メモリのため、使い切るとサービスだけでなくマシン全体が固まります",
+"ko": "이 기기는 통합 메모리라 다 쓰면 서비스뿐 아니라 기기 전체가 멈춥니다"
+},
+"記憶體不夠：產這一件要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB）。": {
+"en": "Not enough memory: this job needs about {0} GiB, only {1} GiB free, which would leave {2} GiB (below {3} GiB). ",
+"ja": "メモリ不足：この生成には約 {0} GiB 必要ですが空きは {1} GiB、生成中の残りは {2} GiB（{3} GiB 未満）になります。",
+"ko": "메모리 부족: 이 작업에 약 {0} GiB 필요, 남은 {1} GiB, 생성 중 {2} GiB 남음({3} GiB 미만). "
+},
+"記憶體不夠：產這一件要約": {
+"en": "Not enough memory: this job needs about",
+"ja": "メモリ不足：この生成には約",
+"ko": "메모리 부족: 이 작업에 약"
+},
+"記憶體不夠：產這一件要約 ": {
+"en": "Not enough memory: this job needs about ",
+"ja": "メモリ不足：この生成には約 ",
+"ko": "메모리 부족: 이 작업에 약 "
+},
+"統一記憶體吃爆會把整台拖死；": {
+"en": "Running out of unified memory freezes the whole machine; ",
+"ja": "統合メモリを使い切るとマシン全体が固まります。",
+"ko": "통합 메모리를 다 쓰면 기기 전체가 멈춥니다. "
 }
 }
