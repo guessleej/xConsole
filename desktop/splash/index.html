@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<title>xConsole</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; color: #e9eef2;
+         background: linear-gradient(158deg, #0d1922, #13242f 56%, #1a3040); }
+  .box { text-align: center; }
+  h1 { font-size: 30px; margin: 18px 0 6px; letter-spacing: .02em; }
+  p { margin: 0; color: #9fb0bd; font-size: 15px; }
+  .bar { width: 220px; height: 4px; margin: 26px auto 0; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .bar i { display: block; width: 40%; height: 100%; background: #e0484f; border-radius: 4px; animation: run 1.3s ease-in-out infinite; }
+  @keyframes run { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; } }
+</style>
+</head>
+<body>
+  <div class="box">
+    <svg width="72" height="72" viewBox="0 0 1024 1024" aria-hidden="true"><polygon points="250,250 400,250 774,774 624,774" fill="#bf181f"/><polygon points="774,250 660,250 250,774 364,774" fill="#e0484f"/></svg>
+    <h1>xConsole</h1>
+    <p>正在啟動模型主控台，第一次開會久一點</p>
+    <div class="bar"><i></i></div>
+  </div>
+</body>
+</html>

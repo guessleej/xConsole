@@ -4620,7 +4620,51 @@
 "pattern": false
 },
 {
+"zh": "別台電腦可以用 https://這台的位址:{0} 連進來（要登入）",
+"pattern": true
+},
+{
+"zh": "別台電腦可以用 https://這台的位址:",
+"pattern": false
+},
+{
+"zh": "連進來（要登入",
+"pattern": false
+},
+{
+"zh": "目前只有這台電腦自己能用",
+"pattern": false
+},
+{
+"zh": "關閉區網存取",
+"pattern": false
+},
+{
+"zh": "打開區網存取",
+"pattern": false
+},
+{
+"zh": "已關閉，主控台重新啟動中",
+"pattern": false
+},
+{
+"zh": "已打開，主控台重新啟動中",
+"pattern": false
+},
+{
+"zh": "要先在下面設一組密碼，才能打開區網存取。",
+"pattern": false
+},
+{
+"zh": "設定密碼",
+"pattern": false
+},
+{
 "zh": "變更密碼",
+"pattern": false
+},
+{
+"zh": "這台的視窗不用密碼；別台電腦連進來（區網存取）時要用這組密碼登入",
 "pattern": false
 },
 {
@@ -8160,10 +8204,6 @@
 "pattern": false
 },
 {
-"zh": "還沒設帳密。先跑：python3 xconsole_server.py --set-credentials",
-"pattern": false
-},
-{
 "zh": "已把 {0} 個明文代理權杖轉成密文（fleet.json）",
 "pattern": true
 },
@@ -8173,6 +8213,18 @@
 },
 {
 "zh": "個明文代理權杖轉成密文（fleet.json",
+"pattern": false
+},
+{
+"zh": "桌面版：視窗走 http://127.0.0.1:{0}（只有這台）；區網存取{1}",
+"pattern": true
+},
+{
+"zh": "桌面版：視窗走 http://127.0.0.1:",
+"pattern": false
+},
+{
+"zh": "只有這台）；區網存取",
 "pattern": false
 },
 {
@@ -8484,6 +8536,14 @@
 "pattern": false
 },
 {
+"zh": "桌面版要由 xConsole 應用程式帶起來（缺鑰匙或本機通道的埠）",
+"pattern": false
+},
+{
+"zh": "還沒設帳密。先跑：python3 xconsole_server.py --set-credentials",
+"pattern": false
+},
+{
 "zh": "已把 ",
 "pattern": false
 },
@@ -8492,11 +8552,15 @@
 "pattern": false
 },
 {
-"zh": "xConsole 聽在 https://0.0.0.0:{0}；憑證：{1}",
+"zh": "（只有這台）；區網存取",
+"pattern": false
+},
+{
+"zh": "xConsole 聽在 https://{0}:{1}；憑證：{2}",
 "pattern": true
 },
 {
-"zh": "xConsole 聽在 https://0.0.0.0:",
+"zh": "xConsole 聽在 https://",
 "pattern": false
 },
 {
@@ -8708,6 +8772,10 @@
 "pattern": false
 },
 {
+"zh": "桌面版用安裝檔更新；要回舊版，請到 GitHub 的版本頁下載那一版的安裝檔",
+"pattern": false
+},
+{
 "zh": "已變更，請用新密碼重新登入",
 "pattern": false
 },
@@ -8868,6 +8936,10 @@
 "pattern": false
 },
 {
+"zh": "請從 xConsole 應用程式打開",
+"pattern": false
+},
+{
 "zh": "要重新安裝的那台不在納管清單裡",
 "pattern": false
 },
@@ -8956,7 +9028,23 @@
 "pattern": false
 },
 {
+"zh": "已設定；從別台電腦登入時用這組密碼",
+"pattern": false
+},
+{
+"zh": "只有桌面版有這個開關（伺服器版本來就讓區網連）",
+"pattern": false
+},
+{
+"zh": "先在「帳號」設一組密碼，別台電腦登入要用",
+"pattern": false
+},
+{
 "zh": "Hugging Face 令牌的格式是 hf_ 開頭的一串英數字（在 huggingface.co 的 Settings › Access Tokens 建立，選 Read 權限就夠）",
+"pattern": false
+},
+{
+"zh": "開",
 "pattern": false
 },
 {
@@ -9025,6 +9113,10 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址",
+"pattern": false
+},
+{
+"zh": "這一版沒有這個系統的安裝檔",
 "pattern": false
 },
 {
@@ -10444,6 +10536,10 @@
 "pattern": true
 },
 {
+"zh": "這一版的安裝檔沒有可以核對的 sha256，不下載",
+"pattern": false
+},
+{
 "zh": "下載的檔 sha256 對不上 GitHub 公布的（",
 "pattern": false
 },
@@ -10500,7 +10596,23 @@
 "pattern": false
 },
 {
-"zh": "更新包太大（上限 64 MB）",
+"zh": "已經在更新了",
+"pattern": false
+},
+{
+"zh": "安裝檔名稱不對，不下載",
+"pattern": false
+},
+{
+"zh": "安裝檔已下載並核對過，請照安裝程式的畫面完成更新",
+"pattern": false
+},
+{
+"zh": "更新包太大（上限 {0} MB）",
+"pattern": true
+},
+{
+"zh": "更新包太大（上限",
 "pattern": false
 },
 {
@@ -10561,6 +10673,10 @@
 },
 {
 "zh": "）。這台不能連外的話，請在別台下載安裝包，用「手動上傳更新包」",
+"pattern": false
+},
+{
+"zh": "更新包太大（上限 ",
 "pattern": false
 },
 {
@@ -10788,11 +10904,11 @@
 "pattern": false
 },
 {
-"zh": "xconsole-agent 聽在 https://0.0.0.0:{0}（憑證 {1}，權杖在 {2}）",
+"zh": "xconsole-agent 聽在 https://{0}:{1}（憑證 {2}，權杖在 {3}）",
 "pattern": true
 },
 {
-"zh": "xconsole-agent 聽在 https://0.0.0.0:",
+"zh": "xconsole-agent 聽在 https://",
 "pattern": false
 },
 {
@@ -11029,6 +11145,30 @@
 },
 {
 "zh": "AMD／Intel 顯示卡，用 Vulkan 加速",
+"pattern": false
+},
+{
+"zh": "一小時內",
+"pattern": false
+},
+{
+"zh": "有帶權杖",
+"pattern": false
+},
+{
+"zh": "沒有帶權杖",
+"pattern": false
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限 {0} 次、{1}，{2} 後恢復）",
+"pattern": true
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限",
+"pattern": false
+},
+{
+"zh": "後恢復",
 "pattern": false
 },
 {
@@ -11278,6 +11418,10 @@
 {
 "zh": "不支援的動作：{0}",
 "pattern": true
+},
+{
+"zh": "--bind 只收 0.0.0.0 或 127.0.0.1",
+"pattern": false
 },
 {
 "zh": "（憑證 ",
@@ -11821,6 +11965,18 @@
 },
 {
 "zh": "（驅動 ",
+"pattern": false
+},
+{
+"zh": "GitHub 一小時的查詢次數用完了（上限 ",
+"pattern": false
+},
+{
+"zh": " 次、",
+"pattern": false
+},
+{
+"zh": " 後恢復）",
 "pattern": false
 },
 {
@@ -12704,30 +12860,6 @@
 "pattern": false
 },
 {
-"zh": "一小時內",
-"pattern": false
-},
-{
-"zh": "有帶權杖",
-"pattern": false
-},
-{
-"zh": "沒有帶權杖",
-"pattern": false
-},
-{
-"zh": "GitHub 一小時的查詢次數用完了（上限 {0} 次、{1}，{2} 後恢復）",
-"pattern": true
-},
-{
-"zh": "GitHub 一小時的查詢次數用完了（上限",
-"pattern": false
-},
-{
-"zh": "後恢復",
-"pattern": false
-},
-{
 "zh": "壓縮檔裡有不安全的路徑：{0}",
 "pattern": true
 },
@@ -13329,18 +13461,6 @@
 },
 {
 "zh": "有 Intel 顯示卡但沒有 Vulkan 開發套件，會編成只用 CPU。要用 GPU 請 IT 執行：sudo apt install libvulkan-dev glslc mesa-vulkan-drivers",
-"pattern": false
-},
-{
-"zh": "GitHub 一小時的查詢次數用完了（上限 ",
-"pattern": false
-},
-{
-"zh": " 次、",
-"pattern": false
-},
-{
-"zh": " 後恢復）",
 "pattern": false
 },
 {

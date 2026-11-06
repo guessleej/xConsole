@@ -1040,6 +1040,13 @@ class Supervisor:
                         pass
         self._put(unit, pid=None)
 
+    def stop_all(self):
+        """應用程式關掉時：停掉這次帶起來的模型服務（啟用狀態不動，下次打開會照樣帶起來）。"""
+        self.running = False
+        with self.lock:
+            for unit in list(self._meta()):
+                self._stop(unit)
+
     def state(self, unit):
         with self.lock:
             if self._pid(unit):
@@ -7973,6 +7980,19 @@ def run_desktop_helper():
 
 
 
+def _watch_parent(pid):
+    """父行程（xConsole 應用程式）不在了就停掉自己帶起來的模型服務並結束。"""
+    while True:
+        time.sleep(3)
+        if not pid_alive(pid):
+            try:
+                if not SYSTEMD:
+                    SUP.stop_all()
+            finally:
+                os._exit(0)
+
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
@@ -7989,9 +8009,15 @@ def main():
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(CERT_FILE, KEY_FILE)
-    srv = AgentTLSServer(("0.0.0.0", PORT), Handler)
+    # 桌面版（xConsole 應用程式帶起來的）只給同一台的主控台用：只聽 127.0.0.1；應用程式關掉就跟著結束
+    bind = sys.argv[sys.argv.index("--bind") + 1] if "--bind" in sys.argv[:-1] else "0.0.0.0"
+    if bind not in ("0.0.0.0", "127.0.0.1"):
+        raise SystemExit("--bind 只收 0.0.0.0 或 127.0.0.1")
+    if "--parent-pid" in sys.argv[:-1]:
+        threading.Thread(target=_watch_parent, args=(int(sys.argv[sys.argv.index("--parent-pid") + 1]),), daemon=True).start()
+    srv = AgentTLSServer((bind, PORT), Handler)
     srv.ctx = ctx
-    print(f"xconsole-agent 聽在 https://0.0.0.0:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
+    print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
 
 

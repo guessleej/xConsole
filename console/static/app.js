@@ -3704,6 +3704,9 @@ async function checkTlsBanner() {
   const b = $("#tls-banner");
   try {
     const me = await api("/api/me");
+    S.appWindow = !!me.app_window;
+    const lo = $("#logout");
+    if (lo) lo.hidden = S.appWindow;           // 應用程式的視窗不用登入，也就不放登出（別台電腦連進來的照樣有）
     const t = me.tls || {};
     if (t.level === "urgent" || t.level === "expired") {
       b.textContent = t.daysLeft < 0
@@ -4206,13 +4209,36 @@ async function settingsReport(wrap) {
 
 /* ---------------------------------------------------------------- 4 帳號與安全 */
 
+// 桌面版：區網存取開關（照 LocModel：預設只有這台自己用；打開才讓別台電腦連進來，走 HTTPS＋密碼）
+function settingsLan(wrap, me) {
+  const c = card("區網存取", me.lan_access ? `別台電腦可以用 https://這台的位址:${me.https_port} 連進來（要登入）`
+    : "目前只有這台電腦自己能用");
+  const row = el("div", "slot-actions");
+  const b = el("button", "btn sm" + (me.lan_access ? "" : " primary"), me.lan_access ? "關閉區網存取" : "打開區網存取");
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await api("/api/settings/lan", { method: "POST", body: { on: !me.lan_access } });
+      toast(me.lan_access ? "已關閉，主控台重新啟動中" : "已打開，主控台重新啟動中", "ok");
+      setTimeout(() => location.reload(), 4000);
+    } catch (ex) { toast(ex.message, "bad"); b.disabled = false; }
+  };
+  row.appendChild(b);
+  c.appendChild(row);
+  if (me.password_unset) c.appendChild(el("p", "small muted", "要先在下面設一組密碼，才能打開區網存取。"));
+  wrap.appendChild(c);
+}
+
 async function settingsAccount(wrap) {
   let me = {};
   try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
-  const c = card("變更密碼", `目前登入：${me.username || "admin"}`);
+  if (me.desktop) settingsLan(wrap, me);
+  const first = me.app_window && me.password_unset;
+  const c = card(first ? "設定密碼" : "變更密碼", first ? "這台的視窗不用密碼；別台電腦連進來（區網存取）時要用這組密碼登入"
+    : `目前登入：${me.username || "admin"}`);
   const fr = el("div", "form-row");
   const mk = (label) => { const d = el("div"); d.appendChild(el("label", null, label)); const i = Object.assign(el("input"), { type: "password", autocomplete: "new-password" }); d.appendChild(i); fr.appendChild(d); return i; };
-  const o = mk("目前的密碼");
+  const o = first ? { value: "" } : mk("目前的密碼");
   const n1 = mk("新密碼（至少 8 碼）");
   const n2 = mk("再輸入一次新密碼");
   c.appendChild(fr);
@@ -4222,11 +4248,11 @@ async function settingsAccount(wrap) {
     try {
       const r = await api("/api/account/password", { method: "POST", body: { old: o.value, new: n1.value } });
       toast(r.message, "ok");
-      setTimeout(showLogin, 800);
+      if (me.app_window) { n1.value = n2.value = ""; render(); } else setTimeout(showLogin, 800);
     } catch (ex) { toast(ex.message, "bad"); }
   };
   b.onclick = go2;
-  [o, n1, n2].forEach((x) => imeGuard(x, go2));
+  [o, n1, n2].filter((x) => x.tagName).forEach((x) => imeGuard(x, go2));
   const br = el("div", "slot-actions"); br.appendChild(b); c.appendChild(br);
   c.appendChild(el("p", "small muted", "密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。變更後所有已登入的裝置都會被登出。"));
   wrap.appendChild(c);
@@ -5142,6 +5168,12 @@ window.addEventListener("scroll", () => {
 (async function boot() {
   await i18nInit();                          // 選了別的語言就先載字典，畫面一出來就是那個語言
   ["langpick-top", "langpick-login", "langpick-m"].forEach((id) => { const h = document.getElementById(id); if (h) h.appendChild(i18nPicker()); });
+  // xConsole 應用程式開的視窗：鑰匙放在網址 # 後面（不會送到伺服器），換成登入後馬上從網址拿掉
+  const dk = location.hash.match(/^#desktop=([\w-]{32,128})$/);
+  if (dk) {
+    history.replaceState(null, "", location.pathname);
+    try { await api("/api/desktop/enter", { method: "POST", body: { key: dk[1] } }); } catch (_) { /* 失敗就走一般登入 */ }
+  }
   try {
     await api("/api/me");
     start();

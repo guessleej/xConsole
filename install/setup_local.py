@@ -19,6 +19,7 @@ def main():
     ap.add_argument("--home", required=True)
     ap.add_argument("--name", default=socket.gethostname())
     ap.add_argument("--group", default="本機")
+    ap.add_argument("--agent-port", type=int, default=9401)   # 桌面版每次開的埠可能不同（9401 被占就換一個）
     a = ap.parse_args()
     st = os.path.join(a.home, ".xconsole")
     token = open(os.path.join(st, "token"), encoding="utf-8").read().strip()
@@ -27,13 +28,15 @@ def main():
     cfg = json.load(open(fleet_p, encoding="utf-8")) if os.path.exists(fleet_p) else {}
     cfg.setdefault("auth", {})
     nodes = cfg.setdefault("nodes", [])
-    me = next((n for n in nodes if n.get("host") in ("127.0.0.1", "localhost") and n.get("agent_port", 9401) == 9401), None)
+    me = next((n for n in nodes if n.get("host") in ("127.0.0.1", "localhost") and n.get("agent_port", 9401) == a.agent_port), None) \
+        or next((n for n in nodes if n.get("id") == "local" and n.get("host") in ("127.0.0.1", "localhost")), None)
     if me is None:
-        me = {"id": "local", "name": a.name, "group": a.group, "host": "127.0.0.1", "agent_port": 9401}
+        me = {"id": "local", "name": a.name, "group": a.group, "host": "127.0.0.1", "agent_port": a.agent_port}
         if any(n["id"] == "local" for n in nodes):
             me["id"] = "local-" + socket.gethostname().lower()[:20]
         nodes.append(me)
     me["token"] = token
+    me["agent_port"] = a.agent_port
     os.makedirs(os.path.join(st, "trust"), mode=0o700, exist_ok=True)
     dst = os.path.join(st, "trust", me["id"] + ".pem")
     shutil.copyfile(cert, dst)

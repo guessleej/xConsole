@@ -36,7 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -55,6 +55,18 @@ STATE_DIR = os.path.join(HOME, ".xconsole")
 FLEET = os.path.join(STATE_DIR, "fleet.json")
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 PORT = int(os.environ.get("XCONSOLE_PORT", "9400"))
+
+
+def _arg(name):
+    return sys.argv[sys.argv.index(name) + 1] if name in sys.argv[:-1] else None
+
+
+# 桌面版（xConsole 應用程式帶起來的）：視窗走只聽 127.0.0.1 的本機通道、用應用程式給的鑰匙進入，不用輸入密碼；
+# 別台電腦要連進來（區網存取）才走 HTTPS＋密碼。鑰匙從標準輸入讀（不進指令列、環境變數、檔案）
+DESKTOP = "--desktop" in sys.argv
+APP_PORT = int(_arg("--app-port") or 0)
+DESKTOP_KEY = None
+PARENT_PID = int(_arg("--parent-pid") or 0)
 SESSION_HOURS = 12
 SAMPLE_EVERY = 300
 MAX_BODY = 6 * 1024 * 1024
@@ -1323,6 +1335,17 @@ def hf_token():
         return ""
 
 
+def open_with_system(path):
+    """用這台的系統打開檔案（桌面版更新時打開下載好的安裝檔）。"""
+    import subprocess
+    if os.name == "nt":
+        os.startfile(path)  # noqa: S606  路徑是自己下載、核對過 sha256 的安裝檔
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", os.path.dirname(path)])
+
+
 def restart_console():
     """換好新版之後結束行程，由服務管理員（systemd、launchd、Windows 排程）重新帶起。結束碼不是 0：Windows 排程要失敗才會重啟。"""
     os._exit(3)
@@ -1341,8 +1364,8 @@ def update_overview():
     # 各機同時問、每台最多等 4 秒：幾台離線也不會讓這頁卡上好幾分鐘
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(16, len(fl)))) as ex:
         nodes = list(ex.map(probe, fl))
-    return {"current": cur, "job": job, "backups": updater.backups(STATE_DIR), "agent_sha256": sha, "nodes": nodes,
-            "repo": updater.REPO}
+    return {"current": cur, "job": job, "backups": [] if DESKTOP else updater.backups(STATE_DIR), "agent_sha256": sha,
+            "nodes": nodes, "repo": updater.REPO, "desktop": DESKTOP}
 
 
 def chat_seal(data: bytes) -> str:
@@ -2362,7 +2385,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/me":
             cur = CERTS.current() or {}
-            return self._json(200, {"user": self.user, "tls": {
+            return self._json(200, {"user": self.user, "app_window": bool(getattr(self, "loopback", False)), "tls": {
                 "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
                 "validToTaipei": cur.get("validToTaipei"), "selfSigned": cur.get("selfSigned")}})
         if path == "/api/nodes":
@@ -2528,7 +2551,10 @@ class Handler(BaseHTTPRequestHandler):
             cfg = fleet()
             return self._json(200, {"report": cfg["report"], "hostnames": hostnames(),
                                     "username": cfg["auth"].get("username", "admin"),
-                                    "hf_token_set": bool((cfg.get("hf") or {}).get("token"))})
+                                    "hf_token_set": bool((cfg.get("hf") or {}).get("token")),
+                                    "desktop": DESKTOP, "app_window": bool(getattr(self, "loopback", False)),
+                                    "lan_access": bool(cfg.get("lan_access")) if DESKTOP else True,
+                                    "password_unset": bool(cfg.get("desktop_pw_unset")), "https_port": PORT})
         return self._json(404, {"error": "找不到"})
 
     # ---- POST
@@ -2546,7 +2572,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
-        anon = path in ("/api/login", "/api/join", "/api/logout")
+        anon = path in ("/api/login", "/api/join", "/api/logout", "/api/desktop/enter")
         if not anon and not self.user:
             # 先驗登入再讀本文：沒登入的人不能讓主控台讀 6 MB。小的本文照樣讀掉再回 401（沒讀完就關連線，
             # TCP 會送重置，對方連 401 都收不到）；超過 64 KB 的直接關
@@ -2583,6 +2609,17 @@ class Handler(BaseHTTPRequestHandler):
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
             return self._json(200, {"ok": True, "user": user}, cookie=cookie)
+        if path == "/api/desktop/enter":
+            # 應用程式開視窗時把鑰匙放在網址的 # 後面（不會送到伺服器、不進記錄），頁面讀到再送來這裡換登入
+            key = str(body.get("key") or "")
+            if not (getattr(self, "loopback", False) and DESKTOP_KEY and secrets.compare_digest(key, DESKTOP_KEY)):
+                time.sleep(1.0)
+                return self._json(403, {"error": "請從 xConsole 應用程式打開"})
+            user = fleet()["auth"].get("username", "admin")
+            sid = STORE.session_new(user, self.ip, 24 * 30)
+            STORE.audit(user, self.ip, "auth.desktop", user, True)
+            return self._json(200, {"ok": True, "user": user},
+                              cookie=f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; Max-Age={24 * 30 * 3600}")
         if path == "/api/join":
             return self._json(*join_node(self, body))
         if path == "/api/logout":
@@ -2780,6 +2817,17 @@ class Handler(BaseHTTPRequestHandler):
             code, out = updater.check()
             self._audit("update.check", out.get("latest") or "", code == 200, {"message": out.get("error")})
             return self._json(code, out)
+        if path == "/api/update/apply" and DESKTOP:
+            # 桌面版：換的是整個應用程式（含內附的 Python），所以下載新版安裝檔、核對 sha256、打開它
+            code, info = updater.check()
+            inst = info.get("installer") if code == 200 else None
+            if not inst or not inst.get("sha256"):
+                return self._json(code if code != 200 else 400, {"error": info.get("error") or "這一版沒有這個系統的安裝檔"})
+            code, out = updater.start_installer(STATE_DIR, inst["url"], inst["sha256"], info["latest"], open_with_system)
+            self._audit("update.installer", info["latest"], code == 200, {"from": updater.current_version(), "message": out.get("error")})
+            return self._json(code, out)
+        if path in ("/api/update/rollback", "/api/update/upload") and DESKTOP:
+            return self._json(400, {"error": "桌面版用安裝檔更新；要回舊版，請到 GitHub 的版本頁下載那一版的安裝檔"})
         if path == "/api/update/apply":
             # 網址與 sha256 一律由主控台自己問 GitHub 拿，不收畫面送來的（避免被指到別的檔）
             code, info = updater.check()
@@ -3116,16 +3164,33 @@ class Handler(BaseHTTPRequestHandler):
         # ---- 帳號與報表設定
         if path == "/api/account/password":
             old, new, user = str(body.get("old") or ""), str(body.get("new") or ""), self.user
-            if not check_credentials(user, old):
+            first = getattr(self, "loopback", False) and fleet().get("desktop_pw_unset")
+            if not first and not check_credentials(user, old):
                 time.sleep(1.0)
                 self._audit("account.password", user, False, {"reason": "舊密碼不對"})
                 return self._json(403, {"error": "目前的密碼不對"})
             if len(new) < 8:
                 return self._json(400, {"error": "新密碼至少 8 碼"})
             set_credentials(user, new)             # 內含作廢所有登入
-            self._audit("account.password", user, True)
+            update_fleet(lambda c: c.pop("desktop_pw_unset", None))
+            self._audit("account.password", user, True, {"first": bool(first)})
+            if getattr(self, "loopback", False):
+                sid = STORE.session_new(user, self.ip, 24 * 30)
+                return self._json(200, {"ok": True, "message": "已設定；從別台電腦登入時用這組密碼"},
+                                  cookie=f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; Max-Age={24 * 30 * 3600}")
             return self._json(200, {"ok": True, "message": "已變更，請用新密碼重新登入"},
                               cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
+        if path == "/api/settings/lan":
+            # 桌面版的「區網存取」：打開才讓別台電腦連進來（HTTPS＋密碼），要先設好密碼。改了要重新聽，所以重啟主控台
+            if not DESKTOP:
+                return self._json(400, {"error": "只有桌面版有這個開關（伺服器版本來就讓區網連）"})
+            on = body.get("on") is True
+            if on and fleet().get("desktop_pw_unset"):
+                return self._json(400, {"error": "先在「帳號」設一組密碼，別台電腦登入要用", "need_password": True})
+            update_fleet(lambda c: c.__setitem__("lan_access", on))
+            self._audit("settings.lan", "", True, {"on": on})
+            threading.Timer(0.8, restart_console).start()
+            return self._json(200, {"ok": True, "on": on, "restarting": True})
         if path == "/api/settings/hf":
             # Hugging Face 令牌：加密落地，畫面只看得到「已設定」；送 Hugging Face 時才解開（走鏡像時代理不會送）
             if body.get("clear") is True:
@@ -3165,6 +3230,30 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "找不到"})
 
 
+class LoopHandler(Handler):
+    """桌面版視窗專用：只聽 127.0.0.1。流量不出這台，所以不包 TLS；但要擋別的網頁借瀏覽器連進來：
+    Host 與 Origin 一定要是 127.0.0.1:這個埠（DNS rebinding 也過不了），登入只收應用程式給的鑰匙。"""
+    loopback = True
+
+    def parse_request(self):
+        if not super().parse_request():
+            return False
+        want = f"127.0.0.1:{APP_PORT}"
+        origin = self.headers.get("Origin")
+        if self.headers.get("Host") != want or (origin and origin != "http://" + want):
+            self.send_error(421, "Misdirected Request")
+            return False
+        return True
+
+    def send_header(self, k, v):
+        if k == "Strict-Transport-Security":
+            return
+        if k == "Set-Cookie":
+            v = v.replace("; Secure", "")         # 本機 http 收不到 Secure cookie
+        super().send_header(k, v)
+
+
+
 def wait_for_address(seconds=60):
     """開機時 user 服務會比網路先起來：這時抓不到對外 IP，hostnames() 退回主機名稱，
     ensure() 就產一張不含 IP 的暫用自簽，網路好了再重啟又重產一張（2026-10-22 中原主機重開機實際踩到）。
@@ -3189,6 +3278,31 @@ def is_ip(text):
         return False
 
 
+def _watch_parent(pid):
+    """應用程式（父行程）不在了就跟著結束：應用程式當掉或被強制關掉時，不留下沒人管的主控台。"""
+    while True:
+        time.sleep(3)
+        if not _pid_alive(pid):
+            os._exit(0)
+
+
+def _pid_alive(pid):
+    if os.name == "nt":
+        import ctypes
+        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)        # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(h)
+        return code.value == 259                                          # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
@@ -3197,20 +3311,38 @@ def main():
     if sys.stdout is None:
         # Windows 用 pythonw 在背景跑時沒有主控台：訊息寫進記錄檔，不然出錯時什麼都看不到
         sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "console.log"), "a", encoding="utf-8", buffering=1)
+    global DESKTOP_KEY
     cfg = fleet()
-    if not (cfg.get("auth") or {}).get("hash"):
+    if DESKTOP:
+        DESKTOP_KEY = (sys.stdin.readline() if sys.stdin else "").strip()
+        if len(DESKTOP_KEY) < 32 or not APP_PORT:
+            raise SystemExit("桌面版要由 xConsole 應用程式帶起來（缺鑰匙或本機通道的埠）")
+        if not (cfg.get("auth") or {}).get("hash"):
+            # 第一次開：先放一組沒有人知道的隨機密碼（本機視窗用鑰匙進入）；要開區網存取時才請使用者自己設
+            set_credentials("admin", secrets.token_urlsafe(32))
+            update_fleet(lambda c: c.__setitem__("desktop_pw_unset", True))
+        cfg = fleet()
+        if PARENT_PID:
+            threading.Thread(target=_watch_parent, args=(PARENT_PID,), daemon=True).start()
+    elif not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
     moved = migrate_tokens()
     if moved:
         print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
     wait_for_address()
     fresh = CERTS.ensure(hostnames())
-    srv = tls.TLSServer(("0.0.0.0", PORT), Handler)
+    bind = "0.0.0.0" if not DESKTOP or cfg.get("lan_access") else "127.0.0.1"
+    srv = tls.TLSServer((bind, PORT), Handler)
     srv.certs = CERTS
+    if DESKTOP:
+        loop = ThreadingHTTPServer(("127.0.0.1", APP_PORT), LoopHandler)
+        loop.daemon_threads = True
+        threading.Thread(target=loop.serve_forever, daemon=True).start()
+        print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
     threading.Thread(target=sampler, daemon=True).start()
     cur = CERTS.current()
     kind = "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）" if cur["selfSigned"] else cur["issuer"]
-    print(f"xConsole 聽在 https://0.0.0.0:{PORT}；憑證：{kind}"
+    print(f"xConsole 聽在 https://{bind}:{PORT}；憑證：{kind}"
           + ("（剛產生）" if fresh else "") + f"；涵蓋 {', '.join(cur['dns'] + cur['ips'])}", flush=True)
     srv.serve_forever()
 

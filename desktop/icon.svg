@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#1a3040"/><stop offset="1" stop-color="#0d1922"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#g)"/>
+  <polygon points="250,250 400,250 774,774 624,774" fill="#bf181f"/>
+  <polygon points="774,250 660,250 250,774 364,774" fill="#e0484f"/>
+  <text x="512" y="930" font-family="Helvetica, Arial, sans-serif" font-size="92" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="10">CONSOLE</text>
+</svg>

@@ -1,0 +1,18 @@
+[package]
+name = "xconsole-desktop"
+version = "2026.11.7"
+description = "xConsole 模型主控台（桌面版）"
+authors = ["xCloudinfo 云碩科技"]
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-opener = "2"
+getrandom = "0.2"
+url = "2"

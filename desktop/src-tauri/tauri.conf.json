@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "xConsole",
+  "version": "2026.11.7",
+  "identifier": "tw.xcloudinfo.xconsole",
+  "build": {
+    "frontendDist": "../splash"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "app",
+      "dmg",
+      "appimage",
+      "deb"
+    ],
+    "publisher": "xCloudinfo 云碩科技",
+    "copyright": "© xCloudinfo Corp. Limited",
+    "category": "DeveloperTool",
+    "shortDescription": "地端 AI 模型主控台",
+    "longDescription": "在自己的電腦上一鍵安裝推理引擎、下載與執行開源大模型；依記憶體自動判斷放得下多大的模型，資料不出這台電腦。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../build/payload/": "payload/"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "TradChinese",
+          "English"
+        ],
+        "displayLanguageSelector": false,
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "xdotool",
+          "imagemagick"
+        ]
+      }
+    }
+  },
+  "plugins": {},
+  "mainBinaryName": "xConsole"
+}
