@@ -497,21 +497,39 @@ def probe_win_adapters():
     return cards or None
 
 
-_TYPEPERF = {"at": 0.0, "val": 0}
+_TYPEPERF = {"at": 0.0, "val": 0, "busy": False}
+_TYPEPERF_LOCK = threading.Lock()
 
 
-def _win_gpu_used():
-    """GPU 專用記憶體已用量（typeperf 起一次要 2 秒，頁面每次載入會問好幾次）：快取 30 秒。"""
-    if time.time() - _TYPEPERF["at"] < 30:
-        return _TYPEPERF["val"]
+def _typeperf_read():
     _, out, _ = sh(["typeperf", r"\GPU Adapter Memory(*)\Dedicated Usage", "-sc", "1"], timeout=15)
     rows = [ln for ln in out.splitlines() if ln.startswith('"') and "/" in ln[:15]]
     val = 0
     if rows:
         vals = [float(x.strip('"')) for x in rows[-1].split(",")[1:] if re.fullmatch(r'"[\d.]+"', x.strip())]
         val = int(max(vals)) if vals else 0                         # 計數器以 LUID 命名對不回登錄檔，取最大那張
-    _TYPEPERF.update(at=time.time(), val=val)
     return val
+
+
+def _typeperf_refresh():
+    try:
+        val = _typeperf_read()
+        _TYPEPERF.update(at=time.time(), val=val)
+    finally:
+        _TYPEPERF["busy"] = False
+
+
+def _win_gpu_used():
+    """GPU 專用記憶體已用量。typeperf 起一次要 2 秒，頁面每次載入都會問：
+    過期了先回上一次的數字、在背景重查（不讓使用者等）；只有從來沒查過的第一次要等。"""
+    if not _TYPEPERF["at"]:
+        _TYPEPERF.update(at=time.time(), val=_typeperf_read())
+    elif time.time() - _TYPEPERF["at"] > 15:
+        with _TYPEPERF_LOCK:
+            if not _TYPEPERF["busy"]:
+                _TYPEPERF["busy"] = True
+                threading.Thread(target=_typeperf_refresh, daemon=True).start()
+    return _TYPEPERF["val"]
 
 
 def probe_gpus():
