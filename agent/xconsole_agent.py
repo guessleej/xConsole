@@ -208,6 +208,15 @@ def registry():
 
 def floors(machine):
     base = dict(DEFAULT_FLOORS.get(machine.get("memory_model"), DEFAULT_FLOORS["discrete"]))
+    if machine.get("memory_model") in ("unified_single", "discrete"):
+        # 預設底線是照大機器定的（DGX Spark 120 GB 留 12 GB）。記憶體小的機器（32 GB 筆電）照比例留，
+        # 至少 4 GB（LocModel 也是保留 4 GB 給系統）；AI 395 切兩塊的那條是實測出來的，不縮
+        try:
+            total = float(ram_pool().get("total_gib") or 0)
+        except Exception:  # noqa: BLE001
+            total = 0
+        if total:
+            base["ram"] = round(min(base["ram"], max(4.0, total * 0.18)), 1)
     if machine.get("ram_floor_gib") is not None:
         base["ram"] = float(machine["ram_floor_gib"])
     if machine.get("vram_floor_gib") is not None:
