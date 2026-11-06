@@ -304,5 +304,32 @@ case("畫圖：一張、沒有參考圖就不帶這些參數", "-i" not in a and
 eq("產出檔：一次多張用 outs", A.sd_outs({"out": "ab.png", "outs": ["ab_0.png", "ab_1.png"]}), ["ab_0.png", "ab_1.png"])
 eq("產出檔：單張用 out", A.sd_outs({"out": "ab.png"}), ["ab.png"])
 
+# ---- GitHub API：有權杖檔才帶，沒有就不帶
+seen = []
+
+
+class _R(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+real_open = A.urllib.request.urlopen
+A.urllib.request.urlopen = lambda req, timeout=30: (seen.append(req.get_header("Authorization")), _R(b"[]"))[1]
+try:
+    A._gh_json("/repos/x/y/releases")
+    tp = os.path.join(A.STATE_DIR, "github-token")
+    os.makedirs(A.STATE_DIR, exist_ok=True)
+    open(tp, "w").write("ghs_" + "a" * 36 + "\n")
+    A._gh_json("/repos/x/y/releases")
+    open(tp, "w").write("not a token; rm -rf")
+    A._gh_json("/repos/x/y/releases")
+    os.remove(tp)
+finally:
+    A.urllib.request.urlopen = real_open
+eq("GitHub API：沒有權杖檔就不帶、有就帶、格式怪的不帶", seen, [None, "Bearer ghs_" + "a" * 36, None])
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
