@@ -4643,6 +4643,21 @@ def prebuilt_variant(kind="llama"):
     return f"win-cpu-{a}", None, "沒有偵測到 GPU，只用 CPU"
 
 
+def move_dir(src, dest, tries=15):
+    """把解好的資料夾搬到最終位置。Windows 上防毒軟體會在剛解壓的執行檔上掃描幾秒、暫時鎖住資料夾，
+    直接改名會 WinError 5（存取被拒）：等一下重試，還是不行就改用複製（HP 實機遇到）。"""
+    for i in range(tries):
+        try:
+            os.replace(src, dest)
+            return
+        except PermissionError:
+            if OS != "windows":
+                raise
+            time.sleep(1)
+    shutil.copytree(src, dest)
+    shutil.rmtree(src, ignore_errors=True)
+
+
 def _gh_json(path):
     req = urllib.request.Request(GH_API + path, headers={"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -4800,7 +4815,7 @@ def _prebuilt_run(st, log, kind="llama"):
         note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.join(dest, eng['target'] + EXE)}")
         if os.path.exists(dest):
             shutil.rmtree(dest)
-        os.replace(src, dest)
+        move_dir(src, dest)
         shutil.rmtree(tmp, ignore_errors=True)
         for a in (arc, arc2):
             if a and os.path.exists(a):
