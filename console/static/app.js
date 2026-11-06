@@ -19,7 +19,7 @@ const el = (tag, cls, text) => {
   return n;
 };
 const fmt = (n, d = 1) => (n === null || n === undefined || Number.isNaN(n)) ? "—" : Number(n).toFixed(d);
-const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString("zh-TW");
+const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString(uiLocale());
 
 function toast(msg, kind) {
   const t = el("div", "toast" + (kind ? " " + kind : ""), msg);
@@ -39,6 +39,7 @@ async function api(path, opts = {}) {
   try { data = await res.json(); } catch (_) { /* 沒有 JSON 就算了 */ }
   if (res.status === 401) { showLogin(); throw new Error("請先登入"); }
   if (!res.ok) { const e = new Error(data.error || `伺服器回 ${res.status}`); e.data = data; throw e; }
+  if (typeof i18nData === "function") i18nData(data);
   return data;
 }
 
@@ -789,6 +790,28 @@ async function libRec(body, ok, only, v) {
   reveal(holder);
 }
 
+// 開啟位置：網頁版顯示完整路徑可複製；那台有桌面時（單機版、有人登入）可以直接用檔案總管打開
+function openModelFolder(n, m) {
+  const sep = m.path.includes("\\") ? "\\" : "/";
+  const dir = m.path.slice(0, m.path.lastIndexOf(sep)) || m.path;
+  const d = el("div");
+  const pre = el("pre", "code-pre mono small");
+  pre.textContent = dir;
+  d.appendChild(pre);
+  const row = el("div", "slot-actions");
+  const cp = el("button", "btn sm", "複製路徑");
+  cp.onclick = () => copyText(dir);
+  const op = el("button", "btn sm primary", `在 ${n.name} 上打開資料夾`);
+  const note = el("p", "small muted", "「打開資料夾」會在那台的桌面跳出檔案總管；那台沒有人登入桌面時打不開，就用上面的路徑。");
+  op.onclick = async () => {
+    try { await api(`/api/node/${n.id}/desktop/open`, { method: "POST", body: { path: dir } }); toast("已在那台打開", "ok"); }
+    catch (ex) { note.textContent = "打不開：" + ex.message; note.className = "small warn-t"; }
+  };
+  row.append(cp, el("span", "spacer"), op);
+  d.append(row, note);
+  modal({ title: `${m.name}${m.quant ? " " + m.quant : ""} 的位置`, bodyNode: d });
+}
+
 function libInstalledCard(ok, models, jobs) {
   const ic = card("已安裝的模型", `${models.length} 顆`);
   ic.id = "lib-installed";
@@ -817,6 +840,11 @@ function libInstalledCard(ok, models, jobs) {
     const sw = el("button", "btn sm primary", m.in_use ? "執行設定" : "執行");
     sw.onclick = () => runModel(n, m);
     td.appendChild(sw);
+    if (m.path) {
+      const loc = el("button", "btn sm", "開啟位置");
+      loc.onclick = () => openModelFolder(n, m);
+      td.appendChild(loc);
+    }
     if (m.engine === "llama") {
       const b = el("button", "btn sm danger", "刪除");
       b.disabled = !!m.in_use;
@@ -908,8 +936,9 @@ function libDownloadCard(ok, only) {
     form.appendChild(w0);
   }
   const w1 = el("div"); w1.appendChild(el("label", null, "模型名稱（作者/模型）")); w1.appendChild(fRepo);
-  const w2 = el("div"); w2.appendChild(el("label", null, "Hugging Face 權杖（選填）")); w2.appendChild(fTok);
-  w2.appendChild(el("div", "assume", "只在這次下載期間用，不保存、不寫紀錄"));
+  const w2 = el("div"); w2.appendChild(el("label", null, "Hugging Face 令牌（選填）")); w2.appendChild(fTok);
+  w2.appendChild(el("div", "assume", "這裡填的只用這一次；要一直用就按「存起來」（加密保存在主控台，畫面看不到內容）"));
+  w2.appendChild(hfTokenRow(fTok));
   form.appendChild(w1);
   form.appendChild(w2);
   // 不知道完整名稱時先用關鍵字找（照下載數排），點一下就帶進上面的名稱並列出量化
@@ -1535,12 +1564,14 @@ function recList(n, rec, lib, ctx) {
 
   const bar = el("div", "tabbar");
   const list = el("div", "rec-list");
-  const uses = [["all", "全部"], ["chat", "對話與知識"], ["code", "寫程式"], ["vision", "看圖與 OCR"]];
+  // 分類照 LocModel：適合這台（流暢或能跑，不含要用硬碟的）排第一；推理＝標了「推理」的
+  const uses = [["fit", "適合這台"], ["all", "全部"], ["chat", "對話與知識"], ["code", "寫程式"], ["vision", "看圖與 OCR"], ["reason", "推理"]];
+  const useOk = (x, k) => k === "all" || (k === "fit" ? ["smooth", "ok"].includes(x.level) : k === "reason" ? (x.tags || []).includes("推理") : x.use === k);
   const fill = () => {
     bar.textContent = "";
     uses.forEach(([k, label]) => {
       const b = el("button", null, label);
-      if ((S.recUse || "all") === k) b.setAttribute("aria-current", "true");
+      if ((S.recUse || "fit") === k) b.setAttribute("aria-current", "true");
       b.onclick = () => { S.recUse = k; fill(); };
       bar.appendChild(b);
     });
@@ -1549,17 +1580,19 @@ function recList(n, rec, lib, ctx) {
     bar.appendChild(tg);
     list.textContent = "";
     const rank = { smooth: 0, ok: 1, no: 2, unknown: 3 };
-    const rows = rec.items.filter((x) => (S.recUse || "all") === "all" || x.use === S.recUse)
+    const rows = rec.items.filter((x) => useOk(x, S.recUse || "fit"))
       .filter((x) => S.recAll || x.level !== "no")
       .sort((a, b) => rank[a.level] - rank[b.level] || a.order - b.order);
     rows.forEach((it) => list.appendChild(recRow(n, it, lib, ctx)));
-    if (!rows.length) list.appendChild(el("p", "small muted", S.recAll ? "推薦清單是空的，按「管理推薦清單」新增。" : "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。"));
+    if (!rows.length) list.appendChild(el("p", "small muted", S.recAll ? "推薦清單是空的，按「管理推薦清單」新增。"
+      : (S.recUse || "fit") === "fit" ? "推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或放不下的，或到「搜尋 Hugging Face」找小一點的。"
+        : "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。"));
   };
   fill();
   c.append(bar, list);
   const a = rec.assumptions;
   c.appendChild(el("p", "small muted", `速度是估算：記憶體頻寬 × ${Math.round(a.efficiency * 100)}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），`
-    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；實際以 API 串接的實測為準。推薦清單不含中國來源模型（政府案不得使用）。`));
+    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用）。`));
   return c;
 }
 
@@ -1601,7 +1634,7 @@ async function openCatalog() {
       tr.appendChild(el("td", "mono small", e.repo));
       tr.appendChild(el("td", "small nowrap", data.uses[e.use] || "—"));
       tr.appendChild(el("td", "small nowrap", e.quants?.length ? `${e.quants.length} 種` : "還沒讀到"));
-      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString("zh-TW") : "—"));
+      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString(uiLocale()) : "—"));
       const td = el("td", "row-acts");
       const mv = (t, step, dis) => {
         const b = el("button", "btn sm", t);
@@ -1707,6 +1740,28 @@ function sizeLabel(w, h) {
   const d = g(w, h);
   const r = { "1:1": "方形", "3:4": "直式", "9:16": "直式", "2:3": "直式", "4:3": "橫式", "16:9": "橫式", "3:2": "橫式", "8:5": "橫式", "5:8": "直式" }[`${w / d}:${h / d}`];
   return `${w}×${h}${r ? `（${w / d}:${h / d} ${r}）` : ""}`;
+}
+
+// Hugging Face 令牌存在主控台：受限模型（Llama、部分 Gemma）下載時自動帶上；走鏡像的機器不會送出
+function hfTokenRow(fTok) {
+  const row = el("div", "slot-actions hf-tok");
+  const st = el("span", "small muted", "已存的令牌：讀取中…");
+  const save = el("button", "btn sm", "存起來");
+  const clear = el("button", "btn sm", "清除已存的");
+  row.append(st, el("span", "spacer"), save, clear);
+  const show = (set) => { st.textContent = set ? "已存的令牌：已設定（沒填上面那格時自動用它）" : "已存的令牌：沒有"; clear.hidden = !set; };
+  api("/api/settings").then((r) => show(r.hf_token_set)).catch(() => { st.textContent = ""; });
+  save.onclick = async () => {
+    try { await api("/api/settings/hf", { method: "POST", body: { token: fTok.value.trim() } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    fTok.value = "";
+    show(true);
+    toast("已加密存在主控台", "ok");
+  };
+  clear.onclick = async () => {
+    try { await api("/api/settings/hf", { method: "POST", body: { clear: true } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    show(false);
+  };
+  return row;
 }
 
 async function getSdRec(nid, fresh) {
@@ -2128,7 +2183,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     if (!jobs.length) recent.appendChild(el("p", "small muted", "還沒有產出。"));
     jobs.forEach((j) => {
       const r = el("button", "sd-job");
-      r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString("zh-TW", { hour12: false }).slice(5, 16)));
+      r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString(uiLocale(), { hour12: false }).slice(5, 16)));
       r.appendChild(el("span", "sd-job-p", j.prompt));
       r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"),
         { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
@@ -2285,7 +2340,7 @@ async function openSdCatalog(after) {
       tr.appendChild(el("td", "mono small", e.repo));
       tr.appendChild(el("td", "small nowrap", data.kinds[e.kind]));
       tr.appendChild(el("td", "small", e.parts.map((p) => data.roles[p.role]).join("、")));
-      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString("zh-TW") : "—"));
+      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString(uiLocale()) : "—"));
       const td = el("td", "row-acts");
       const mv = (t, step, dis) => {
         const b = el("button", "btn sm", t);
@@ -2744,7 +2799,7 @@ function viewApis() {
       cells[4].textContent = int(info.max_context);
       cells[5].textContent = info.api_key_set ? "有" : "沒有";
       cells[6].textContent = info.last_test
-        ? `${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}` : "還沒測";
+        ? `${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString(uiLocale(), { hour12: false })}` : "還沒測";
     }).catch((ex) => { cells[2].textContent = ex.message; });
   });
   tb.appendChild(body);
@@ -2878,7 +2933,7 @@ async function viewApi() {
   /* ---- 實測 ｜ 工具設定範例 */
   const pair2 = el("div", "grid pair");
   wrap.appendChild(pair2);
-  const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}（台北時間）` : "還沒測過");
+  const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString(uiLocale(), { hour12: false })}（台北時間）` : "還沒測過");
   tc.appendChild(el("p", "small muted", "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。"));
   let fTestKey = null;
   if (info.api_key_set && !newKey) {
@@ -2992,7 +3047,7 @@ function viewOverview() {
     nodes.length === online.length ? "全部連得上" : "有機器連不上代理"));
   tiles.appendChild(tile("模型運作中", `${slotsOn} / ${slotsTotal}`, "已登錄的欄位"));
   tiles.appendChild(tile("顯示記憶體使用", `${fmt(vram, 0)} GiB`, `共 ${fmt(vramTotal, 0)} GiB`));
-  tiles.appendChild(tile("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString("zh-TW"), "每 15 秒自動更新"));
+  tiles.appendChild(tile("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString(uiLocale()), "每 15 秒自動更新"));
   hw.appendChild(tiles);
   hero.appendChild(hw);
 
@@ -3443,7 +3498,7 @@ function viewLogs() {
 
 const SETTINGS_TABS = [
   ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
-  ["logs", "記錄"], ["account", "帳號與安全"], ["brand", "品牌與外觀"],
+  ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
 
 function viewSettings() {
@@ -3454,7 +3509,162 @@ function viewSettings() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   ({ machines: settingsMachines, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
-     account: settingsAccount, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+     account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+}
+
+/* ---------------------------------------------------------------- 版本與更新
+   主控台：檢查 GitHub 上的新版 → 一鍵更新（核對 sha256、先備份、失敗自動還原）→ 主控台重新啟動後自動重新整理。
+   不能連外的機器：在別台下載安裝包，這裡手動上傳並貼上 sha256。可以退回上一版。
+   各機代理：跟主控台隨附的那一份比，不一樣就可以在這裡推過去。 */
+async function settingsUpdate(wrap) {
+  const v = S.view;
+  const c = card("版本與更新", "主控台與各機代理的版本；更新前一律核對 sha256 並先備份");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  loading(body);
+  let ov;
+  try { ov = await api("/api/update"); } catch (ex) { errNote(body, ex.message); return; }
+  if (S.view !== v) return;
+  body.textContent = "";
+  body.appendChild(el("div", "tiles light", null));
+  const tiles = body.lastChild;
+  tiles.append(tileOf("主控台版本", ov.current || "未知", `來源：github.com/${ov.repo}`),
+    tileOf("各機代理", `${ov.nodes.filter((n) => n.current).length}/${ov.nodes.length} 台是最新`, "跟主控台隨附的那一份比"));
+  const jobBox = el("div");
+  body.appendChild(jobBox);
+  const drawJob = (job) => {
+    jobBox.textContent = "";
+    if (!job?.state) return;
+    const msg = { checking: "檢查更新包…", downloading: `下載中…${job.got ? `（${fmt(job.got / 1048576, 1)} MB）` : ""}`, installing: "安裝相依套件…",
+      applying: "備份並換上新版…", restarting: `換好了，主控台重新啟動中（備份 ${job.backup || ""}）…`, failed: `更新沒有成功：${job.error}` }[job.state] || job.state;
+    jobBox.appendChild(el("p", "note " + (job.state === "failed" ? "bad" : "warn"), msg));
+  };
+  drawJob(ov.job);
+  const watchJob = async () => {
+    for (;;) {
+      await new Promise((ok) => setTimeout(ok, 2000));
+      let r;
+      try { r = await api("/api/update"); } catch (_) { r = null; }
+      if (!r) { jobBox.textContent = ""; jobBox.appendChild(el("p", "note warn", "主控台重新啟動中，等它回來…")); continue; }
+      if (r.job?.state === "restarting") { drawJob(r.job); continue; }
+      if (r.current !== ov.current || (!r.job?.state && ov.job?.state === "restarting")) { toast(`已更新到 ${r.current}，重新載入頁面`, "ok"); setTimeout(() => location.reload(), 1200); return; }
+      drawJob(r.job);
+      if (!["checking", "downloading", "installing", "applying"].includes(r.job?.state)) return;
+    }
+  };
+
+  // ---- 檢查新版
+  body.appendChild(el("h4", "pick-h", "主控台"));
+  const chk = el("div");
+  const chkBtn = el("button", "btn primary", "檢查新版");
+  body.append(chkBtn, chk);
+  chkBtn.onclick = async () => {
+    chk.textContent = "";
+    loading(chk);
+    let r;
+    try { r = await api("/api/update/check", { method: "POST", body: {} }); } catch (ex) { chk.textContent = ""; errNote(chk, ex.message); return; }
+    chk.textContent = "";
+    chk.appendChild(el("p", "note " + (r.newer ? "warn" : ""), r.newer ? `有新版 ${r.latest}（目前 ${r.current}）${r.published ? "，" + new Date(r.published).toLocaleDateString(uiLocale()) + " 發布" : ""}` : `目前就是最新版（${r.current}）`));
+    if (r.notes) { const pre = el("pre", "code-pre small upd-notes"); pre.textContent = r.notes; chk.appendChild(pre); }
+    if (r.newer && r.asset) {
+      chk.appendChild(el("p", "small muted", `安裝包 ${r.asset.name}（${fmt((r.asset.size || 0) / 1048576, 1)} MB），sha256 ${r.asset.sha256 ? r.asset.sha256.slice(0, 16) + "…" : "GitHub 沒有提供，不能自動更新"}`));
+      const go = el("button", "btn primary", `更新到 ${r.latest}`);
+      go.disabled = !r.asset.sha256;
+      go.onclick = () => modal({ title: `更新到 ${r.latest}`, bodyNode: el("p", null, "會先備份目前的檔，換上新版後主控台重新啟動（大約十幾秒，頁面會自動重新載入）。正在跑的模型不受影響。"),
+        confirmText: "開始更新", onConfirm: async () => {
+          try { await api("/api/update/apply", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+          drawJob({ state: "checking" });
+          watchJob();
+        } });
+      chk.appendChild(go);
+    }
+  };
+
+  // ---- 手動上傳
+  const up = el("details", "upd-manual");
+  up.appendChild(el("summary", null, "不能連外：手動上傳更新包"));
+  const fFile = el("input");
+  fFile.type = "file";
+  fFile.accept = ".gz,.tgz,application/gzip";
+  const fSha = textInput("", "從 GitHub 版本頁抄 sha256（64 碼）");
+  fSha.maxLength = 64;
+  const upBtn = el("button", "btn sm primary", "上傳並更新");
+  const upErr = el("div");
+  up.append(el("p", "small muted", `在能上網的電腦到 github.com/${ov.repo}/releases 下載 xconsole-版本.tar.gz，並抄下它的 sha256；兩樣都對了才會更新。`),
+    fieldBox("更新包", fFile), fieldBox("sha256", fSha), upBtn, upErr);
+  body.appendChild(up);
+  upBtn.onclick = async () => {
+    errNote(upErr, "");
+    const f = fFile.files[0];
+    if (!f) { errNote(upErr, "先選更新包"); return; }
+    if (!/^[0-9a-f]{64}$/i.test(fSha.value.trim())) { errNote(upErr, "sha256 要是 64 碼的十六進位"); return; }
+    if (f.size > 64 * 1024 * 1024) { errNote(upErr, "更新包要在 64 MB 以內"); return; }
+    upBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/update/upload?sha256=${fSha.value.trim().toLowerCase()}`, { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" }, body: f });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `伺服器回 ${res.status}`);
+    } catch (ex) { errNote(upErr, ex.message); upBtn.disabled = false; return; }
+    drawJob({ state: "checking" });
+    watchJob();
+  };
+
+  // ---- 退回上一版
+  if (ov.backups?.length) {
+    const b = ov.backups[0];
+    const rb = el("button", "btn sm", `退回上一版（${b.version}，${new Date(b.at * 1000).toLocaleString(uiLocale(), { hour12: false })} 備份）`);
+    rb.onclick = () => modal({ title: "退回上一版", bodyNode: el("p", null, `把主控台換回 ${b.version}，然後重新啟動。各機代理不會跟著退，需要的話在下面個別處理。`),
+      confirmText: "退回", danger: true, onConfirm: async () => {
+        try { await api("/api/update/rollback", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+        drawJob({ state: "restarting" });
+        watchJob();
+      } });
+    body.appendChild(rb);
+  }
+
+  // ---- 各機代理
+  body.appendChild(el("h4", "pick-h", "各機代理"));
+  const tb = el("table", "api-table");
+  tb.innerHTML = "<thead><tr><th>機器</th><th>狀態</th><th></th></tr></thead>";
+  const tbody = el("tbody");
+  ov.nodes.forEach((n) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, n.name));
+    const stTd = el("td", "small " + (n.current ? "ok-t" : "warn-t"), !n.online ? (n.old_agent ? "代理太舊（沒有線上更新），請用安裝程式或部署腳本更新一次" : "連不上")
+      : n.current ? "最新" : `跟主控台隨附的不同（${(n.sha256 || "").slice(0, 8)}）`);
+    tr.appendChild(stTd);
+    const td = el("td", "row-acts");
+    if (n.online && !n.current) {
+      const b = el("button", "btn sm primary", "更新這台代理");
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api(`/api/update/agent/${n.id}`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); b.disabled = false; return; }
+        stTd.textContent = "已送出新版，代理重新啟動中…";
+        // 只更新這一列：等代理回來再問一次它的版本
+        for (let i = 0; i < 20; i++) {
+          await new Promise((ok) => setTimeout(ok, 3000));
+          let r;
+          try { r = await api("/api/update"); } catch (_) { continue; }
+          const me = r.nodes.find((x) => x.id === n.id);
+          if (me?.online) {
+            stTd.textContent = me.current ? "最新" : "已重新啟動，但版本還是不同";
+            stTd.className = "small " + (me.current ? "ok-t" : "warn-t");
+            b.remove();
+            return;
+          }
+        }
+        stTd.textContent = "代理一分鐘內沒有回來，請到那台看服務狀態";
+      };
+      td.appendChild(b);
+    }
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+  tb.appendChild(tbody);
+  body.appendChild(tb);
+  if (["checking", "downloading", "installing", "applying", "restarting"].includes(ov.job?.state)) watchJob();
 }
 
 function card(title, sub) {
@@ -3917,7 +4127,7 @@ async function settingsReport(wrap) {
   box.appendChild(el("p", "small muted", `${r.period.from} 至 ${r.period.to}（台北時間）`));
   if (r.period.note) box.appendChild(el("p", "note warn", r.period.note));
 
-  const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString("zh-TW");
+  const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString(uiLocale());
   const t = r.build_vs_buy.local;
   const tiles = el("div", "tiles light");
   const tile = (k, v, s) => { const d = el("div", "tile"); d.appendChild(el("div", "k", k)); d.appendChild(el("div", "v", v)); if (s) d.appendChild(el("div", "s", s)); return d; };
@@ -4040,7 +4250,7 @@ async function settingsAccount(wrap) {
     const body = el("tbody");
     items.forEach((a) => {
       const tr = el("tr");
-      [new Date(a.ts * 1000).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }),
+      [new Date(a.ts * 1000).toLocaleString(uiLocale(), { timeZone: "Asia/Taipei", hour12: false }),
        a.user || "—", a.ip || "—", LABEL[a.action] || a.action, a.target || "—",
        a.ok ? "成功" : ((a.detail && a.detail.blocked) ? "被准入擋下" : "失敗")].forEach((v) => tr.appendChild(el("td", null, v)));
       body.appendChild(tr);
@@ -4339,7 +4549,7 @@ async function openMachineSettings(nid) {
   tr.appendChild(tb);
   body.appendChild(tr);
 
-  let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent;
+  let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent, fGpuMode, fGpuName, fGpuVendor, fGpuVram, fHfMirror, fGhProxy, fDesk;
   if (!info) {
     body.appendChild(el("p", "note warn", `這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定。${infoErr}`));
   } else {
@@ -4368,6 +4578,23 @@ async function openMachineSettings(nid) {
     }
     body.appendChild(el("p", "small muted",
       `這台：${det.gpus.length ? det.gpus.map((g) => `卡 ${g.id} ${g.name || ""}${g.vram_gib ? " " + g.vram_gib + " GiB" : ""}`).join("、") : "沒有偵測到 GPU"}；系統記憶體 ${det.ram_gib} GiB`));
+    // 手動指定顯示卡：偵測不到（例：Windows 的內顯被當成沒有）或顯存讀錯時用
+    const ovr = st.gpu_override;
+    const fg = el("div", "form-row");
+    fGpuMode = selectInput([["auto", "自動偵測（建議）"], ["cpu", "不用 GPU，只用 CPU"], ["manual", "手動指定一張卡"]],
+      ovr === "cpu" ? "cpu" : ovr ? "manual" : "auto");
+    fGpuName = textInput(ovr?.name || "", "例：AMD Radeon 880M");
+    fGpuName.maxLength = 80;
+    fGpuVendor = selectInput([["amd", "AMD"], ["intel", "Intel"], ["nvidia", "NVIDIA"], ["apple", "Apple"]], ovr?.vendor || "amd");
+    fGpuVram = numInput(ovr?.vram_gib ?? "", "GiB");
+    fGpuVram.min = "0.5";
+    const manualBoxes = [fieldBox("顯示卡名稱", fGpuName), fieldBox("廠牌", fGpuVendor, "決定裝哪一版推理引擎（AMD／Intel 走 Vulkan）"),
+      fieldBox("顯存（GiB）", fGpuVram, "內顯填專用記憶體；Windows 的內顯另外會借用一半系統記憶體，不必加進來")];
+    const syncGpu = () => manualBoxes.forEach((b) => { b.hidden = fGpuMode.value !== "manual"; });
+    fGpuMode.onchange = syncGpu;
+    fg.append(fieldBox("顯示卡", fGpuMode, "偵測錯了才改。改了之後推薦、記憶體試算與推理引擎版本都照這裡算"), ...manualBoxes);
+    syncGpu();
+    body.appendChild(fg);
 
     // 推薦清單估速度用：每產生一個 token 都要把權重從記憶體讀一遍，速度上限看頻寬
     const ch = info.chip || {};
@@ -4423,6 +4650,14 @@ async function openMachineSettings(nid) {
     bbtn.onclick = () => openEngineBuild(nid);
     bb.appendChild(bbtn);
     body.appendChild(bb);
+    // 下載來源：連不上 Hugging Face 或 GitHub 的網路環境用（例：公司防火牆、對岸）
+    body.appendChild(el("h4", "pick-h", "下載來源"));
+    const fd = el("div", "form-row");
+    fHfMirror = textInput(st.hf_mirror || "", "空白＝官方 https://huggingface.co");
+    fGhProxy = textInput(st.github_proxy || "", "空白＝直連 GitHub");
+    fd.append(fieldBox("Hugging Face 鏡像", fHfMirror, "例：https://hf-mirror.com。走鏡像時不會送出 Hugging Face 令牌（鏡像是第三方）"),
+      fieldBox("GitHub 加速字首", fGhProxy, "例：https://ghfast.top/。只用在下載推理引擎；版本與 sha256 仍直接問 GitHub，對不上就不裝"));
+    body.appendChild(fd);
     // Agent：會在這台建檔、跑指令，預設關閉；打開後只能動 ~/xconsole-agent/ 底下，每條指令要人按允許
     body.appendChild(el("h4", "pick-h", "Agent"));
     const agRow = el("label", "check-row");
@@ -4430,7 +4665,17 @@ async function openMachineSettings(nid) {
     fAgent.type = "checkbox";
     fAgent.checked = !!(st.agent_enabled ?? info.agent_enabled);
     agRow.append(fAgent, document.createTextNode(" 允許 Agent 在這台工作（建檔、寫程式、跑指令）"));
-    body.append(agRow, el("p", "small muted", "檔案只能動 ~/xconsole-agent/ 底下的工作資料夾；指令以代理的身分執行，每條都要人在網頁上按允許，並寫進記錄。不需要就保持關閉。"));
+    body.append(agRow, el("p", "small muted", "檔案只能動工作資料夾裡面：~/xconsole-agent/ 底下的，或在 Agent 頁連結進來的資料夾（系統資料夾、家目錄本身、.ssh 這類設定夾不能連）。指令以代理的身分執行，每條都要人在網頁上按允許，並寫進記錄。不需要就保持關閉。"));
+    body.appendChild(el("h4", "pick-h", "操作電腦"));
+    const pcRow = el("label", "check-row");
+    fDesk = el("input");
+    fDesk.type = "checkbox";
+    fDesk.checked = !!st.desktop_enabled;
+    pcRow.append(fDesk, document.createTextNode(" 讓模型操作這台的桌面（看螢幕、控制滑鼠鍵盤）"));
+    const dk = info.desktop || {};
+    body.append(pcRow, el("p", "small " + (dk.how ? "muted" : "warn-t"), dk.how
+      ? `${dk.how === "helper" ? "由桌面小幫手代為操作（使用者登入後才有桌面）" : "代理直接操作這台的桌面"}。對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉。`
+      : `這台現在不能操作桌面：${dk.why || "沒有圖形桌面"}`));
     body.appendChild(el("h4", "pick-h", "備註"));
     fNote = el("textarea");
     fNote.value = st.note || "";
@@ -4449,7 +4694,9 @@ async function openMachineSettings(nid) {
           bandwidth_gbs: fBw.value, ram_bandwidth_gbs: fRbw.value,
           gguf_root: fRoot.value === "__custom" ? fRootC.value.trim() : fRoot.value,
           llama_server: fLlama.value === "__custom" ? fLlamaC.value.trim() : fLlama.value,
-          sd_cli: fSd.value === "__custom" ? fSdC.value.trim() : fSd.value, agent_enabled: fAgent.checked } });
+          sd_cli: fSd.value === "__custom" ? fSdC.value.trim() : fSd.value, agent_enabled: fAgent.checked,
+          gpu_override: fGpuMode.value === "manual" ? { name: fGpuName.value.trim(), vendor: fGpuVendor.value, vram_gib: Number(fGpuVram.value) } : fGpuMode.value,
+          hf_mirror: fHfMirror.value.trim(), github_proxy: fGhProxy.value.trim(), desktop_enabled: fDesk.checked } });
       }
     } catch (ex) { errNote(err, ex.message); return; }
     ov.remove();
@@ -4893,10 +5140,13 @@ window.addEventListener("scroll", () => {
 }, { passive: true });
 
 (async function boot() {
+  await i18nInit();                          // 選了別的語言就先載字典，畫面一出來就是那個語言
+  ["langpick-top", "langpick-login", "langpick-m"].forEach((id) => { const h = document.getElementById(id); if (h) h.appendChild(i18nPicker()); });
   try {
     await api("/api/me");
     start();
   } catch (_) {
     showLogin();
   }
+  i18nStart();
 })();

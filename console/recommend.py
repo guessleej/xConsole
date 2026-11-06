@@ -79,7 +79,10 @@ def capacity(state):
     chip = state.get("chip") or {}
     out = {"memory_model": mm, "bandwidth_gbs": chip.get("bandwidth_gbs"), "bandwidth_src": chip.get("bandwidth_src"),
            "ram_bandwidth_gbs": chip.get("ram_bandwidth_gbs") or DEFAULT_RAM_BW,
-           "ram_bw_assumed": not chip.get("ram_bandwidth_gbs"), "cards": len(pools.get("gpus") or [])}
+           "ram_bw_assumed": not chip.get("ram_bandwidth_gbs"), "cards": len(pools.get("gpus") or []),
+           "os": chip.get("os"),
+           # 這台實測過的校正倍數（代理比對「實測 ÷ 公式估」的移動平均）：所有估計速度乘上它
+           "speed_factor": chip.get("speed_factor") if chip.get("speed_factor_n") else None}
     if mm == "unified_single":
         tot = (pools.get("unified") or {}).get("total_gib") or 0
         fast = tot - fl.get("ram", 12) - 1.5
@@ -97,6 +100,16 @@ def capacity(state):
                    tiers=[{"kind": "gpu", "label": "GPU 那一塊", "gib": round(v - fl.get("vram", 4), 1)},
                           {"kind": "floor", "label": "系統那一塊", "gib": round(r, 1)}],
                    note="BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，吃爆會把整台拖死，所以另外盯")
+    elif not sum(c.get("total_gib") or 0 for c in pools.get("gpus") or []):
+        # 沒有 GPU（或讀不到顯存）：模型全在系統記憶體、用 CPU 算，速度照系統記憶體頻寬
+        r = (pools.get("ram") or {}).get("total_gib") or 0
+        fast = max(0.0, r - fl.get("ram", 8) - 2.5)
+        out.update(fast=fast, slow=0.0, cpu_only=True,
+                   bandwidth_gbs=chip.get("bandwidth_gbs") or chip.get("ram_bandwidth_gbs") or DEFAULT_RAM_BW,
+                   bandwidth_src=chip.get("bandwidth_src") or ("管理者設定" if chip.get("ram_bandwidth_gbs") else "假設值"),
+                   tiers=[{"kind": "ram", "label": "系統記憶體（CPU 執行）", "gib": round(fast, 1)},
+                          {"kind": "floor", "label": "保留給系統", "gib": fl.get("ram", 8)}],
+                   note="這台沒有偵測到可用的 GPU：模型放系統記憶體、用 CPU 算，速度看記憶體頻寬。偵測錯了可以在這台的設定手動指定顯示卡")
     else:
         v = sum(c.get("total_gib") or 0 for c in pools.get("gpus") or [])
         r = (pools.get("ram") or {}).get("total_gib") or 0
@@ -138,7 +151,7 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
     read = size * act * GIB
     fixed = (prof.get("layers") or 0) * LAYER_MS / 1000
     if need <= cap["fast"]:
-        place = {"unified_single": "全部放進統一記憶體", "unified_split": "全部放進 GPU 那一塊"}.get(
+        place = "全部放進系統記憶體（CPU 執行）" if cap.get("cpu_only") else {"unified_single": "全部放進統一記憶體", "unified_split": "全部放進 GPU 那一塊"}.get(
             cap["memory_model"], f"分到 {cap['cards']} 張卡" if cap["cards"] > 1 else "全部放進顯示卡")
         # 多張卡是一層接一層輪流算（llama.cpp 預設依層切），頻寬不會相加，照單張卡算
         tok = 1 / (read / (EFFICIENCY * bw * 1e9) + fixed) if bw else None
@@ -159,14 +172,22 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
                            split={"gpu": need - moved, "ram": moved, "disk": 0.0})
                 moe_ok = True
         if not moe_ok:
-            d = _disk_plan(cap, size, mmproj_gib + ENGINE_OVERHEAD + kv, act, hdd, fixed)
+            d = _moe_disk_plan(cap, prof, size, mmproj_gib + ENGINE_OVERHEAD + kv, hdd, fixed) \
+                or _disk_plan(cap, size, mmproj_gib + ENGINE_OVERHEAD + kv, act, hdd, fixed)
             if d:
                 out.update(d)
             else:
                 out.update(level="no", tok_s=None,
                            place=f"要約 {need:.0f} GiB，這台最多 {cap['fast'] + cap['slow']:.0f} GiB"
                            + ("（這台 BIOS 把記憶體切成兩塊，不能用硬碟執行）" if cap["memory_model"] == "unified_split" else ""))
+    if cap.get("cpu_only"):
+        # 沒有 GPU：「快速層」就是系統記憶體，三色條照實畫在系統記憶體那一格
+        sp = out["split"]
+        out["split"] = {"gpu": 0.0, "ram": sp["gpu"] + sp["ram"], "disk": sp["disk"]}
     out["split"] = {k: round(v, 1) for k, v in out["split"].items()}
+    if out["tok_s"] is not None and cap.get("speed_factor"):
+        out["tok_s"] *= cap["speed_factor"]
+        out["calibrated"] = round(cap["speed_factor"], 2)
     if out["tok_s"] is not None:
         # 不到 1 tok/s 的（用硬碟執行）留兩位有效數字，不要四捨五入成 0
         out["tok_s"] = round(out["tok_s"], 1) if out["tok_s"] >= 1 else float(f"{out['tok_s']:.2g}")
@@ -175,6 +196,53 @@ def plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False):
     out["load_est_sec"] = load_seconds(size, hdd)
     out["hdd"] = hdd                       # 存放區是不是機械硬碟：執行頁要用硬碟時提醒改放 SSD
     return out
+
+
+def _moe_disk_plan(cap, prof, size, pinned, hdd, fixed_s):
+    """MoE 用硬碟執行，照張量種類分層（跟代理 moe_disk_layout 同一個放法）：
+    注意力、共用權重、KV 放快速層 → 專家層留在檔案映射的記憶體 → 放不下的專家從 SSD 按需讀。
+    每個 token：共用部分全讀、專家只讀被選中的那幾個（expert_used_frac）。回 None＝不適用，交給整層的放法。"""
+    mm, fast, slow = cap["memory_model"], cap["fast"], cap["slow"]
+    frac, n_exp = prof.get("expert_layer_frac"), int(prof.get("expert_layers") or 0)
+    if not prof.get("moe") or not frac or n_exp <= 0 or mm == "unified_split" or fast <= 0 or cap.get("cpu_only"):
+        return None
+    if mm == "unified_single" and cap.get("os") == "darwin":
+        return None
+    per = frac * size                                    # expert_layer_frac＝每一層專家占整顆的比例
+    experts = min(size, per * n_exp)
+    dense = size - experts
+    if pinned + dense > fast:
+        return None
+    euf = prof.get("expert_used_frac") or prof.get("active_frac") or 1.0
+    bw = cap.get("bandwidth_gbs")
+    if mm == "unified_single":
+        n_gpu, cached = 0, min(experts, fast - pinned - dense)
+        gpu_exp, ram_w, spill = 0.0, cached, experts - cached
+        rbw = bw
+        split = {"gpu": pinned + dense + cached, "ram": 0.0, "disk": spill}
+        ram_w_fast = True
+    else:
+        n_gpu = min(n_exp, int((fast - pinned - dense) // per)) if per > 0 else n_exp
+        gpu_exp = n_gpu * per
+        rest = experts - gpu_exp
+        ram_w = min(rest, slow)
+        spill = rest - ram_w
+        rbw = cap["ram_bandwidth_gbs"]
+        split = {"gpu": pinned + dense + gpu_exp, "ram": ram_w, "disk": spill}
+        ram_w_fast = False
+    if n_gpu >= n_exp:
+        return None
+    disk_gbs = DISK_GBS.get(hdd, DISK_GBS[None])
+    if bw and rbw:
+        t = ((dense + gpu_exp * euf) * GIB / (bw * 1e9) + ram_w * euf * GIB / ((bw if ram_w_fast else rbw) * 1e9)) / EFFICIENCY \
+            + spill * euf * GIB / (disk_gbs * 1e9) + fixed_s
+        tok = 1 / t
+    else:
+        tok = None
+    where = "統一記憶體" if mm == "unified_single" else "顯示卡"
+    place = (f"注意力與共用權重放{where}，{n_exp - n_gpu} 層專家留在檔案映射"
+             + (f"，其中 {spill:.0f} GiB 從 SSD 按需讀" if spill > 0.05 else "（全部在記憶體裡）"))
+    return {"level": "disk", "place": place, "tok_s": tok, "split": split, "cpu_moe": n_exp - n_gpu, "tiered": True}
 
 
 def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
@@ -305,7 +373,11 @@ def plan_installed(state, lib):
         stem = m["id"].rsplit("/", 1)[-1]
         p = plan_quant(cap, m, {"stem": stem, "quant": m.get("quant"), "size_gib": m["size_gib"]},
                        m.get("mmproj_gib") or 0.0, lib.get("hdd"), False)
-        m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec")}
+        m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec"), "calibrated": p.get("calibrated"),
+                                                   "tiered": p.get("tiered")}
+        if m.get("measured_tok_s"):
+            # 這顆在這台實際跑過：直接用實測值，不用估的
+            m["plan"].update(tok_s=round(m["measured_tok_s"], 1), measured=True)
     lib["capacity"] = cap
     return lib
 

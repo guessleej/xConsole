@@ -1,0 +1,28 @@
+# 打 v 開頭的標籤（例 v2026.11.7）就建一個正式版：附 xconsole-<版本>.tar.gz（GitHub 會替附件算 sha256），
+# 主控台「設定 › 版本與更新」從這裡檢查與下載，下載後核對 sha256 才換上。
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: 版本檔要跟標籤一致
+        run: |
+          test "v$(cat VERSION)" = "${GITHUB_REF_NAME}" || { echo "VERSION 是 $(cat VERSION)，標籤是 ${GITHUB_REF_NAME}"; exit 1; }
+      - name: 打包（只放執行要的檔，不含測試與手冊）
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          git archive --format=tar.gz --prefix="xconsole-${V}/" -o "xconsole-${V}.tar.gz" HEAD \
+            console agent install requirements.txt VERSION README.md SECURITY.md
+          sha256sum "xconsole-${V}.tar.gz" | tee SHA256SUMS
+      - name: 建正式版
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" "xconsole-${V}.tar.gz" SHA256SUMS --title "xConsole ${V}" --generate-notes

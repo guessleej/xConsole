@@ -5,3 +5,8 @@
 10049	IGNORE	Non-Storable Content：資訊性；API 回應刻意 no-store，靜態檔 no-cache，就是不要被快取
 10015	IGNORE	Re-examine Cache-control Directives：同上，快取標頭是刻意設定（API no-store、靜態檔 no-cache 讓更新即時生效）
 90005	IGNORE	Sec-Fetch-Dest Header is Missing：說的是 ZAP 自己送出的請求沒帶這個標頭，不是伺服器的弱點
+# 以下三條只對翻譯字典 i18n-*.json 排除（其他網址照常檢查）：字典裡是介面文字的英文／日文翻譯，
+# 有「Error」「Exception」等字、像程式碼的大括號樣板、以及說明文字裡的範例位址 192.168.x.x，都不是洩漏
+10023	OUTOFSCOPE	https?://[^/]+/i18n-[a-zA-Z-]+\.json
+10099	OUTOFSCOPE	https?://[^/]+/i18n-[a-zA-Z-]+\.json
+2	OUTOFSCOPE	https?://[^/]+/i18n-[a-zA-Z-]+\.json

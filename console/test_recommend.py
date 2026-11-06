@@ -57,7 +57,9 @@ def main():
     case("2 張 48G：快速層＝兩張加總扣底線", c["fast"], 94.0)
     case("2 張 48G：備援層＝系統記憶體扣底線與引擎", c["slow"], 201.5)
     case("2 張 48G：流暢稠密模型上限是好記的整數", c["max_dense_b"] in R.NICE_B, True)
-    case("沒有 GPU：快速層 0、標題講清楚", (R.capacity(NOGPU)["fast"], R.capacity(NOGPU)["cards"]), (0.0, 0))
+    c = R.capacity(NOGPU)
+    case("沒有 GPU：快速層＝系統記憶體扣底線與引擎、標成 CPU 執行", (c["fast"], c["cards"], c.get("cpu_only")), (53.5, 0, True))
+    case("  頻寬沒填用假設的系統記憶體頻寬，並標明是假設", (c["bandwidth_gbs"], c["bandwidth_src"]), (R.DEFAULT_RAM_BW, "假設值"))
 
     # ---- 單一量化的規劃
     p = R.plan_quant(R.capacity(AI395), DENSE, q("Q4_K_M", 17.4))
@@ -76,7 +78,8 @@ def main():
     case("  分層：顯示卡放滿、其餘在系統記憶體當頁快取、沒有溢出到硬碟",
          (p["split"]["gpu"], p["split"]["ram"], p["split"]["disk"]), (94.0, round(130 - (94 - 1 - 4), 1), 0.0))
     p = R.plan_quant(R.capacity(NOGPU), MOE, q("Q4_K_M", 10))
-    case("沒有 GPU：任何模型都不推薦", p["level"], "no")
+    case("沒有 GPU：MoE 小模型用 CPU 跑得動，放系統記憶體", (p["level"] in ("smooth", "ok"), p["place"], p["split"]["gpu"]),
+         (True, "全部放進系統記憶體（CPU 執行）", 0.0))
     case("頻寬未知：速度回 None、不硬掰數字",
          R.plan_quant(R.capacity(state("unified_single", None, floors={"ram": 12}, unified={"total_gib": 120})), DENSE,
                       q("Q4_K_M", 17))["tok_s"], None)
@@ -191,7 +194,17 @@ def main():
     case("  DGX Spark 用硬碟：快速層之外的權重全部算溢出", dense_disk["split"]["disk"], round(400 - (106.5 - 1 - 4), 1))
     case("AI 395（BIOS 切兩塊）不管多大都不給 disk",
          {R.plan_quant(R.capacity(AI395), DENSE, q("Q8_0", n))["level"] for n in (100, 200, 400)}, {"no"})
-    case("沒有 GPU 的機器也不給 disk（跟「不推薦」一致）", R.plan_quant(R.capacity(NOGPU), DENSE, big)["level"], "no")
+    p = R.plan_quant(R.capacity(NOGPU), DENSE, big)
+    case("沒有 GPU 的機器：放不下就用硬碟執行（權重留在系統記憶體當頁快取、其餘從 SSD 讀）",
+         (p["level"], p["split"]["gpu"], p["split"]["ram"] > 0, p["split"]["disk"] > 0), ("disk", 0.0, True, True))
+    # ---- MoE 依張量種類分層（注意力與共用放顯卡、專家留在映射記憶體、溢出從 SSD 讀），跟代理 moe_disk_layout 同一個放法
+    small_card = state("discrete", 960, floors={"ram": 8, "vram": 2}, ram={"total_gib": 64}, gpus=[{"id": "0", "total_gib": 24}])
+    p = R.plan_quant(R.capacity(small_card), MOE, q("Q4_K_M", 200))
+    case("MoE 放不下：注意力與共用放顯卡、專家分到記憶體與 SSD", (p["level"], p.get("tiered"), p["split"]["disk"] > 0), ("disk", True, True))
+    flat = R._disk_plan(R.capacity(small_card), 200, 1 + R.kv_gib(MOE, 32768) + 0, MOE["active_frac"], None, MOE["layers"] * R.LAYER_MS / 1000)
+    case("  依張量分層比整層切快（每 token 共用全讀、專家只讀被選中的）", p["tok_s"] > flat["tok_s"], True)
+    p2 = R.plan_quant(R.capacity(SPARK), MOE, q("Q4_K_M", 300))
+    case("  DGX Spark：專家全部留映射記憶體，只有共用部分常駐", (p2.get("tiered"), p2["cpu_moe"]), (True, MOE["expert_layers"]))
     tiny_vram = state("discrete", 400, floors={"ram": 8, "vram": 2}, ram={"total_gib": 64}, gpus=[{"id": "0", "total_gib": 6}])
     case("KV 與計算緩衝放不進顯示卡：連 disk 都不給", R.plan_quant(R.capacity(tiny_vram), DENSE, big)["level"], "no")
     case("建議下載不會挑 disk 的量化", R.pick([fast_disk, slow_disk]), None)

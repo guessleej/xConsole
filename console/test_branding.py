@@ -200,7 +200,7 @@ check("稽核不記圖檔內容", base64.b64encode(logo).decode()[:40] not in bl
 
 # ---- 6. 頁尾寫死在頁面裡：登入頁與主畫面各一個，不能被拿掉
 html = open(os.path.join(x.STATIC, "index.html"), encoding="utf-8").read()
-check("登入頁與主畫面都有 Powered by xCloudinfo", html.count('<footer class="powered">Powered by <strong>xCloudinfo</strong> 云碩科技</footer>') == 2)
+check("登入頁與主畫面都有 Powered by xCloudinfo", html.count('<footer class="powered" data-i18n-skip>Powered by <strong>xCloudinfo</strong> 云碩科技</footer>') == 2)  # data-i18n-skip：品牌字不翻
 js = open(os.path.join(x.STATIC, "app.js"), encoding="utf-8").read()
 check("前端沒有任何地方動頁尾", ".powered" not in js and "powered" not in js.replace("Powered by xCloudinfo", ""))
 check("退回沒自訂時整組還原預設（不是直接 return）", "if (!b.custom) { resetBranding(); return; }" in js and "function resetBranding()" in js)

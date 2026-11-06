@@ -85,6 +85,11 @@ function packMsg(m) {
   if (m.image_lost) o.image_lost = true;
   if (m.docs?.length) o.docs = m.docs.map(({ name, text, chars, truncated, lost }) => ({ name, ...(text ? { text } : {}), ...(chars != null ? { chars } : {}), ...(truncated ? { truncated } : {}), ...(lost ? { lost } : {}) }));
   if (m.alts?.length > 1) { o.alts = m.alts.map(({ content, reasoning, stat }) => ({ content: content || "", ...(reasoning ? { reasoning } : {}), ...(stat ? { stat } : {}) })); o.alt = m.alt ?? m.alts.length - 1; }
+  if (m.computer) {
+    const { node, task, goal, state, result, error, steps, model, log } = m.computer;
+    o.computer = { node, goal, ...(task ? { task } : {}), ...(state ? { state } : {}), ...(result ? { result } : {}), ...(error ? { error } : {}),
+      ...(steps != null ? { steps } : {}), ...(model ? { model } : {}), log: (log || []).slice(-60) };
+  }
   if (m.gen) {
     const { node, job, kind, prompt, model, title, state, error, asked, count, edit } = m.gen;
     o.gen = { node, kind, count: count || 1, ...(job ? { job } : {}), ...(prompt ? { prompt } : {}), ...(model ? { model } : {}), ...(title ? { title } : {}),
@@ -138,6 +143,8 @@ const withDocs = (m) => (m.docs || []).map((d) => (d.text ? `【附件：${d.nam
 const genText = (g) => (g.state === "done" ? `（已產生${g.kind === "video" ? "一段影片" : ` ${g.count || 1} 張圖`}，提示詞：${g.prompt || g.asked || ""}）`
   : `（${g.kind === "video" ? "影片" : "圖片"}沒有產生成功）`);
 
+const pcText = (cp) => `（操作電腦：${cp.goal}；${cp.state === "done" ? "完成，" + (cp.result || "") : cp.state === "stopped" ? "使用者停止" : "沒有完成，" + (cp.error || "")}）`;
+
 async function buildHistory(cur, msgs, t) {
   const start = cur.summary?.upto || 0;
   const sent = msgs.slice(start).filter((m) => !m.pending && !m.error);
@@ -147,7 +154,7 @@ async function buildHistory(cur, msgs, t) {
   if (sys) out.push({ role: "system", content: sys });
   for (let i = 0; i < sent.length; i++) {
     const m = sent[i];
-    const text = m.gen ? genText(m.gen) : withDocs(m);
+    const text = m.gen ? genText(m.gen) : m.computer ? pcText(m.computer) : withDocs(m);
     if (m.image && i === lastImg) {
       let url = null;
       try { url = await imgDataUrl(m.image); } catch (_) { url = null; }
@@ -411,7 +418,7 @@ async function viewChat() {
       if (cur.id === it.id) row.setAttribute("aria-current", "true");
       const b = el("button", "chat-item-main");
       b.appendChild(el("span", "chat-item-t", it.title || "新對話"));
-      b.appendChild(el("span", "small muted", it.snippet || new Date(it.updated * 1000).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })));
+      b.appendChild(el("span", "small muted", it.snippet || new Date(it.updated * 1000).toLocaleString(uiLocale(), { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })));
       b.onclick = () => pickChat(it);
       const ren = el("button", "icon-btn", "改名");
       ren.onclick = () => renameChat(it, () => { if (cur.id === it.id) cur.title = it.title; drawSide(); });
@@ -509,18 +516,38 @@ async function viewChat() {
   attach.hidden = true;
   const attBtn = el("button", "btn sm", "附件");
   const toolB = el("button", "btn sm toggle", "工具");
+  const pcB = el("button", "btn sm toggle", "操作電腦");
   const imgB = el("button", "btn sm toggle", "畫圖");
   const vidB = el("button", "btn sm toggle", "影片");
   const docsRow = el("div", "chat-docs");
   const syncMode = () => {
     imgB.setAttribute("aria-pressed", String(cur.mode === "image"));
     vidB.setAttribute("aria-pressed", String(cur.mode === "video"));
+    pcB.setAttribute("aria-pressed", String(cur.mode === "computer"));
+    pcB.title = "讓看得懂圖的模型看這台的螢幕、控制滑鼠鍵盤，一步一步完成你交代的事；預設每一步都先問你";
     toolB.setAttribute("aria-pressed", String(!!cur.settings?.tools));
     const t = tgt();
     toolB.disabled = !t?.local;
     toolB.title = t?.local ? "讓模型呼叫主控台的查詢工具：機器狀態、推薦模型、已下載的模型（只查，不會動作）" : "第三方 API 不開放主控台的工具";
-    ta.placeholder = cur.mode === "image" ? "描述想要的畫面（附一張圖就是改圖）。Enter 送出" : cur.mode === "video" ? "描述影片內容（附一張圖當第一格）。Enter 送出"
+    ta.placeholder = cur.mode === "computer" ? "交代電腦要做的事，例：打開記事本，寫一段會議通知並存到桌面。Enter 送出"
+      : cur.mode === "image" ? "描述想要的畫面（附一張圖就是改圖）。Enter 送出" : cur.mode === "video" ? "描述影片內容（附一張圖當第一格）。Enter 送出"
       : "問點什麼，或說「畫一張…」「生成一段…的影片」（Enter 送出，Shift+Enter 換行）";
+  };
+  pcB.onclick = async () => {
+    if (cur.mode === "computer") { cur.mode = "chat"; syncMode(); return; }
+    const t = tgt();
+    const n = t?.local ? t.n : curNode();
+    if (!t) { toast("先在上面選一個模型", "bad"); return; }
+    if (t.local && !t.vision) { toast("操作電腦要用看得懂圖的模型（標了「看圖」的）；先在上面換一個", "bad"); return; }
+    let st;
+    try { st = await api(`/api/node/${n.id}/desktop/status`); } catch (ex) { toast(ex.message, "bad"); return; }
+    if (!st.enabled) { toast(`${n.name} 沒有開「讓模型操作這台的桌面」：請管理者到 設定 › 機器 › 這台的設定 打開`, "bad"); return; }
+    if (!st.available) { toast(st.why || "這台現在不能操作桌面", "bad"); return; }
+    const d = el("div");
+    d.append(el("p", null, `打開後，模型可以看 ${n.name} 的螢幕，並控制滑鼠和鍵盤完成任務。預設每一步操作前都會先問你；隨時按「停止」可以中止。`),
+      el("p", "note warn", "建議：先關掉含有隱私的視窗；不要讓它處理付款、轉帳、刪除檔案、輸入密碼。本機模型操作電腦的準確度有限，複雜的事可能做不到。"),
+      el("p", "small muted", "在同一台電腦上操作時，這個網頁也會出現在螢幕上：可以用手機或另一台電腦開主控台看進度與按允許，或按「這次都允許」後把瀏覽器縮到最小。"));
+    modal({ title: "允許模型操作這台電腦？", bodyNode: d, confirmText: "允許", onConfirm: () => { cur.mode = "computer"; cur.pcNode = n.id; syncMode(); ta.focus(); } });
   };
   imgB.onclick = () => { cur.mode = cur.mode === "image" ? "chat" : "image"; syncMode(); ta.focus(); };
   vidB.onclick = () => { cur.mode = cur.mode === "video" ? "chat" : "video"; syncMode(); ta.focus(); };
@@ -578,7 +605,7 @@ async function viewChat() {
   const send = el("button", "btn primary", "送出");
   const stopB = el("button", "btn sm danger", "停止");
   stopB.hidden = true;
-  tools.append(attach, attBtn, toolB, imgB, vidB, el("span", "spacer"), stopB, send);
+  tools.append(attach, attBtn, toolB, pcB, imgB, vidB, el("span", "spacer"), stopB, send);
   inputRow.append(docsRow, ta, tools);
   drawDocs();
   mainCol.append(noteRow, inputRow);
@@ -589,7 +616,7 @@ async function viewChat() {
   const lock = (on) => {
     cur.busy = on; send.disabled = on; stopB.hidden = !on;
     if (on) cur._genStop = false;
-    box.querySelectorAll(".msg-acts button, .msg-acts select").forEach((b) => { b.disabled = on; });
+    box.querySelectorAll(".msg-acts button, .msg-acts select").forEach((b) => { if (!b.closest(".pc-pending")) b.disabled = on; });
   };
   const paintOf = (m) => () => paintReply(m, box, false, acts);
 
@@ -655,6 +682,7 @@ async function viewChat() {
     if (!text || cur.busy) return;
     if (cur.docs.some((d) => d.busy)) { toast("附件還在讀取，等一下再送", "bad"); return; }
     const t = tgt();
+    if (cur.mode === "computer") { await runComputer(text); return; }
     const intent = detectGen(text, !!cur.image, cur.mode);
     if (!t && !intent) { toast("這則對話的模型目前沒有在執行，先在上面換一個", "bad"); return; }
     if (cur.image && !intent && !t.vision) { toast("這個模型看不懂圖片；要問圖請換一個標了「看圖」的模型，要改圖請說「把…改成…」或按「畫圖」", "bad"); return; }
@@ -682,6 +710,67 @@ async function viewChat() {
     }
     await answer(reply, cur.msgs.slice(0, -1));
   };
+
+  // ---- 操作電腦：開一個任務，每秒問一次進度（截圖沒變就不重送），等人按允許
+  async function runComputer(goal) {
+    const t = tgt();
+    const nid = cur.pcNode || (t?.local ? t.n.id : curNode()?.id);
+    const user = { role: "user", content: goal };
+    if (!cur.msgs.length) cur.title = goal.replace(/\s+/g, " ").slice(0, 30);
+    const reply = { role: "assistant", content: "", computer: { node: nid, goal, state: "starting", model: t?.label, log: [] } };
+    cur.msgs.push(user, reply);
+    ta.value = ""; cur.draft = "";
+    if (box.querySelector(".chat-empty")) box.textContent = "";
+    box.append(chatBubble(user, cur.msgs.length - 2, acts), chatBubble(reply, cur.msgs.length - 1, acts));
+    box.scrollTop = box.scrollHeight;
+    lock(true);
+    const model = t.local ? { kind: "local", node: t.n.id, slot: t.s.id } : { kind: "provider", id: t.prov.id, model: t.prov.default_model };
+    let r;
+    try { r = await api("/api/computer/tasks", { method: "POST", body: { node: nid, model, goal } }); } catch (ex) {
+      Object.assign(reply.computer, { state: "failed", error: ex.message });
+      reply.content = "操作電腦沒有開始：" + ex.message;
+      lock(false); paintReply(reply, box, true, acts); saveChat(cur); return;
+    }
+    const cp = reply.computer;
+    cp.task = r.id;
+    cp.state = "running";
+    await saveChat(cur);                  // 先存：重新整理頁面後還找得回這個任務（停止與允許的按鈕）
+    await watchComputer(reply);
+  }
+
+  // 任務進行中：每秒問一次進度（截圖沒變就不重送）。開新任務、或重新整理後打開這段對話都走這裡
+  async function watchComputer(reply) {
+    const cp = reply.computer;
+    if (cp._watch) return;
+    cp._watch = true;
+    const id = cp.task;
+    const mine = cur;
+    mine.pcTask = id;
+    lock(true);
+    stopB.onclick = () => api(`/api/computer/tasks/${id}/stop`, { method: "POST", body: {} }).catch(() => {});
+    for (;;) {
+      let j;
+      try { j = await api(`/api/computer/tasks/${id}${cp._shotId ? `?after=${cp._shotId}` : ""}`); } catch (ex) {
+        if (/404|沒有這/.test(ex.message)) { Object.assign(cp, { state: "failed", error: "主控台重啟過，這個任務已經中斷" }); break; }
+        await new Promise((ok) => setTimeout(ok, 2000)); continue;
+      }
+      if (j.shot) { cp._shot = j.shot; cp._shotId = j.shot_id; cp._size = j.size; }
+      Object.assign(cp, { state: j.state, error: j.error, result: j.result, steps: j.steps, _pending: j.pending, _always: j.always,
+        log: j.log.map(({ type, text }) => ({ type, text })) });
+      if (cur === mine) paintReply(reply, box, false, acts);
+      if (!["running", "waiting_approval"].includes(j.state)) break;
+      await new Promise((ok) => setTimeout(ok, 1000));
+    }
+    reply.content = cp.state === "done" ? `已完成：${cp.result || ""}` : cp.state === "stopped" ? "已停止操作電腦" : `操作電腦沒有完成：${cp.error || ""}`;
+    mine.pcTask = null;
+    cp._watch = false;
+    if (cur === mine) {
+      stopB.onclick = stopAll;
+      lock(false);
+      paintReply(reply, box, true, acts);
+    }
+    saveChat(mine);
+  }
 
   // ---- 每則訊息的動作
   const acts = {
@@ -716,7 +805,12 @@ async function viewChat() {
       else if (cur.id) api(`/api/chats/${cur.id}/delete`, { method: "POST", body: {} }).then(() => { cur.id = null; loadChatList().then(drawSide); }).catch(() => {});
       syncStatus();
     },
+    decide: async (m, allow, always) => {
+      const cp = m.computer;
+      try { await api(`/api/computer/tasks/${cp.task}/decide`, { method: "POST", body: { allow, always, pending: cp._pending?.id } }); } catch (ex) { toast(ex.message, "bad"); }
+    },
     reuse: (dataUrl) => { cur.image = dataUrl; drawDocs(); ta.focus(); toast("已把這張圖放進附件：說「把…改成…」就會照著改", "ok"); },
+    pc: (m) => { if (m.computer?.task && !m.computer._watch) watchComputer(m); },
     gen: (m) => {
       const g = m.gen;
       if (g.state === "running" && !g._watch) {
@@ -911,6 +1005,7 @@ function paintMsg(m, final, acts) {
     b.appendChild(row);
   }
   if (m.gen) { paintGen(m, b, acts); return; }
+  if (m.computer) { paintComputer(m, b, final, acts); return; }
   if (m.reasoning) {
     const d = el("details", "msg-think");
     d.open = !m.content && !final;
@@ -931,7 +1026,7 @@ function msgActs(m, acts, media) {
   const btn = (label, fn) => { const x = el("button", "link-btn", label); x.disabled = acts.busy(); x.onclick = fn; row.appendChild(x); return x; };
   // 畫圖、影片那則：只有重新產生與刪除（文字的複製、調整回答、編輯對它沒有意義）
   if (media) {
-    btn("重新產生", () => acts.regen(i()));
+    if (media !== "pc") btn("重新產生", () => acts.regen(i()));
     btn("刪除", () => acts.del(i()));
     return row;
   }
@@ -1022,4 +1117,48 @@ function paintGen(m, b, acts) {
     r2.appendChild(toPage);
     row.replaceWith(r2);
   }
+}
+
+function paintComputer(m, b, final, acts) {
+  const cp = m.computer;
+  const live = ["starting", "running", "waiting_approval"].includes(cp.state);
+  if (live && cp.task) acts?.pc(m);
+  const head = el("div", "small");
+  head.textContent = `操作電腦・${cp.model || ""}・${{ starting: "準備中", running: "進行中", waiting_approval: "等你允許", done: "完成", stopped: "已停止", failed: "沒有完成" }[cp.state] || cp.state}`
+    + (cp.steps ? `・已做 ${cp.steps} 步` : "");
+  b.appendChild(head);
+  if (live && cp._shot) {
+    const im = el("img", "pc-shot");
+    im.src = "data:image/png;base64," + cp._shot;
+    im.alt = "這台目前的螢幕";
+    b.appendChild(im);
+  }
+  if (live && cp._pending) {
+    const p = el("div", "pc-pending");
+    p.appendChild(el("b", null, "下一步：" + cp._pending.text));
+    const row = el("div", "msg-acts");
+    const yes = el("button", "btn sm primary", "允許");
+    const no = el("button", "btn sm", "拒絕");
+    const all = el("button", "btn sm", "這次都允許");
+    yes.onclick = () => acts?.decide(m, true, false);
+    no.onclick = () => acts?.decide(m, false, false);
+    all.onclick = () => acts?.decide(m, true, true);
+    row.append(yes, no, all);
+    p.appendChild(row);
+    b.appendChild(p);
+  }
+  const log = (cp.log || []).filter((x) => x.type !== "note");
+  if (log.length) {
+    const d = el("details", "pc-log small");
+    d.open = live;
+    d.appendChild(el("summary", null, `步驟（${log.length}）`));
+    const ol = el("ol");
+    log.slice(-30).forEach((x) => ol.appendChild(el("li", x.type === "error" || x.type === "denied" ? "bad-t" : x.type === "plan" ? "muted" : "",
+      ({ plan: "打算：", act: "做了：", denied: "被拒絕：", error: "失敗：", done: "完成：", stopped: "" }[x.type] || "") + x.text)));
+    d.appendChild(ol);
+    b.appendChild(d);
+  }
+  if (cp.state === "done") b.appendChild(el("div", "msg-text", cp.result || "完成"));
+  if (cp.state === "failed") b.appendChild(el("p", "note bad", cp.error || "沒有完成"));
+  if (final && !live && acts) b.appendChild(msgActs(m, acts, "pc"));
 }
