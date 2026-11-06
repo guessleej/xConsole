@@ -50,12 +50,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python desktop/scripts/prepare_payload.py
+      - name: Windows 程式碼簽章憑證（有設才簽；沒有簽章，SmartScreen 第一次會擋）
+        if: runner.os == 'Windows'
+        id: sign
+        shell: powershell
+        env:
+          PFX_B64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
+          PFX_PW: ${{ secrets.WINDOWS_SIGN_PFX_PASSWORD }}
+        run: |
+          if (-not $env:PFX_B64) { Write-Host '沒有設簽章憑證（WINDOWS_SIGN_PFX_BASE64），這次的安裝檔不簽章'; exit 0 }
+          $f = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String($env:PFX_B64))
+          $pw = ConvertTo-SecureString $env:PFX_PW -AsPlainText -Force
+          $c = Import-PfxCertificate -FilePath $f -CertStoreLocation Cert:\CurrentUser\My -Password $pw
+          Remove-Item $f -Force
+          $cfg = @{ bundle = @{ windows = @{ certificateThumbprint = $c.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5 -Compress
+          Set-Content -Path (Join-Path $env:RUNNER_TEMP 'sign.json') -Value $cfg -Encoding ascii
+          "config=$env:RUNNER_TEMP\sign.json" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "會用這張憑證簽章：$($c.Subject)（到期 $($c.NotAfter)）"
       - name: 建安裝檔
         shell: bash
         working-directory: desktop/src-tauri
+        env:
+          SIGN_CONFIG: ${{ steps.sign.outputs.config }}
         run: |
           rustup default stable
-          npx --yes "$TAURI_CLI" build --bundles ${{ matrix.bundles }}
+          if [ -n "$SIGN_CONFIG" ]; then
+            npx --yes "$TAURI_CLI" build --bundles ${{ matrix.bundles }} --config "$SIGN_CONFIG"
+          else
+            npx --yes "$TAURI_CLI" build --bundles ${{ matrix.bundles }}
+          fi
       - name: 整理產物
         shell: bash
         run: |
@@ -64,6 +88,25 @@ jobs:
           find "$B" -maxdepth 2 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o -name '*.deb' \) -exec cp {} dist/ \;
           ls -la dist
           (cd dist && shasum -a 256 * | tee SHA256SUMS-${{ runner.os }})
+      - name: Windows：用微軟 Defender 實際掃描安裝檔與裝好的程式（被判有問題就不放行）
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $st = Get-MpComputerStatus -ErrorAction SilentlyContinue
+          if (-not $st -or -not $st.AntivirusEnabled) {
+            Write-Host '::warning::這台 CI 機器的 Defender 沒有開，掃不了；請在實機（例如 HP）上另外掃描'
+            exit 0
+          }
+          Update-MpSignature -ErrorAction SilentlyContinue
+          Write-Host "Defender 病毒碼 $((Get-MpComputerStatus).AntivirusSignatureVersion)"
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          foreach ($f in Get-ChildItem dist\*.exe) {
+            & $mp -Scan -ScanType 3 -File $f.FullName -DisableRemediation | Out-Host
+            if ($LASTEXITCODE -eq 2) { throw "Defender 判定 $($f.Name) 有問題" }
+            Write-Host "Defender 掃描 $($f.Name)：沒有發現威脅"
+          }
+          $sig = Get-AuthenticodeSignature (Get-ChildItem dist\*-setup.exe | Select-Object -First 1).FullName
+          Write-Host "安裝檔簽章狀態：$($sig.Status) $($sig.SignerCertificate.Subject)"
       - name: Windows：靜默安裝、啟動、確認主控台與代理起得來
         if: runner.os == 'Windows'
         shell: powershell
@@ -72,6 +115,12 @@ jobs:
           Start-Process $setup.FullName -ArgumentList '/S' -Wait
           $exe = Join-Path $env:LOCALAPPDATA 'xConsole\xConsole.exe'
           if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA 'xConsole') -EA SilentlyContinue; throw "裝完找不到 $exe" }
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          if ((Get-MpComputerStatus -ErrorAction SilentlyContinue).AntivirusEnabled) {
+            & $mp -Scan -ScanType 3 -File (Join-Path $env:LOCALAPPDATA 'xConsole') -DisableRemediation | Out-Host
+            if ($LASTEXITCODE -eq 2) { throw 'Defender 判定裝好的程式有問題' }
+            Write-Host 'Defender 掃描安裝資料夾：沒有發現威脅'
+          }
           $p = Start-Process $exe -ArgumentList '--hidden' -PassThru
           $log = Join-Path $env:LOCALAPPDATA 'tw.xcloudinfo.xconsole\.xconsole\console.log'
           $ok = $false
