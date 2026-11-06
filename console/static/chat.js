@@ -733,24 +733,43 @@ async function viewChat() {
     }
     const cp = reply.computer;
     cp.task = r.id;
-    cur.pcTask = r.id;
-    stopB.onclick = () => api(`/api/computer/tasks/${r.id}/stop`, { method: "POST", body: {} }).catch(() => {});
+    cp.state = "running";
+    await saveChat(cur);                  // 先存：重新整理頁面後還找得回這個任務（停止與允許的按鈕）
+    await watchComputer(reply);
+  }
+
+  // 任務進行中：每秒問一次進度（截圖沒變就不重送）。開新任務、或重新整理後打開這段對話都走這裡
+  async function watchComputer(reply) {
+    const cp = reply.computer;
+    if (cp._watch) return;
+    cp._watch = true;
+    const id = cp.task;
+    const mine = cur;
+    mine.pcTask = id;
+    lock(true);
+    stopB.onclick = () => api(`/api/computer/tasks/${id}/stop`, { method: "POST", body: {} }).catch(() => {});
     for (;;) {
       let j;
-      try { j = await api(`/api/computer/tasks/${r.id}${cp._shotId ? `?after=${cp._shotId}` : ""}`); } catch (ex) { await new Promise((ok) => setTimeout(ok, 2000)); continue; }
+      try { j = await api(`/api/computer/tasks/${id}${cp._shotId ? `?after=${cp._shotId}` : ""}`); } catch (ex) {
+        if (/404|沒有這/.test(ex.message)) { Object.assign(cp, { state: "failed", error: "主控台重啟過，這個任務已經中斷" }); break; }
+        await new Promise((ok) => setTimeout(ok, 2000)); continue;
+      }
       if (j.shot) { cp._shot = j.shot; cp._shotId = j.shot_id; cp._size = j.size; }
       Object.assign(cp, { state: j.state, error: j.error, result: j.result, steps: j.steps, _pending: j.pending, _always: j.always,
         log: j.log.map(({ type, text }) => ({ type, text })) });
-      paintReply(reply, box, false, acts);
+      if (cur === mine) paintReply(reply, box, false, acts);
       if (!["running", "waiting_approval"].includes(j.state)) break;
       await new Promise((ok) => setTimeout(ok, 1000));
     }
     reply.content = cp.state === "done" ? `已完成：${cp.result || ""}` : cp.state === "stopped" ? "已停止操作電腦" : `操作電腦沒有完成：${cp.error || ""}`;
-    cur.pcTask = null;
-    stopB.onclick = stopAll;
-    lock(false);
-    paintReply(reply, box, true, acts);
-    saveChat(cur);
+    mine.pcTask = null;
+    cp._watch = false;
+    if (cur === mine) {
+      stopB.onclick = stopAll;
+      lock(false);
+      paintReply(reply, box, true, acts);
+    }
+    saveChat(mine);
   }
 
   // ---- 每則訊息的動作
@@ -791,6 +810,7 @@ async function viewChat() {
       try { await api(`/api/computer/tasks/${cp.task}/decide`, { method: "POST", body: { allow, always, pending: cp._pending?.id } }); } catch (ex) { toast(ex.message, "bad"); }
     },
     reuse: (dataUrl) => { cur.image = dataUrl; drawDocs(); ta.focus(); toast("已把這張圖放進附件：說「把…改成…」就會照著改", "ok"); },
+    pc: (m) => { if (m.computer?.task && !m.computer._watch) watchComputer(m); },
     gen: (m) => {
       const g = m.gen;
       if (g.state === "running" && !g._watch) {
@@ -1102,6 +1122,7 @@ function paintGen(m, b, acts) {
 function paintComputer(m, b, final, acts) {
   const cp = m.computer;
   const live = ["starting", "running", "waiting_approval"].includes(cp.state);
+  if (live && cp.task) acts?.pc(m);
   const head = el("div", "small");
   head.textContent = `操作電腦・${cp.model || ""}・${{ starting: "準備中", running: "進行中", waiting_approval: "等你允許", done: "完成", stopped: "已停止", failed: "沒有完成" }[cp.state] || cp.state}`
     + (cp.steps ? `・已做 ${cp.steps} 步` : "");

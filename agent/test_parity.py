@@ -165,6 +165,17 @@ def main():
     c, out = A.agent_browse(A.HOME)
     case("資料夾瀏覽器：只列子資料夾、隱藏的不列、標出能不能選", c == 200 and "proj-a" in [d["name"] for d in out["dirs"]]
          and not any(d["name"].startswith(".") for d in out["dirs"]))
+    bob = os.path.join(os.path.dirname(A.HOME), "bob-" + os.path.basename(A.HOME), "Documents")
+    os.makedirs(bob, exist_ok=True)
+    case("別人家目錄底下的資料夾也不能連結（不只家目錄本身）", A.agent_link_denied(bob) is not None, bob)
+    open(os.path.join(A.STATE_DIR, "desktop-user.txt"), "w", encoding="utf-8").write("Jeff")
+    real_env = os.environ.get("USERNAME")
+    os.environ["USERNAME"] = "HP$"
+    try:
+        own = A.win_own_users()
+        case("Windows 能碰的使用者資料夾：桌面使用者與 Public，不含 SYSTEM 的機器帳號", "jeff" in own and "public" in own and "hp$" not in own, own)
+    finally:
+        os.environ.pop("USERNAME") if real_env is None else os.environ.__setitem__("USERNAME", real_env)
     c, _ = A.agent_unlink("proj-a")
     case("取消連結：資料夾本身還在", c == 200 and os.path.isdir(proj) and "proj-a" not in A.agent_links())
 
@@ -208,6 +219,30 @@ def main():
         eq("  只回怎麼操作", A.machine_info()["desktop"], {"how": "helper", "why": None})
     finally:
         A.desktop_route = real_route
+    case("save_machine 在登錄檔鎖底下（不會蓋掉同時進來的更新）", hasattr(A.save_machine, "__wrapped__")
+         and not hasattr(A.check_mirror, "__wrapped__"))
+    saved = (A.OS, A.gpu_override, A.has_nvidia, A.platform_machine, A.sh)
+    try:
+        A.OS, A.has_nvidia, A.platform_machine = "windows", (lambda: False), (lambda: "AMD64")
+        A.sh = lambda argv, timeout=20: (1, "", "")
+        A.gpu_override = lambda: {"vendor": "nvidia", "name": "RTX 4090"}
+        case("Windows 手動指定 NVIDIA（偵測失敗）：裝 CUDA 版", (A.prebuilt_variant() or ("",))[0].startswith("win-cuda-"), A.prebuilt_variant())
+        case("  stable-diffusion 也裝 CUDA 版", A.prebuilt_variant("sd")[0] == "win-cuda12-x64", A.prebuilt_variant("sd"))
+        A.gpu_override = lambda: "cpu"
+        eq("  指定不用 GPU：stable-diffusion 也只裝 CPU 版", A.prebuilt_variant("sd")[0], "win-cpu-x64")
+    finally:
+        A.OS, A.gpu_override, A.has_nvidia, A.platform_machine, A.sh = saved
+    saved = (A.OS, A._linux_display_env, os.environ.get("DISPLAY"), os.environ.get("WAYLAND_DISPLAY"))
+    try:
+        A.OS, A._linux_display_env = "linux", (lambda: {})
+        os.environ.pop("DISPLAY", None)
+        os.environ["WAYLAND_DISPLAY"] = "wayland-0"
+        how, why = A.desktop_route()
+        case("Linux 純 Wayland：截得到圖但點不了，照實說不能用", how is None and "Wayland" in why, (how, why))
+    finally:
+        A.OS, A._linux_display_env = saved[0], saved[1]
+        for k, v in (("DISPLAY", saved[2]), ("WAYLAND_DISPLAY", saved[3])):
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
     eq("顯示卡名稱帶 (TM) 也對得到頻寬", A.spec_bandwidth("AMD Radeon(TM) 890M Graphics"), 89.6)
     real_rp = A.ram_pool
     try:

@@ -135,6 +135,27 @@ def main():
     C.run(t, cn, mc, au)
     check("模型連續三次給不出動作就停，講原因", t.state == "failed" and "三次" in (t.error or ""), t.error)
 
+    # ---- action 不是字串、模型呼叫中途按停止、意外例外
+    cn, mc, au, rec = fake_env(['{"action":{"x":1}}', '{"action":["click"]}', '{"action":7}'])
+    t = C.ComputerTask("admin", "", "n1", {}, "做點事", "本機")
+    C.run(t, cn, mc, au)
+    check("action 不是字串算沒給動作，不會讓執行緒當掉", t.state == "failed" and "三次" in (t.error or ""), (t.state, t.error))
+    cn, mc, au, rec = fake_env(['{"action":"click","x":1,"y":1}'])
+    t = C.ComputerTask("admin", "", "n1", {}, "點", "本機")
+    t.always = True
+
+    def slow_model(task, req):
+        task.stop = True                          # 模擬：模型還在想的時候使用者按了停止
+        return mc(task, req)
+    C.run(t, cn, slow_model, au)
+    check("問模型期間按了停止：回來的動作不執行", t.state == "stopped" and rec["acts"] == [], (t.state, rec["acts"]))
+
+    def boom(*a, **k):
+        raise KeyError("width")
+    t = C.ComputerTask("admin", "", "n1", {}, "點", "本機")
+    C.run(t, lambda *a, **k: (200, {"enabled": True, "available": True}) if a[1] == "/desktop/status" else (200, {}), boom, au)
+    check("意外例外：任務轉成失敗，不會一直卡在進行中", t.state == "failed" and "意外" in (t.error or ""), (t.state, t.error))
+
     # ---- 這台沒開、沒有桌面
     cn, mc, au, rec = fake_env([], {"enabled": False, "available": True})
     t = C.ComputerTask("admin", "", "n1", {}, "做點事", "本機")

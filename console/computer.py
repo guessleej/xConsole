@@ -158,11 +158,13 @@ def run(t, call_node, model_call, audit):
                     {"type": "text", "text": f"要完成的事：{t.goal}\n\n已經做過的動作：\n{recent}\n\n這是現在的螢幕，下一步要做什麼？只回 JSON。"},
                     {"type": "image_url", "image_url": {"url": "data:image/png;base64," + shot["png"]}}]}]}
             code, out = model_call(t, req)
+            if t.stop:                            # 問模型時可能卡很久，這段期間按了停止就不要再做任何事
+                break
             if code != 200:
                 raise RuntimeError(f"模型回錯：{out.get('error') or code}")
             msg = ((out.get("choices") or [{}])[0]).get("message") or {}
             act = parse_action(msg.get("content") or "") or parse_action(msg.get("reasoning_content") or "")
-            if not act or not act.get("action"):
+            if not act or not isinstance(act.get("action"), str) or not act["action"]:
                 fails += 1
                 t.add("note", text="模型這一輪沒有給出看得懂的動作，再問一次")
                 if fails >= 3:
@@ -210,11 +212,12 @@ def run(t, call_node, model_call, audit):
             if t.state not in ("done", "failed"):
                 t.state = "stopped"
         t.add("stopped", text="已停止")
-    except RuntimeError as ex:
+    except Exception as ex:  # noqa: BLE001  任何意外都要讓任務結束，否則「同時只能一個」會一直卡住
+        err = str(ex) if isinstance(ex, RuntimeError) else f"操作電腦意外中斷：{type(ex).__name__}"
         with t.lock:
-            t.state, t.error = "failed", str(ex)
-        t.add("error", text=str(ex))
-        audit("computer.failed", t.node, False, {"message": str(ex)[:300]})
+            t.state, t.error = "failed", err
+        t.add("error", text=err)
+        audit("computer.failed", t.node, False, {"message": err[:300]})
     finally:
         with t.lock:
             t.pending = None
