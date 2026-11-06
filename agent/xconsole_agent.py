@@ -5298,7 +5298,7 @@ def contained(raw, bases):
         if not os.path.isdir(b):
             continue
         rb = os.path.realpath(b)
-        if real.startswith(rb + os.sep):
+        if real.startswith(rb if rb.endswith(os.sep) else rb + os.sep) and real != rb:
             try:
                 return inside(rb, os.path.relpath(real, rb))
             except ValueError:
@@ -5316,7 +5316,8 @@ def check_root(raw):
     bases = data_bases()
     real = contained(p, bases)
     if real is None:
-        return None, "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）"
+        return None, ("存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）" if OS == "windows"
+                      else "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）")
     if OS == "linux" and any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
         return None, f"{real} 是系統目錄，不能當存放區"
     if OS == "windows" and not real.lower().startswith(os.path.realpath(HOME).lower() + os.sep):
