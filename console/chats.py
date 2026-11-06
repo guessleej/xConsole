@@ -21,6 +21,8 @@ TEXT_MAX = 400_000
 DOC_MAX = 220_000
 MAX_MSGS = 400
 KEEP_PER_USER = 500
+BLOB_PER_CHAT = 256 * 1024 * 1024          # 一則對話的附圖總量（密文）
+BLOB_PER_USER = 2 * 1024 * 1024 * 1024     # 一個人全部對話的附圖總量（密文）：不讓一個帳號把主控台的磁碟塞滿
 
 # 對話設定：鍵、型別、範圍。第三方 API 只轉送 OPENAI_STD 這幾個（其他是 llama.cpp 的擴充，送過去可能被拒）
 SETTINGS = {
@@ -211,6 +213,12 @@ def save(store, seal, user, body):
     owner = store.chat_owner(cid)
     if owner is not None and owner != user:
         return 404, {"error": "沒有這則對話"}
+    if new:
+        add = sum(len(raw) for _, _, raw in new) * 4 // 3 + 64 * len(new)     # 密文是 base64，約 4/3 倍
+        if store.blob_bytes(user, cid) + add > BLOB_PER_CHAT:
+            return 413, {"error": "這則對話的附圖已經太多（上限 256 MB），請開新對話"}
+        if store.blob_bytes(user) + add > BLOB_PER_USER:
+            return 413, {"error": "你存的對話附圖總共超過 2 GB，請先刪掉一些舊對話"}
     have = store.blob_ids(user, cid)
     old_refs = {m["image"][5:] for m in msgs if isinstance(m.get("image"), str)}
     if old_refs - have:
@@ -224,7 +232,7 @@ def save(store, seal, user, body):
     raw = json.dumps(doc, ensure_ascii=False).encode()
     if len(raw) > CHAT_MAX:
         return 413, {"error": "這則對話太大了（上限 32 MB）；請開新對話"}
-    if not store.chat_put(user, {"id": cid, "title": title, "target": target, "n_msgs": len(msgs), "body": seal(raw)},
+    if not store.chat_put(user, {"id": cid, "title": seal(title.encode()), "target": target, "n_msgs": len(msgs), "body": seal(raw)},
                           keep=KEEP_PER_USER):
         return 404, {"error": "沒有這則對話"}
     store.blob_gc(user, cid, refs)
@@ -240,7 +248,16 @@ def load(store, unseal, user, cid):
     if not row:
         return 404, {"error": "沒有這則對話"}
     doc = json.loads(unseal(row["body"])) if row["body"] else {"msgs": []}
-    return 200, {k: row[k] for k in ("id", "title", "target", "created", "updated")} | doc
+    return 200, {k: row[k] for k in ("id", "target", "created", "updated")} | {"title": open_title(unseal, row["title"])} | doc
+
+
+def open_title(unseal, t):
+    if t and t.startswith("enc:v1:"):
+        try:
+            return unseal(t).decode()
+        except Exception:  # noqa: BLE001
+            return "（標題讀不到）"
+    return t or "新對話"
 
 
 def _snippet(text, q, width=60):
@@ -256,9 +273,10 @@ def listing(store, unseal, user, q=""):
     rows = store.chat_list(user, with_body=bool(q))
     out = []
     for r in rows:
-        item = {k: r[k] for k in ("id", "title", "target", "n_msgs", "created", "updated")}
+        item = {k: r[k] for k in ("id", "target", "n_msgs", "created", "updated")}
+        item["title"] = open_title(unseal, r["title"])
         if q:
-            hit = q in (r["title"] or "").lower()
+            hit = q in item["title"].lower()
             snip = None
             if r.get("body"):
                 try:
@@ -266,7 +284,7 @@ def listing(store, unseal, user, q=""):
                 except Exception:  # noqa: BLE001  # 壞掉的一則不擋整個列表
                     doc = {"msgs": []}
                 for m in doc.get("msgs", []):
-                    texts = [m.get("content") or ""] + [d.get("name") or "" for d in m.get("docs", [])]
+                    texts = [m.get("content") or ""] + [x for d in m.get("docs", []) for x in (d.get("name") or "", d.get("text") or "")]
                     for t in texts:
                         snip = _snippet(t, q)
                         if snip:

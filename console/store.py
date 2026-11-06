@@ -195,6 +195,8 @@ class Store:
         body = row.get("body") or ""
         if body and not body.startswith("enc:v1:"):
             raise ValueError("對話內容沒有加密，拒絕寫入")
+        if row.get("title") and not str(row["title"]).startswith("enc:v1:"):
+            raise ValueError("對話標題沒有加密，拒絕寫入")       # 標題取自第一句話，一樣是使用者內容
         now = time.time()
         with self.lock:
             old = self.db.execute("SELECT user, created FROM chats WHERE id=?", (row["id"],)).fetchone()
@@ -211,6 +213,8 @@ class Store:
         return True
 
     def chat_rename(self, user, cid, title):
+        if not str(title).startswith("enc:v1:"):
+            raise ValueError("對話標題沒有加密，拒絕寫入")
         with self.lock:
             return self.db.execute("UPDATE chats SET title=? WHERE id=? AND user=?", (title, cid, user)).rowcount > 0
 
@@ -227,6 +231,15 @@ class Store:
         with self.lock:
             self.db.execute("INSERT OR REPLACE INTO chat_blobs(id,chat,user,mime,data,created) VALUES(?,?,?,?,?,?)",
                             (bid, chat, user, mime, data, time.time()))
+
+    def blob_bytes(self, user, chat=None):
+        """這個人（或這則對話）的附圖總共占多少位元組（密文長度）。"""
+        q, a = "SELECT COALESCE(SUM(LENGTH(data)),0) FROM chat_blobs WHERE user=?", [user]
+        if chat:
+            q += " AND chat=?"
+            a.append(chat)
+        with self.lock:
+            return int(self.db.execute(q, a).fetchone()[0])
 
     def blob_get(self, user, bid):
         with self.lock:
