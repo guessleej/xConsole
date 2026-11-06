@@ -71,8 +71,9 @@ fn log_file(data: &Path, name: &str) -> Stdio {
 
 fn command(rt: &Runtime, script: &[&str], log: &str) -> Command {
     let mut c = Command::new(python(&rt.payload));
-    // -E -s：不吃這台的 PYTHON* 環境變數與使用者的套件，只用內含的那一份
-    c.arg("-E").arg("-s");
+    // -E -s：不吃這台的 PYTHON* 環境變數與使用者的套件，只用內含的那一份；
+    // -E 會連 PYTHONUTF8 一起忽略，所以用 -X utf8 指定（不然記錄檔裡的中文在繁中 Windows 會變成 cp950 亂碼）
+    c.arg("-E").arg("-s").arg("-X").arg("utf8");
     c.arg(rt.payload.join("app").join(script[0]));
     c.args(&script[1..]);
     c.current_dir(rt.payload.join("app"));

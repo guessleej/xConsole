@@ -374,7 +374,7 @@ async function viewRun() {
     b.classList.remove("rv");
     statusHolder.replaceChildren(b);
   };
-  sel.onchange = () => { st.ctx = null; st.disk = false; draw(); };
+  sel.onchange = () => { st.ctx = null; st.touched.ctx = false; st.disk = false; draw(); };
   if (slotSel) slotSel.onchange = () => { S.runSlot = slotSel.value; st.base = null; st.touched = {}; st.thinking = "auto"; st.lan = true; draw(); };
   draw();
   reveal(holder);
@@ -431,6 +431,8 @@ function drawPlan(c, n, m, p) {
 }
 
 function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
+  // 規劃為了放得下把上下文縮短了（小機器）：沒自己選過就照那個長度啟動，不要又用模型預設的 32K
+  if (st.ctx == null && !st.touched.ctx && p?.ctx_reduced && p.ctx) st.ctx = p.ctx;
   c.querySelectorAll(":scope > :not(.card-head)").forEach((x) => x.remove());
   const isLlama = m.engine === "llama";
   // 上下文：自動＝模型預設；每個選項標 KV 要多少（跟換模型視窗同一條公式）
@@ -444,7 +446,7 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
       const b = el("button", null, ctx ? `${ctx / 1024}K` : "自動");
       b.title = ctx ? `KV 約 ${fmt(kvAt(ctx))} GiB` : "用模型的預設";
       if (ctx === st.ctx) b.setAttribute("aria-current", "true");
-      b.onclick = () => { st.ctx = ctx; drawSettings(c, n, m, p, slot, running, st, prog, statusHolder); };
+      b.onclick = () => { st.ctx = ctx; st.touched.ctx = true; drawSettings(c, n, m, p, slot, running, st, prog, statusHolder); };
       bar.appendChild(b);
     });
     c.appendChild(bar);

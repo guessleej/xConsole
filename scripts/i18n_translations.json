@@ -17458,5 +17458,30 @@
 "en": "The desktop edition updates with installers; use Update under Version & updates, or download the installer from the GitHub releases page",
 "ja": "デスクトップ版はインストーラーで更新します。「バージョンと更新」で更新するか、GitHub のリリースページからインストーラーを入手してください",
 "ko": "데스크톱판은 설치 파일로 업데이트합니다. '버전 및 업데이트'에서 업데이트하거나 GitHub 릴리스 페이지에서 설치 파일을 받으세요"
+},
+"（上下文縮到 {0}K 才放得下）": {
+"en": " (fits with context reduced to {0}K)",
+"ja": "（コンテキストを {0}K に縮めると収まります）",
+"ko": "(컨텍스트를 {0}K로 줄이면 들어갑니다)"
+},
+"上下文縮到": {
+"en": "context reduced to",
+"ja": "コンテキストを",
+"ko": "컨텍스트를"
+},
+"K 才放得下": {
+"en": "K to fit",
+"ja": "K に縮めると収まります",
+"ko": "K로 줄이면 들어갑니다"
+},
+"（上下文縮到 ": {
+"en": " (context reduced to ",
+"ja": "（コンテキストを ",
+"ko": "(컨텍스트를 "
+},
+"K 才放得下）": {
+"en": "K to fit)",
+"ja": "K に縮めると収まります）",
+"ko": "K로 줄이면 들어갑니다)"
 }
 }

@@ -9884,6 +9884,18 @@
 "pattern": false
 },
 {
+"zh": "（上下文縮到 {0}K 才放得下）",
+"pattern": true
+},
+{
+"zh": "上下文縮到",
+"pattern": false
+},
+{
+"zh": "K 才放得下",
+"pattern": false
+},
+{
 "zh": "，其中 ",
 "pattern": false
 },
@@ -9965,6 +9977,14 @@
 },
 {
 "zh": "BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，吃爆會把整台拖死，所以另外盯",
+"pattern": false
+},
+{
+"zh": "（上下文縮到 ",
+"pattern": false
+},
+{
+"zh": "K 才放得下）",
 "pattern": false
 },
 {
