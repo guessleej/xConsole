@@ -117,7 +117,7 @@ def start_installer(state_dir, url, sha256, version, opener):
             with open(path, "wb") as fh:
                 fh.write(data)
             if not path.endswith(".exe"):
-                os.chmod(path, 0o755)
+                os.chmod(path, 0o700)                 # 只有自己能讀能執行
             _job("installer_ready", message="安裝檔已下載並核對過，請照安裝程式的畫面完成更新", path=path)
             opener(path)
         except Exception as ex:  # noqa: BLE001
