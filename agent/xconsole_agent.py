@@ -7283,7 +7283,7 @@ DESKTOP_TEXT_MAX = 500
 DESKTOP_ACTIONS = ("click", "double_click", "right_click", "move", "drag", "type", "key", "scroll", "wait")
 DESKTOP_KEY_RX = re.compile(r"(?:(?:ctrl|control|shift|alt|option|cmd|command|win|super|meta)\+){0,3}"
                             r"(?:[a-z0-9]|f[1-9]|f1[0-2]|enter|return|tab|esc|escape|backspace|delete|del|space|up|down|left|right|"
-                            r"home|end|pageup|pagedown|insert|[-=\[\];',./`\\])", re.I)
+                            r"home|end|pageup|pagedown|insert|[-=\[\];',./`\\]|win|super|meta|cmd|command|ctrl|control|alt|option|shift)", re.I)
 
 
 def _png(rgb, w, h):
@@ -7591,6 +7591,8 @@ def _mac_act(a, x, y, x2, y2, text, keys, dy):
             time.sleep(0.005)
     elif a == "key":
         parts = keys.lower().split("+")
+        if parts == ["cmd"] or parts == ["command"] or parts == ["win"]:
+            parts = ["cmd", "space"]                         # macOS 沒有單按的「開始」鍵：換成 Spotlight
         flags = sum(MAC_FLAG.get(p, 0) for p in parts[:-1])
         code = MAC_KEY.get(parts[-1])
         if code is None or any(p not in MAC_FLAG for p in parts[:-1]):
