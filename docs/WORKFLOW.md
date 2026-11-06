@@ -12,13 +12,17 @@
    自己已經有檔案就按右上「匯入本機 GGUF」。
 3. 執行：選一顆已安裝的模型 → 看分層規劃（放顯示卡／系統記憶體／硬碟各多少）→ 設上下文、思考模式、區網存取
    → 看預估速度與第一次載入時間 → 按「啟動模型」→ 看載入進度 → 下方狀態列出現 API 網址可以複製。
-4. 對話：直接跟剛啟動的模型聊；模型寫出 HTML 可以直接執行預覽、下載、複製。也可以切到管理者設好的第三方 API。
+   記憶體放不下時自動往後排到硬碟，不必另外勾選；按鈕會標「會用到硬碟，很慢」，存放區在機械硬碟上會提醒改放 SSD。
+4. 對話：直接跟剛啟動的模型聊；按「附件」可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼（主控台抽出文字附進對話），
+   看得懂圖的模型也能附圖。模型寫出 HTML 可以直接執行預覽、下載、複製。也可以切到管理者設好的第三方 API。
 5. Agent：選一個工作資料夾、交代一件事，Agent 自己規劃、建檔、寫程式、跑指令；每條指令要人按允許。
-6. 畫圖、影片：寫一句描述就產出；模型不在就帶去下載。
+6. 畫圖、影片：寫一句描述就產出；模型不在就帶去下載。畫圖可選方形、直式、橫式畫幅、一次 1～4 張，
+   也可以放一張參考圖在上面重繪；影片可以放第一格畫面，接著往下演。
 
 **管理者（多一台、多台）**
 
 7. 設定：機器（加一台、這台的設定、移除）、推理引擎、第三方 API、HTTPS 與憑證、服務使用報告、記錄、帳號、品牌。
+   推理引擎下載可以暫停、斷線後接著下載；不能連外的機器改成手動匯入官方安裝包（送齊後核對 sha256）。
 
 ## 二、頂部導覽（禁左側欄）
 
@@ -73,3 +77,12 @@
    `POST /api/agent/tasks {node, folder, model, prompt}`、`GET /api/agent/tasks`、`GET /api/agent/tasks/{id}`、
    `POST /api/agent/tasks/{id}/approve {allow, always}`、`POST /api/agent/tasks/{id}/stop`。
    任務狀態 `running|waiting_approval|done|failed|stopped`；回 `plan`、`files`、`log`、`pending`、`tree`。
+8. **推理引擎下載與手動匯入**：預編譯版下載中按「暫停下載」→ 狀態 `paused`；再按「繼續下載」用 HTTP Range 接著下，
+   整個檔核對官方 sha256 才安裝。手動匯入：`POST /api/node/{n}/(llama|sd)/import?name&offset&total`（本文是檔案位元組、每塊最多 64 MB、
+   帶 `X-XConsole-Upload: 1`）、`POST .../import/status {name}`、`.../import/cancel {name}`、`.../import/install {name, sha256?}`；
+   安裝進度與編譯共用 `.../build/progress`（`mode: "import"`）。
+9. **對話附件**：`POST /api/extract {name, b64}` → `{text, chars, truncated, pages}`；上限 15 MB、抽出最多 20 萬字。
+10. **畫圖參數**：`POST /api/node/{n}/sd/generate` 多 `count`（1～4，只限畫圖）、`init_image`（data URL，PNG／JPEG／WebP，4 MB 內）、
+    `strength`（0.05～1，只限畫圖）。一次多張的產出用 `GET .../sd/jobs/{id}/output/{i}` 取第 i 張，參考圖用 `.../init`。
+11. **機器偵測**：Linux 的 Intel 顯示卡（sysfs vendor 0x8086）用 Vulkan 編譯（缺 `libvulkan-dev glslc` 時講清楚要裝什麼）；
+    存放區是不是機械硬碟：Linux 讀 `queue/rotational`、macOS 讀 `diskutil` 的 SolidState、Windows 讀 `Get-PhysicalDisk` 的 MediaType。

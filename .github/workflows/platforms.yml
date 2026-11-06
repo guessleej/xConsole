@@ -34,6 +34,10 @@ jobs:
         run: python agent/test_admit.py
       - name: 推薦清單
         run: python console/test_recommend.py
+      - name: Intel 顯示卡、SSD 判斷、引擎續傳與手動匯入、畫圖參考圖與多張
+        run: python agent/test_gaps.py
+      - name: 對話附件抽文字（PDF、Word、Excel、PowerPoint、純文字）
+        run: python console/test_extract.py
       - name: 安裝腳本產得出來、語法正確（Linux／macOS 的 bash 與 Windows 的 PowerShell）
         shell: bash
         run: |

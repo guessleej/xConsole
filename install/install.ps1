@@ -54,7 +54,7 @@ if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
   icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 }
-foreach ($f in 'xconsole_server.py', 'tls.py', 'store.py', 'report.py', 'recommend.py', 'catalog_default.json') {
+foreach ($f in 'xconsole_server.py', 'tls.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
 }
 Copy-Item -Force (Join-Path $SRC 'console\static\*') (Join-Path $dir 'static')

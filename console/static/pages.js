@@ -419,6 +419,12 @@ function drawPlan(c, n, m, p) {
       : "顯示卡放不下，部分層改放系統記憶體、權重用記憶體映射載入；能跑但比較慢。",
     no: p.place || "這台放不下這顆。" }[p.level] || "";
   c.appendChild(el("p", "note" + (p.level === "disk" ? " warn" : p.level === "no" ? " bad" : ""), msg));
+  // 放硬碟那一層的速度看碟：機械硬碟比 SSD 慢十倍，提醒把存放區換到 SSD
+  if (sp.disk && p.hdd === true) {
+    c.appendChild(el("p", "note bad", "這顆的存放區在機械硬碟上，從硬碟按需讀取會比 SSD 慢約十倍。建議到「模型 › 存放區」把存放區改到 SSD 再執行。"));
+  } else if (sp.disk && p.hdd === false) {
+    c.appendChild(el("p", "small muted", "存放區在 SSD 上，放硬碟的那部分從 SSD 讀。"));
+  }
 }
 
 function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
@@ -471,27 +477,19 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
       p?.load_sec != null ? "上次實際載入" : "依磁碟速度估"));
   c.appendChild(est);
 
-  // 要用硬碟：管理者勾選確認才放行；BIOS 切兩塊的機器一律不行
+  // 要用硬碟：跟 LocModel 一樣自動往後排（顯示卡→系統記憶體→硬碟），不必另外勾選；分層與速度上面已經寫清楚。
+  // BIOS 切兩塊的機器一律不行
   const diskNeed = p?.level === "disk";
+  const diskBlocked = diskNeed && (p.disk_allowed === false || n.state.pools?.memory_model === "unified_split");
+  st.disk = diskNeed && !diskBlocked;
   const err = el("div");
-  if (diskNeed) {
-    if (p.disk_allowed === false || n.state.pools?.memory_model === "unified_split") {
-      c.appendChild(el("p", "note bad", "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：系統那塊被擠爆會把整台拖死，所以不允許用硬碟補。請換小一點的量化。"));
-    } else {
-      const r = el("label", "check-row");
-      const cb = el("input");
-      cb.type = "checkbox";
-      cb.checked = st.disk;
-      cb.onchange = () => { st.disk = cb.checked; btn.disabled = !st.disk; };
-      r.append(cb, document.createTextNode(p.split?.disk ? " 我了解：放不進記憶體的部分會從硬碟按需讀取，速度通常不到 1 tok/s"
-        : " 我了解：這顆要分到顯示卡與系統記憶體、用記憶體映射載入，速度比較慢"));
-      c.appendChild(r);
-    }
+  if (diskBlocked) {
+    c.appendChild(el("p", "note bad", "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：系統那塊被擠爆會把整台拖死，所以不允許用硬碟補。請換小一點的量化。"));
   }
-  const btn = el("button", "btn primary run-go", running ? "套用設定並重新載入" : "啟動模型");
+  const btn = el("button", "btn primary run-go", (running ? "套用設定並重新載入" : "啟動模型") + (st.disk && p.split?.disk ? "（會用到硬碟，很慢）" : ""));
   // 等級是照預設上下文算的；調短了就可能放得下，交給代理用這個長度重做一次記憶體試算
   const shorter = !!(st.ctx && p?.ctx && st.ctx < p.ctx);
-  btn.disabled = (p?.level === "no" && !shorter) || (diskNeed && !st.disk && !shorter);
+  btn.disabled = (p?.level === "no" && !shorter) || (diskBlocked && !shorter);
   btn.title = p?.level === "no" && !shorter ? "這台放不下這顆；可以先把上下文調短" : "";
   if (shorter && (p?.level === "no" || diskNeed)) {
     c.appendChild(el("p", "note", `上面的規劃是照 ${int(p.ctx)} 個 token 算的。調到 ${st.ctx / 1024}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。`));
@@ -601,13 +599,14 @@ function progressCard(m) {
 const CHAT2 = { sessions: [], cur: null };
 const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型" };
 try { CHAT2.sessions = JSON.parse(sessionStorage.getItem("xconsole-chats") || "[]"); } catch (_) { CHAT2.sessions = []; }
-// 附圖一起存；分頁的儲存空間（約 5 MB）放不下時，只存文字並在那則訊息標 image_lost，
-// 重新整理後畫面會說圖沒了、送給模型時也不再假裝有圖
+// 附圖與附件的文字一起存；分頁的儲存空間（約 5 MB）放不下時，只存對話文字，並在那則訊息標 image_lost／附件 lost，
+// 重新整理後畫面會說圖或附件沒了、送給模型時也不再假裝還有
 const saveChats = () => {
-  const pack = (keepImg) => JSON.stringify(CHAT2.sessions.slice(0, 30).map((s) => ({
-    ...s, msgs: s.msgs.filter((m) => !m.pending).map(({ role, content, reasoning, stat, error, image, image_lost }) => ({
+  const pack = (keep) => JSON.stringify(CHAT2.sessions.slice(0, 30).map((s) => ({
+    ...s, docs: undefined, msgs: s.msgs.filter((m) => !m.pending).map(({ role, content, reasoning, stat, error, image, image_lost, docs }) => ({
       role, content, reasoning, stat, error,
-      ...(image && keepImg ? { image } : {}), ...(image_lost || (image && !keepImg) ? { image_lost: true } : {}) })) })));
+      ...(image && keep ? { image } : {}), ...(image_lost || (image && !keep) ? { image_lost: true } : {}),
+      ...(docs?.length ? { docs: docs.map((d) => (keep && d.text ? d : { name: d.name, chars: d.chars, lost: true })) } : {}) })) })));
   try { sessionStorage.setItem("xconsole-chats", pack(true)); return; } catch (_) { /* 多半是圖太大 */ }
   try { sessionStorage.setItem("xconsole-chats", pack(false)); } catch (_) { /* 空間不夠或無痕：只留在記憶體 */ }
 };
@@ -702,26 +701,75 @@ async function viewChat() {
   ta.value = cur.draft || "";
   ta.oninput = () => { cur.draft = ta.value; };
   const tools = el("div", "chat-tools");
+  // 附件：文件（PDF、Word、Excel、PowerPoint、純文字、程式碼）由主控台抽出文字附進對話；圖片只給看得懂圖的模型
   const attach = el("input");
   attach.type = "file";
-  attach.accept = "image/png,image/jpeg,image/webp";
+  attach.multiple = true;
   attach.hidden = true;
-  const attBtn = el("button", "btn sm", "附圖");
+  const attBtn = el("button", "btn sm", "附件");
+  const docsRow = el("div", "chat-docs");
+  cur.docs = cur.docs || [];
+  const drawDocs = () => {
+    docsRow.textContent = "";
+    if (cur.image) {
+      const c = el("span", "chat-doc", "圖片");
+      const x = el("button", null, "×");
+      x.setAttribute("aria-label", "拿掉圖片");
+      x.onclick = () => { cur.image = null; drawDocs(); };
+      c.appendChild(x);
+      docsRow.appendChild(c);
+    }
+    cur.docs.forEach((d, i) => {
+      const c = el("span", "chat-doc", d.busy ? `${d.name}（讀取中…）` : `${d.name}・${int(d.chars)} 字${d.truncated ? "（太長，只取前段）" : ""}`);
+      if (!d.busy) {
+        const x = el("button", null, "×");
+        x.setAttribute("aria-label", `拿掉 ${d.name}`);
+        x.onclick = () => { cur.docs.splice(i, 1); drawDocs(); };
+        c.appendChild(x);
+      }
+      docsRow.appendChild(c);
+    });
+    docsRow.hidden = !cur.image && !cur.docs.length;
+  };
   attBtn.onclick = () => attach.click();
   attach.onchange = async () => {
-    const f = attach.files[0];
-    if (!f) return;
-    if (f.size > 4 * 1024 * 1024) { toast("圖片最大 4 MB", "bad"); return; }
-    cur.image = "data:" + f.type + ";base64," + await readB64(f);
-    attBtn.textContent = "已附圖（再按換一張）";
+    const files = [...attach.files];
+    attach.value = "";
+    for (const f of files) {
+      if (/^image\//.test(f.type)) {
+        if (!tgt()?.vision) { toast("這個模型看不懂圖片；要問圖請換一個標了「看圖」的模型", "bad"); continue; }
+        if (f.size > 4 * 1024 * 1024) { toast("圖片最大 4 MB", "bad"); continue; }
+        cur.image = "data:" + f.type + ";base64," + await readB64(f);
+        drawDocs();
+        continue;
+      }
+      if (cur.docs.length >= 5) { toast("一則最多附 5 個檔案", "bad"); break; }
+      if (f.size > 15 * 1024 * 1024) { toast(`${f.name} 超過 15 MB`, "bad"); continue; }
+      const d = { name: f.name, busy: true };
+      cur.docs.push(d);
+      drawDocs();
+      try {
+        const r = await api("/api/extract", { method: "POST", body: { name: f.name, b64: await readB64(f) } });
+        Object.assign(d, { busy: false, text: r.text, chars: r.chars, truncated: r.truncated, pages: r.pages });
+      } catch (ex) {
+        cur.docs.splice(cur.docs.indexOf(d), 1);
+        toast(`${f.name}：${ex.message}`, "bad");
+      }
+      drawDocs();
+    }
   };
   const send = el("button", "btn primary", "送出");
   const stopB = el("button", "btn sm danger", "停止");
   stopB.hidden = true;
   tools.append(attach, attBtn, el("span", "spacer"), stopB, send);
-  inputRow.append(ta, tools);
+  inputRow.append(docsRow, ta, tools);
+  drawDocs();
   c.appendChild(inputRow);
-  const syncVision = () => { attBtn.hidden = !tgt()?.vision; };
+  const syncVision = () => {
+    const v = !!tgt()?.vision;
+    attach.accept = ".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.log,.html,.xml,.yaml,.yml,.py,.js,.ts,.sh,.sql" + (v ? ",image/png,image/jpeg,image/webp" : "");
+    attBtn.title = v ? "附文件或圖片" : "附文件（PDF、Word、Excel、PowerPoint、純文字、程式碼）";
+  };
   sel.onchange = () => { cur.target = sel.value; saveChats(); syncVision(); syncStatus(); };
   syncVision();
   syncStatus();
@@ -732,22 +780,27 @@ async function viewChat() {
   const submit = async () => {
     const text = ta.value.trim();
     if (!text || cur.busy) return;
+    if (cur.docs.some((d) => d.busy)) { toast("附件還在讀取，等一下再送", "bad"); return; }
     const t = tgt();
-    const user = { role: "user", content: text, image: cur.image || null };
+    const user = { role: "user", content: text, image: cur.image || null,
+      ...(cur.docs.length ? { docs: cur.docs.map(({ name, text: tx, chars, truncated }) => ({ name, text: tx, chars, truncated })) } : {}) };
     if (!cur.msgs.length) cur.title = text.slice(0, 24);
     cur.msgs.push(user);
     const reply = { role: "assistant", content: "", pending: true };
     cur.msgs.push(reply);
-    ta.value = ""; cur.draft = ""; cur.image = null; attBtn.textContent = "附圖";
+    ta.value = ""; cur.draft = ""; cur.image = null; cur.docs = []; drawDocs();
     if (box.querySelector(".chat-empty")) box.textContent = "";
     box.append(chatBubble(user), chatBubble(reply));
     box.scrollTop = box.scrollHeight;
     cur.busy = true; send.disabled = true; stopB.hidden = false;
     const sent = cur.msgs.filter((m) => !m.pending && !m.error);
     const lastImg = sent.map((m) => !!m.image).lastIndexOf(true);
+    // 附件的文字放在問題前面，標清楚哪段是附件；已經看不到的附件照實說
+    const withDocs = (m) => (m.docs || []).map((d) => (d.text ? `【附件：${d.name}】\n${d.text}\n【附件結束】\n\n`
+      : `（先前附了「${d.name}」，內容已經看不到了）\n`)).join("") + m.content;
     const history = sent.map((m, i) => ({ role: m.role,
-      content: m.image && i === lastImg ? [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: m.image } }]
-        : m.image ? `（先前附了一張圖）${m.content}` : m.image_lost ? `（先前附了一張圖，已經看不到了）${m.content}` : m.content }));
+      content: m.image && i === lastImg ? [{ type: "text", text: withDocs(m) }, { type: "image_url", image_url: { url: m.image } }]
+        : m.image ? `（先前附了一張圖）${withDocs(m)}` : m.image_lost ? `（先前附了一張圖，已經看不到了）${withDocs(m)}` : withDocs(m) }));
     const t0 = performance.now();
     try {
       cur.ctl = new AbortController();
@@ -860,6 +913,11 @@ function paintMsg(m, final) {
   b.textContent = "";
   if (m.image) { const im = el("img", "msg-img"); im.src = m.image; im.alt = "附加的圖片"; b.appendChild(im); }
   else if (m.image_lost) b.appendChild(el("p", "small muted", "這則附的圖太大，沒有存進這個分頁，重新整理後就沒了；要繼續問這張圖請重新附上。"));
+  if (m.docs?.length) {
+    const row = el("div", "chat-docs");
+    m.docs.forEach((d) => row.appendChild(el("span", "chat-doc", `${d.name}・${int(d.chars || 0)} 字${d.lost ? "（內容沒存下來，要再問請重新附上）" : ""}`)));
+    b.appendChild(row);
+  }
   if (m.reasoning) {
     const d = el("details", "msg-think");
     d.open = !m.content && !final;
