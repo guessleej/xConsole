@@ -4335,7 +4335,8 @@ def _gh_json(path):
         lim, reset = ex.headers.get("X-RateLimit-Limit"), ex.headers.get("X-RateLimit-Reset")
         if ex.code in (403, 429) and ex.headers.get("X-RateLimit-Remaining") == "0":
             when = time.strftime("%H:%M", time.localtime(int(reset))) if (reset or "").isdigit() else "一小時內"
-            raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{'有' if 'Authorization' in h else '沒有'}帶權杖，{when} 後恢復）") from ex
+            tk = "有帶權杖" if "Authorization" in h else "沒有帶權杖"
+            raise OSError(f"GitHub 一小時的查詢次數用完了（上限 {lim} 次、{tk}，{when} 後恢復）") from ex
         raise
 
 
