@@ -5658,9 +5658,34 @@ MAC_DENY = ("/system", "/library", "/applications", "/private", "/cores", "/opt"
 ROOT_ONLY_DENY = ("/volumes", "/mnt", "/media")          # 只擋這幾個本身（裡面的外接碟可以選）
 
 
+def browse_roots():
+    """資料夾瀏覽器、連結資料夾、打開資料夾能碰到的範圍：家目錄、資料磁碟與外接碟（Windows 是各磁碟）。"""
+    roots = [os.path.realpath(HOME), os.path.realpath(os.path.expanduser("~"))]
+    if OS == "windows":
+        roots += [f"{d}:\\" for d in "CDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.isdir(f"{d}:\\")]
+    elif OS == "darwin":
+        roots += ["/Volumes"]
+    else:
+        roots += [d for d in ("/mnt", "/media", "/data", "/srv") if os.path.isdir(d)]
+    return roots
+
+
+def in_browse_roots(path):
+    """正規化之後要落在某個允許的根目錄底下，才回正規化後的路徑；否則回 None。"""
+    full = os.path.realpath(os.path.expanduser(str(path or "")))
+    for root in browse_roots():
+        r = os.path.realpath(root)
+        base = r if r.endswith(os.sep) else r + os.sep
+        if full == r or full.startswith(base):
+            return full
+    return None
+
+
 def agent_link_denied(path):
     """這個資料夾能不能給 Agent 用。回 None＝可以，否則回原因。路徑先 realpath（符號連結指到系統資料夾也擋）。"""
-    full = os.path.realpath(path)
+    full = in_browse_roots(path)
+    if full is None:
+        return "只能選家目錄、資料磁碟或外接碟裡的資料夾"
     home = os.path.realpath(HOME)
     low = full.lower().rstrip("\\/")
     if OS == "windows":
@@ -5670,8 +5695,12 @@ def agent_link_denied(path):
             return "不能直接用整顆磁碟"
         if parts[0].lower() in WIN_DENY:
             return f"{parts[0]} 是系統資料夾"
+        if parts[0].lower() == "users" and len(parts) <= 2:
+            return "不能直接用整個使用者資料夾；請選裡面的一個資料夾（例：文件、桌面底下的專案）"
         if len(parts) >= 3 and parts[0].lower() == "users" and parts[2].lower() == "appdata":
             return "AppData 放的是程式設定與登入資料，不能給 Agent"
+        if len(parts) >= 3 and parts[0].lower() == "users" and parts[2].startswith("."):
+            return f"{parts[2]} 是隱藏的設定資料夾（可能有金鑰或登入資料）"
     elif not full.startswith(home + os.sep):             # 家目錄底下的不套系統資料夾規則（macOS 的家目錄可能在 /private 底下）
         if full == "/" or any(full == d or full.startswith(d + "/") for d in SYSTEM_DIRS):
             return "這是系統資料夾"
@@ -5707,7 +5736,9 @@ def agent_browse(path=""):
     path = str(path or "").strip() or HOME
     if "\x00" in path or len(path) > 1000:
         return 400, {"error": "路徑不對"}
-    full = os.path.realpath(os.path.expanduser(path))
+    full = in_browse_roots(path)
+    if full is None:
+        return 400, {"error": "只能瀏覽家目錄、資料磁碟或外接碟"}
     if not os.path.isdir(full):
         return 404, {"error": "沒有這個資料夾"}
     dirs = []
@@ -5729,7 +5760,8 @@ def agent_browse(path=""):
     else:
         roots += [{"name": d, "path": d} for d in ("/mnt", "/media", "/data", "/srv") if os.path.isdir(d)]
     parent = os.path.dirname(full)
-    return 200, {"path": full, "parent": parent if parent != full else None, "dirs": dirs, "roots": roots,
+    parent = parent if parent != full and in_browse_roots(parent) else None
+    return 200, {"path": full, "parent": parent, "dirs": dirs, "roots": roots,
                  "ok": agent_link_denied(full) is None, "why": agent_link_denied(full)}
 
 
@@ -7653,8 +7685,10 @@ def desktop_act_direct(body):
 
 
 def desktop_open_direct(path):
-    """用檔案總管（Finder）打開一個資料夾。"""
-    full = os.path.realpath(str(path or ""))
+    """用檔案總管（Finder）打開一個資料夾。只開允許範圍裡的（代理那邊另外限定模型存放區與工作資料夾）。"""
+    full = in_browse_roots(path)
+    if full is None:
+        return 400, {"error": "只能打開家目錄、資料磁碟或外接碟裡的資料夾"}
     if not os.path.isdir(full):
         return 404, {"error": "沒有這個資料夾"}
     if OS == "windows":
