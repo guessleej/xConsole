@@ -207,6 +207,16 @@ def main():
     finally:
         A.desktop_route = real_route
     eq("顯示卡名稱帶 (TM) 也對得到頻寬", A.spec_bandwidth("AMD Radeon(TM) 890M Graphics"), 89.6)
+    real_rp = A.ram_pool
+    try:
+        A.ram_pool = lambda: {"total_gib": 31.8, "free_gib": 20.0, "used_gib": 11.8}
+        eq("32 GB 筆電（單一池）：底線照比例留（不是 DGX 的 12 GB）", A.floors({"memory_model": "unified_single"})["ram"], 5.7)
+        A.ram_pool = lambda: {"total_gib": 120.0, "free_gib": 100.0, "used_gib": 20.0}
+        eq("120 GB 的 DGX Spark：照舊 12 GB", A.floors({"memory_model": "unified_single"})["ram"], 12.0)
+        eq("AI 395 切兩塊：照舊 15 GB（實測值，不縮）", A.floors({"memory_model": "unified_split"})["ram"], 15.0)
+        eq("管理者自己填的底線優先", A.floors({"memory_model": "unified_single", "ram_floor_gib": 9})["ram"], 9.0)
+    finally:
+        A.ram_pool = real_rp
 
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)
