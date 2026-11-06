@@ -4672,7 +4672,7 @@ def _gh_json(path):
     放了 ~/.xconsole/github-token（權限 600，只放唯讀的公開權杖）就帶上，一小時 5,000 次。權杖只送給 GH_API 這一台。"""
     h = {"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"}
     tok = (load_text(os.path.join(STATE_DIR, "github-token")) or "").strip()
-    if re.fullmatch(r"[\w-]{20,255}", tok):
+    if re.fullmatch(r"[\x21-\x7e]{20,4096}", tok):   # 可見字元、不含空白與換行（不能被拿來多塞一個標頭）；GitHub 權杖格式會變，不鎖死字元集
         h["Authorization"] = "Bearer " + tok
     req = urllib.request.Request(GH_API + path, headers=h)
     for i in range(3):                    # GitHub 偶爾回 502／503／504（版本清單很大時常見）：等一下再問，最多三次
