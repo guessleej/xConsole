@@ -16953,5 +16953,285 @@
 "en": "? Total",
 "ja": "？合計",
 "ko": "? 총"
+},
+"還有 {0} 則舊對話沒搬成功，下次打開對話頁會再試": {
+"en": "{0} old chats could not be moved yet; they will be retried next time you open Chat",
+"ja": "{0} 件の古い会話を移行できませんでした。次にチャットを開いたときに再試行します",
+"ko": "이전 대화 {0}개를 아직 옮기지 못했습니다. 다음에 대화를 열 때 다시 시도합니다"
+},
+"還有": {
+"en": "Still",
+"ja": "まだ",
+"ko": "아직"
+},
+"則舊對話沒搬成功，下次打開對話頁會再試": {
+"en": "old chats could not be moved; will retry next time Chat opens",
+"ja": "件の古い会話を移行できませんでした。次回再試行します",
+"ko": "개의 이전 대화를 옮기지 못했습니다. 다음에 다시 시도합니다"
+},
+"這一則有附圖：工具只能處理文字，這次改用一般對話回答（看得到圖）": {
+"en": "This message has an image: tools handle text only, so this reply uses normal chat (which can see the image)",
+"ja": "このメッセージには画像があります。ツールはテキストのみのため、今回は通常の会話で回答します（画像を見られます）",
+"ko": "이 메시지에는 이미지가 있습니다. 도구는 텍스트만 처리하므로 이번에는 일반 대화로 답합니다(이미지를 볼 수 있음)"
+},
+"主控台重啟過，這個任務已經中斷": {
+"en": "The console restarted; this task was interrupted",
+"ja": "コンソールが再起動したため、このタスクは中断されました",
+"ko": "콘솔이 다시 시작되어 이 작업이 중단되었습니다"
+},
+"（標題讀不到）": {
+"en": "(title unreadable)",
+"ja": "（タイトルを読めません）",
+"ko": "(제목을 읽을 수 없음)"
+},
+"這則對話的附圖已經太多（上限 256 MB），請開新對話": {
+"en": "This chat has too many attachments (limit 256 MB); please start a new chat",
+"ja": "この会話の添付が多すぎます（上限 256 MB）。新しい会話を始めてください",
+"ko": "이 대화의 첨부 파일이 너무 많습니다(최대 256 MB). 새 대화를 시작하세요"
+},
+"你存的對話附圖總共超過 2 GB，請先刪掉一些舊對話": {
+"en": "Your saved chat attachments exceed 2 GB in total; please delete some old chats first",
+"ja": "保存した会話の添付が合計 2 GB を超えています。古い会話をいくつか削除してください",
+"ko": "저장된 대화 첨부 파일이 총 2 GB를 넘었습니다. 먼저 이전 대화를 몇 개 삭제하세요"
+},
+"不支援的動作 {0}": {
+"en": "Unsupported action {0}",
+"ja": "未対応の操作 {0}",
+"ko": "지원하지 않는 동작 {0}"
+},
+"沒有要打的字": {
+"en": "No text to type",
+"ja": "入力する文字がありません",
+"ko": "입력할 글자가 없습니다"
+},
+"按鍵格式不對": {
+"en": "Invalid key format",
+"ja": "キーの形式が正しくありません",
+"ko": "키 형식이 올바르지 않습니다"
+},
+"不支援的動作 ": {
+"en": "Unsupported action ",
+"ja": "未対応の操作 ",
+"ko": "지원하지 않는 동작 "
+},
+"{0}={1} 超出畫面（0～{2}）": {
+"en": "{0}={1} is off screen (0-{2})",
+"ja": "{0}={1} が画面外です（0～{2}）",
+"ko": "{0}={1}이(가) 화면을 벗어났습니다(0~{2})"
+},
+"超出畫面（0～": {
+"en": "off screen (0-",
+"ja": "画面外（0～",
+"ko": "화면 밖(0~"
+},
+"操作電腦意外中斷：{0}": {
+"en": "Computer use stopped unexpectedly: {0}",
+"ja": "コンピューター操作が予期せず中断しました：{0}",
+"ko": "컴퓨터 조작이 예기치 않게 중단되었습니다: {0}"
+},
+"操作電腦意外中斷": {
+"en": "Computer use stopped unexpectedly",
+"ja": "コンピューター操作が予期せず中断しました",
+"ko": "컴퓨터 조작이 예기치 않게 중단되었습니다"
+},
+"缺少 {0} 座標": {
+"en": "Missing {0} coordinate",
+"ja": "{0} 座標がありません",
+"ko": "{0} 좌표가 없습니다"
+},
+"缺少": {
+"en": "Missing",
+"ja": "不足",
+"ko": "누락"
+},
+"座標": {
+"en": "coordinate",
+"ja": "座標",
+"ko": "좌표"
+},
+" 超出畫面（0～": {
+"en": " is off screen (0-",
+"ja": " が画面外（0～",
+"ko": " 화면 밖(0~"
+},
+"（上一步 {0} 不能用：{1}，請改正）": {
+"en": "(previous step {0} is not usable: {1}; please correct it)",
+"ja": "（前の手順 {0} は使えません：{1}。修正してください）",
+"ko": "(이전 단계 {0}은(는) 사용할 수 없음: {1}, 수정하세요)"
+},
+"上一步": {
+"en": "previous step",
+"ja": "前の手順",
+"ko": "이전 단계"
+},
+"不能用": {
+"en": "not usable",
+"ja": "使えません",
+"ko": "사용할 수 없음"
+},
+"請改正": {
+"en": "please correct it",
+"ja": "修正してください",
+"ko": "수정하세요"
+},
+"操作電腦意外中斷：": {
+"en": "Computer use stopped unexpectedly: ",
+"ja": "コンピューター操作が予期せず中断しました：",
+"ko": "컴퓨터 조작이 예기치 않게 중단되었습니다: "
+},
+"缺少 ": {
+"en": "Missing ",
+"ja": "不足 ",
+"ko": "누락 "
+},
+" 座標": {
+"en": " coordinate",
+"ja": " 座標",
+"ko": " 좌표"
+},
+"模型給的動作不能用（{0}），請它重來": {
+"en": "The model's action is not usable ({0}); asking it to try again",
+"ja": "モデルの操作は使えません（{0}）。やり直しを依頼します",
+"ko": "모델이 준 동작을 사용할 수 없습니다({0}). 다시 하도록 요청합니다"
+},
+"模型給的動作不能用": {
+"en": "The model's action is not usable",
+"ja": "モデルの操作は使えません",
+"ko": "모델이 준 동작을 사용할 수 없습니다"
+},
+"請它重來": {
+"en": "asking it to try again",
+"ja": "やり直しを依頼します",
+"ko": "다시 하도록 요청합니다"
+},
+"（上一步 ": {
+"en": "(previous step ",
+"ja": "（前の手順 ",
+"ko": "(이전 단계 "
+},
+" 不能用：": {
+"en": " is not usable: ",
+"ja": " は使えません：",
+"ko": " 사용할 수 없음: "
+},
+"，請改正）": {
+"en": "; please correct it)",
+"ja": "。修正してください）",
+"ko": ", 수정하세요)"
+},
+"模型連續三次給不出能用的動作；這顆模型可能不適合操作電腦，請換一顆看圖能力強一點的": {
+"en": "The model failed three times in a row to give a usable action; it may not suit computer use, try one with stronger vision",
+"ja": "モデルが3回続けて使える操作を返せませんでした。コンピューター操作に向かない可能性があります。画像理解の強いモデルに替えてください",
+"ko": "모델이 세 번 연속 사용할 수 있는 동작을 주지 못했습니다. 컴퓨터 조작에 맞지 않을 수 있으니 이미지 이해가 더 좋은 모델로 바꾸세요"
+},
+"模型給的動作不能用（": {
+"en": "The model's action is not usable (",
+"ja": "モデルの操作は使えません（",
+"ko": "모델이 준 동작을 사용할 수 없습니다("
+},
+"），請它重來": {
+"en": "); asking it to try again",
+"ja": "）。やり直しを依頼します",
+"ko": "). 다시 하도록 요청합니다"
+},
+"退回 {0}": {
+"en": "Rolling back to {0}",
+"ja": "{0} に戻します",
+"ko": "{0}(으)로 되돌림"
+},
+"更新包解開後太大（上限 256 MB）": {
+"en": "The update package is too large once unpacked (limit 256 MB)",
+"ja": "更新パッケージの展開後サイズが大きすぎます（上限 256 MB）",
+"ko": "업데이트 패키지를 풀면 너무 큽니다(최대 256 MB)"
+},
+"已經在更新或退回了": {
+"en": "An update or rollback is already in progress",
+"ja": "すでに更新または復元を実行中です",
+"ko": "이미 업데이트 또는 되돌리기가 진행 중입니다"
+},
+"更新正在進行，等它做完再退回": {
+"en": "An update is in progress; roll back after it finishes",
+"ja": "更新を実行中です。終わってから戻してください",
+"ko": "업데이트가 진행 중입니다. 끝난 뒤 되돌리세요"
+},
+"相依套件換回舊版中": {
+"en": "Restoring the previous dependency versions",
+"ja": "依存パッケージを旧版に戻しています",
+"ko": "의존 패키지를 이전 버전으로 되돌리는 중"
+},
+"退回失敗：{0}": {
+"en": "Rollback failed: {0}",
+"ja": "復元に失敗しました：{0}",
+"ko": "되돌리기 실패: {0}"
+},
+"退回失敗": {
+"en": "Rollback failed",
+"ja": "復元に失敗しました",
+"ko": "되돌리기 실패"
+},
+"舊版的相依套件裝不回去（這台要能連 pypi.org）：": {
+"en": "Could not reinstall the previous dependencies (this machine must reach pypi.org): ",
+"ja": "旧版の依存パッケージを入れ直せませんでした（pypi.org に接続できる必要があります）：",
+"ko": "이전 의존 패키지를 다시 설치하지 못했습니다(pypi.org에 연결할 수 있어야 함): "
+},
+"退回失敗：": {
+"en": "Rollback failed: ",
+"ja": "復元に失敗しました：",
+"ko": "되돌리기 실패: "
+},
+"{0} 是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾": {
+"en": "{0} belongs to another user; choose a folder of this machine's desktop user",
+"ja": "{0} は別のユーザーのフォルダーです。このマシンのデスクトップユーザー自身のフォルダーを選んでください",
+"ko": "{0}은(는) 다른 사용자의 폴더입니다. 이 기기 데스크톱 사용자의 폴더를 선택하세요"
+},
+"是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾": {
+"en": "belongs to another user; choose a folder of this machine's desktop user",
+"ja": "は別のユーザーのフォルダーです。デスクトップユーザー自身のフォルダーを選んでください",
+"ko": "은(는) 다른 사용자의 폴더입니다. 데스크톱 사용자의 폴더를 선택하세요"
+},
+"這台是純 Wayland 桌面，滑鼠鍵盤送不進去；請登入時改選 X11（Xorg）工作階段": {
+"en": "This machine runs a Wayland-only desktop, so mouse and keyboard input cannot be sent; choose an X11 (Xorg) session at login",
+"ja": "このマシンは Wayland のみのデスクトップで、マウスとキーボードを送れません。ログイン時に X11（Xorg）セッションを選んでください",
+"ko": "이 기기는 Wayland 전용 데스크톱이라 마우스와 키보드 입력을 보낼 수 없습니다. 로그인할 때 X11(Xorg) 세션을 선택하세요"
+},
+"這台沒有送滑鼠鍵盤事件的工具：sudo apt install xdotool": {
+"en": "This machine has no tool to send mouse and keyboard events: sudo apt install xdotool",
+"ja": "マウスとキーボードのイベントを送るツールがありません：sudo apt install xdotool",
+"ko": "마우스·키보드 이벤트를 보낼 도구가 없습니다: sudo apt install xdotool"
+},
+"存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）": {
+"en": "The storage area must be a folder on a disk, e.g. C:\\AI-Models or D:\\models (not the drive root itself)",
+"ja": "保存先はディスク上のフォルダーにしてください。例：C:\\AI-Models、D:\\models（ドライブのルートそのものは不可）",
+"ko": "저장소는 디스크의 폴더여야 합니다. 예: C:\\AI-Models, D:\\models(드라이브 루트 자체는 불가)"
+},
+"{0} 是系統資料夾，不能當存放區": {
+"en": "{0} is a system folder and cannot be the storage area",
+"ja": "{0} はシステムフォルダーのため保存先にできません",
+"ko": "{0}은(는) 시스템 폴더라 저장소로 쓸 수 없습니다"
+},
+"是系統資料夾，不能當存放區": {
+"en": "is a system folder and cannot be the storage area",
+"ja": "はシステムフォルダーのため保存先にできません",
+"ko": "은(는) 시스템 폴더라 저장소로 쓸 수 없습니다"
+},
+"不能直接放在使用者資料夾或 AppData 裡；請選裡面的一個資料夾，或像 C:\\AI-Models 這樣另外建一個": {
+"en": "It cannot be the user folder itself or inside AppData; choose a folder inside it, or create one like C:\\AI-Models",
+"ja": "ユーザーフォルダーそのものや AppData の中には置けません。中のフォルダーを選ぶか、C:\\AI-Models のように別に作ってください",
+"ko": "사용자 폴더 자체나 AppData 안에는 둘 수 없습니다. 그 안의 폴더를 고르거나 C:\\AI-Models처럼 따로 만드세요"
+},
+" 是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾": {
+"en": " belongs to another user; choose a folder of this machine's desktop user",
+"ja": " は別のユーザーのフォルダーです。デスクトップユーザー自身のフォルダーを選んでください",
+"ko": " 은(는) 다른 사용자의 폴더입니다. 데스크톱 사용자의 폴더를 선택하세요"
+},
+"這台沒有截圖工具：sudo apt install imagemagick xdotool": {
+"en": "This machine has no screenshot tool: sudo apt install imagemagick xdotool",
+"ja": "スクリーンショットのツールがありません：sudo apt install imagemagick xdotool",
+"ko": "스크린샷 도구가 없습니다: sudo apt install imagemagick xdotool"
+},
+" 是系統資料夾，不能當存放區": {
+"en": " is a system folder and cannot be the storage area",
+"ja": " はシステムフォルダーのため保存先にできません",
+"ko": " 은(는) 시스템 폴더라 저장소로 쓸 수 없습니다"
 }
 }

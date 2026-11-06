@@ -39,6 +39,7 @@ async function api(path, opts = {}) {
   try { data = await res.json(); } catch (_) { /* 沒有 JSON 就算了 */ }
   if (res.status === 401) { showLogin(); throw new Error("請先登入"); }
   if (!res.ok) { const e = new Error(data.error || `伺服器回 ${res.status}`); e.data = data; throw e; }
+  if (typeof i18nData === "function") i18nData(data);
   return data;
 }
 

@@ -15,6 +15,7 @@
   頁尾的「Powered by xCloudinfo 云碩科技」寫死在頁面裡，不開放關掉。
 """
 import base64
+import concurrent.futures
 import datetime as dt
 import hashlib
 import http.client
@@ -1330,12 +1331,16 @@ def restart_console():
 def update_overview():
     job, cur = updater.status()
     _, sha = updater.bundled_agent()
-    nodes = []
-    for n in fleet()["nodes"]:
-        code, out = call_node(n["id"], "/self", timeout=10)
-        nodes.append({"id": n["id"], "name": n["name"], "online": code == 200, "sha256": out.get("sha256") if code == 200 else None,
-                      "os": out.get("os"), "current": code == 200 and out.get("sha256") == sha,
-                      "old_agent": code == 404})          # 太舊的代理沒有 /self：要用安裝程式或部署腳本更新一次
+    fl = fleet()["nodes"]
+
+    def probe(n):
+        code, out = call_node(n["id"], "/self", timeout=4)
+        return {"id": n["id"], "name": n["name"], "online": code == 200, "sha256": out.get("sha256") if code == 200 else None,
+                "os": out.get("os"), "current": code == 200 and out.get("sha256") == sha,
+                "old_agent": code == 404}                 # 太舊的代理沒有 /self：要用安裝程式或部署腳本更新一次
+    # 各機同時問、每台最多等 4 秒：幾台離線也不會讓這頁卡上好幾分鐘
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(16, len(fl)))) as ex:
+        nodes = list(ex.map(probe, fl))
     return {"current": cur, "job": job, "backups": updater.backups(STATE_DIR), "agent_sha256": sha, "nodes": nodes,
             "repo": updater.REPO}
 

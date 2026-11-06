@@ -65,10 +65,36 @@ async function i18nInit() {
   I18N.re = pieces.length ? new RegExp(pieces.slice(0, 4000).map(reEsc).join("|"), "g") : null;
 }
 
+// 使用者與伺服器給的資料（機器名、對話標題、模型、資料夾、設定檔、角色…）不是介面文字，不翻：
+// 主控台每次拿到回應就把這些欄位的值記下來；翻譯時整段相同就不動，句子裡夾著的也原樣保留
+const I18N_DATA_KEYS = new Set(["name", "title", "role", "label", "model", "path", "folder", "goal", "note", "profile",
+  "user", "username", "subject", "display_name", "alias"]);
+
+function i18nData(obj) {
+  if (I18N.lang === "zh-TW") return;                // 字典還沒載入也先記：之後才畫的畫面一樣要擋
+  I18N.data = I18N.data || new Set();
+  const before = I18N.data.size;
+  const seen = (o, depth) => {
+    if (!o || typeof o !== "object" || depth > 6) return;
+    if (Array.isArray(o)) { o.slice(0, 2000).forEach((x) => seen(x, depth + 1)); return; }
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === "string") {
+        if (I18N_DATA_KEYS.has(k) && v.length <= 200 && /[㐀-鿿]/.test(v)) I18N.data.add(v.trim());
+      } else seen(v, depth + 1);
+    }
+  };
+  seen(obj, 0);
+  if (I18N.data.size !== before) {
+    const list = [...I18N.data].filter((x) => x.length >= 2).sort((a, b) => b.length - a.length).slice(0, 3000);
+    I18N.dataRe = list.length ? new RegExp("(" + list.map(reEsc).join("|") + ")") : null;
+  }
+}
+
 function i18nText(s) {
   if (!I18N.exact || !s || !/[㐀-鿿]/.test(s)) return s;
   const lead = s.match(/^\s*/)[0], tail = s.match(/\s*$/)[0];
   const core = s.trim();
+  if (I18N.data?.has(core)) return s;
   const hit = I18N.exact.get(core);
   if (hit != null) return lead + hit + tail;
   for (const p of I18N.patterns) {
@@ -78,6 +104,11 @@ function i18nText(s) {
       p.names.forEach((n, i) => { out = out.split(`{${n}}`).join(i18nText(m[i + 1])); });
       return lead + out + tail;
     }
+  }
+  // 樣板對不上、要拆片段翻之前：夾在句子裡的資料先切出來原樣保留
+  if (I18N.dataRe) {
+    const parts = core.split(I18N.dataRe);
+    if (parts.length > 1) return lead + parts.map((p, i) => (i % 2 ? p : i18nText(p))).join("") + tail;
   }
   if (!I18N.re) return s;
   // 拼起來的句子：認得的片段換掉（由長到短），空白補在中文與英文之間

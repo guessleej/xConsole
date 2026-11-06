@@ -85,6 +85,8 @@ globalThis.__run = async () => {
   I18N.re = new RegExp(pieces.map(reEsc).join("|"), "g");
   console.log(JSON.stringify([i18nText("重新整理"), i18nText("  重新整理 "), i18nText("已啟動 gemma-4"), i18nText("約 12 tok/s"),
     i18nText("記憶體不夠，請換小一點的量化"), i18nText("gemma-4-E2B"), i18nText("已啟動 約 3 tok/s")]));
+  i18nData({ nodes: [{ id: "n1", name: "重新整理", slots: [{ role: "記憶體不夠" }] }], error: "請換小一點的量化" });
+  console.log(JSON.stringify([i18nText("重新整理"), i18nText("已啟動 記憶體不夠"), i18nText("請換小一點的量化")]));
 };
 __run();
 """ % json.dumps(sample, ensure_ascii=False)
@@ -92,7 +94,8 @@ __run();
                "globalThis.document={documentElement:{}};globalThis.location={reload(){}};"
         r = subprocess.run([node, "-e", stub + prog], capture_output=True, text=True, timeout=30)
         try:
-            got = json.loads(r.stdout.strip().splitlines()[-1])
+            got = json.loads(r.stdout.strip().splitlines()[-2])
+            data = json.loads(r.stdout.strip().splitlines()[-1])
         except (ValueError, IndexError):
             got = None
             check("翻譯函式跑得起來", False, r.stderr[-300:])
@@ -104,6 +107,9 @@ __run();
             check("拼起來的句子：認得的片段換掉", "Not enough memory" in got[4] and "Use a smaller quantization" in got[4], got[4])
             check("沒有中文的字不動（模型名稱）", got[5] == "gemma-4-E2B", got[5])
             check("樣板的變數本身也會翻（巢狀）", got[6] == "Started about 3 tok/s", got[6])
+            check("使用者資料（機器名）跟介面文字一樣也不翻", data[0] == "重新整理", data[0])
+            check("  句子裡夾著的資料（角色名）原樣保留，其他照翻", data[1] == "Started 記憶體不夠", data[1])
+            check("  錯誤訊息不是資料，照翻", data[2] == "Use a smaller quantization", data[2])
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)
 

@@ -6996,6 +6996,18 @@
 "pattern": false
 },
 {
+"zh": "還有 {0} 則舊對話沒搬成功，下次打開對話頁會再試",
+"pattern": true
+},
+{
+"zh": "還有",
+"pattern": false
+},
+{
+"zh": "則舊對話沒搬成功，下次打開對話頁會再試",
+"pattern": false
+},
+{
 "zh": "對話沒存進主控台：",
 "pattern": false
 },
@@ -7440,6 +7452,10 @@
 "pattern": false
 },
 {
+"zh": "這一則有附圖：工具只能處理文字，這次改用一般對話回答（看得到圖）",
+"pattern": false
+},
+{
 "zh": "查了：{0}",
 "pattern": true
 },
@@ -7465,6 +7481,10 @@
 },
 {
 "zh": "操作電腦沒有開始：",
+"pattern": false
+},
+{
+"zh": "主控台重啟過，這個任務已經中斷",
 "pattern": false
 },
 {
@@ -9196,6 +9216,10 @@
 "pattern": false
 },
 {
+"zh": "（標題讀不到）",
+"pattern": false
+},
+{
 "zh": " 要是數字",
 "pattern": false
 },
@@ -9229,6 +9253,14 @@
 },
 {
 "zh": "對話編號不對",
+"pattern": false
+},
+{
+"zh": "這則對話的附圖已經太多（上限 256 MB），請開新對話",
+"pattern": false
+},
+{
+"zh": "你存的對話附圖總共超過 2 GB，請先刪掉一些舊對話",
 "pattern": false
 },
 {
@@ -9308,6 +9340,22 @@
 "pattern": false
 },
 {
+"zh": "不支援的動作 {0}",
+"pattern": true
+},
+{
+"zh": "不支援的動作",
+"pattern": false
+},
+{
+"zh": "沒有要打的字",
+"pattern": false
+},
+{
+"zh": "按鍵格式不對",
+"pattern": false
+},
+{
 "zh": "從（",
 "pattern": false
 },
@@ -9332,6 +9380,18 @@
 "pattern": false
 },
 {
+"zh": "不支援的動作 ",
+"pattern": false
+},
+{
+"zh": "{0}={1} 超出畫面（0～{2}）",
+"pattern": true
+},
+{
+"zh": "超出畫面（0～",
+"pattern": false
+},
+{
 "zh": "捲動 ",
 "pattern": false
 },
@@ -9349,6 +9409,30 @@
 },
 {
 "zh": "（還沒有做任何動作）",
+"pattern": false
+},
+{
+"zh": "操作電腦意外中斷：{0}",
+"pattern": true
+},
+{
+"zh": "操作電腦意外中斷",
+"pattern": false
+},
+{
+"zh": "缺少 {0} 座標",
+"pattern": true
+},
+{
+"zh": "缺少",
+"pattern": false
+},
+{
+"zh": "座標",
+"pattern": false
+},
+{
+"zh": " 超出畫面（0～",
 "pattern": false
 },
 {
@@ -9381,6 +9465,34 @@
 },
 {
 "zh": "模型回錯",
+"pattern": false
+},
+{
+"zh": "（上一步 {0} 不能用：{1}，請改正）",
+"pattern": true
+},
+{
+"zh": "上一步",
+"pattern": false
+},
+{
+"zh": "不能用",
+"pattern": false
+},
+{
+"zh": "請改正",
+"pattern": false
+},
+{
+"zh": "操作電腦意外中斷：",
+"pattern": false
+},
+{
+"zh": "缺少 ",
+"pattern": false
+},
+{
+"zh": " 座標",
 "pattern": false
 },
 {
@@ -9440,6 +9552,34 @@
 "pattern": false
 },
 {
+"zh": "模型給的動作不能用（{0}），請它重來",
+"pattern": true
+},
+{
+"zh": "模型給的動作不能用",
+"pattern": false
+},
+{
+"zh": "請它重來",
+"pattern": false
+},
+{
+"zh": "（上一步 ",
+"pattern": false
+},
+{
+"zh": " 不能用：",
+"pattern": false
+},
+{
+"zh": "，請改正）",
+"pattern": false
+},
+{
+"zh": "模型連續三次給不出能用的動作；這顆模型可能不適合操作電腦，請換一顆看圖能力強一點的",
+"pattern": false
+},
+{
 "zh": "{0}（使用者拒絕了，換個做法）",
 "pattern": true
 },
@@ -9453,6 +9593,14 @@
 },
 {
 "zh": "截不到螢幕（代理回 ",
+"pattern": false
+},
+{
+"zh": "模型給的動作不能用（",
+"pattern": false
+},
+{
+"zh": "），請它重來",
 "pattern": false
 },
 {
@@ -10292,12 +10440,8 @@
 "pattern": false
 },
 {
-"zh": "退回 {0}，重新啟動主控台",
+"zh": "退回 {0}",
 "pattern": true
-},
-{
-"zh": "重新啟動主控台",
-"pattern": false
 },
 {
 "zh": "下載的檔 sha256 對不上 GitHub 公布的（",
@@ -10305,6 +10449,10 @@
 },
 {
 "zh": "更新包的檔案太多",
+"pattern": false
+},
+{
+"zh": "更新包解開後太大（上限 256 MB）",
 "pattern": false
 },
 {
@@ -10337,10 +10485,6 @@
 },
 {
 "zh": "退回 ",
-"pattern": false
-},
-{
-"zh": "，重新啟動主控台",
 "pattern": false
 },
 {
@@ -10388,7 +10532,7 @@
 "pattern": false
 },
 {
-"zh": "已經在更新了",
+"zh": "已經在更新或退回了",
 "pattern": false
 },
 {
@@ -10398,6 +10542,18 @@
 {
 "zh": "備份並換上新版",
 "pattern": false
+},
+{
+"zh": "重新啟動主控台",
+"pattern": false
+},
+{
+"zh": "更新正在進行，等它做完再退回",
+"pattern": false
+},
+{
+"zh": "退回 {0}，重新啟動主控台",
+"pattern": true
 },
 {
 "zh": "連不上 GitHub（",
@@ -10428,6 +10584,22 @@
 "pattern": false
 },
 {
+"zh": "相依套件換回舊版中",
+"pattern": false
+},
+{
+"zh": "，重新啟動主控台",
+"pattern": false
+},
+{
+"zh": "退回失敗：{0}",
+"pattern": true
+},
+{
+"zh": "退回失敗",
+"pattern": false
+},
+{
 "zh": "新版的 {0}/{1} 編譯不過，不更新：{2}",
 "pattern": true
 },
@@ -10445,6 +10617,14 @@
 },
 {
 "zh": "），不更新",
+"pattern": false
+},
+{
+"zh": "舊版的相依套件裝不回去（這台要能連 pypi.org）：",
+"pattern": false
+},
+{
+"zh": "退回失敗：",
 "pattern": false
 },
 {
@@ -10601,10 +10781,6 @@
 },
 {
 "zh": "載入模型中",
-"pattern": false
-},
-{
-"zh": "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）",
 "pattern": false
 },
 {
@@ -10916,10 +11092,6 @@
 "pattern": false
 },
 {
-"zh": "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）",
-"pattern": false
-},
-{
 "zh": "{0} 是系統目錄，不能當存放區",
 "pattern": true
 },
@@ -11004,6 +11176,14 @@
 "pattern": false
 },
 {
+"zh": "{0} 是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾",
+"pattern": true
+},
+{
+"zh": "是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾",
+"pattern": false
+},
+{
 "zh": "AppData 放的是程式設定與登入資料，不能給 Agent",
 "pattern": false
 },
@@ -11084,12 +11264,20 @@
 "pattern": false
 },
 {
-"zh": "不支援的動作：{0}",
-"pattern": true
+"zh": "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）",
+"pattern": false
 },
 {
-"zh": "不支援的動作",
+"zh": "這台是純 Wayland 桌面，滑鼠鍵盤送不進去；請登入時改選 X11（Xorg）工作階段",
 "pattern": false
+},
+{
+"zh": "這台沒有送滑鼠鍵盤事件的工具：sudo apt install xdotool",
+"pattern": false
+},
+{
+"zh": "不支援的動作：{0}",
+"pattern": true
 },
 {
 "zh": "（憑證 ",
@@ -11760,7 +11948,27 @@
 "pattern": false
 },
 {
+"zh": "存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）",
+"pattern": false
+},
+{
+"zh": "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）",
+"pattern": false
+},
+{
 "zh": " 是系統目錄，不能當存放區",
+"pattern": false
+},
+{
+"zh": "{0} 是系統資料夾，不能當存放區",
+"pattern": true
+},
+{
+"zh": "是系統資料夾，不能當存放區",
+"pattern": false
+},
+{
+"zh": "不能直接放在使用者資料夾或 AppData 裡；請選裡面的一個資料夾，或像 C:\\AI-Models 這樣另外建一個",
 "pattern": false
 },
 {
@@ -11825,6 +12033,10 @@
 },
 {
 "zh": " 是系統資料夾",
+"pattern": false
+},
+{
+"zh": " 是別人的使用者資料夾；只能選這台桌面使用者自己的資料夾",
 "pattern": false
 },
 {
@@ -12088,7 +12300,7 @@
 "pattern": false
 },
 {
-"zh": "這台沒有截圖工具：sudo apt install imagemagick xdotool（Wayland 桌面另裝 grim ydotool）",
+"zh": "這台沒有截圖工具：sudo apt install imagemagick xdotool",
 "pattern": false
 },
 {
@@ -12625,6 +12837,10 @@
 },
 {
 "zh": "沒有正在進行的編譯",
+"pattern": false
+},
+{
+"zh": " 是系統資料夾，不能當存放區",
 "pattern": false
 },
 {

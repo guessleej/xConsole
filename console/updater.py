@@ -5,7 +5,7 @@
 - 更新主控台：下載 → 整個檔核對 GitHub 公布的 sha256（不能連外的機器改成手動上傳，核對管理者貼上的 sha256）
   → 解到暫存資料夾（擋 .. 與絕對路徑、檔數與大小上限）→ 每個 .py 先編譯一次確認沒有語法錯 → 備份目前的檔
   → 換上（requirements.txt 變了就先用同一個 Python 裝相依套件，裝不起來就整組還原）→ 結束行程，由服務管理員重新帶起。
-- 退回上一版：把最近一次的備份換回去再重啟。
+- 退回上一版：把最近一次的備份換回去（相依清單不同就裝回舊的）再重啟；更新進行中不准退回。備份只留最近 10 份。
 - 代理：主控台把新版的 xconsole_agent.py 送給各機（代理核對 sha256、編譯過才換，舊的留備份），代理結束後由服務管理員重新帶起。
 """
 import hashlib
@@ -28,6 +28,9 @@ GH_API = os.environ.get("XCONSOLE_GH_API", "https://api.github.com")
 HERE = os.path.dirname(os.path.abspath(__file__))
 MAX_PKG = 64 * 1024 * 1024
 MAX_FILES = 2000
+MAX_UNPACKED = 256 * 1024 * 1024
+KEEP_BACKUPS = 10
+BUSY = ("downloading", "checking", "installing", "applying", "restarting", "rolling_back")
 VER_RX = re.compile(r"v?\d{1,4}(\.\d{1,4}){1,3}([-.][\w.]{1,20})?")
 STATE = {"job": None}
 LOCK = threading.Lock()
@@ -102,6 +105,8 @@ def _extract(data, dest):
         members = tf.getmembers()
         if len(members) > MAX_FILES:
             raise ValueError("更新包的檔案太多")
+        if sum(m.size for m in members if m.isfile()) > MAX_UNPACKED:
+            raise ValueError("更新包解開後太大（上限 256 MB）")   # tarfile 照標頭的大小讀，總和擋住就不會解出超量的檔
         for m in members:
             name = m.name.replace("\\", "/")
             if name.startswith("/") or ".." in name.split("/") or re.match(r"^[A-Za-z]:", name):
@@ -173,10 +178,9 @@ def _apply(root, state_dir, restart):
     new_req = open(new_req_p, encoding="utf-8").read() if os.path.exists(new_req_p) else old_req
     if new_req != old_req:
         _job("installing", message="相依套件有變，安裝中")
-        r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check", "-r", new_req_p],
-                           capture_output=True, text=True, timeout=900)
-        if r.returncode != 0:
-            raise ValueError("新版的相依套件裝不起來（這台要能連 pypi.org）：" + (r.stderr or r.stdout)[-300:])
+        ok, msg = _pip(new_req_p)
+        if not ok:
+            raise ValueError("新版的相依套件裝不起來（這台要能連 pypi.org）：" + msg)
     try:
         for src, dst in pairs:
             os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -186,7 +190,23 @@ def _apply(root, state_dir, restart):
     except OSError as ex:
         _restore(bdir)
         raise ValueError(f"換檔失敗，已還原：{ex}") from ex
+    _prune(state_dir, keep=os.path.basename(bdir))
     return bdir
+
+
+def _prune(state_dir, keep):
+    """只留最近 KEEP_BACKUPS 份備份（畫面上也只列這些），更舊的刪掉，免得每次更新多一份、磁碟越吃越多。"""
+    d = _backup_dir(state_dir)
+    names = sorted((n for n in os.listdir(d) if os.path.isdir(os.path.join(d, n))), reverse=True)
+    for n in names[KEEP_BACKUPS:]:
+        if n != keep:
+            shutil.rmtree(os.path.join(d, n), ignore_errors=True)
+
+
+def _pip(req_path):
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check", "-r", req_path],
+                       capture_output=True, text=True, timeout=900)
+    return r.returncode == 0, (r.stderr or r.stdout)[-300:]
 
 
 def _restore(bdir):
@@ -213,8 +233,8 @@ def start_update(state_dir, restart, data=None, url=None, sha256=None, version=N
     if not re.fullmatch(r"[0-9a-f]{64}", sha256):
         return 400, {"error": "要有 64 碼的 sha256 才能核對更新包（GitHub 的版本頁上每個附件都有）"}
     with LOCK:
-        if STATE.get("job") and STATE["job"].get("state") in ("downloading", "checking", "installing", "applying"):
-            return 409, {"error": "已經在更新了"}
+        if STATE.get("job") and STATE["job"].get("state") in BUSY:
+            return 409, {"error": "已經在更新或退回了"}
         STATE["job"] = {"state": "checking", "at": time.time(), "version": version}
 
     def run():
@@ -253,13 +273,33 @@ def backups(state_dir):
 
 
 def rollback(state_dir, restart):
+    """退回最近一次的備份。跟更新共用同一把鎖：更新進行中不准退回；相依清單不同就把舊的裝回去再重啟。"""
     bs = backups(state_dir)
     if not bs:
         return 404, {"error": "沒有可以退回的備份"}
-    ver = _restore(os.path.join(_backup_dir(state_dir), bs[0]["name"]))
-    _job("restarting", message=f"退回 {ver}，重新啟動主控台")
-    _restart_soon(restart)
-    return 200, {"ok": True, "version": ver}
+    with LOCK:
+        if STATE.get("job") and STATE["job"].get("state") in BUSY:
+            return 409, {"error": "更新正在進行，等它做完再退回"}
+        STATE["job"] = {"state": "rolling_back", "at": time.time(), "message": f"退回 {bs[0]['version']}"}
+    bdir = os.path.join(_backup_dir(state_dir), bs[0]["name"])
+    req = os.path.join(HERE, "requirements.txt")
+    before = open(req, encoding="utf-8").read() if os.path.exists(req) else ""
+
+    def run():
+        try:
+            ver = _restore(bdir)
+            after = open(req, encoding="utf-8").read() if os.path.exists(req) else ""
+            if after and after != before:
+                _job("rolling_back", message="相依套件換回舊版中")
+                ok, msg = _pip(req)
+                if not ok:
+                    raise ValueError("舊版的相依套件裝不回去（這台要能連 pypi.org）：" + msg)
+            _job("restarting", message=f"退回 {ver}，重新啟動主控台", new_version=ver)
+            _restart_soon(restart)
+        except Exception as ex:  # noqa: BLE001
+            _job("failed", error=f"退回失敗：{str(ex)[:500]}")
+    threading.Thread(target=run, daemon=True).start()
+    return 200, {"ok": True, "version": bs[0]["version"]}
 
 
 def bundled_agent():

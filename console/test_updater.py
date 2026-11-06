@@ -102,6 +102,21 @@ def main():
         check(f"擋下：{why}", job["state"] == "failed", job)
     check("  擋下的都沒有動到目前的檔", open(os.path.join(inst, "static", "index.html")).read() == "old index")
 
+    real_max = U.MAX_UNPACKED
+    U.MAX_UNPACKED = 1000
+    try:
+        U.STATE["job"] = None
+        big = pkg(extra=[("xconsole-x/console/big.json", b"0" * 5000, "file")])
+        U.start_update(state, None, data=big, sha256=hashlib.sha256(big).hexdigest())
+        job = wait_job()
+        check("擋下：解開後總大小超過上限", job["state"] == "failed" and "太大" in job["error"], job)
+    finally:
+        U.MAX_UNPACKED = real_max
+
+    bdir = os.path.join(state, "update-backups")
+    for i in range(12):                                   # 以前留下的舊備份
+        os.makedirs(os.path.join(bdir, f"2020010{i // 10}-00000{i % 10}"))
+        open(os.path.join(bdir, f"2020010{i // 10}-00000{i % 10}", "manifest.json"), "w").write('{"version":"old","files":[]}')
     U.STATE["job"] = None
     c, out = U.start_update(state, None, data=data, sha256=hashlib.sha256(data).hexdigest())
     job = wait_job()
@@ -112,9 +127,22 @@ def main():
     bs = U.backups(state)
     check("  換之前有備份（記著原本的版本）", bs and bs[0]["version"] == "2026.1.1", bs)
 
-    c, out = U.rollback(state, None)
-    check("退回上一版：檔換回原本的", c == 200 and out["version"] == "2026.1.1" and U.current_version() == "2026.1.1"
-          and open(os.path.join(inst, "static", "app.js")).read() == "// old app", out)
+    check("  備份只留最近 10 份，剛做的那份還在", len(os.listdir(bdir)) == 10 and bs[0]["version"] == "2026.1.1", sorted(os.listdir(bdir)))
+
+    check("更新進行中不准退回", U.rollback(state, None)[0] == 409)
+    U.STATE["job"] = None
+    open(os.path.join(inst, "requirements.txt"), "a").write("\nnewdep==9.9\n")   # 新版多了一個相依套件
+    piped = []
+    real_pip = U._pip
+    U._pip = lambda p: (piped.append(open(p).read()), (True, ""))[1]
+    try:
+        c, out = U.rollback(state, None)
+        job = wait_job()
+    finally:
+        U._pip = real_pip
+    check("退回上一版：檔換回原本的", c == 200 and out["version"] == "2026.1.1" and job["state"] == "restarting"
+          and U.current_version() == "2026.1.1" and open(os.path.join(inst, "static", "app.js")).read() == "// old app", (out, job))
+    check("  相依清單不同：把舊版的相依套件裝回去", piped and "newdep" not in piped[0], piped)
     data2, sha2 = U.bundled_agent()
     check("隨附代理的 sha256", sha2 == hashlib.sha256(open(os.path.join(inst, "agent", "xconsole_agent.py"), "rb").read()).hexdigest())
 
