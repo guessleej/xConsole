@@ -93,8 +93,9 @@ function planCell(p) {
   const [lbl, cls] = levelOf(p);
   const top = el("div", "plan-top");
   top.appendChild(el("span", "chip " + cls, lbl));
-  top.appendChild(el("span", "small mono", p.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `約 ${fmt(p.tok_s, 0)} tok/s`) : "速度未知"));
+  top.appendChild(el("span", "small mono", p.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `${p.measured ? "實測" : "約"} ${fmt(p.tok_s, 0)} tok/s`) : "速度未知"));
   if (p.guess) top.appendChild(el("span", "small muted", "（估算）"));
+  else if (!p.measured && p.calibrated) top.appendChild(el("span", "small muted", "（依這台實測校正）"));
   cell.appendChild(top);
   cell.appendChild(splitBar(p.split));
   return cell;
@@ -415,7 +416,9 @@ function drawPlan(c, n, m, p) {
   const msg = { smooth: `全部放進最快的一層，預估約 ${fmt(p.tok_s, 0)} tok/s，很順。`,
     ok: p.cpu_moe ? `${p.cpu_moe} 層專家放系統記憶體，能跑但比較慢${p.tok_s != null ? `（約 ${fmt(p.tok_s, 0)} tok/s）` : ""}。`
       : p.tok_s == null ? "放得下。這台的記憶體頻寬還沒填，算不出速度；到「這台的設定」填了就會標出來。" : `放得下，但速度偏慢（約 ${fmt(p.tok_s, 0)} tok/s）。`,
-    disk: sp.disk ? `這台的記憶體放不下這顆，約 ${fmt(sp.disk, 0)} GiB 要從硬碟按需讀取；能跑，但很慢${p.tok_s != null ? `（約 ${p.tok_s < 1 ? "不到 1" : fmt(p.tok_s, 0)} tok/s）` : ""}，適合測試。`
+    disk: p.tiered ? `MoE 模型依張量分層：注意力與共用權重${sp.gpu ? "放顯示卡" : "常駐記憶體"}，${p.cpu_moe} 層專家留在記憶體映射，`
+        + (sp.disk ? `其中約 ${fmt(sp.disk, 0)} GiB 用到才從 SSD 讀` : "全部在記憶體裡") + `；每個字只讀被選中的少數專家，所以比整層搬出去快${p.tok_s != null ? `（約 ${p.tok_s < 1 ? "不到 1" : fmt(p.tok_s, 0)} tok/s）` : ""}。`
+      : sp.disk ? `這台的記憶體放不下這顆，約 ${fmt(sp.disk, 0)} GiB 要從硬碟按需讀取；能跑，但很慢${p.tok_s != null ? `（約 ${p.tok_s < 1 ? "不到 1" : fmt(p.tok_s, 0)} tok/s）` : ""}，適合測試。`
       : "顯示卡放不下，部分層改放系統記憶體、權重用記憶體映射載入；能跑但比較慢。",
     no: p.place || "這台放不下這顆。" }[p.level] || "";
   c.appendChild(el("p", "note" + (p.level === "disk" ? " warn" : p.level === "no" ? " bad" : ""), msg));
@@ -471,8 +474,9 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
 
   const est = el("div", "tiles light run-est");
   est.append(
-    tileOf("預估速度", p?.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `約 ${fmt(p.tok_s, 0)} tok/s`) : "未知",
-      p?.tok_s != null ? "依記憶體頻寬估算" : "到這台的設定填記憶體頻寬"),
+    tileOf(p?.measured ? "實測速度" : "預估速度", p?.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `${p.measured ? "" : "約 "}${fmt(p.tok_s, 0)} tok/s`) : "未知",
+      p?.measured ? "這顆在這台實際對話量到的" : p?.calibrated ? `依記憶體頻寬估、乘上這台實測的校正（×${p.calibrated}）`
+        : p?.tok_s != null ? "依記憶體頻寬估算；對話過一次就會改成實測" : "到這台的設定填記憶體頻寬"),
     tileOf("第一次載入", p?.load_sec != null ? `${fmt(p.load_sec, 0)} 秒` : p?.load_est_sec != null ? `約 ${fmtDur(p.load_est_sec)}` : "—",
       p?.load_sec != null ? "上次實際載入" : "依磁碟速度估"));
   c.appendChild(est);
@@ -494,6 +498,7 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   if (shorter && (p?.level === "no" || diskNeed)) {
     c.appendChild(el("p", "note", `上面的規劃是照 ${int(p.ctx)} 個 token 算的。調到 ${st.ctx / 1024}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。`));
   }
+  if (isLlama) c.appendChild(launchArgsBox(n, m, slot, running));
   c.append(btn, err);
   if (running && slot) {
     const stopB = el("button", "btn danger run-go", "停止模型");
@@ -501,6 +506,61 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
     c.appendChild(stopB);
   }
   btn.onclick = () => startModel(n, m, slot, st, btn, err, prog, statusHolder);
+}
+
+// 高階：啟動引數。完整指令（這顆正在跑時）＋自訂引數（跟著這顆模型存，下次啟動或重新載入時生效）
+function launchArgsBox(n, m, slot, running) {
+  const d = el("details", "run-adv");
+  d.appendChild(el("summary", null, "高階：啟動引數"));
+  const body = el("div");
+  d.appendChild(body);
+  let loaded = false;
+  d.addEventListener("toggle", async () => {
+    if (!d.open || loaded) return;
+    loaded = true;
+    loading(body);
+    let r;
+    try { r = await api(`/api/node/${n.id}/llama/args?model=${encodeURIComponent(m.id)}`); } catch (ex) { errNote(body, ex.message); loaded = false; return; }
+    body.textContent = "";
+    body.appendChild(el("p", "small muted", r.cmd ? "這顆正在跑，完整的啟動指令（金鑰只放檔案位置，不在指令裡）：" : "這顆還沒在跑；啟動後這裡會顯示完整的啟動指令。"));
+    if (r.cmd) {
+      const pre = el("pre", "code-pre mono small run-cmd");
+      pre.textContent = r.cmd;
+      const cp = el("button", "btn sm", "複製指令");
+      cp.onclick = () => copyText(r.cmd);
+      body.append(pre, cp);
+    }
+    const ta = el("textarea", "mono");
+    ta.rows = 2;
+    ta.maxLength = 2000;
+    ta.placeholder = "例：-fa on -t 8 --n-cpu-moe 20\n或：-ot \"blk\\.(\\d+)\\.ffn_.*_exps\\.=CPU\"";
+    ta.value = r.args || "";
+    ta.setAttribute("aria-label", "自訂啟動引數");
+    body.appendChild(fieldBox("自訂啟動引數", ta,
+      "接在自動產生的參數後面，跟著這顆模型存。模型、監聽位址與埠、金鑰、任何檔案路徑由主控台管，不能在這裡改。"
+      + "自己寫了 -ngl、-ot、--n-cpu-moe、-ts 時，自動分層就讓位；寫了 -c 時上下文用你的。記憶體試算仍照自動分層算，請自己確認放得下。"));
+    const note = el("p", "note warn");
+    note.hidden = !r.auto_layers_off;
+    note.textContent = "已停用自動分層：分層由你寫的參數決定。";
+    const row = el("div", "slot-actions");
+    const save = el("button", "btn sm primary", "儲存引數");
+    const help = el("a", "link-btn", "llama-server 參數說明");
+    help.href = "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md";
+    help.target = "_blank";
+    help.rel = "noopener noreferrer";
+    const err = el("div");
+    row.append(help, el("span", "spacer"), save);
+    body.append(note, row, err);
+    save.onclick = async () => {
+      errNote(err, "");
+      let out;
+      try { out = await api(`/api/node/${n.id}/llama/args`, { method: "POST", body: { model: m.id, args: ta.value } }); } catch (ex) { errNote(err, ex.message); return; }
+      ta.value = out.args;
+      note.hidden = !out.auto_layers_off;
+      toast(running ? "已儲存；按「套用設定並重新載入」才會生效" : "已儲存；下次啟動這顆時生效", "ok");
+    };
+  });
+  return d;
 }
 
 const fmtDur = (sec) => sec >= 90 ? `${Math.floor(sec / 60)} 分 ${Math.round(sec % 60)} 秒` : `${Math.round(sec)} 秒`;
@@ -665,6 +725,50 @@ async function openPreview(html) {
    交給 Agent 一件事：它在這台機器的工作資料夾裡規劃、建檔、寫程式、跑指令。每條指令都要人按允許
    （可以勾「這個任務之後不再問」）。檔案只能動工作資料夾裡的；指令在這台以代理的身分執行。 */
 
+// 資料夾瀏覽器：只列子資料夾（不列檔案），不能選的標出原因；選好就連結給 Agent 用
+function openFolderBrowser(n, done) {
+  const d = el("div", "fb");
+  const head = el("div", "fb-head");
+  const list = el("div", "fb-list scrollbox");
+  const err = el("div");
+  d.append(head, list, err);
+  const ov = modal({ title: "選這台的一個資料夾給 Agent 用", bodyNode: d, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  let cur = null;
+  const pick = el("button", "btn primary", "用這個資料夾");
+  ov.querySelector(".actions").appendChild(pick);
+  const go2 = async (path) => {
+    loading(list);
+    let r;
+    try { r = await api(`/api/node/${n.id}/agent/browse?path=${encodeURIComponent(path || "")}`); } catch (ex) { errNote(list, ex.message); return; }
+    cur = r;
+    head.textContent = "";
+    const roots = el("div", "chips");
+    r.roots.forEach((x) => { const b = el("button", "chip-btn", x.name); b.onclick = () => go2(x.path); roots.appendChild(b); });
+    head.append(roots, el("div", "mono small fb-path", r.path));
+    if (r.why) head.appendChild(el("p", "small warn-t", `這個資料夾不能用：${r.why}`));
+    pick.disabled = !r.ok;
+    list.textContent = "";
+    if (r.parent) { const up = el("button", "fb-row", "↑ 上一層"); up.onclick = () => go2(r.parent); list.appendChild(up); }
+    if (!r.dirs.length) list.appendChild(el("p", "small muted", "這裡沒有子資料夾。"));
+    r.dirs.forEach((x) => {
+      const b = el("button", "fb-row" + (x.ok ? "" : " fb-no"), x.name);
+      if (!x.ok) b.title = x.why;
+      b.onclick = () => go2(x.path);
+      list.appendChild(b);
+    });
+  };
+  pick.onclick = async () => {
+    if (!cur?.ok) return;
+    let r;
+    try { r = await api(`/api/node/${n.id}/agent/folders/link`, { method: "POST", body: { path: cur.path } }); } catch (ex) { errNote(err, ex.message); return; }
+    ov.remove();
+    toast(`已連結：${r.name}`, "ok");
+    done(r.name);
+  };
+  go2("");
+}
+
 async function viewAgent() {
   const main = $("#main");
   const v = S.view;
@@ -679,7 +783,7 @@ async function viewAgent() {
     if (S.view !== v) return;
     const c = card("Agent 還沒在這台開啟");
     c.appendChild(el("p", "small muted", "Agent 會在這台機器上建檔、跑指令。為了安全，每台預設關閉，要管理者在「這台的設定」打開；"
-      + "打開後檔案只能動 ~/xconsole-agent/ 底下的工作資料夾，每條指令都要人按允許。"));
+      + "打開後檔案只能動工作資料夾裡面（~/xconsole-agent/ 底下的，或你連結進來的資料夾），每條指令都要人按允許。"));
     c.appendChild(el("p", "note", ex.message));
     const b = el("button", "btn primary", "到這台的設定開啟");
     b.onclick = () => openMachineSettings(n.id);
@@ -704,10 +808,14 @@ async function viewAgent() {
 
   const bar = el("div", "chat-bar");
   const mSel = selectInput(models.length ? models : [["", "沒有可用的模型"]], S.agentModel || models[0]?.[0]);
-  const fSel = selectInput([["", "選擇工作資料夾…"], ...(folders.folders || []).map((f) => [f.name, `${f.name}（${f.files} 個檔案）`])], S.agentFolder || "");
+  const fSel = selectInput([["", "選擇工作資料夾…"], ...(folders.folders || []).map((f) => [f.name,
+    f.linked ? `${f.name}（連結：${f.path}${f.broken ? "・不能用了" : ""}）` : `${f.name}（${f.files} 個檔案）`])], S.agentFolder || "");
   const newF = el("button", "btn sm", "新增資料夾");
+  const linkF = el("button", "btn sm", "連結這台的資料夾");
+  linkF.title = "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選";
+  linkF.onclick = () => openFolderBrowser(n, (name) => { S.agentFolder = name; viewAgent(); });
   const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}）`])], S.agentTask || "");
-  bar.append(mSel, fSel, newF, el("span", "spacer"), taskSel);
+  bar.append(mSel, fSel, newF, linkF, el("span", "spacer"), taskSel);
   mainC.appendChild(bar);
   mSel.onchange = () => { S.agentModel = mSel.value; };
   fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(); };
@@ -762,7 +870,17 @@ async function viewAgent() {
       filesBox.appendChild(r);
     });
     const tree = t?.tree || [];
-    treeBox.appendChild(el("p", "small muted", fSel.value ? `~/xconsole-agent/${fSel.value}` : "還沒選資料夾"));
+    const fi = (folders.folders || []).find((f) => f.name === fSel.value);
+    treeBox.appendChild(el("p", "small muted", !fSel.value ? "還沒選資料夾" : fi?.linked ? fi.path : `~/xconsole-agent/${fSel.value}`));
+    if (fi?.linked) {
+      const un = el("button", "link-btn", "取消連結（資料夾本身不動）");
+      un.onclick = async () => {
+        try { await api(`/api/node/${n.id}/agent/folders/unlink`, { method: "POST", body: { name: fi.name } }); } catch (ex) { toast(ex.message, "bad"); return; }
+        S.agentFolder = "";
+        viewAgent();
+      };
+      treeBox.appendChild(un);
+    }
     if (tree.length) {
       const pre = el("pre", "mono small agent-tree");
       pre.textContent = tree.map((x) => (x.dir ? x.path + "/" : `${x.path}  (${x.size != null ? fmtBytes(x.size) : ""})`)).join("\n");

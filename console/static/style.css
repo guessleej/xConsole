@@ -1295,3 +1295,17 @@ input.switch:checked::after { transform: translateX(18px); }
 .chat-side-top .btn.primary { flex: 1; }
 .chat-side-x { display: none; }
 @media (max-width: 860px) { .chat-side-x { display: inline-flex; } }
+.run-adv { margin: 12px 0; }
+.run-adv summary { cursor: pointer; font-weight: 600; }
+.run-adv textarea { width: 100%; }
+.run-cmd { max-height: 140px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.pc-shot { display: block; width: min(640px, 100%); border-radius: 10px; margin: 6px 0; box-shadow: 0 6px 18px rgba(22, 32, 42, .18); }
+.pc-pending { background: rgba(217, 119, 6, .11); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.pc-log ol { margin: 6px 0 0 18px; padding: 0; max-height: 220px; overflow-y: auto; }
+.pc-log summary { cursor: pointer; }
+.fb-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.fb-path { overflow-wrap: anywhere; }
+.fb-list { max-height: 360px; display: flex; flex-direction: column; gap: 2px; }
+.fb-row { text-align: left; border: 0; background: none; color: inherit; font: inherit; padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.fb-row:hover { background: var(--bg-hover); }
+.fb-no { color: var(--ink-3); }

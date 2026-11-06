@@ -40,6 +40,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chats  # noqa: E402
+import computer  # noqa: E402
 import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
@@ -1309,6 +1310,17 @@ def provider_json(prov, method, path, body=None, timeout=120):
         conn.close()
 
 
+HF_TOKEN_PATHS = re.compile(r"/api/node/[\w.-]+/(?:library/(?:hf|hf/tree|hf/search|download)|sd/download)")
+
+
+def hf_token():
+    t = (fleet().get("hf") or {}).get("token") or ""
+    try:
+        return tls.unseal(CERTS.p, t).decode() if t.startswith("enc:v1:") else ""
+    except Exception:  # noqa: BLE001  # 主金鑰換過或密文壞了：當作沒設，不擋下載公開模型
+        return ""
+
+
 def chat_seal(data: bytes) -> str:
     return tls.seal(CERTS.p, data)
 
@@ -1703,6 +1715,49 @@ def agent_stop(t, audit):
                          daemon=True).start()
     audit("agent.task_stop", t.id, True)
     return {"ok": True, "state": t.state}
+
+
+def resolve_model(node, m):
+    """Agent 與操作電腦共用：模型要是本機欄位（kind=local, node, slot）或第三方 API（kind=provider, id, model）。回 (模型, 標籤, 錯誤)。"""
+    if isinstance(m, str):
+        kind, _, rest = m.partition(":")
+        m = {"kind": kind, "slot": rest} if kind == "local" else {"kind": kind, "id": rest.split(":", 1)[0],
+                                                                    "model": rest.split(":", 1)[1] if ":" in rest else ""}
+    if not isinstance(m, dict) or m.get("kind") not in ("local", "provider"):
+        return None, None, "模型要是本機欄位或第三方 API"
+    if m["kind"] == "local":
+        slot, mnode = str(m.get("slot") or ""), str(m.get("node") or node)
+        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]):
+            return None, None, "本機模型要指定欄位"
+        return {"kind": "local", "node": mnode, "slot": slot}, f"本機 {mnode}/{slot}", None
+    prov = STORE.provider_get(str(m.get("id") or ""))
+    if not prov:
+        return None, None, "沒有這筆第三方 API"
+    name = str(m.get("model") or prov.get("default_model") or "")
+    if not name or not PROVIDER_MODEL_RX.fullmatch(name):
+        return None, None, "這筆第三方 API 沒有設預設模型，請指定模型"
+    return {"kind": "provider", "id": prov["id"], "model": name}, f"{prov['name']}／{name}", None
+
+
+def computer_start(user, ip, body, audit):
+    node = str(body.get("node") or "")
+    if not any(n["id"] == node for n in fleet()["nodes"]):
+        return 404, {"error": "沒有這台機器"}
+    model, label, err = resolve_model(node, body.get("model"))
+    if err:
+        return 400, {"error": err}
+
+    def cn(nid, path, method, b, timeout):
+        return call_node(nid, path, method, b, timeout=timeout)
+
+    class _T:      # agent_model_call 只用到 .model
+        pass
+
+    def mc(t, req):
+        holder = _T()
+        holder.model = t.model
+        return agent_model_call(holder, req)
+    return computer.start(user, ip, node, model, body.get("goal"), label, cn, mc, audit)
 
 
 def agent_start(user, ip, body):
@@ -2309,6 +2364,14 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/slot/([\w.-]+)/progress", path)
         if m:
             return self._json(*call_node(m.group(1), f"/slot/{m.group(2)}/progress", timeout=15))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/args", path)
+        if m:
+            q = (parse_qs(urlparse(self.path).query).get("model") or [""])[0]
+            return self._json(*call_node(m.group(1), "/llama/args?model=" + urllib.parse.quote(q[:400]), timeout=30))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/browse", path)
+        if m:
+            q = (parse_qs(urlparse(self.path).query).get("path") or [""])[0]
+            return self._json(*call_node(m.group(1), "/agent/browse?path=" + urllib.parse.quote(q[:1000]), timeout=30))
         m = re.fullmatch(r"/api/node/([\w.-]+)/agent/folders", path)
         if m:
             return self._json(*call_node(m.group(1), "/agent/folders", timeout=30))
@@ -2317,6 +2380,16 @@ class Handler(BaseHTTPRequestHandler):
                 rows = sorted(AGENT_TASKS.values(), key=lambda x: -x.created)
             return self._json(200, {"items": [t.public(full=False) for t in rows],
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
+        m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})", path)
+        if m:
+            t = computer.TASKS.get(m.group(1))
+            if not t or t.user != self.user:
+                return self._json(404, {"error": "沒有這個任務"})
+            after = (parse_qs(urlparse(self.path).query).get("after") or [None])[0]
+            return self._json(200, t.public(int(after) if after and after.isdigit() else None))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/desktop/status", path)
+        if m:
+            return self._json(*call_node(m.group(1), "/desktop/status", timeout=20))
         m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})", path)
         if m:
             t = AGENT_TASKS.get(m.group(1))
@@ -2402,7 +2475,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/settings":
             cfg = fleet()
             return self._json(200, {"report": cfg["report"], "hostnames": hostnames(),
-                                    "username": cfg["auth"].get("username", "admin")})
+                                    "username": cfg["auth"].get("username", "admin"),
+                                    "hf_token_set": bool((cfg.get("hf") or {}).get("token"))})
         return self._json(404, {"error": "找不到"})
 
     # ---- POST
@@ -2431,6 +2505,8 @@ class Handler(BaseHTTPRequestHandler):
         self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
+        if HF_TOKEN_PATHS.fullmatch(path) and not str(body.get("token") or "").strip():
+            body["token"] = hf_token()          # 畫面沒另外填令牌：用設定裡存的（受限模型如 Llama、部分 Gemma 才下載得到）
 
         if path == "/api/login":
             user = str(body.get("username") or "")[:64]
@@ -2625,19 +2701,52 @@ class Handler(BaseHTTPRequestHandler):
                                     "models": [{"id": i, "cn_origin": any(c in i.lower() for c in recommend.CN_ORIGIN)}
                                                for i in sorted(ids)][:500]})
         # ---- Agent：工作資料夾與任務
-        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/(folders/create|fs/list|fs/read)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/llama/args", path)
+        if m:
+            code, out = call_node(m.group(1), "/llama/args", "POST", {"model": body.get("model"), "args": body.get("args")}, timeout=30)
+            self._audit("llama.custom_args", f"{m.group(1)}/{body.get('model')}", code == 200,
+                        {"args": out.get("args"), "message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/(folders/create|folders/link|folders/unlink|fs/list|fs/read)", path)
         if m:
             node_id, act = m.groups()
             want = {k: body.get(k) for k in ("name", "folder", "path") if k in body}
             code, out = call_node(node_id, f"/agent/{act}", "POST", want, timeout=60)
-            if act == "folders/create":
-                self._audit("agent.folder_create", f"{node_id}/{body.get('name')}", code == 200, {"message": out.get("error")})
+            if act.startswith("folders/"):
+                self._audit("agent." + act.replace("folders/", "folder_"), f"{node_id}/{body.get('name') or body.get('path')}",
+                            code == 200, {"message": out.get("error"), "path": out.get("path")})
             return self._json(code, out)
         if path == "/api/agent/tasks":
             code, out = agent_start(self.user, self.ip, body)
             self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/computer/tasks":
+            who, where = self.user or "", self.ip      # 背景執行緒寫稽核：先記下來，不能事後再讀 self（連線會被下一個請求重用）
+
+            def aud(action, target, ok, detail=None):
+                STORE.audit(who, where, action, target, ok, detail)
+            code, out = computer_start(self.user, self.ip, body, aud)
+            if code != 200:
+                self._audit("computer.start", str(body.get("node") or ""), False, {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})/(decide|stop)", path)
+        if m:
+            t = computer.TASKS.get(m.group(1))
+            if not t or t.user != self.user:
+                return self._json(404, {"error": "沒有這個任務"})
+            if m.group(2) == "stop":
+                self._audit("computer.stop", t.node, True, {"task": t.id})
+                return self._json(*computer.stop(t))
+            code, out = computer.decide(t, body)
+            self._audit("computer.decide", t.node, code == 200, {"task": t.id, "allow": body.get("allow") is True,
+                                                                  "always": body.get("always") is True})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/desktop/open", path)
+        if m:
+            code, out = call_node(m.group(1), "/desktop/open", "POST", {"path": body.get("path")}, timeout=20)
+            self._audit("desktop.open", f"{m.group(1)}:{str(body.get('path') or '')[:200]}", code == 200, {"message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})/(approve|stop)", path)
         if m:
@@ -2938,6 +3047,19 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("account.password", user, True)
             return self._json(200, {"ok": True, "message": "已變更，請用新密碼重新登入"},
                               cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
+        if path == "/api/settings/hf":
+            # Hugging Face 令牌：加密落地，畫面只看得到「已設定」；送 Hugging Face 時才解開（走鏡像時代理不會送）
+            if body.get("clear") is True:
+                update_fleet(lambda c: c.setdefault("hf", {}).pop("token", None))
+                self._audit("settings.hf_token", "", True, {"cleared": True})
+                return self._json(200, {"ok": True, "token_set": False})
+            tok = str(body.get("token") or "").strip()
+            if not re.fullmatch(r"hf_[A-Za-z0-9]{20,200}", tok):
+                return self._json(400, {"error": "Hugging Face 令牌的格式是 hf_ 開頭的一串英數字（在 huggingface.co 的 Settings › Access Tokens 建立，選 Read 權限就夠）"})
+            sealed = tls.seal(CERTS.p, tok.encode())
+            update_fleet(lambda c: c.setdefault("hf", {}).__setitem__("token", sealed))
+            self._audit("settings.hf_token", "", True, {"set": True})
+            return self._json(200, {"ok": True, "token_set": True})
         if path == "/api/settings":
             rep = body.get("report") or {}
 

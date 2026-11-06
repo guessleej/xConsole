@@ -117,6 +117,29 @@ def _clean_gen(g):
     return out
 
 
+def _clean_computer(cp):
+    """對話裡的「操作電腦」那一則：只存任務摘要與步驟文字，截圖不存。"""
+    if not isinstance(cp, dict):
+        raise Bad("操作電腦的紀錄格式不對")
+    node, task = cp.get("node"), cp.get("task")
+    if not isinstance(node, str) or not NODE_RX.fullmatch(node) or (task is not None and not (isinstance(task, str) and CHAT_ID_RX.fullmatch(task))):
+        raise Bad("操作電腦的紀錄格式不對")
+    out = {"node": node, **({"task": task} if task else {})}
+    for k, lim in (("goal", 2000), ("state", 20), ("result", 4000), ("error", 1000), ("model", 200)):
+        v = _s(cp.get(k), lim, k)
+        if v:
+            out[k] = v
+    st = cp.get("steps")
+    if isinstance(st, int) and not isinstance(st, bool) and 0 <= st <= 1000:
+        out["steps"] = st
+    log = cp.get("log") or []
+    if not isinstance(log, list):
+        raise Bad("操作電腦的紀錄格式不對")
+    out["log"] = [{"type": str(x.get("type") or "")[:12], "text": str(x.get("text") or "")[:500]}
+                  for x in log[-60:] if isinstance(x, dict)]
+    return out
+
+
 def clean_msgs(msgs):
     """回 (乾淨的訊息, 新附圖 [(位置, mime, bytes)])。新附圖先占位，存好拿到 id 再填回去。"""
     if not isinstance(msgs, list) or len(msgs) > MAX_MSGS:
@@ -178,6 +201,8 @@ def clean_msgs(msgs):
             c["alt"] = alt if isinstance(alt, int) and not isinstance(alt, bool) and 0 <= alt < len(c["alts"]) else len(c["alts"]) - 1
         if m.get("gen"):
             c["gen"] = _clean_gen(m["gen"])
+        if m.get("computer"):
+            c["computer"] = _clean_computer(m["computer"])
         out.append(c)
     return out, new
 

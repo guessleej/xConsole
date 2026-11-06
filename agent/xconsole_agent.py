@@ -22,12 +22,14 @@ import math
 import os
 import re
 import secrets
+import shlex
 import shutil
 import socket
 import ssl
 import struct
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -482,7 +484,32 @@ def probe_win_adapters():
 
 
 def probe_gpus():
-    return probe_nvidia() or probe_amd_sysfs() or probe_intel_sysfs() or probe_apple() or probe_win_adapters() or []
+    return apply_gpu_override(probe_nvidia() or probe_amd_sysfs() or probe_intel_sysfs() or probe_apple() or probe_win_adapters() or [])
+
+
+GPU_VENDORS = ("amd", "intel", "nvidia", "apple")
+
+
+def gpu_override():
+    """管理者在「這台的設定」手動指定的顯示卡：None＝自動偵測；"cpu"＝不用 GPU；
+    {"name", "vendor", "vram_gib"}＝偵測不到或顯存讀錯時，照這張卡算。"""
+    try:
+        ov = registry()["machine"].get("gpu_override")
+    except Exception:  # noqa: BLE001  # 登錄檔壞掉時照自動偵測，不擋硬體探測
+        return None
+    return ov if ov == "cpu" or isinstance(ov, dict) else None
+
+
+def apply_gpu_override(gpus, used_bytes=None):
+    ov = gpu_override()
+    if ov is None:
+        return gpus
+    if ov == "cpu":
+        return []
+    used = used_bytes if used_bytes is not None else sum(g.get("vram_used") or 0 for g in gpus)
+    total = float(ov["vram_gib"]) * GIB
+    return [{"id": "0", "name": ov["name"], "vendor": ov["vendor"], "vram_total": total,
+             "vram_used": min(used, total), "manual": True}]
 
 
 def has_nvidia():
@@ -570,6 +597,18 @@ LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def hardware():
+    """硬體量測，套上管理者手動指定的顯示卡（偵測錯時的補救）。"""
+    hw = _hardware_raw()
+    if gpu_override() is None:
+        return hw
+    g = dict(hw.get("gpu") or {})
+    cards = apply_gpu_override(g.get("gpus") or [], g.get("vram_used"))
+    g.update(count=len(cards), gpus=cards, vram_total=sum(c["vram_total"] for c in cards),
+             vram_used=sum(c["vram_used"] for c in cards))
+    return {**hw, "gpu": g, "gpu_manual": True}
+
+
+def _hardware_raw():
     """先用同機已在跑的 node_agent，拿不到才自己量。拿不到就老實標未知，不假裝零。"""
     for url in NODE_AGENTS:
         try:
@@ -611,6 +650,8 @@ BANDWIDTH_GBS = (
     ("P100", 732), ("P40", 347), ("V100", 900), ("T4", 320), ("GTX 1650", 128),
     ("MI300X", 5300), ("MI250", 3277), ("MI210", 1638), ("MI100", 1229), ("MI50", 1024), ("MI60", 1024),
     ("RX 7900 XTX", 960),
+    # 筆電 APU 的內顯吃系統記憶體：照雙通道 DDR5-5600 的 89.6 GB/s（LPDDR5X-7500 機種會到 120，管理者可在這台的設定改）
+    ("Radeon 890M", 89.6), ("Radeon 880M", 89.6), ("Radeon 780M", 89.6), ("Radeon 760M", 89.6),
 )
 # AMD 獨立卡在 sysfs 只認得出「AMD GPU」：用 KFD 的 gfx 版本反查型號
 AMD_GFX = {"90006": "AMD Instinct MI50／MI60", "90008": "AMD Instinct MI100", "90010": "AMD Instinct MI210／MI250",
@@ -674,6 +715,10 @@ def chip(machine=None):
     c["bandwidth_gbs"] = own or c["bandwidth_spec_gbs"]
     c["bandwidth_src"] = "管理者設定" if own else ("規格書標稱值" if c["bandwidth_spec_gbs"] else None)
     c["ram_bandwidth_gbs"] = machine.get("ram_bandwidth_gbs")
+    c["os"] = OS
+    # 依這台實測校正的速度倍數（record_speed 算的）：推薦清單與預估速度都乘上它
+    c["speed_factor"] = machine.get("speed_factor")
+    c["speed_factor_n"] = machine.get("speed_factor_n") or 0
     return c
 
 
@@ -1995,11 +2040,17 @@ def run_options(slot, raw):
     mm = registry()["machine"].get("memory_model", "discrete")
     return {"options": out, "ctx_train": prof.get("ctx_train"), "size_gib": round(size, 1), "load_sec": load,
             "split": lay["split"] if lay else None, "mode": lay["mode"] if lay else None,
+            "tiered": bool(lay and lay.get("tiered")), "cpu_moe": (lay or {}).get("cpu_moe") or 0,
             "disk_mode": bool(raw.get("disk")), "disk_allowed": mm != "unified_split",
             "disk_needed": bool(lay and lay["mode"] == "disk"),
             "disk_note": None if mm != "unified_split" else DISK_DENIED,
             "bandwidth_gbs": chip().get("bandwidth_gbs"), "hdd": (store or {}).get("hdd"),
             "profile": {k: prof.get(k) for k in ("active_frac", "layers", "moe", "arch")},
+            "measured_tok_s": ((registry().get("speed") or {}).get(os.path.abspath(raw.get("model") or "")) or {}).get("tok_s"),
+            "speed_factor": registry()["machine"].get("speed_factor"),
+            "cmd": llama_cmd_text(raw) if raw.get("exe") and raw.get("model") else None,
+            "extra_args": " ".join(shlex.quote(t) for t in llama_custom_args(raw)),
+            "auto_layers_off": bool({t.split("=", 1)[0] for t in llama_custom_args(raw)} & LLAMA_AUTO_LAYERS),
             "thinking": raw.get("reasoning") or "auto", "lan": (raw.get("host") or "0.0.0.0") != "127.0.0.1",
             "thinking_supported": bool(reasoning_args(raw["exe"], "off")) if raw.get("exe") else False}
 
@@ -2026,6 +2077,52 @@ def _run_layout(slot, raw, prof, size_gib, ctx, par):
         return lay
     dl = disk_layout(m, reg["machine"], cards, slot.get("gpu_ids"), ctx, par, back_v, ram_pool()["free_gib"] + back_r)
     return dl or lay
+
+
+SPEED_EFF, SPEED_LAYER_MS, SPEED_DEFAULT_BW = 0.6, 0.1, 50   # 跟 console/recommend.py 的 EFFICIENCY、LAYER_MS、DEFAULT_RAM_BW 一致
+_SPEED_LAST = {}
+
+
+def estimate_decode(prof, size_gib, machine):
+    """公式估的生成速度（全部放進快速層時）：跟推薦清單同一條公式，拿來跟實測比出校正倍數。"""
+    c = chip(machine)
+    bw = c.get("bandwidth_gbs") or c.get("ram_bandwidth_gbs") or SPEED_DEFAULT_BW
+    act = prof.get("active_frac") or 1.0
+    t = size_gib * act * GIB / (SPEED_EFF * bw * 1e9) + (prof.get("layers") or 0) * SPEED_LAYER_MS / 1000
+    return 1 / t if t > 0 else None
+
+
+def record_speed(slot_id, tok_s, n_tokens):
+    """一次對話的實測生成速度：記在這顆模型上（模型庫顯示實測值）。
+    一般放法（全部放進快速層、沒有搬專家、沒有用硬碟）時，另外跟公式估的比，更新這台的校正倍數。
+    太短的回答（不到 32 個 token）不算，啟動成本會讓數字偏低。最多每 20 秒寫一次登錄檔。"""
+    if not tok_s or not n_tokens or n_tokens < 32 or not 0.01 < tok_s < 100000:
+        return
+    slot = _slot(slot_id) or {}
+    raw = (load_json(slot.get("config"), {}) or {}) if slot.get("kind") == "llama" and slot.get("config") else {}
+    key = os.path.abspath(raw["model"]) if raw.get("model") else f"{slot.get('kind')}:{slot.get('model')}"
+    now = time.time()
+    if now - _SPEED_LAST.get(key, 0) < 20:
+        return
+    _SPEED_LAST[key] = now
+    with REG_LOCK:
+        reg = registry()
+        sp = reg.setdefault("speed", {}).setdefault(key, {})
+        sp["tok_s"] = round(tok_s if not sp.get("tok_s") else 0.7 * sp["tok_s"] + 0.3 * tok_s, 2)
+        sp["n"] = int(sp.get("n") or 0) + 1
+        sp["at"] = int(now)
+        normal = raw.get("model") and not raw.get("disk") and not raw.get("cpu_moe") and int(raw.get("ngl", 999)) >= 999 \
+            and not llama_custom_args(raw, reg)
+        if normal:
+            prof = _profile_cached(raw["model"]) or {}
+            size = sum(os.path.getsize(x) for x in shard_paths(raw["model"]) if os.path.exists(x)) / GIB
+            est = estimate_decode(prof, size, reg["machine"]) if prof and size else None
+            if est:
+                f = max(0.2, min(5.0, tok_s / est))
+                m = reg["machine"]
+                m["speed_factor"] = round(f if not m.get("speed_factor") else 0.7 * m["speed_factor"] + 0.3 * f, 3)
+                m["speed_factor_n"] = int(m.get("speed_factor_n") or 0) + 1
+        save_json(REGISTRY, reg)
 
 
 def record_load(model_path, seconds):
@@ -2112,6 +2209,15 @@ def api_settings(slot_id, body, force=False):
                     host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
                     if host != (raw.get("host") or "0.0.0.0"):
                         want["lan"] = host
+        if "extra_args" in body:
+            if slot.get("kind") != "llama":
+                errors.append("自訂啟動引數只有 llama.cpp 的欄位能設")
+            else:
+                toks, err = parse_llama_args(body.get("extra_args"))
+                if err:
+                    errors.append(err)
+                elif toks != llama_custom_args(raw):
+                    want["extra_args"] = toks
         k = body.get("key")
         if k not in (None, "keep"):
             if k == "none":
@@ -2194,6 +2300,51 @@ def api_settings(slot_id, body, force=False):
     return 200, out
 
 
+def llama_args_get(model_id):
+    """執行頁「高階：啟動引數」：這顆模型的自訂引數；有欄位正在用它跑時，附上完整的啟動指令。"""
+    reg = registry()
+    _, models, _ = scan_gguf(reg)
+    m = next((x for x in models if x["id"] == model_id), None)
+    if not m:
+        return 404, {"error": "存放區裡沒有這顆"}
+    toks = llama_custom_args({"model": m["path"]}, reg)
+    cmd = None
+    for sl in reg["slots"]:
+        if sl.get("kind") == "llama" and sl.get("config"):
+            raw = load_json(sl["config"], {}) or {}
+            if os.path.abspath(raw.get("model") or "") == os.path.abspath(m["path"]) and raw.get("exe"):
+                cmd = llama_cmd_text(raw, reg)
+                break
+    return 200, {"model": model_id, "args": " ".join(shlex.quote(t) for t in toks),
+                 "auto_layers_off": bool({t.split("=", 1)[0] for t in toks} & LLAMA_AUTO_LAYERS), "cmd": cmd,
+                 "allowed": sorted(LLAMA_ARG_OK)}
+
+
+def llama_args_set(model_id, text):
+    _, models, _ = scan_gguf()
+    m = next((x for x in models if x["id"] == model_id), None)
+    if not m:
+        return 404, {"error": "存放區裡沒有這顆"}
+    toks, err = parse_llama_args(text)
+    if err:
+        return 400, {"error": err}
+    set_custom_args(m["path"], toks)
+    return 200, {"ok": True, "args": " ".join(shlex.quote(t) for t in toks),
+                 "auto_layers_off": bool({t.split("=", 1)[0] for t in toks} & LLAMA_AUTO_LAYERS)}
+
+
+def set_custom_args(model_path, toks):
+    with REG_LOCK:
+        r = registry()
+        d = r.setdefault("llama_custom_args", {})
+        key = os.path.abspath(model_path or "")
+        if toks:
+            d[key] = list(toks)
+        else:
+            d.pop(key, None)
+        save_json(REGISTRY, r)
+
+
 def _api_apply_llama(slot, raw, port, want, force):
     """llama.cpp 欄位的 API 設定寫回：名稱＝--alias、上下文＝ctx、輸出上限＝-n、金鑰＝--api-key-file。"""
     slot_id = slot["id"]
@@ -2214,10 +2365,15 @@ def _api_apply_llama(slot, raw, port, want, force):
             new["reasoning"] = v
         elif k == "lan":
             new["host"] = v                    # 0.0.0.0＝區網連得到；127.0.0.1＝只有這台自己
+    old_custom = llama_custom_args(old)
+    if "extra_args" in want:
+        set_custom_args(old.get("model"), want["extra_args"])
     save_json(cfg_path, new)
     os.chmod(cfg_path, 0o600)
 
     def revert(msg):
+        if "extra_args" in want:
+            set_custom_args(old.get("model"), old_custom)
         save_json(cfg_path, old)
         if old_key_text is not None:
             write_llama_key(slot_id, old_key_text.strip())
@@ -2629,6 +2785,9 @@ def disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_free_gi
     size, mmproj = float(m["size_gib"]), float(m.get("mmproj_gib") or 0)
     kv = llama_kv_gib(m, ctx, parallel)
     layers = max(1, int(m.get("layers") or 1))
+    moe = moe_disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_free_gib)
+    if moe:
+        return moe
     if mm == "unified_single":
         ngl = 999 if OS == "darwin" else 0
         est_vram, est_ram, frac = round(1.0 + mmproj, 1), 1.5, 0.0
@@ -2655,6 +2814,55 @@ def disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_free_gi
     return {"mode": "disk", "cpu_moe": 0, "ngl": ngl, "mmap": True, "est_vram": est_vram, "est_ram": est_ram,
             "kv": round(kv, 2), "kv_ram_frac": frac, "moved_gib": 0.0, "gpu_weights_gib": round(gpu_w, 1),
             "split": {k: round(max(0.0, v), 1) for k, v in split.items()}}
+
+
+def moe_disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_free_gib=None):
+    """MoE 模型用硬碟執行：照張量種類分層，不是整層切。
+    注意力、共用權重、KV 放顯示卡（-ngl 999）→ 專家層從第一層起留在檔案映射的記憶體（--n-cpu-moe N）→
+    記憶體放不下的專家由作業系統按需從 SSD 讀。每 token 只用到少數幾個專家，所以比整層搬出去快得多。
+      discrete        顯卡先放注意力＋共用＋KV，剩下的空間放得下幾層專家就放幾層，其餘 N 層留在映射記憶體
+      unified_single  Apple 以外（DGX Spark、Jetson）：CUDA 會把放上 GPU 的張量複製成不可換頁的記憶體，
+                      所以專家全部留在映射記憶體（N＝全部），只有注意力與共用部分常駐；Apple 走原本的整層映射
+    不是 MoE、拿不到專家比例、或連注意力＋KV 都放不進顯卡時回 None，由呼叫端用整層的放法。"""
+    mm = machine.get("memory_model", "discrete")
+    frac, n_exp = m.get("expert_layer_frac"), int(m.get("expert_layers") or 0)
+    if not m.get("moe") or not frac or n_exp <= 0 or mm == "unified_split" or (mm == "unified_single" and OS == "darwin"):
+        return None
+    fl = floors(machine)
+    size, mmproj = float(m["size_gib"]), float(m.get("mmproj_gib") or 0)
+    kv = llama_kv_gib(m, ctx, parallel)
+    per = frac * size                                    # expert_layer_frac＝每一層專家占整顆的比例
+    experts = min(size, per * n_exp)
+    dense = size - experts
+    if mm == "unified_single":
+        n_cpu = n_exp
+        pinned = dense + 1.0 + mmproj + kv
+        est_vram, est_ram = round(dense + 1.0 + mmproj, 1), 1.5
+        cache = None if ram_free_gib is None else max(0.0, ram_free_gib - fl["ram"] - pinned - est_ram)
+        cached = experts if cache is None else min(experts, cache)
+        split = {"gpu": pinned + est_ram + cached, "ram": 0.0, "disk": experts - cached}
+        gpu_w = dense
+    else:
+        use = [c for c in cards if not gpu_ids or str(c["id"]) in gpu_ids]
+        if not use:
+            return None
+        avail = sum(c["free_gib"] for c in use) + back_gib - fl["vram"]
+        room = avail - 1.0 - mmproj - kv - dense
+        if room < 0:
+            return None
+        n_gpu = min(n_exp, int(room // per)) if per > 0 else n_exp
+        n_cpu = n_exp - n_gpu
+        gpu_w = dense + n_gpu * per
+        est_vram, est_ram = round(gpu_w + 1.0 + mmproj, 1), 2.5
+        rest = n_cpu * per
+        cache = None if ram_free_gib is None else max(0.0, ram_free_gib - fl["ram"] - est_ram)
+        cached = rest if cache is None else min(rest, cache)
+        split = {"gpu": est_vram + kv, "ram": cached, "disk": rest - cached}
+    if n_cpu == 0:
+        return None                                     # 全部放得進顯卡就不必用硬碟執行
+    return {"mode": "disk", "tiered": True, "cpu_moe": n_cpu, "ngl": 999, "mmap": True, "est_vram": est_vram,
+            "est_ram": est_ram, "kv": round(kv, 2), "kv_ram_frac": 0.0, "moved_gib": 0.0,
+            "gpu_weights_gib": round(gpu_w, 1), "split": {k: round(max(0.0, v), 1) for k, v in split.items()}}
 
 
 def llama_kv_gib(prof, ctx, parallel=1):
@@ -2763,27 +2971,95 @@ def write_llama_key(slot_id, key):
     return p
 
 
-def llama_argv(raw, reg=None):
-    """設定檔 → llama-server 參數。金鑰只給檔案路徑（--api-key-file），不放進指令列（ps 看得到）。"""
+# 自訂啟動引數（執行頁「高階：啟動引數」）：只收這些調校用的參數，任何會指到檔案、改監聽位址、
+# 換模型或金鑰的參數一律不收（--host、--port 由主控台管；-m、--mmproj、--api-key-file 由欄位設定管）
+LLAMA_ARG_OK = {
+    "-ngl", "--n-gpu-layers", "--gpu-layers", "-c", "--ctx-size", "-ot", "--override-tensor", "--n-cpu-moe", "-ncmoe",
+    "--cpu-moe", "-cmoe", "-ts", "--tensor-split", "-sm", "--split-mode", "-mg", "--main-gpu", "-t", "--threads",
+    "-tb", "--threads-batch", "-b", "--batch-size", "-ub", "--ubatch-size", "-fa", "--flash-attn", "-ctk", "--cache-type-k",
+    "-ctv", "--cache-type-v", "-np", "--parallel", "-cb", "--cont-batching", "-nocb", "--no-cont-batching", "--mlock",
+    "--no-mmap", "--mmap", "--numa", "--prio", "--poll", "--temp", "--top-k", "--top-p", "--min-p", "--repeat-penalty",
+    "--presence-penalty", "--frequency-penalty", "--seed", "-n", "--n-predict", "--keep", "--rope-scaling", "--rope-scale",
+    "--rope-freq-base", "--rope-freq-scale", "--yarn-orig-ctx", "--yarn-ext-factor", "--yarn-attn-factor",
+    "--yarn-beta-slow", "--yarn-beta-fast", "--no-kv-offload", "-nkvo", "--kv-unified", "-kvu", "--swa-full",
+    "--cache-reuse", "--defrag-thold", "-dt", "--no-warmup", "--reasoning-budget", "--reasoning-format", "--chat-template",
+    "--draft-max", "--draft-min", "--draft-p-min", "--spec-replace", "--override-kv", "--slot-prompt-similarity", "-sps",
+    "--context-shift", "--no-context-shift", "--cache-ram", "-cram", "--threads-http", "--load-mode",
+}
+# 自己寫了這些，自動分層就讓位（對應的自動參數不加）
+LLAMA_AUTO_LAYERS = {"-ngl", "--n-gpu-layers", "--gpu-layers", "-ot", "--override-tensor", "--n-cpu-moe", "-ncmoe",
+                     "--cpu-moe", "-cmoe", "-ts", "--tensor-split"}
+LLAMA_AUTO_CTX = {"-c", "--ctx-size"}
+LLAMA_VAL_RX = re.compile(r"[\w.,:=+*\\\[\]()|^$?{}<> -]{1,200}")
+
+
+def parse_llama_args(text):
+    """網頁貼上的啟動引數 → 參數清單。回 (清單, 錯誤)。不准檔案路徑、不准 shell 字元、最多 40 個。"""
+    text = str(text or "").strip()
+    if not text:
+        return [], None
+    if len(text) > 2000:
+        return None, "啟動引數太長（上限 2,000 字）"
+    try:
+        toks = shlex.split(text)
+    except ValueError:
+        return None, "啟動引數的引號沒有成對"
+    if len(toks) > 40:
+        return None, "啟動引數最多 40 個"
+    for t in toks:
+        if t.startswith("-") and not re.fullmatch(r"-?\d+(\.\d+)?", t):
+            flag = t.split("=", 1)[0]
+            if flag not in LLAMA_ARG_OK:
+                return None, f"不接受 {flag}：這裡只收調校效能與取樣的參數（模型、監聽位址、金鑰、任何檔案路徑由主控台管）"
+            if "=" in t and not LLAMA_VAL_RX.fullmatch(t.split("=", 1)[1]):
+                return None, f"{flag} 的值有不允許的字元"
+        elif "/" in t or (OS == "windows" and re.search(r"^[A-Za-z]:|\\\\", t)) or t.startswith("~") or not LLAMA_VAL_RX.fullmatch(t):
+            return None, f"「{t[:40]}」不像參數值：不能放檔案路徑或特殊字元"
+    return toks, None
+
+
+def llama_custom_args(raw, reg=None):
     reg = reg or registry()
+    return list((reg.get("llama_custom_args") or {}).get(os.path.abspath(raw.get("model") or ""), []))
+
+
+def llama_argv(raw, reg=None):
+    """設定檔 → llama-server 參數。金鑰只給檔案路徑（--api-key-file），不放進指令列（ps 看得到）。
+    這顆模型有自訂啟動引數就接在最後；自己寫了分層或上下文，對應的自動參數就不加。"""
+    reg = reg or registry()
+    custom = llama_custom_args(raw, reg)
+    flags = {t.split("=", 1)[0] for t in custom if t.startswith("-")}
+    own_layers, own_ctx = bool(flags & LLAMA_AUTO_LAYERS), bool(flags & LLAMA_AUTO_CTX)
     ctx, par = int(raw.get("ctx", 4096)), int(raw.get("parallel", 1))
-    argv = [raw["exe"], "-m", raw["model"], "--host", raw.get("host", "0.0.0.0"), "--port", str(raw["port"]),
-            "-c", str(ctx * par), "-np", str(par), "-ngl", str(raw.get("ngl", 999)),
-            "--alias", raw["alias"], "--jinja"]
+    argv = [raw["exe"], "-m", raw["model"], "--host", raw.get("host", "0.0.0.0"), "--port", str(raw["port"])]
+    if not own_ctx:
+        argv += ["-c", str(ctx * par)]
+    if not flags & {"-np", "--parallel"}:
+        argv += ["-np", str(par)]
+    if not own_layers:
+        argv += ["-ngl", str(raw.get("ngl", 999))]
+    argv += ["--alias", raw["alias"], "--jinja"]
     if raw.get("mmproj"):
         argv += ["--mmproj", raw["mmproj"]]
-    if raw.get("cpu_moe"):
+    if raw.get("cpu_moe") and not own_layers:
         argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
     argv += reasoning_args(raw["exe"], raw.get("reasoning"))
     if raw.get("max_tokens"):
         argv += ["-n", str(int(raw["max_tokens"]))]
     if raw.get("api_key_file") and os.path.exists(raw["api_key_file"]):
         argv += ["--api-key-file", raw["api_key_file"]]
-    if not raw.get("mmap", False):
+    if not raw.get("mmap", False) and not flags & {"--mmap", "--no-mmap", "--load-mode"}:
         # 統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆
         argv += no_mmap_args(raw["exe"])
     extra = reg["machine"].get("llama_args") or []
-    return argv + [str(x) for x in extra if isinstance(x, (str, int))]
+    return argv + [str(x) for x in extra if isinstance(x, (str, int))] + custom
+
+
+def llama_cmd_text(raw, reg=None):
+    """畫面上顯示的完整啟動指令（金鑰本身不在指令裡，只有金鑰檔的位置）。"""
+    argv = llama_argv(raw, reg)
+    q = (lambda a: f'"{a}"' if re.search(r'[\s"]', a) else a) if OS == "windows" else shlex.quote
+    return " ".join(q(str(a)) for a in [os.path.basename(argv[0])] + argv[1:])
 
 
 @functools.lru_cache(maxsize=8)
@@ -3074,11 +3350,11 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
             save_json(cfg_path, raw)
             os.chmod(cfg_path, 0o600)
             est = {"vram": lay["est_vram"], "ram": lay["est_ram"], "kv": lay["kv"], "moved_gib": 0.0}
-            cpu_moe = 0
+            cpu_moe = lay["cpu_moe"]                    # MoE 依張量分層時，專家層留在映射記憶體的層數
             put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
                  "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
                  "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
-                 "model": m["name"], "quant": m.get("quant"), "cpu_moe": None})
+                 "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
             verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
     if not verdict["allow"] and not force:
         return undo("記憶體不夠" + ("（用硬碟執行也放不下：KV、計算緩衝與放 GPU 的層仍要占記憶體）"
@@ -3212,9 +3488,12 @@ def library():
             if ec and ec.get("_native"):
                 in_use.setdefault(os.path.abspath(ec["_native"]), sl["id"] + "（停用中的 Strata）")
     loads = reg.get("load_sec") or {}
+    speeds = reg.get("speed") or {}
     for m in ggufs:
         m["in_use"] = in_use.get(os.path.abspath(m["path"]))
         m["load_sec"] = loads.get(os.path.abspath(m["path"]))
+        sp = speeds.get(os.path.abspath(m["path"])) or {}
+        m["measured_tok_s"] = sp.get("tok_s")
     strata = []
     sslot = next((s for s in reg["slots"] if s.get("kind") == "strata" or (s.get("engines") or {}).get("strata")), None)
     if sslot:
@@ -3264,7 +3543,7 @@ def _hf_file_url(repo, path):
     if not HF_REPO_RX.fullmatch(repo) or ".." in path.split("/"):
         raise ValueError("Hugging Face 名稱或檔名不合法")
     q = urllib.parse.quote
-    return f"{HF_BASE}/{q(repo, safe='/')}/resolve/main/{q(path, safe='/')}"
+    return f"{hf_base()}/{q(repo, safe='/')}/resolve/main/{q(path, safe='/')}"
 
 
 class _HFRedirect(urllib.request.HTTPRedirectHandler):
@@ -3280,9 +3559,27 @@ class _HFRedirect(urllib.request.HTTPRedirectHandler):
 _HF_OPENER = urllib.request.build_opener(_HFRedirect)
 
 
+HF_HOSTS = ("huggingface.co", "hf.co")
+
+
+def _is_hf_host(url):
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    return host in HF_HOSTS or host.endswith((".huggingface.co", ".hf.co"))
+
+
+def hf_base():
+    """Hugging Face 的位址：這台的設定填了鏡像就走鏡像，沒填走官方（測試時 XCONSOLE_HF_BASE 指到本機假站）。"""
+    try:
+        mirror = registry()["machine"].get("hf_mirror")
+    except Exception:  # noqa: BLE001
+        mirror = None
+    return mirror or HF_BASE
+
+
 def _hf_get(url, token="", rng=None, timeout=30):
     h = {"User-Agent": "xconsole-agent"}
-    if token:
+    # 令牌只送給 Hugging Face 自己（與測試用的假站）：走鏡像時不送，鏡像是第三方，送過去等於交出去
+    if token and (_is_hf_host(url) or url.startswith(HF_BASE + "/")):
         h["Authorization"] = f"Bearer {token}"
     if rng:
         h["Range"] = f"bytes={rng}-"
@@ -3294,7 +3591,7 @@ def hf_files(repo, token=""):
     if not HF_REPO_RX.fullmatch(repo or ""):
         return 400, {"error": "名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF"}
     try:
-        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
+        with _hf_get(f"{hf_base()}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
             tree = json.load(resp)
     except urllib.error.HTTPError as exc:
         msg = {401: "要登入才看得到（請貼 Hugging Face 權杖）", 403: "要先到 Hugging Face 頁面同意授權條款",
@@ -3376,7 +3673,7 @@ def hf_profile(repo, token="", match=""):
     prof["cn_origin"] = prof.get("cn_origin") or any(c in repo.lower() for c in CN_ORIGIN)
     card = {}
     try:
-        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}", token, timeout=20) as resp:
+        with _hf_get(f"{hf_base()}/api/models/{urllib.parse.quote(repo, safe='/')}", token, timeout=20) as resp:
             mi = json.load(resp)
         lic = (mi.get("cardData") or {}).get("license") or next(
             (t.split(":", 1)[1] for t in mi.get("tags") or [] if t.startswith("license:")), None)
@@ -3394,7 +3691,7 @@ def hf_search(q, token=""):
     q = (q or "").strip()
     if not HF_SEARCH_RX.fullmatch(q):
         return 400, {"error": "關鍵字 1～80 字，只能有英數、空白與 . _ + - /"}
-    url = (f"{HF_BASE}/api/models?search={urllib.parse.quote(q)}&filter=gguf&sort=downloads&direction=-1&limit=24")
+    url = (f"{hf_base()}/api/models?search={urllib.parse.quote(q)}&filter=gguf&sort=downloads&direction=-1&limit=24")
     try:
         with _hf_get(url, token, timeout=20) as resp:
             rows = json.load(resp)
@@ -3734,6 +4031,9 @@ def pools(reg, hw):
         if OS == "darwin" and vram_total:
             # Apple Silicon：GPU 只能用到統一記憶體的一部分（Metal 的上限），模型超過就載不起來
             out["unified"]["gpu_limit_gib"] = round(vram_total, 1)
+        elif OS == "windows" and vram_total and not has_nvidia():
+            # Windows 的內顯：專用記憶體（BIOS 切的那塊）＋共用 GPU 記憶體（Windows 固定讓 GPU 借最多一半的系統記憶體）
+            out["unified"]["gpu_limit_gib"] = round(vram_total + ram["total_gib"] / 2, 1)
         out["ram"] = out["unified"]
     else:
         out["ram"] = {**ram, "floor_gib": fl["ram"]}
@@ -4257,7 +4557,9 @@ def _build_run(st, pre, log, kind="llama"):
     sub = ["--recurse-submodules", "--shallow-submodules"] if eng["submodules"] else []
     try:
         if not os.path.isdir(os.path.join(dest, ".git")):
-            step("下載原始碼", ["git", "clone", "--depth", "1", *sub, "--branch", st["tag"], eng["repo"], dest])
+            # 有 GitHub 加速字首就經它下載；commit 編號是直接問官方 repo 拿的，下載完照樣核對，對不上就不編譯
+            src = (registry()["machine"].get("github_proxy") or "") + eng["repo"]
+            step("下載原始碼", ["git", "clone", "--depth", "1", *sub, "--branch", st["tag"], src, dest])
         else:
             # 資料夾已經在（上次中斷）：先還原成乾淨的那一版，被改過的檔案與舊的 build 一律清掉，再核對 commit
             step("還原原始碼", ["git", "-C", dest, "reset", "--hard", "--quiet", st["commit"]])
@@ -4309,6 +4611,11 @@ def prebuilt_variant(kind="llama"):
     if OS != "windows":
         return None
     a = "arm64" if arm else "x64"
+    ov = gpu_override()
+    if ov == "cpu":
+        return f"win-cpu-{a}", None, "這台的設定指定不用 GPU，只用 CPU"
+    if isinstance(ov, dict) and ov.get("vendor") in ("amd", "intel"):
+        return f"win-vulkan-{a}", None, f"這台的設定指定 {ov['name']}，用 Vulkan 加速"
     if has_nvidia():
         _, out, _ = sh(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"], timeout=15)
         m = re.match(r"(\d+)", out.strip())
@@ -4402,7 +4709,9 @@ def _prebuilt_run(st, log, kind="llama"):
         done, last = have, -1
         if not (total and have == total):
             hdr = {"User-Agent": "xconsole-agent", **({"Range": f"bytes={have}-"} if have else {})}
-            req = urllib.request.Request(asset["browser_download_url"], headers=hdr)
+            # GitHub 加速字首（例 https://ghfast.top/）只用在下載安裝包；版本資訊與 sha256 仍直接問 GitHub API，
+            # 所以就算加速站被動手腳，下載下來的檔對不上官方 sha256 就不會裝
+            req = urllib.request.Request((registry()["machine"].get("github_proxy") or "") + asset["browser_download_url"], headers=hdr)
             with urllib.request.urlopen(req, timeout=60) as resp:
                 if have and resp.status != 206:   # 對方不支援續傳：從頭來
                     h, done = hashlib.sha256(), 0
@@ -4816,6 +5125,9 @@ def suggest_memory_model(gpus=None):
         return "unified_single", "nvidia-smi 回報不出顯存總量（DGX Spark 這類統一記憶體機就是這樣）"
     if gpus and all(g.get("vendor") == "intel" and not g.get("vram_total") for g in gpus):
         return "unified_single", "Intel 內建顯示晶片：跟系統共用同一塊記憶體"
+    if OS == "windows" and not nvidia and gpus and (_apu_like() or all(g.get("vendor") == "intel" for g in gpus)):
+        return "unified_single", ("Windows 上的內建顯示晶片（AMD APU／Intel）：除了 BIOS 切的專用記憶體，Windows 還會讓 GPU 借用"
+                                  "最多一半的系統記憶體（共用 GPU 記憶體），所以當成一個池算，走 Vulkan 版引擎")
     if not nvidia and gpus and _apu_like():
         return "unified_split", "AMD APU（例 Ryzen AI 395）：BIOS 切一塊給 GPU，系統只剩另一塊，兩塊都要盯"
     if gpus:
@@ -4936,7 +5248,10 @@ def machine_info():
                      "vram_floor_gib": m.get("vram_floor_gib"), "note": m.get("note", ""),
                      "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or "",
                      "bandwidth_gbs": m.get("bandwidth_gbs"), "ram_bandwidth_gbs": m.get("ram_bandwidth_gbs"),
-                     "sd_cli": m.get("sd_cli") or "", "agent_enabled": bool(m.get("agent_enabled"))},
+                     "sd_cli": m.get("sd_cli") or "", "agent_enabled": bool(m.get("agent_enabled")),
+                     "gpu_override": m.get("gpu_override"), "hf_mirror": m.get("hf_mirror") or "",
+                     "github_proxy": m.get("github_proxy") or "", "desktop_enabled": bool(m.get("desktop_enabled"))},
+        "desktop": dict(zip(("how", "why"), desktop_route())),
         "agent": {"enabled": bool(m.get("agent_enabled")), "root": AGENT_ROOT},
         "defaults": {k: DEFAULT_FLOORS[k] for k in MEMORY_MODELS},
         "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg),
@@ -5040,6 +5355,18 @@ def check_sd_cli(raw):
 
 
 @_locked
+def check_mirror(v, kind):
+    """Hugging Face 鏡像／GitHub 加速字首：只收 https、不帶帳密與查詢字串。空白＝不用。"""
+    v = str(v or "").strip()
+    if not v:
+        return None, None
+    u = urllib.parse.urlparse(v)
+    if u.scheme != "https" or not u.hostname or u.username or u.password or u.query or u.fragment or len(v) > 200 \
+            or re.search(r"[\s<>\"']", v):
+        return None, ("Hugging Face 鏡像" if kind == "hf_mirror" else "GitHub 加速字首") + "只收 https:// 開頭、不帶帳密與查詢字串的網址"
+    return (v.rstrip("/") if kind == "hf_mirror" else (v if v.endswith("/") else v + "/")), None
+
+
 def save_machine(body):
     reg = registry()
     m = reg["machine"]
@@ -5071,6 +5398,33 @@ def save_machine(body):
         if not 1 <= v <= 20000:
             return 400, {"error": "記憶體頻寬要在 1～20000 GB/s 之間"}
         new[k] = v
+    if "gpu_override" in body:
+        ov = body.get("gpu_override")
+        if ov in (None, "", "auto"):
+            new["gpu_override"] = None
+        elif ov == "cpu":
+            new["gpu_override"] = "cpu"
+        elif isinstance(ov, dict):
+            name = str(ov.get("name") or "").strip()
+            if not 1 <= len(name) <= 80 or re.search(r"[\x00-\x1f<>]", name):
+                return 400, {"error": "顯示卡名稱要 1～80 個字"}
+            if ov.get("vendor") not in GPU_VENDORS:
+                return 400, {"error": "顯示卡廠牌只能是 " + "、".join(GPU_VENDORS)}
+            try:
+                vg = float(ov.get("vram_gib"))
+            except (TypeError, ValueError):
+                return 400, {"error": "顯存要填數字（GiB）"}
+            if not 0.5 <= vg <= 4096:
+                return 400, {"error": "顯存要在 0.5～4096 GiB 之間"}
+            new["gpu_override"] = {"name": name, "vendor": ov["vendor"], "vram_gib": vg}
+        else:
+            return 400, {"error": "手動指定顯示卡的格式不對"}
+    for k in ("hf_mirror", "github_proxy"):
+        if k in body:
+            v, err = check_mirror(body.get(k), k)
+            if err:
+                return 400, {"error": err}
+            new[k] = v
     note = str(body.get("note") or "")
     if len(note) > 300 or re.search(r"[\x00-\x08\x0b-\x1f]", note):
         return 400, {"error": "備註最多 300 字，不能有控制字元"}
@@ -5085,6 +5439,13 @@ def save_machine(body):
     if err:
         return 400, {"error": err}
     new["gguf_root"], new["llama_server"], new["sd_cli"] = root, exe, sd
+    if "desktop_enabled" in body:
+        if not isinstance(body["desktop_enabled"], bool):
+            return 400, {"error": "操作電腦要是 true 或 false"}
+        if body["desktop_enabled"]:
+            m["desktop_enabled"] = True
+        else:
+            m.pop("desktop_enabled", None)
     if "agent_enabled" in body:
         # 沒帶就不動（只改其他設定的畫面不會順手把它關掉）
         if not isinstance(body["agent_enabled"], bool):
@@ -5289,11 +5650,139 @@ def _agent_off():
     return 403, {"error": "這台沒有開 Agent 模式。請到「設定 → 機器 → 這台的設定」打開", "disabled": True}
 
 
+# 連結進來的資料夾（管理者在網頁上用資料夾瀏覽器選這台的任一資料夾）：存在 machine.agent_links {名稱: 絕對路徑}。
+# 系統資料夾、磁碟根目錄、家目錄本身、家目錄底下的隱藏設定夾（.ssh、.gnupg…）、xConsole 自己的狀態目錄一律不收。
+WIN_DENY = ("windows", "program files", "program files (x86)", "programdata", "$recycle.bin", "system volume information",
+            "recovery", "boot")
+MAC_DENY = ("/system", "/library", "/applications", "/private", "/cores", "/opt", "/usr", "/bin", "/sbin")
+ROOT_ONLY_DENY = ("/volumes", "/mnt", "/media")          # 只擋這幾個本身（裡面的外接碟可以選）
+
+
+def agent_link_denied(path):
+    """這個資料夾能不能給 Agent 用。回 None＝可以，否則回原因。路徑先 realpath（符號連結指到系統資料夾也擋）。"""
+    full = os.path.realpath(path)
+    home = os.path.realpath(HOME)
+    low = full.lower().rstrip("\\/")
+    if OS == "windows":
+        drive, rest = os.path.splitdrive(full)
+        parts = [x for x in re.split(r"[\\/]+", rest) if x]
+        if not parts:
+            return "不能直接用整顆磁碟"
+        if parts[0].lower() in WIN_DENY:
+            return f"{parts[0]} 是系統資料夾"
+        if len(parts) >= 3 and parts[0].lower() == "users" and parts[2].lower() == "appdata":
+            return "AppData 放的是程式設定與登入資料，不能給 Agent"
+    elif not full.startswith(home + os.sep):             # 家目錄底下的不套系統資料夾規則（macOS 的家目錄可能在 /private 底下）
+        if full == "/" or any(full == d or full.startswith(d + "/") for d in SYSTEM_DIRS):
+            return "這是系統資料夾"
+        if OS == "darwin" and any(low == d or low.startswith(d + "/") for d in MAC_DENY):
+            return "這是系統資料夾"
+        if low in ROOT_ONLY_DENY:
+            return "請選裡面的資料夾"
+    if full == home or home.startswith(full + os.sep) or \
+            (os.path.dirname(full) == os.path.dirname(home) and not full.startswith(home + os.sep)):
+        return "不能直接用整個家目錄、包含家目錄的上層、或別人的家目錄；請選家目錄底下的一個資料夾"
+    st = os.path.realpath(STATE_DIR)
+    if full == st or full.startswith(st + os.sep) or st.startswith(full + os.sep):
+        return "這個資料夾含 xConsole 自己的狀態與金鑰"
+    if full.startswith(home + os.sep):
+        first = os.path.relpath(full, home).split(os.sep)[0]
+        if first.startswith("."):
+            return f"{first} 是隱藏的設定資料夾（可能有金鑰或登入資料）"
+    if not os.path.isdir(full):
+        return "沒有這個資料夾"
+    if not os.access(full, os.R_OK | os.W_OK | os.X_OK):
+        return "代理帳號對這個資料夾沒有讀寫權限"
+    return None
+
+
+def agent_links(reg=None):
+    return dict((reg or registry())["machine"].get("agent_links") or {})
+
+
+def agent_browse(path=""):
+    """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個標出能不能選。沒給路徑＝從家目錄開始。"""
+    if not agent_enabled():
+        return _agent_off()
+    path = str(path or "").strip() or HOME
+    if "\x00" in path or len(path) > 1000:
+        return 400, {"error": "路徑不對"}
+    full = os.path.realpath(os.path.expanduser(path))
+    if not os.path.isdir(full):
+        return 404, {"error": "沒有這個資料夾"}
+    dirs = []
+    try:
+        names = sorted(os.listdir(full), key=str.lower)
+    except OSError as ex:
+        return 400, {"error": f"打不開這個資料夾：{ex.strerror}"}
+    for n in names[:1000]:
+        p = os.path.join(full, n)
+        if n.startswith(".") or not os.path.isdir(p) or os.path.islink(p):
+            continue
+        why = agent_link_denied(p)
+        dirs.append({"name": n, "path": p, "ok": why is None, "why": why})
+    roots = [{"name": "家目錄", "path": os.path.realpath(HOME)}]
+    if OS == "windows":
+        roots += [{"name": f"{d}:\\", "path": f"{d}:\\"} for d in "CDEFGHIJ" if os.path.isdir(f"{d}:\\")]
+    elif OS == "darwin":
+        roots.append({"name": "外接磁碟", "path": "/Volumes"})
+    else:
+        roots += [{"name": d, "path": d} for d in ("/mnt", "/media", "/data", "/srv") if os.path.isdir(d)]
+    parent = os.path.dirname(full)
+    return 200, {"path": full, "parent": parent if parent != full else None, "dirs": dirs, "roots": roots,
+                 "ok": agent_link_denied(full) is None, "why": agent_link_denied(full)}
+
+
+def agent_link(path, name=None):
+    if not agent_enabled():
+        return _agent_off()
+    full = os.path.realpath(os.path.expanduser(str(path or "")))
+    why = agent_link_denied(full)
+    if why:
+        return 400, {"error": why}
+    with REG_LOCK:
+        reg = registry()
+        links = reg["machine"].setdefault("agent_links", {})
+        if full in links.values():
+            return 200, {"ok": True, "name": next(k for k, v in links.items() if v == full)}
+        base = str(name or os.path.basename(full) or "資料夾").strip()[:60]
+        base = re.sub(r"[^\w .-]", "_", base).strip(" .") or "資料夾"
+        nm, i = base, 2
+        taken = set(links) | (set(os.listdir(AGENT_ROOT)) if os.path.isdir(AGENT_ROOT) else set())
+        while nm in taken:
+            nm, i = f"{base} {i}", i + 1
+        if not AGENT_FOLDER_RX.fullmatch(nm):
+            return 400, {"error": "資料夾名稱只能用中英文、數字、空白、點、底線與連字號"}
+        links[nm] = full
+        save_json(REGISTRY, reg)
+    return 200, {"ok": True, "name": nm, "path": full}
+
+
+def agent_unlink(name):
+    """取消連結：只是不再給 Agent 用，資料夾與裡面的檔案原封不動。"""
+    if not agent_enabled():
+        return _agent_off()
+    with REG_LOCK:
+        reg = registry()
+        links = reg["machine"].get("agent_links") or {}
+        if name not in links:
+            return 404, {"error": "沒有這個連結的資料夾"}
+        links.pop(name)
+        save_json(REGISTRY, reg)
+    return 200, {"ok": True}
+
+
 def agent_folder(name):
-    """工作資料夾的真實路徑：只能是 ~/xconsole-agent/ 底下的一層、已經存在、不是符號連結指出去的。"""
+    """工作資料夾的真實路徑：~/xconsole-agent/ 底下的一層，或管理者連結進來的資料夾；已經存在、不是符號連結指出去的。"""
     name = str(name or "")
     if not AGENT_FOLDER_RX.fullmatch(name) or name in (".", ".."):
         raise ValueError("資料夾名稱只能用中英文、數字、空白、點、底線與連字號，1～64 字")
+    links = agent_links()
+    if name in links:
+        why = agent_link_denied(links[name])
+        if why:
+            raise ValueError(f"連結的資料夾不能用了：{why}")
+        return os.path.realpath(links[name])
     os.makedirs(AGENT_ROOT, mode=0o700, exist_ok=True)
     full = inside(AGENT_ROOT, name)
     if os.path.dirname(full) != os.path.realpath(AGENT_ROOT):
@@ -5330,6 +5819,10 @@ def agent_folders():
             if n > AGENT_LIST_MAX:
                 break
         out.append({"name": name, "files": n, "updated": int(newest)})
+    for name, full in sorted(agent_links().items()):
+        why = agent_link_denied(full)
+        out.append({"name": name, "linked": True, "path": full, "files": None,
+                    "updated": int(os.path.getmtime(full)) if os.path.isdir(full) else None, "broken": why})
     return 200, {"enabled": True, "root": AGENT_ROOT, "os": OS, "folders": out}
 
 
@@ -5893,7 +6386,7 @@ def hf_tree(repo, token=""):
     if not HF_REPO_RX.fullmatch(repo or ""):
         return 400, {"error": "名稱格式是「作者/模型」"}
     try:
-        with _hf_get(f"{HF_BASE}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
+        with _hf_get(f"{hf_base()}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
             tree = json.load(resp)
     except urllib.error.HTTPError as exc:
         msg = {401: "要登入才看得到（請貼 Hugging Face 權杖）", 403: "要先到 Hugging Face 頁面同意授權條款",
@@ -6430,19 +6923,33 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(502, {"error": f"連不到模型服務：{str(exc)[:120]}"})
         with resp:
             if not req["stream"]:
-                return self._send(200, json.load(resp))
+                out = json.load(resp)
+                tm = out.get("timings") or {}
+                record_speed(slot_id, tm.get("predicted_per_second"), tm.get("predicted_n"))
+                return self._send(200, out)
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
+            timing = None
             try:
                 for line in resp:
                     self.wfile.write(line)
                     self.wfile.flush()
+                    if b'"timings"' in line:                # llama.cpp 在最後幾行附實測速度
+                        try:
+                            timing = json.loads(line.decode("utf-8", "replace").split("data:", 1)[1]).get("timings") or timing
+                        except Exception:  # noqa: BLE001
+                            pass
             except (BrokenPipeError, ConnectionResetError):
                 pass                                   # 使用者按了停止：模型那邊也跟著斷
+            if timing:
+                try:
+                    record_speed(slot_id, timing.get("predicted_per_second"), timing.get("predicted_n"))
+                except Exception:  # noqa: BLE001  # 記速度失敗不影響對話
+                    pass
         return None
 
     def _body(self):
@@ -6496,6 +7003,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*slot_progress(m.group(1)))
         if path == "/agent/folders":
             return self._send(*agent_folders())
+        if path == "/desktop/status":
+            return self._send(*desktop_status())
+        if path == "/desktop/screenshot":
+            if not desktop_enabled():
+                return self._send(403, {"error": "這台沒有開「讓模型操作這台的桌面」，請到這台的設定打開", "disabled": True})
+            return self._send(*desktop_call("GET", "/desktop/screenshot", timeout=60))
+        if path == "/llama/args":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self._send(*llama_args_get((q.get("model") or [""])[0]))
+        if path == "/agent/browse":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self._send(*agent_browse((q.get("path") or [""])[0]))
         return self._send(404, {"error": "找不到"})
 
     def do_POST(self):  # noqa: N802
@@ -6608,6 +7127,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*save_machine(body))
         if path == "/agent/folders/create":
             return self._send(*agent_folder_create(body.get("name")))
+        if path == "/llama/args":
+            return self._send(*llama_args_set(str(body.get("model") or ""), body.get("args")))
+        if path == "/desktop/act":
+            if not desktop_enabled():
+                return self._send(403, {"error": "這台沒有開「讓模型操作這台的桌面」，請到這台的設定打開", "disabled": True})
+            return self._send(*desktop_call("POST", "/desktop/act", body, timeout=60))
+        if path == "/desktop/open":
+            # 只開模型存放區、畫圖模型區與 Agent 工作資料夾底下的資料夾（「開啟位置」用），不必打開操作電腦
+            full = os.path.realpath(str(body.get("path") or ""))
+            reg = registry()
+            roots = [gguf_root(reg), sd_root(reg), AGENT_ROOT, *agent_links(reg).values()]
+            if not any(full == os.path.realpath(r) or full.startswith(os.path.realpath(r) + os.sep) for r in roots if r):
+                return self._send(400, {"error": "只能打開模型存放區或 Agent 工作資料夾底下的資料夾"})
+            return self._send(*desktop_call("POST", "/desktop/open", {"path": full}, timeout=20))
+        if path == "/agent/folders/link":
+            return self._send(*agent_link(body.get("path"), body.get("name")))
+        if path == "/agent/folders/unlink":
+            return self._send(*agent_unlink(str(body.get("name") or "")))
         if path == "/agent/fs/list":
             return self._send(*agent_list(body.get("folder"), body.get("path") or ""))
         if path == "/agent/fs/read":
@@ -6656,6 +7193,574 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "找不到"})
 
 
+# ---------------------------------------------------------------- 操作電腦（這台的桌面）
+# 讓模型看這台的螢幕、控制滑鼠鍵盤。每台預設關閉（machine.desktop_enabled），要管理者在「這台的設定」打開；
+# 每一步由主控台那邊有人按允許才送到這裡（或使用者在那次任務選了「這次都允許」）。
+# 截圖一律縮到最寬 1280 給模型看；模型給的座標以截圖為準，這裡換回實際像素。
+# Windows 以 SYSTEM 跑在看不到桌面的工作階段 0：改由「桌面小幫手」（--desktop-helper，使用者登入後以使用者身分啟動、
+# 只聽 127.0.0.1、權杖放在使用者自己的 %LOCALAPPDATA%\xConsole）代為截圖與操作，代理只轉送。
+DESKTOP_MAX_W = 1280
+DESKTOP_TEXT_MAX = 500
+DESKTOP_ACTIONS = ("click", "double_click", "right_click", "move", "drag", "type", "key", "scroll", "wait")
+DESKTOP_KEY_RX = re.compile(r"(?:(?:ctrl|control|shift|alt|option|cmd|command|win|super|meta)\+){0,3}"
+                            r"(?:[a-z0-9]|f[1-9]|f1[0-2]|enter|return|tab|esc|escape|backspace|delete|del|space|up|down|left|right|"
+                            r"home|end|pageup|pagedown|insert|[-=\[\];',./`\\])", re.I)
+
+
+def _png(rgb, w, h):
+    """RGB 位元組 → PNG（標準函式庫：zlib＋struct）。"""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib_crc(t + d))
+    stride = w * 3
+    raw = b"".join(b"\x00" + bytes(rgb[i * stride:(i + 1) * stride]) for i in range(h))
+    import zlib
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) \
+        + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b"")
+
+
+def zlib_crc(b):
+    import zlib
+    return zlib.crc32(b) & 0xffffffff
+
+
+def _bgra_to_rgb(buf, w, h):
+    rgb = bytearray(w * h * 3)
+    rgb[0::3], rgb[1::3], rgb[2::3] = buf[2::4], buf[1::4], buf[0::4]
+    return rgb
+
+
+def desktop_user_dir(user=None):
+    """桌面小幫手放權杖與程式的地方（使用者自己的資料夾，SYSTEM 也讀得到）。"""
+    if user:
+        return os.path.join(os.environ.get("SystemDrive", "C:") + "\\", "Users", user, "AppData", "Local", "xConsole")
+    return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "xConsole")
+
+
+def _win_session_id():
+    try:
+        import ctypes
+        sid = ctypes.c_ulong()
+        ctypes.windll.kernel32.ProcessIdToSessionId(os.getpid(), ctypes.byref(sid))
+        return sid.value
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def desktop_route():
+    """回 ("direct", None)：代理自己就能操作；("helper", (port, token))：轉給桌面小幫手；(None, 原因)：這台不能。"""
+    if OS == "windows":
+        if _win_session_id() not in (0, None):
+            return "direct", None
+        user = (load_text(os.path.join(STATE_DIR, "desktop-user.txt")) or "").strip()
+        if not user or not re.fullmatch(r"[\w .$-]{1,64}", user):
+            return None, "這台的代理以系統服務身分執行，看不到桌面；請在這台重新執行一次安裝程式，裝上「桌面小幫手」"
+        info = load_json(os.path.join(desktop_user_dir(user), "desktop-helper.json"), None)
+        if not info or not info.get("port") or not info.get("token"):
+            return None, f"桌面小幫手還沒啟動：請用 {user} 登入這台的桌面（登入後會自動啟動）"
+        return "helper", (int(info["port"]), str(info["token"]))
+    if OS == "darwin":
+        return "direct", None
+    if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY") or _linux_display_env():
+        return "direct", None
+    return None, "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）"
+
+
+def _linux_display_env():
+    """systemd 使用者服務沒有 DISPLAY：找這個帳號正在用的桌面工作階段。"""
+    env = {}
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    run = f"/run/user/{uid}"
+    way = sorted(glob.glob(os.path.join(run, "wayland-[0-9]")))
+    if way:
+        env.update(WAYLAND_DISPLAY=os.path.basename(way[0]), XDG_RUNTIME_DIR=run)
+    if os.path.exists("/tmp/.X11-unix/X0"):
+        env["DISPLAY"] = ":0"
+        for xa in (os.path.join(HOME, ".Xauthority"), *glob.glob(os.path.join(run, "gdm", "Xauthority")),
+                   *glob.glob(os.path.join(run, ".mutter-Xwaylandauth.*"))):
+            if os.path.exists(xa):
+                env["XAUTHORITY"] = xa
+                break
+    return env
+
+
+# ---- Windows：GDI 截圖、SendInput
+def _win_api():
+    import ctypes
+    from ctypes import wintypes
+    u32, g32 = ctypes.windll.user32, ctypes.windll.gdi32
+    try:
+        u32.SetProcessDPIAware()
+    except Exception:  # noqa: BLE001
+        pass
+    for f, res, args in ((u32.GetDC, ctypes.c_void_p, [ctypes.c_void_p]), (u32.ReleaseDC, ctypes.c_int, [ctypes.c_void_p, ctypes.c_void_p]),
+                         (g32.CreateCompatibleDC, ctypes.c_void_p, [ctypes.c_void_p]),
+                         (g32.CreateCompatibleBitmap, ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]),
+                         (g32.SelectObject, ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_void_p]),
+                         (g32.DeleteObject, ctypes.c_int, [ctypes.c_void_p]), (g32.DeleteDC, ctypes.c_int, [ctypes.c_void_p]),
+                         (g32.SetStretchBltMode, ctypes.c_int, [ctypes.c_void_p, ctypes.c_int]),
+                         (g32.StretchBlt, ctypes.c_int, [ctypes.c_void_p] + [ctypes.c_int] * 4 + [ctypes.c_void_p] + [ctypes.c_int] * 4 + [wintypes.DWORD]),
+                         (g32.GetDIBits, ctypes.c_int, [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint])):
+        f.restype, f.argtypes = res, args
+    return ctypes, u32, g32
+
+
+def _win_capture(max_w):
+    ctypes, u32, g32 = _win_api()
+    sw, sh = u32.GetSystemMetrics(0), u32.GetSystemMetrics(1)
+    k = min(1.0, max_w / sw) if sw else 1.0
+    w, h = max(1, int(sw * k)), max(1, int(sh * k))
+    hdc = u32.GetDC(None)
+    mdc = g32.CreateCompatibleDC(hdc)
+    bmp = g32.CreateCompatibleBitmap(hdc, w, h)
+    old = g32.SelectObject(mdc, bmp)
+    try:
+        g32.SetStretchBltMode(mdc, 4)                       # HALFTONE：縮小不會一格一格糊掉
+        if not g32.StretchBlt(mdc, 0, 0, w, h, hdc, 0, 0, sw, sh, 0x00CC0020 | 0x40000000):
+            raise RuntimeError("擷取不到螢幕（可能在登入畫面、鎖定畫面或 UAC 確認視窗）")
+
+        class BIH(ctypes.Structure):
+            _fields_ = [("biSize", ctypes.c_uint32), ("biWidth", ctypes.c_int32), ("biHeight", ctypes.c_int32),
+                        ("biPlanes", ctypes.c_uint16), ("biBitCount", ctypes.c_uint16), ("biCompression", ctypes.c_uint32),
+                        ("biSizeImage", ctypes.c_uint32), ("biXPelsPerMeter", ctypes.c_int32), ("biYPelsPerMeter", ctypes.c_int32),
+                        ("biClrUsed", ctypes.c_uint32), ("biClrImportant", ctypes.c_uint32)]
+        bi = BIH(ctypes.sizeof(BIH), w, -h, 1, 32, 0, 0, 0, 0, 0, 0)
+        buf = ctypes.create_string_buffer(w * h * 4 + 1024)
+        g32.GetDIBits(mdc, bmp, 0, h, buf, ctypes.byref(bi), 0)
+    finally:
+        g32.SelectObject(mdc, old)
+        g32.DeleteObject(bmp)
+        g32.DeleteDC(mdc)
+        u32.ReleaseDC(None, hdc)
+    return _png(_bgra_to_rgb(buf.raw[:w * h * 4], w, h), w, h), w, h, sw, sh
+
+
+WIN_VK = {"enter": 0x0D, "return": 0x0D, "tab": 0x09, "esc": 0x1B, "escape": 0x1B, "backspace": 0x08, "delete": 0x2E, "del": 0x2E,
+          "space": 0x20, "up": 0x26, "down": 0x28, "left": 0x25, "right": 0x27, "home": 0x24, "end": 0x23, "pageup": 0x21,
+          "pagedown": 0x22, "insert": 0x2D, "ctrl": 0x11, "control": 0x11, "shift": 0x10, "alt": 0x12, "option": 0x12,
+          "win": 0x5B, "super": 0x5B, "meta": 0x5B, "cmd": 0x11, "command": 0x11,
+          **{f"f{i}": 0x6F + i for i in range(1, 13)}, "-": 0xBD, "=": 0xBB, "[": 0xDB, "]": 0xDD, ";": 0xBA, "'": 0xDE,
+          ",": 0xBC, ".": 0xBE, "/": 0xBF, "`": 0xC0, "\\": 0xDC}
+
+
+def _win_input():
+    import ctypes
+
+    class KI(ctypes.Structure):
+        _fields_ = [("wVk", ctypes.c_ushort), ("wScan", ctypes.c_ushort), ("dwFlags", ctypes.c_ulong),
+                    ("time", ctypes.c_ulong), ("dwExtraInfo", ctypes.c_size_t)]
+
+    class MI(ctypes.Structure):
+        _fields_ = [("dx", ctypes.c_long), ("dy", ctypes.c_long), ("mouseData", ctypes.c_ulong), ("dwFlags", ctypes.c_ulong),
+                    ("time", ctypes.c_ulong), ("dwExtraInfo", ctypes.c_size_t)]
+
+    class U(ctypes.Union):
+        _fields_ = [("ki", KI), ("mi", MI), ("pad", ctypes.c_byte * 32)]
+
+    class INPUT(ctypes.Structure):
+        _fields_ = [("type", ctypes.c_ulong), ("u", U)]
+
+    u32 = ctypes.windll.user32
+    u32.SendInput.argtypes = [ctypes.c_uint, ctypes.c_void_p, ctypes.c_int]
+
+    def send(*items):
+        arr = (INPUT * len(items))(*items)
+        u32.SendInput(len(items), ctypes.byref(arr), ctypes.sizeof(INPUT))
+
+    def key(vk=0, scan=0, flags=0):
+        i = INPUT(1)
+        i.u.ki = KI(vk, scan, flags, 0, 0)
+        return i
+
+    def mouse(flags, data=0):
+        i = INPUT(0)
+        i.u.mi = MI(0, 0, data & 0xFFFFFFFF, flags, 0, 0)
+        return i
+    return u32, send, key, mouse
+
+
+def _win_act(a, x, y, x2, y2, text, keys, dy):
+    u32, send, key, mouse = _win_input()
+    if a in ("click", "double_click", "right_click", "move", "drag"):
+        u32.SetCursorPos(x, y)
+        time.sleep(0.05)
+    if a == "click":
+        send(mouse(0x02), mouse(0x04))
+    elif a == "double_click":
+        send(mouse(0x02), mouse(0x04))
+        time.sleep(0.08)
+        send(mouse(0x02), mouse(0x04))
+    elif a == "right_click":
+        send(mouse(0x08), mouse(0x10))
+    elif a == "drag":
+        send(mouse(0x02))
+        for i in range(1, 11):
+            u32.SetCursorPos(int(x + (x2 - x) * i / 10), int(y + (y2 - y) * i / 10))
+            time.sleep(0.02)
+        send(mouse(0x04))
+    elif a == "scroll":
+        if x is not None:
+            u32.SetCursorPos(x, y)
+        send(mouse(0x0800, int(-dy * 120)))
+    elif a == "type":
+        units = text.encode("utf-16-le")
+        for i in range(0, len(units), 2):
+            cu = int.from_bytes(units[i:i + 2], "little")
+            send(key(0, cu, 0x0004), key(0, cu, 0x0004 | 0x0002))     # KEYEVENTF_UNICODE（中文也打得出來）
+            time.sleep(0.005)
+    elif a == "key":
+        parts = keys.lower().split("+")
+        vks = [WIN_VK.get(p) or (ord(p.upper()) if len(p) == 1 and p.isalnum() else None) for p in parts]
+        if None in vks:
+            raise ValueError(f"不認得的按鍵：{keys}")
+        send(*[key(v) for v in vks])
+        send(*[key(v, 0, 0x0002) for v in reversed(vks)])
+
+
+# ---- macOS：screencapture／sips 截圖、CoreGraphics 送事件
+MAC_KEY = {"enter": 36, "return": 36, "tab": 48, "space": 49, "backspace": 51, "delete": 117, "del": 117, "esc": 53, "escape": 53,
+           "left": 123, "right": 124, "down": 125, "up": 126, "home": 115, "end": 119, "pageup": 116, "pagedown": 121,
+           **{c: i for i, c in enumerate("asdfhgzxcv")}, "b": 11, "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17,
+           "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "=": 24, "9": 25, "7": 26, "-": 27, "8": 28, "0": 29,
+           "]": 30, "o": 31, "u": 32, "[": 33, "i": 34, "p": 35, "l": 37, "j": 38, "'": 39, "k": 40, ";": 41, "\\": 42,
+           ",": 43, "/": 44, "n": 45, "m": 46, ".": 47, "`": 50, **{f"f{i}": c for i, c in
+                                                                 enumerate((122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111), 1)}}
+MAC_FLAG = {"cmd": 0x100000, "command": 0x100000, "meta": 0x100000, "win": 0x100000, "super": 0x100000,
+            "shift": 0x20000, "ctrl": 0x40000, "control": 0x40000, "alt": 0x80000, "option": 0x80000}
+
+
+def _mac_cg():
+    import ctypes
+    cg = ctypes.CDLL("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
+
+    class P(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
+    cg.CGEventCreateMouseEvent.restype = ctypes.c_void_p
+    cg.CGEventCreateMouseEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint32, P, ctypes.c_uint32]
+    cg.CGEventCreateKeyboardEvent.restype = ctypes.c_void_p
+    cg.CGEventCreateKeyboardEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint16, ctypes.c_bool]
+    cg.CGEventCreateScrollWheelEvent.restype = ctypes.c_void_p
+    cg.CGEventCreateScrollWheelEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_int32]
+    cg.CGEventPost.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
+    cg.CGEventSetFlags.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+    cg.CGEventKeyboardSetUnicodeString.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p]
+    cg.CGEventSetIntegerValueField.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int64]
+    cg.CFRelease.argtypes = [ctypes.c_void_p]
+    cg.CGMainDisplayID.restype = ctypes.c_uint32
+    cg.CGDisplayPixelsWide.argtypes = cg.CGDisplayPixelsHigh.argtypes = [ctypes.c_uint32]
+    cg.CGDisplayPixelsWide.restype = cg.CGDisplayPixelsHigh.restype = ctypes.c_size_t
+    return ctypes, cg, P
+
+
+def _mac_capture(max_w):
+    _, cg, _ = _mac_cg()
+    did = cg.CGMainDisplayID()
+    lw, lh = cg.CGDisplayPixelsWide(did), cg.CGDisplayPixelsHigh(did)       # 邏輯座標（滑鼠事件用這個）
+    d = tempfile.mkdtemp(prefix="xc-shot-")
+    try:
+        p = os.path.join(d, "s.png")
+        rc, _, err = sh(["screencapture", "-x", "-m", "-t", "png", p], timeout=20)
+        if rc != 0 or not os.path.exists(p) or os.path.getsize(p) < 100:
+            raise RuntimeError("擷取不到螢幕：請到「系統設定 › 隱私權與安全性 › 螢幕錄製」允許執行代理的 Python")
+        sh(["sips", "--resampleWidth", str(min(max_w, lw)), p], timeout=30)
+        _, info, _ = sh(["sips", "-g", "pixelWidth", "-g", "pixelHeight", p], timeout=20)
+        w = int(re.search(r"pixelWidth:\s*(\d+)", info).group(1))
+        h = int(re.search(r"pixelHeight:\s*(\d+)", info).group(1))
+        with open(p, "rb") as fh:
+            return fh.read(), w, h, lw, lh
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def _mac_act(a, x, y, x2, y2, text, keys, dy):
+    ctypes, cg, P = _mac_cg()
+
+    def post(ev):
+        cg.CGEventPost(0, ev)
+        cg.CFRelease(ev)
+
+    def m(kind, px, py, btn=0, clicks=1):
+        ev = cg.CGEventCreateMouseEvent(None, kind, P(px, py), btn)
+        if clicks > 1:
+            cg.CGEventSetIntegerValueField(ev, 1, clicks)            # kCGMouseEventClickState
+        post(ev)
+    if a in ("click", "double_click", "move", "drag", "right_click"):
+        m(5, x, y)
+        time.sleep(0.05)
+    if a == "click":
+        m(1, x, y); m(2, x, y)
+    elif a == "double_click":
+        m(1, x, y); m(2, x, y); m(1, x, y, 0, 2); m(2, x, y, 0, 2)
+    elif a == "right_click":
+        m(3, x, y, 1); m(4, x, y, 1)
+    elif a == "drag":
+        m(1, x, y)
+        for i in range(1, 11):
+            m(6, x + (x2 - x) * i / 10, y + (y2 - y) * i / 10)
+            time.sleep(0.02)
+        m(2, x2, y2)
+    elif a == "scroll":
+        ev = cg.CGEventCreateScrollWheelEvent(None, 0, 1, int(-dy * 3))
+        post(ev)
+    elif a == "type":
+        for ch in text:
+            units = ch.encode("utf-16-le")
+            arr = (ctypes.c_uint16 * (len(units) // 2)).from_buffer_copy(units)
+            for down in (True, False):
+                ev = cg.CGEventCreateKeyboardEvent(None, 0, down)
+                cg.CGEventKeyboardSetUnicodeString(ev, len(arr), arr)
+                post(ev)
+            time.sleep(0.005)
+    elif a == "key":
+        parts = keys.lower().split("+")
+        flags = sum(MAC_FLAG.get(p, 0) for p in parts[:-1])
+        code = MAC_KEY.get(parts[-1])
+        if code is None or any(p not in MAC_FLAG for p in parts[:-1]):
+            raise ValueError(f"不認得的按鍵：{keys}")
+        for down in (True, False):
+            ev = cg.CGEventCreateKeyboardEvent(None, code, down)
+            if flags:
+                cg.CGEventSetFlags(ev, flags)
+            post(ev)
+
+
+# ---- Linux：grim／ImageMagick 截圖、xdotool／ydotool 送事件
+def _linux_env():
+    return {**os.environ, **_linux_display_env(), **{k: v for k, v in os.environ.items() if k in ("DISPLAY", "WAYLAND_DISPLAY")}}
+
+
+def _linux_capture(max_w):
+    env = _linux_env()
+    d = tempfile.mkdtemp(prefix="xc-shot-")
+    try:
+        p = os.path.join(d, "s.png")
+        tries = ([["grim", p]] if env.get("WAYLAND_DISPLAY") else []) + [["import", "-window", "root", p], ["gnome-screenshot", "-f", p], ["scrot", "-o", p]]
+        for cmd in tries:
+            if shutil.which(cmd[0]):
+                subprocess.run(cmd, env=env, capture_output=True, timeout=30)
+                if os.path.exists(p) and os.path.getsize(p) > 100:
+                    break
+        else:
+            raise RuntimeError("這台沒有截圖工具：sudo apt install imagemagick xdotool（Wayland 桌面另裝 grim ydotool）")
+        if not os.path.exists(p):
+            raise RuntimeError("擷取不到螢幕")
+        sw, sh_ = _png_size(p)
+        if sw > max_w and shutil.which("convert"):
+            subprocess.run(["convert", p, "-resize", f"{max_w}x", p], capture_output=True, timeout=30)
+        w, h = _png_size(p)
+        with open(p, "rb") as fh:
+            return fh.read(), w, h, sw, sh_
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def _png_size(p):
+    with open(p, "rb") as fh:
+        head = fh.read(24)
+    return struct.unpack(">II", head[16:24])
+
+
+def _linux_act(a, x, y, x2, y2, text, keys, dy):
+    env = _linux_env()
+    if shutil.which("xdotool") and env.get("DISPLAY"):
+        run = lambda *args: subprocess.run(["xdotool", *[str(v) for v in args]], env=env, capture_output=True, timeout=30)  # noqa: E731
+        if a in ("click", "double_click", "right_click", "move", "drag"):
+            run("mousemove", x, y)
+        if a == "click":
+            run("click", 1)
+        elif a == "double_click":
+            run("click", "--repeat", 2, 1)
+        elif a == "right_click":
+            run("click", 3)
+        elif a == "drag":
+            run("mousedown", 1); run("mousemove", x2, y2); run("mouseup", 1)
+        elif a == "scroll":
+            run("click", "--repeat", max(1, abs(int(dy))), 5 if dy > 0 else 4)
+        elif a == "type":
+            run("type", "--delay", 8, "--", text)
+        elif a == "key":
+            run("key", "--", keys.replace("cmd", "super").replace("win", "super").replace("enter", "Return").replace("esc", "Escape"))
+        return
+    raise RuntimeError("這台沒有可以送滑鼠鍵盤事件的工具：sudo apt install xdotool（Wayland 桌面請改用 X11 工作階段）")
+
+
+def desktop_capture_direct(max_w=DESKTOP_MAX_W):
+    fn = {"windows": _win_capture, "darwin": _mac_capture}.get(OS, _linux_capture)
+    png, w, h, pw, ph = fn(max_w)
+    return {"png": base64.b64encode(png).decode(), "width": w, "height": h, "screen_w": pw, "screen_h": ph}
+
+
+def desktop_check_action(body, w, h):
+    """模型給的動作：種類白名單、座標在截圖範圍內、文字長度、按鍵格式。回 (乾淨的動作, 錯誤)。"""
+    a = body.get("action")
+    if a not in DESKTOP_ACTIONS:
+        return None, f"不支援的動作：{a}"
+    out = {"action": a}
+    if a in ("click", "double_click", "right_click", "move", "drag") or (a == "scroll" and body.get("x") is not None):
+        for k in ("x", "y") + (("x2", "y2") if a == "drag" else ()):
+            try:
+                v = int(round(float(body.get(k))))
+            except (TypeError, ValueError):
+                return None, f"{k} 要是數字"
+            lim = w if k.startswith("x") else h
+            if not 0 <= v < lim:
+                return None, f"{k}={v} 超出截圖範圍（0～{lim - 1}）"
+            out[k] = v
+    if a == "type":
+        t = body.get("text")
+        if not isinstance(t, str) or not t or len(t) > DESKTOP_TEXT_MAX or "\x00" in t:
+            return None, f"要打的字要是 1～{DESKTOP_TEXT_MAX} 字"
+        out["text"] = t
+    if a == "key":
+        k = str(body.get("keys") or "").strip()
+        if not DESKTOP_KEY_RX.fullmatch(k):
+            return None, f"不認得的按鍵組合：{k[:40]}"
+        out["keys"] = k
+    if a == "scroll":
+        try:
+            out["dy"] = max(-20, min(20, int(body.get("dy") or 3)))
+        except (TypeError, ValueError):
+            return None, "捲動量要是整數"
+    if a == "wait":
+        try:
+            out["seconds"] = max(0.5, min(10.0, float(body.get("seconds") or 2)))
+        except (TypeError, ValueError):
+            out["seconds"] = 2.0
+    return out, None
+
+
+def desktop_act_direct(body):
+    """執行一個動作。座標以截圖（width×height）為準，換算成實際螢幕座標。"""
+    w, h = int(body.get("width") or 0), int(body.get("height") or 0)
+    sw, sh_ = int(body.get("screen_w") or 0), int(body.get("screen_h") or 0)
+    if not (w and h and sw and sh_):
+        return 400, {"error": "缺少截圖尺寸，請先截一張圖"}
+    act, err = desktop_check_action(body, w, h)
+    if err:
+        return 400, {"error": err}
+    a = act["action"]
+    if a == "wait":
+        time.sleep(act["seconds"])
+        return 200, {"ok": True}
+    sc = lambda v, a_, b_: None if v is None else int(round(v * b_ / a_))  # noqa: E731
+    x, y = sc(act.get("x"), w, sw), sc(act.get("y"), h, sh_)
+    x2, y2 = sc(act.get("x2"), w, sw), sc(act.get("y2"), h, sh_)
+    fn = {"windows": _win_act, "darwin": _mac_act}.get(OS, _linux_act)
+    try:
+        fn(a, x, y, x2, y2, act.get("text", ""), act.get("keys", ""), act.get("dy", 0))
+    except (RuntimeError, ValueError, OSError) as ex:
+        return 400, {"error": str(ex)}
+    return 200, {"ok": True}
+
+
+def desktop_open_direct(path):
+    """用檔案總管（Finder）打開一個資料夾。"""
+    full = os.path.realpath(str(path or ""))
+    if not os.path.isdir(full):
+        return 404, {"error": "沒有這個資料夾"}
+    if OS == "windows":
+        subprocess.Popen(["explorer", full])
+    elif OS == "darwin":
+        subprocess.Popen(["open", full])
+    else:
+        subprocess.Popen(["xdg-open", full], env=_linux_env())
+    return 200, {"ok": True}
+
+
+def desktop_call(method, path, body=None, timeout=60):
+    """操作電腦的入口：代理自己能做就直接做，不能就轉給桌面小幫手。"""
+    how, extra = desktop_route()
+    if how is None:
+        return 409, {"error": extra, "unavailable": True}
+    if how == "helper":
+        port, tok = extra
+        req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method=method,
+                                     data=json.dumps(body or {}).encode() if method == "POST" else None,
+                                     headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
+        try:
+            with LOCAL.open(req, timeout=timeout) as r:
+                return r.status, json.load(r)
+        except urllib.error.HTTPError as ex:
+            try:
+                return ex.code, json.load(ex)
+            except Exception:  # noqa: BLE001
+                return ex.code, {"error": f"桌面小幫手回 {ex.code}"}
+        except Exception as ex:  # noqa: BLE001
+            return 502, {"error": f"連不上桌面小幫手（{str(ex)[:80]}）：請確認有人登入這台的桌面"}
+    return desktop_dispatch(method, path, body or {})
+
+
+def desktop_dispatch(method, path, body):
+    try:
+        if path == "/desktop/info":
+            return 200, {"ok": True, "os": OS, "how": desktop_route()[0]}
+        if path == "/desktop/screenshot":
+            return 200, desktop_capture_direct()
+        if path == "/desktop/act":
+            return desktop_act_direct(body)
+        if path == "/desktop/open":
+            return desktop_open_direct(body.get("path"))
+    except (RuntimeError, OSError) as ex:
+        return 500, {"error": str(ex)}
+    return 404, {"error": "找不到"}
+
+
+def desktop_enabled(reg=None):
+    return bool((reg or registry())["machine"].get("desktop_enabled"))
+
+
+def desktop_status():
+    how, why = desktop_route()
+    return 200, {"enabled": desktop_enabled(), "available": how is not None, "how": how, "why": why if how is None else None, "os": OS}
+
+
+def run_desktop_helper():
+    """桌面小幫手：使用者登入後以使用者身分啟動，只聽 127.0.0.1、要權杖。權杖與埠寫在使用者自己的資料夾給代理讀。"""
+    d = desktop_user_dir()
+    os.makedirs(d, exist_ok=True)
+    tok = secrets.token_urlsafe(32)
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _out(self, code, obj):
+            b = json.dumps(obj, ensure_ascii=False).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def _ok(self):
+            got = self.headers.get("Authorization") or ""
+            if not (got.startswith("Bearer ") and secrets.compare_digest(got[7:], tok)):
+                self._out(401, {"error": "需要權杖"})
+                return False
+            return True
+
+        def do_GET(self):  # noqa: N802
+            if self._ok():
+                self._out(*desktop_dispatch("GET", self.path.split("?")[0], {}))
+
+        def do_POST(self):  # noqa: N802
+            if not self._ok():
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(min(n, 1 << 20)) or b"{}")
+            except Exception:  # noqa: BLE001
+                body = {}
+            self._out(*desktop_dispatch("POST", self.path.split("?")[0], body))
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    p = os.path.join(d, "desktop-helper.json")
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump({"port": srv.server_address[1], "token": tok, "pid": os.getpid()}, fh)
+    os.replace(tmp, p)
+    srv.serve_forever()
+
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
@@ -6681,5 +7786,7 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--launch-llama":
         launch_llama(sys.argv[2])
+    elif "--desktop-helper" in sys.argv:
+        run_desktop_helper()
     else:
         main()

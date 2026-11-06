@@ -13,13 +13,18 @@
 3. 執行：選一顆已安裝的模型 → 看分層規劃（放顯示卡／系統記憶體／硬碟各多少）→ 設上下文、思考模式、區網存取
    → 看預估速度與第一次載入時間 → 按「啟動模型」→ 看載入進度 → 下方狀態列出現 API 網址可以複製。
    記憶體放不下時自動往後排到硬碟，不必另外勾選；按鈕會標「會用到硬碟，很慢」，存放區在機械硬碟上會提醒改放 SSD。
+   MoE 模型用硬碟執行時依張量種類分層：注意力、共用權重與 KV 放顯示卡，專家層留在記憶體映射，放不下的專家用到才從 SSD 讀。
+   「高階：啟動引數」列出完整的 llama-server 指令，可以加自訂引數（跟著模型存；自己寫分層參數時自動分層讓位）。
+   速度先照記憶體頻寬估，對話過之後改顯示實測，並用實測校正這台其他模型的估算。
 4. 對話：直接跟剛啟動的模型聊；按「附件」可以附 PDF、Word、Excel、PowerPoint、純文字與程式碼（主控台抽出文字附進對話），
    看得懂圖的模型也能附圖。模型寫出 HTML 可以直接執行預覽、下載、複製。也可以切到管理者設好的第三方 API。
    對話紀錄存在主控台（左邊可搜尋、改名、刪除，換瀏覽器也在）；每則回答可以複製、重新生成、調整回答（更簡潔、更詳細、
    更正式、更口語、換個說法、改用英文）、編輯、刪除，重新生成與調整回答會留下各版本可切換。「對話設定」放系統提示詞與取樣參數。
    說「畫一張…」「生成一段…的影片」就直接產出，附圖說「把…改成…」就改圖（也可以按輸入列的「畫圖」「影片」）；
    「工具」打開時模型可以查這台的狀態與推薦。對話太長時，較早的部分自動整理成摘要再送，畫面上標「已壓縮前 N 則」。
-5. Agent：選一個工作資料夾、交代一件事，Agent 自己規劃、建檔、寫程式、跑指令；每條指令要人按允許。
+5. Agent：選一個工作資料夾（新建在 ~/xconsole-agent/，或「連結這台的資料夾」選既有的專案），交代一件事，
+   Agent 自己規劃、建檔、寫程式、跑指令；每條指令要人按允許。
+   對話頁的「操作電腦」：看得懂圖的模型看這台的螢幕、控制滑鼠鍵盤，每一步預設先問（管理者要先在這台的設定打開）。
 6. 畫圖、影片：寫一句描述就產出；模型不在就帶去下載。畫圖可選方形、直式、橫式畫幅、一次 1～4 張，
    也可以放一張參考圖在上面重繪；影片可以放第一格畫面，接著往下演。
 
@@ -98,6 +103,14 @@
     `GET /api/chats/blob/{id}`（附圖原檔）；`POST /api/chats/{id}/rename {title}`、`POST /api/chats/{id}/delete`、`POST /api/chats/delete-all`。
     訊息欄位：`role`、`content`、`reasoning`、`stat`、`error`、`image`、`docs`、`alts`＋`alt`（回答的各版本）、`gen`（對話裡畫圖、做影片：
     `{node, job, kind, prompt, asked, model, title, count, state, edit}`）。
+14. **執行與設定**：`GET/POST /api/node/{n}/llama/args`（`{model, args}`，自訂啟動引數，白名單）；`run_options` 多 `cmd`、`extra_args`、
+    `measured_tok_s`、`speed_factor`、`tiered`、`cpu_moe`；機器設定多 `gpu_override`（`null`／`"cpu"`／`{name, vendor, vram_gib}`）、
+    `hf_mirror`、`github_proxy`、`desktop_enabled`；`POST /api/settings/hf {token}|{clear:true}`（加密保存，GET `/api/settings` 回 `hf_token_set`）。
+15. **Agent 連結資料夾**：`GET /api/node/{n}/agent/browse?path=`（只列子資料夾，`ok`／`why`）、`POST .../agent/folders/link {path}`、
+    `POST .../agent/folders/unlink {name}`；`/agent/folders` 的連結項目多 `linked`、`path`、`broken`。
+16. **操作電腦**：`GET /api/node/{n}/desktop/status` → `{enabled, available, how, why, os}`；`POST /api/computer/tasks {node, model, goal}`、
+    `GET /api/computer/tasks/{id}?after=<截圖編號>`、`POST .../decide {allow, always, pending}`、`POST .../stop`；
+    `POST /api/node/{n}/desktop/open {path}`（只開模型存放區與 Agent 工作資料夾底下）。
 13. **取樣參數**：本機對話（`/api/node/{n}/chat/{s}`）與助理（`/api/assistant` 的 `sampling`）收 `temperature` 0～2、`top_p` 0～1、
     `top_k` 0～1000 整數、`min_p` 0～1、`repeat_penalty` 0.5～2、`presence_penalty` -2～2、`max_tokens` 1～131072、`seed` -1～2^31-1（-1＝隨機，不送）；
     第三方 API 只轉送 `temperature`、`top_p`、`presence_penalty`、`max_tokens`、`seed`。助理另收 `system`（接在主控台的助理指示後面）。

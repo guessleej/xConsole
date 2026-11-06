@@ -789,6 +789,28 @@ async function libRec(body, ok, only, v) {
   reveal(holder);
 }
 
+// 開啟位置：網頁版顯示完整路徑可複製；那台有桌面時（單機版、有人登入）可以直接用檔案總管打開
+function openModelFolder(n, m) {
+  const sep = m.path.includes("\\") ? "\\" : "/";
+  const dir = m.path.slice(0, m.path.lastIndexOf(sep)) || m.path;
+  const d = el("div");
+  const pre = el("pre", "code-pre mono small");
+  pre.textContent = dir;
+  d.appendChild(pre);
+  const row = el("div", "slot-actions");
+  const cp = el("button", "btn sm", "複製路徑");
+  cp.onclick = () => copyText(dir);
+  const op = el("button", "btn sm primary", `在 ${n.name} 上打開資料夾`);
+  const note = el("p", "small muted", "「打開資料夾」會在那台的桌面跳出檔案總管；那台沒有人登入桌面時打不開，就用上面的路徑。");
+  op.onclick = async () => {
+    try { await api(`/api/node/${n.id}/desktop/open`, { method: "POST", body: { path: dir } }); toast("已在那台打開", "ok"); }
+    catch (ex) { note.textContent = "打不開：" + ex.message; note.className = "small warn-t"; }
+  };
+  row.append(cp, el("span", "spacer"), op);
+  d.append(row, note);
+  modal({ title: `${m.name}${m.quant ? " " + m.quant : ""} 的位置`, bodyNode: d });
+}
+
 function libInstalledCard(ok, models, jobs) {
   const ic = card("已安裝的模型", `${models.length} 顆`);
   ic.id = "lib-installed";
@@ -817,6 +839,11 @@ function libInstalledCard(ok, models, jobs) {
     const sw = el("button", "btn sm primary", m.in_use ? "執行設定" : "執行");
     sw.onclick = () => runModel(n, m);
     td.appendChild(sw);
+    if (m.path) {
+      const loc = el("button", "btn sm", "開啟位置");
+      loc.onclick = () => openModelFolder(n, m);
+      td.appendChild(loc);
+    }
     if (m.engine === "llama") {
       const b = el("button", "btn sm danger", "刪除");
       b.disabled = !!m.in_use;
@@ -908,8 +935,9 @@ function libDownloadCard(ok, only) {
     form.appendChild(w0);
   }
   const w1 = el("div"); w1.appendChild(el("label", null, "模型名稱（作者/模型）")); w1.appendChild(fRepo);
-  const w2 = el("div"); w2.appendChild(el("label", null, "Hugging Face 權杖（選填）")); w2.appendChild(fTok);
-  w2.appendChild(el("div", "assume", "只在這次下載期間用，不保存、不寫紀錄"));
+  const w2 = el("div"); w2.appendChild(el("label", null, "Hugging Face 令牌（選填）")); w2.appendChild(fTok);
+  w2.appendChild(el("div", "assume", "這裡填的只用這一次；要一直用就按「存起來」（加密保存在主控台，畫面看不到內容）"));
+  w2.appendChild(hfTokenRow(fTok));
   form.appendChild(w1);
   form.appendChild(w2);
   // 不知道完整名稱時先用關鍵字找（照下載數排），點一下就帶進上面的名稱並列出量化
@@ -1535,12 +1563,14 @@ function recList(n, rec, lib, ctx) {
 
   const bar = el("div", "tabbar");
   const list = el("div", "rec-list");
-  const uses = [["all", "全部"], ["chat", "對話與知識"], ["code", "寫程式"], ["vision", "看圖與 OCR"]];
+  // 分類照 LocModel：適合這台（流暢或能跑，不含要用硬碟的）排第一；推理＝標了「推理」的
+  const uses = [["fit", "適合這台"], ["all", "全部"], ["chat", "對話與知識"], ["code", "寫程式"], ["vision", "看圖與 OCR"], ["reason", "推理"]];
+  const useOk = (x, k) => k === "all" || (k === "fit" ? ["smooth", "ok"].includes(x.level) : k === "reason" ? (x.tags || []).includes("推理") : x.use === k);
   const fill = () => {
     bar.textContent = "";
     uses.forEach(([k, label]) => {
       const b = el("button", null, label);
-      if ((S.recUse || "all") === k) b.setAttribute("aria-current", "true");
+      if ((S.recUse || "fit") === k) b.setAttribute("aria-current", "true");
       b.onclick = () => { S.recUse = k; fill(); };
       bar.appendChild(b);
     });
@@ -1549,17 +1579,19 @@ function recList(n, rec, lib, ctx) {
     bar.appendChild(tg);
     list.textContent = "";
     const rank = { smooth: 0, ok: 1, no: 2, unknown: 3 };
-    const rows = rec.items.filter((x) => (S.recUse || "all") === "all" || x.use === S.recUse)
+    const rows = rec.items.filter((x) => useOk(x, S.recUse || "fit"))
       .filter((x) => S.recAll || x.level !== "no")
       .sort((a, b) => rank[a.level] - rank[b.level] || a.order - b.order);
     rows.forEach((it) => list.appendChild(recRow(n, it, lib, ctx)));
-    if (!rows.length) list.appendChild(el("p", "small muted", S.recAll ? "推薦清單是空的，按「管理推薦清單」新增。" : "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。"));
+    if (!rows.length) list.appendChild(el("p", "small muted", S.recAll ? "推薦清單是空的，按「管理推薦清單」新增。"
+      : (S.recUse || "fit") === "fit" ? "推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或放不下的，或到「搜尋 Hugging Face」找小一點的。"
+        : "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。"));
   };
   fill();
   c.append(bar, list);
   const a = rec.assumptions;
   c.appendChild(el("p", "small muted", `速度是估算：記憶體頻寬 × ${Math.round(a.efficiency * 100)}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），`
-    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；實際以 API 串接的實測為準。推薦清單不含中國來源模型（政府案不得使用）。`));
+    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用）。`));
   return c;
 }
 
@@ -1707,6 +1739,28 @@ function sizeLabel(w, h) {
   const d = g(w, h);
   const r = { "1:1": "方形", "3:4": "直式", "9:16": "直式", "2:3": "直式", "4:3": "橫式", "16:9": "橫式", "3:2": "橫式", "8:5": "橫式", "5:8": "直式" }[`${w / d}:${h / d}`];
   return `${w}×${h}${r ? `（${w / d}:${h / d} ${r}）` : ""}`;
+}
+
+// Hugging Face 令牌存在主控台：受限模型（Llama、部分 Gemma）下載時自動帶上；走鏡像的機器不會送出
+function hfTokenRow(fTok) {
+  const row = el("div", "slot-actions hf-tok");
+  const st = el("span", "small muted", "已存的令牌：讀取中…");
+  const save = el("button", "btn sm", "存起來");
+  const clear = el("button", "btn sm", "清除已存的");
+  row.append(st, el("span", "spacer"), save, clear);
+  const show = (set) => { st.textContent = set ? "已存的令牌：已設定（沒填上面那格時自動用它）" : "已存的令牌：沒有"; clear.hidden = !set; };
+  api("/api/settings").then((r) => show(r.hf_token_set)).catch(() => { st.textContent = ""; });
+  save.onclick = async () => {
+    try { await api("/api/settings/hf", { method: "POST", body: { token: fTok.value.trim() } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    fTok.value = "";
+    show(true);
+    toast("已加密存在主控台", "ok");
+  };
+  clear.onclick = async () => {
+    try { await api("/api/settings/hf", { method: "POST", body: { clear: true } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    show(false);
+  };
+  return row;
 }
 
 async function getSdRec(nid, fresh) {
@@ -4339,7 +4393,7 @@ async function openMachineSettings(nid) {
   tr.appendChild(tb);
   body.appendChild(tr);
 
-  let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent;
+  let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent, fGpuMode, fGpuName, fGpuVendor, fGpuVram, fHfMirror, fGhProxy, fDesk;
   if (!info) {
     body.appendChild(el("p", "note warn", `這台現在連不上，只能改上面的基本資料；記憶體與模型存放等連上之後再設定。${infoErr}`));
   } else {
@@ -4368,6 +4422,23 @@ async function openMachineSettings(nid) {
     }
     body.appendChild(el("p", "small muted",
       `這台：${det.gpus.length ? det.gpus.map((g) => `卡 ${g.id} ${g.name || ""}${g.vram_gib ? " " + g.vram_gib + " GiB" : ""}`).join("、") : "沒有偵測到 GPU"}；系統記憶體 ${det.ram_gib} GiB`));
+    // 手動指定顯示卡：偵測不到（例：Windows 的內顯被當成沒有）或顯存讀錯時用
+    const ovr = st.gpu_override;
+    const fg = el("div", "form-row");
+    fGpuMode = selectInput([["auto", "自動偵測（建議）"], ["cpu", "不用 GPU，只用 CPU"], ["manual", "手動指定一張卡"]],
+      ovr === "cpu" ? "cpu" : ovr ? "manual" : "auto");
+    fGpuName = textInput(ovr?.name || "", "例：AMD Radeon 880M");
+    fGpuName.maxLength = 80;
+    fGpuVendor = selectInput([["amd", "AMD"], ["intel", "Intel"], ["nvidia", "NVIDIA"], ["apple", "Apple"]], ovr?.vendor || "amd");
+    fGpuVram = numInput(ovr?.vram_gib ?? "", "GiB");
+    fGpuVram.min = "0.5";
+    const manualBoxes = [fieldBox("顯示卡名稱", fGpuName), fieldBox("廠牌", fGpuVendor, "決定裝哪一版推理引擎（AMD／Intel 走 Vulkan）"),
+      fieldBox("顯存（GiB）", fGpuVram, "內顯填專用記憶體；Windows 的內顯另外會借用一半系統記憶體，不必加進來")];
+    const syncGpu = () => manualBoxes.forEach((b) => { b.hidden = fGpuMode.value !== "manual"; });
+    fGpuMode.onchange = syncGpu;
+    fg.append(fieldBox("顯示卡", fGpuMode, "偵測錯了才改。改了之後推薦、記憶體試算與推理引擎版本都照這裡算"), ...manualBoxes);
+    syncGpu();
+    body.appendChild(fg);
 
     // 推薦清單估速度用：每產生一個 token 都要把權重從記憶體讀一遍，速度上限看頻寬
     const ch = info.chip || {};
@@ -4423,6 +4494,14 @@ async function openMachineSettings(nid) {
     bbtn.onclick = () => openEngineBuild(nid);
     bb.appendChild(bbtn);
     body.appendChild(bb);
+    // 下載來源：連不上 Hugging Face 或 GitHub 的網路環境用（例：公司防火牆、對岸）
+    body.appendChild(el("h4", "pick-h", "下載來源"));
+    const fd = el("div", "form-row");
+    fHfMirror = textInput(st.hf_mirror || "", "空白＝官方 https://huggingface.co");
+    fGhProxy = textInput(st.github_proxy || "", "空白＝直連 GitHub");
+    fd.append(fieldBox("Hugging Face 鏡像", fHfMirror, "例：https://hf-mirror.com。走鏡像時不會送出 Hugging Face 令牌（鏡像是第三方）"),
+      fieldBox("GitHub 加速字首", fGhProxy, "例：https://ghfast.top/。只用在下載推理引擎；版本與 sha256 仍直接問 GitHub，對不上就不裝"));
+    body.appendChild(fd);
     // Agent：會在這台建檔、跑指令，預設關閉；打開後只能動 ~/xconsole-agent/ 底下，每條指令要人按允許
     body.appendChild(el("h4", "pick-h", "Agent"));
     const agRow = el("label", "check-row");
@@ -4430,7 +4509,17 @@ async function openMachineSettings(nid) {
     fAgent.type = "checkbox";
     fAgent.checked = !!(st.agent_enabled ?? info.agent_enabled);
     agRow.append(fAgent, document.createTextNode(" 允許 Agent 在這台工作（建檔、寫程式、跑指令）"));
-    body.append(agRow, el("p", "small muted", "檔案只能動 ~/xconsole-agent/ 底下的工作資料夾；指令以代理的身分執行，每條都要人在網頁上按允許，並寫進記錄。不需要就保持關閉。"));
+    body.append(agRow, el("p", "small muted", "檔案只能動工作資料夾裡面：~/xconsole-agent/ 底下的，或在 Agent 頁連結進來的資料夾（系統資料夾、家目錄本身、.ssh 這類設定夾不能連）。指令以代理的身分執行，每條都要人在網頁上按允許，並寫進記錄。不需要就保持關閉。"));
+    body.appendChild(el("h4", "pick-h", "操作電腦"));
+    const pcRow = el("label", "check-row");
+    fDesk = el("input");
+    fDesk.type = "checkbox";
+    fDesk.checked = !!st.desktop_enabled;
+    pcRow.append(fDesk, document.createTextNode(" 讓模型操作這台的桌面（看螢幕、控制滑鼠鍵盤）"));
+    const dk = info.desktop || {};
+    body.append(pcRow, el("p", "small " + (dk.how ? "muted" : "warn-t"), dk.how
+      ? `${dk.how === "helper" ? "由桌面小幫手代為操作（使用者登入後才有桌面）" : "代理直接操作這台的桌面"}。對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉。`
+      : `這台現在不能操作桌面：${dk.why || "沒有圖形桌面"}`));
     body.appendChild(el("h4", "pick-h", "備註"));
     fNote = el("textarea");
     fNote.value = st.note || "";
@@ -4449,7 +4538,9 @@ async function openMachineSettings(nid) {
           bandwidth_gbs: fBw.value, ram_bandwidth_gbs: fRbw.value,
           gguf_root: fRoot.value === "__custom" ? fRootC.value.trim() : fRoot.value,
           llama_server: fLlama.value === "__custom" ? fLlamaC.value.trim() : fLlama.value,
-          sd_cli: fSd.value === "__custom" ? fSdC.value.trim() : fSd.value, agent_enabled: fAgent.checked } });
+          sd_cli: fSd.value === "__custom" ? fSdC.value.trim() : fSd.value, agent_enabled: fAgent.checked,
+          gpu_override: fGpuMode.value === "manual" ? { name: fGpuName.value.trim(), vendor: fGpuVendor.value, vram_gib: Number(fGpuVram.value) } : fGpuMode.value,
+          hf_mirror: fHfMirror.value.trim(), github_proxy: fGhProxy.value.trim(), desktop_enabled: fDesk.checked } });
       }
     } catch (ex) { errNote(err, ex.message); return; }
     ov.remove();

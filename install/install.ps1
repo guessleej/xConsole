@@ -21,7 +21,7 @@ function Say($t) { Write-Host "`n== $t ==" }
 function Die($t) { Write-Host "`n安裝停止：$t" -ForegroundColor Red; exit 1 }
 
 if ($Uninstall) {
-  foreach ($t in 'xConsole', 'xConsole Agent') {
+  foreach ($t in 'xConsole', 'xConsole Agent', 'xConsole Desktop') {
     Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $t -Confirm:$false -ErrorAction SilentlyContinue
   }
@@ -125,6 +125,24 @@ for ($i = 0; $i -lt 40 -and -not $up; $i++) {
 if (-not $up) { Die "節點代理沒有起來，請看 $st\agent.log，或在「工作排程器」查看 xConsole Agent 的最後執行結果" }
 & $vpy (Join-Path $SRC 'install\setup_local.py') --home $base
 Task 'xConsole' (Join-Path $dir 'xconsole_server.py') $dir
+if ($admin) {
+  # 桌面小幫手（操作電腦用）：代理以 SYSTEM 跑在看不到桌面的工作階段，改由這個在使用者登入後、以使用者身分啟動的
+  # 小程式代為截圖與操作。只聽 127.0.0.1、權杖放在使用者自己的 %LOCALAPPDATA%\xConsole；程式資料夾使用者讀不到，所以另外複製一份
+  $hd = Join-Path $env:LOCALAPPDATA 'xConsole\desktop'
+  New-Item -ItemType Directory -Force -Path $hd | Out-Null
+  Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $hd 'xconsole_agent.py')
+  Set-Content -LiteralPath (Join-Path $st 'desktop-user.txt') -Value $env:USERNAME -Encoding ASCII
+  $pyw = Join-Path (Split-Path -Parent $py) 'pythonw.exe'
+  if (-not (Test-Path $pyw)) { $pyw = $py }
+  $dn = 'xConsole Desktop'
+  Stop-ScheduledTask -TaskName $dn -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $dn -Confirm:$false -ErrorAction SilentlyContinue
+  $dact = New-ScheduledTaskAction -Execute $pyw -Argument ('"' + (Join-Path $hd 'xconsole_agent.py') + '" --desktop-helper') -WorkingDirectory $hd
+  $dtrg = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $dpri = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+  Register-ScheduledTask -TaskName $dn -Action $dact -Trigger $dtrg -Principal $dpri -Settings $set -ErrorAction SilentlyContinue | Out-Null
+  Start-ScheduledTask -TaskName $dn -ErrorAction SilentlyContinue
+}
 # 存活檢查打同埠的 http://：回 308（轉到 https）就代表主控台活著
 $up = $false
 for ($i = 0; $i -lt 40 -and -not $up; $i++) {
