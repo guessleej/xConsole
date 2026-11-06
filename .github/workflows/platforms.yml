@@ -103,6 +103,7 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then H='C:\ProgramData\xConsole'; else H="$HOME"; fi
           # 共用的 CI 機器不帶權杖很容易撞到 GitHub 一小時 60 次的上限：把這次工作的唯讀權杖放成檔案給代理用（用完機器就銷毀）
           mkdir -p "$H/.xconsole"; ( umask 077; printf "%s" "$GH_TOKEN" > "$H/.xconsole/github-token" )
+          echo "權杖檔 $(wc -c < "$H/.xconsole/github-token") 位元組（不印內容）"
           SKIP=""; [ "$RUNNER_OS" = Linux ] && SKIP="--skip-engine"
           python test/e2e_install.py --home "$H" --password-file "$RUNNER_TEMP/pw" $SKIP
       - name: 失敗時的記錄

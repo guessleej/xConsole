@@ -324,12 +324,15 @@ try:
     os.makedirs(A.STATE_DIR, exist_ok=True)
     open(tp, "w").write("ghs_" + "a" * 36 + "\n")
     A._gh_json("/repos/x/y/releases")
+    open(tp, "w").write("ghs_abc.def-" + "x" * 300)
+    A._gh_json("/repos/x/y/releases")
     open(tp, "w").write("not a token; rm -rf")
     A._gh_json("/repos/x/y/releases")
     os.remove(tp)
 finally:
     A.urllib.request.urlopen = real_open
-eq("GitHub API：沒有權杖檔就不帶、有就帶、格式怪的不帶", seen, [None, "Bearer ghs_" + "a" * 36, None])
+eq("GitHub API：沒有權杖檔就不帶、有就帶（含點號的長權杖也收）、有空白的不帶", seen,
+   [None, "Bearer ghs_" + "a" * 36, "Bearer ghs_abc.def-" + "x" * 300, None])
 
 
 def _limited(req, timeout=30):
