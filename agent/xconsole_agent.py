@@ -2491,6 +2491,7 @@ def _api_apply_llama(slot, raw, port, want, force):
             new["reasoning"] = v
         elif k == "lan":
             new["host"] = v                    # 0.0.0.0＝區網連得到；127.0.0.1＝只有這台自己
+            new["lan_chosen"] = True           # 使用者自己選的：桌面版換模型時照樣沿用
     old_custom = llama_custom_args(old)
     if "extra_args" in want:
         set_custom_args(old.get("model"), want["extra_args"])
@@ -3380,8 +3381,14 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     prev_raw = (load_json(slot["config"], {}) or {}) if slot.get("config") and slot.get("kind") in ("llama", "strata") else {}
     if thinking is None:
         thinking = (prev_raw.get("reasoning") if slot.get("kind") == "llama" else None) or ("off" if DESKTOP_AGENT else "auto")
-    host = ("0.0.0.0" if lan else "127.0.0.1") if lan is not None else \
-        (prev_raw.get("host") or ("127.0.0.1" if DESKTOP_AGENT else "0.0.0.0"))
+    # 桌面版：只有使用者自己打開過區網存取（lan_chosen）才沿用；舊版留下的 0.0.0.0 不算，預設只給這台自己用
+    lan_chosen = lan is not None or bool(prev_raw.get("lan_chosen"))
+    if lan is not None:
+        host = "0.0.0.0" if lan else "127.0.0.1"
+    elif DESKTOP_AGENT and not prev_raw.get("lan_chosen"):
+        host = "127.0.0.1"
+    else:
+        host = prev_raw.get("host") or ("127.0.0.1" if DESKTOP_AGENT else "0.0.0.0")
     alias = slot.get("api_model_name") or _slug(f"{m['name']}-{m['quant']}" if m.get("quant") else m["name"])
     os.makedirs(ENGINE_DIR, mode=0o700, exist_ok=True)
     cfg_path = engine_file(slot_id, "-llama.json")
@@ -3398,7 +3405,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     base_raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
                 "host": host, "port": int(port), "ctx": want_ctx, "parallel": par,
                 "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
-                "api_key_file": keyfile, "gpus": gpu_ids, **({"reasoning": thinking} if thinking != "auto" else {})}
+                "api_key_file": keyfile, "gpus": gpu_ids, **({"reasoning": thinking} if thinking != "auto" else {}),
+                **({"lan_chosen": True} if lan_chosen else {})}
 
     def raw_for(ly):
         r = {**base_raw, "ngl": ly["ngl"], "cpu_moe": ly["cpu_moe"] or None}

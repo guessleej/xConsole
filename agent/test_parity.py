@@ -255,6 +255,8 @@ def main():
         eq("  使用者確認過的不再覆蓋", A.registry()["machine"]["memory_model"], "discrete")
     finally:
         A.suggest_memory_model = real_sug
+    case("桌面版：區網存取只沿用使用者自己打開的（舊版留下的 0.0.0.0 不算）",
+         "elif DESKTOP_AGENT and not prev_raw.get(\"lan_chosen\")" in open(A.__file__, encoding="utf-8").read())
     eq("顯示卡名稱帶 (TM) 也對得到頻寬", A.spec_bandwidth("AMD Radeon(TM) 890M Graphics"), 89.6)
     real_rp = A.ram_pool
     try:
