@@ -117,6 +117,18 @@ def main():
     check("稽核記了每個動作", len(typed) == 3)
     check("  打字不記內容", "0912345678" not in json.dumps(rec["audit"], ensure_ascii=False))
 
+    # ---- 座標超出畫面：問人之前就擋，告訴模型重來
+    cn, mc, au, rec = fake_env(['{"action":"click","x":100,"y":950}', '{"action":"key","keys":"win"}', '{"action":"done","result":"好"}'])
+    t = C.ComputerTask("admin", "", "n1", {}, "打開開始功能表", "本機")
+    t.always = False
+    th = threading.Thread(target=C.run, args=(t, cn, mc, au), daemon=True)
+    th.start()
+    check("座標超出畫面：不問人、直接請模型重來", wait_state(t, ("waiting_approval",)) and t.pending["action"]["action"] == "key"
+          and any("超出畫面" in x["text"] for x in t.log), [x["text"] for x in t.log])
+    C.decide(t, {"allow": True})
+    th.join(10)
+    check("  單按 Windows 鍵也收", t.state == "done" and rec["acts"] and rec["acts"][0]["keys"] == "win", rec["acts"])
+
     # ---- 模型亂回
     cn, mc, au, rec = fake_env(["我不知道", "嗯", "?"])
     t = C.ComputerTask("admin", "", "n1", {}, "做點事", "本機")

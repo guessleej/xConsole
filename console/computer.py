@@ -177,6 +177,15 @@ def run(t, call_node, model_call, audit):
                 audit("computer.done", t.node, True, {"steps": t.steps})
                 return
             act = {k: act[k] for k in ("action", "x", "y", "x2", "y2", "text", "keys", "dy", "seconds") if k in act}
+            bad = check_action(act, w, h)
+            if bad:
+                # 問人之前先擋：座標超出畫面、缺座標這種，告訴模型哪裡錯、讓它重來（算一次沒給出能用的動作）
+                fails += 1
+                t.add("note", text=f"模型給的動作不能用（{bad}），請它重來")
+                hist.append(f"（上一步 {describe(act)} 不能用：{bad}，請改正）")
+                if fails >= 3:
+                    raise RuntimeError("模型連續三次給不出能用的動作；這顆模型可能不適合操作電腦，請換一顆看圖能力強一點的")
+                continue
             if act["action"] == "type" and len(str(act.get("text") or "")) > 500:
                 act["text"] = str(act["text"])[:500]
             thought = str(act_thought(msg) or "")[:300]
@@ -210,6 +219,27 @@ def run(t, call_node, model_call, audit):
         with t.lock:
             t.pending = None
             t.updated = time.time()
+
+
+def check_action(a, w, h):
+    """動作在問人之前先檢查一次（代理執行時還會再檢查）：種類、座標範圍、文字長度、按鍵格式。回錯誤訊息或 None。"""
+    k = a.get("action")
+    if k not in ("click", "double_click", "right_click", "move", "drag", "type", "key", "scroll", "wait"):
+        return f"不支援的動作 {k}"
+    need = ("x", "y", "x2", "y2") if k == "drag" else ("x", "y") if k in ("click", "double_click", "right_click", "move") else ()
+    for c in need:
+        try:
+            v = float(a.get(c))
+        except (TypeError, ValueError):
+            return f"缺少 {c} 座標"
+        lim = w if c.startswith("x") else h
+        if not 0 <= v < lim:
+            return f"{c}={int(v)} 超出畫面（0～{lim - 1}）"
+    if k == "type" and not str(a.get("text") or "").strip():
+        return "沒有要打的字"
+    if k == "key" and not re.fullmatch(r"[\w+\-=\[\];',./`\\]{1,40}", str(a.get("keys") or "")):
+        return "按鍵格式不對"
+    return None
 
 
 def act_thought(msg):
