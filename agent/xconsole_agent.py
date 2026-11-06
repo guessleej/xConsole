@@ -4669,7 +4669,13 @@ def move_dir(src, dest, tries=15):
 
 
 def _gh_json(path):
-    req = urllib.request.Request(GH_API + path, headers={"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"})
+    """問 GitHub API。不帶權杖一小時只能問 60 次（以對外 IP 計，公司共用一個出口時很快用完）；
+    放了 ~/.xconsole/github-token（權限 600，只放唯讀的公開權杖）就帶上，一小時 5,000 次。權杖只送給 GH_API 這一台。"""
+    h = {"User-Agent": "xconsole-agent", "Accept": "application/vnd.github+json"}
+    tok = (load_text(os.path.join(STATE_DIR, "github-token")) or "").strip()
+    if re.fullmatch(r"[\w-]{20,255}", tok):
+        h["Authorization"] = "Bearer " + tok
+    req = urllib.request.Request(GH_API + path, headers=h)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp)
 
