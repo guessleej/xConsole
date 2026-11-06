@@ -47,6 +47,8 @@ jobs:
         run: cd agent && python test_gaps.py
       - name: 對話附件抽文字（獨立行程、壓縮炸彈、逾時）
         run: cd console && python test_extract.py
+      - name: 對話紀錄（加密落地、別人的看不到、搜尋、附圖 blob、取樣參數只送支援的）
+        run: cd console && python test_chats.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）

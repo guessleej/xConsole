@@ -3494,6 +3494,13 @@ def upload_cancel(folder, name):
 CHAT_ROLES = ("system", "user", "assistant", "tool")
 
 
+CHAT_SAMPLING = {
+    "temperature": (float, 0, 2), "top_p": (float, 0, 1), "top_k": (int, 0, 1000), "min_p": (float, 0, 1),
+    "repeat_penalty": (float, 0.5, 2), "presence_penalty": (float, -2, 2), "max_tokens": (int, 1, 131072),
+    "seed": (int, -1, 2 ** 31 - 1),
+}
+
+
 def chat_request(slot_id, body):
     """檢查並組好要送給模型的請求。回 (錯誤碼, 錯誤訊息) 或 (埠, 金鑰, 請求本文)。"""
     slot = _slot(slot_id)
@@ -3511,15 +3518,23 @@ def chat_request(slot_id, body):
     req = {"messages": msgs, "stream": bool(body.get("stream", True))}
     if body.get("stream", True):
         req["stream_options"] = {"include_usage": True}
-    for k, lo, hi in (("max_tokens", 1, 131072), ("temperature", 0, 2)):
-        if body.get(k) is not None:
-            try:
-                v = float(body[k])
-            except (TypeError, ValueError):
-                return 400, f"{k} 要是數字"
-            if not lo <= v <= hi:
-                return 400, f"{k} 要在 {lo}～{hi} 之間"
-            req[k] = int(v) if k == "max_tokens" else v
+    # 取樣參數：llama.cpp 的 OpenAI 相容端點都認得（Top K、Min P、重複懲罰是它的擴充）；種子 -1＝隨機，不送
+    for k, (typ, lo, hi) in CHAT_SAMPLING.items():
+        if body.get(k) is None or body.get(k) == "":
+            continue
+        try:
+            if isinstance(body[k], bool):
+                raise ValueError
+            v = float(body[k])
+            if typ is int and v != int(v):
+                raise ValueError
+        except (TypeError, ValueError, OverflowError):
+            return 400, f"{k} 要是{'整數' if typ is int else '數字'}"
+        if not lo <= v <= hi:
+            return 400, f"{k} 要在 {lo}～{hi} 之間"
+        if k == "seed" and v == -1:
+            continue
+        req[k] = int(v) if typ is int else v
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
     name = (raw or {}).get("model_name")

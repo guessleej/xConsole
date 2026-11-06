@@ -64,6 +64,13 @@ class Store:
         CREATE TABLE IF NOT EXISTS providers(
           id TEXT PRIMARY KEY, name TEXT, base_url TEXT, api_key TEXT, default_model TEXT,
           ca_pem TEXT, created REAL, updated REAL);
+        CREATE TABLE IF NOT EXISTS chats(
+          id TEXT PRIMARY KEY, user TEXT, title TEXT, target TEXT, n_msgs INTEGER,
+          created REAL, updated REAL, body TEXT);
+        CREATE INDEX IF NOT EXISTS chats_user ON chats(user, updated);
+        CREATE TABLE IF NOT EXISTS chat_blobs(
+          id TEXT PRIMARY KEY, chat TEXT, user TEXT, mime TEXT, data TEXT, created REAL);
+        CREATE INDEX IF NOT EXISTS chat_blobs_chat ON chat_blobs(chat);
         """)
 
     # ---- 稽核
@@ -160,6 +167,82 @@ class Store:
     def provider_delete(self, pid):
         with self.lock:
             return self.db.execute("DELETE FROM providers WHERE id=?", (pid,)).rowcount > 0
+
+    # ---- 對話紀錄：body 與附圖都是呼叫端用 tls.seal 加密過的 enc:v1: 密文，這裡只存不解；
+    # 每一個查詢都帶 user，別人的對話一律當作不存在
+    CHAT_COLS = ("id", "title", "target", "n_msgs", "created", "updated")
+
+    def chat_list(self, user, with_body=False):
+        cols = self.CHAT_COLS + (("body",) if with_body else ())
+        with self.lock:
+            rows = self.db.execute("SELECT " + ",".join(cols) + " FROM chats WHERE user=? ORDER BY updated DESC",
+                                   (user,)).fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    def chat_get(self, user, cid):
+        cols = self.CHAT_COLS + ("body",)
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(cols) + " FROM chats WHERE id=? AND user=?", (cid, user)).fetchone()
+        return dict(zip(cols, r)) if r else None
+
+    def chat_owner(self, cid):
+        with self.lock:
+            r = self.db.execute("SELECT user FROM chats WHERE id=?", (cid,)).fetchone()
+        return r[0] if r else None
+
+    def chat_put(self, user, row, keep=500):
+        """新增或整筆更新。別人的 id 回 False（不覆寫）。超過 keep 則刪掉這個人最舊的對話與附圖。"""
+        body = row.get("body") or ""
+        if body and not body.startswith("enc:v1:"):
+            raise ValueError("對話內容沒有加密，拒絕寫入")
+        now = time.time()
+        with self.lock:
+            old = self.db.execute("SELECT user, created FROM chats WHERE id=?", (row["id"],)).fetchone()
+            if old and old[0] != user:
+                return False
+            self.db.execute("INSERT OR REPLACE INTO chats(id,user,title,target,n_msgs,created,updated,body) VALUES(?,?,?,?,?,?,?,?)",
+                            (row["id"], user, row.get("title") or "", row.get("target") or "", int(row.get("n_msgs") or 0),
+                             old[1] if old else now, now, body))
+            gone = [r[0] for r in self.db.execute("SELECT id FROM chats WHERE user=? ORDER BY updated DESC LIMIT -1 OFFSET ?",
+                                                  (user, keep)).fetchall()]
+            for g in gone:
+                self.db.execute("DELETE FROM chats WHERE id=?", (g,))
+                self.db.execute("DELETE FROM chat_blobs WHERE chat=?", (g,))
+        return True
+
+    def chat_rename(self, user, cid, title):
+        with self.lock:
+            return self.db.execute("UPDATE chats SET title=? WHERE id=? AND user=?", (title, cid, user)).rowcount > 0
+
+    def chat_delete(self, user, cid):
+        with self.lock:
+            ok = self.db.execute("DELETE FROM chats WHERE id=? AND user=?", (cid, user)).rowcount > 0
+            if ok:
+                self.db.execute("DELETE FROM chat_blobs WHERE chat=? AND user=?", (cid, user))
+        return ok
+
+    def blob_put(self, user, chat, bid, mime, data):
+        if not data.startswith("enc:v1:"):
+            raise ValueError("附圖沒有加密，拒絕寫入")
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO chat_blobs(id,chat,user,mime,data,created) VALUES(?,?,?,?,?,?)",
+                            (bid, chat, user, mime, data, time.time()))
+
+    def blob_get(self, user, bid):
+        with self.lock:
+            r = self.db.execute("SELECT chat, mime, data FROM chat_blobs WHERE id=? AND user=?", (bid, user)).fetchone()
+        return {"chat": r[0], "mime": r[1], "data": r[2]} if r else None
+
+    def blob_ids(self, user, chat):
+        with self.lock:
+            return {r[0] for r in self.db.execute("SELECT id FROM chat_blobs WHERE chat=? AND user=?", (chat, user)).fetchall()}
+
+    def blob_gc(self, user, chat, keep):
+        """這則對話裡已經沒有被引用的附圖（訊息刪了、改了）一併刪掉。"""
+        with self.lock:
+            for (bid,) in self.db.execute("SELECT id FROM chat_blobs WHERE chat=? AND user=?", (chat, user)).fetchall():
+                if bid not in keep:
+                    self.db.execute("DELETE FROM chat_blobs WHERE id=?", (bid,))
 
     # ---- 取樣
     def sample(self, node, online, st=None, counters=None):
