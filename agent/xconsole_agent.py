@@ -2093,6 +2093,7 @@ def _run_layout(slot, raw, prof, size_gib, ctx, par):
 
 SPEED_EFF, SPEED_LAYER_MS, SPEED_DEFAULT_BW = 0.6, 0.1, 50   # 跟 console/recommend.py 的 EFFICIENCY、LAYER_MS、DEFAULT_RAM_BW 一致
 _SPEED_LAST = {}
+_SPEED_SEEN = {}
 
 
 def estimate_decode(prof, size_gib, machine):
@@ -2113,8 +2114,14 @@ def record_speed(slot_id, tok_s, n_tokens):
     slot = _slot(slot_id) or {}
     raw = (load_json(slot.get("config"), {}) or {}) if slot.get("kind") == "llama" and slot.get("config") else {}
     key = os.path.abspath(raw["model"]) if raw.get("model") else f"{slot.get('kind')}:{slot.get('model')}"
+    # 載入後的第一個回答不算：Vulkan／Metal 第一次要編譯著色器，HP 實測第一次 22.6、第二次 47.6 tok/s
+    loaded = (_LOAD.get(slot_id) or {}).get("t0") or 0
+    seen = _SPEED_SEEN.get((slot_id, key))
+    if seen is None or seen < loaded:
+        _SPEED_SEEN[(slot_id, key)] = time.time()
+        return
     now = time.time()
-    if now - _SPEED_LAST.get(key, 0) < 20:
+    if now - _SPEED_LAST.get(key, 0) < 5:
         return
     _SPEED_LAST[key] = now
     with REG_LOCK:

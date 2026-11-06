@@ -185,6 +185,8 @@ def main():
     A._profile_cached = lambda p: {"active_frac": 1.0, "layers": 32}
     try:
         est = A.estimate_decode({"active_frac": 1.0, "layers": 32}, 4.0, A.registry()["machine"])
+        A.record_speed("s9", est * 0.5, 200)
+        case("載入後第一個回答不算（暖機）", "speed" not in A.registry() or os.path.abspath(mp) not in A.registry().get("speed", {}))
         A.record_speed("s9", est * 2, 200)
         r = A.registry()
         eq("實測記在這顆模型上", r["speed"][os.path.abspath(mp)]["tok_s"], round(est * 2, 2))
