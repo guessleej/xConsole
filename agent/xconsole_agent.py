@@ -681,6 +681,8 @@ def spec_bandwidth(hay):
     """名稱 → 規格書頻寬。名稱是「MI210／MI250」這種認不出是哪一張的（同一個 gfx 版本），兩種頻寬不同就回未知，
     不拿第一個比到的充數（MI250 是 MI210 的兩倍，速度估算會整個翻倍）。"""
     def one(h):
+        h = re.sub(r"\((?:TM|R)\)|[™®]", "", h, flags=re.I)       # 「AMD Radeon(TM) 890M Graphics」→「AMD Radeon 890M Graphics」
+        h = re.sub(r"\s+", " ", h)
         return next((v for k, v in BANDWIDTH_GBS if k.lower() in h.lower()), None)
     vals = {one(a) for a in hay.split("／")}
     return vals.pop() if len(vals) == 1 else None
@@ -4033,8 +4035,11 @@ def pools(reg, hw):
             # Apple Silicon：GPU 只能用到統一記憶體的一部分（Metal 的上限），模型超過就載不起來
             out["unified"]["gpu_limit_gib"] = round(vram_total, 1)
         elif OS == "windows" and vram_total and not has_nvidia():
-            # Windows 的內顯：專用記憶體（BIOS 切的那塊）＋共用 GPU 記憶體（Windows 固定讓 GPU 借最多一半的系統記憶體）
-            out["unified"]["gpu_limit_gib"] = round(vram_total + ram["total_gib"] / 2, 1)
+            # Windows 的內顯：專用記憶體（BIOS 切的那塊）＋共用 GPU 記憶體（Windows 固定讓 GPU 借最多一半的系統記憶體）。
+            # 有的驅動在登錄檔回報的「顯存」已經含共用的部分（HP 的 890M 回 32 GB，跟整台記憶體一樣大）：
+            # 大到超過系統記憶體四分之三就當作不可信，只算共用的那一半
+            dedicated = vram_total if vram_total < ram["total_gib"] * 0.75 else 0.0
+            out["unified"]["gpu_limit_gib"] = round(min(ram["total_gib"], dedicated + ram["total_gib"] / 2), 1)
         out["ram"] = out["unified"]
     else:
         out["ram"] = {**ram, "floor_gib": fl["ram"]}
@@ -5252,7 +5257,8 @@ def machine_info():
                      "sd_cli": m.get("sd_cli") or "", "agent_enabled": bool(m.get("agent_enabled")),
                      "gpu_override": m.get("gpu_override"), "hf_mirror": m.get("hf_mirror") or "",
                      "github_proxy": m.get("github_proxy") or "", "desktop_enabled": bool(m.get("desktop_enabled"))},
-        "desktop": dict(zip(("how", "why"), desktop_route())),
+        # 只回「怎麼操作」與不能用的原因；桌面小幫手的埠與權杖絕不出這台
+        "desktop": (lambda r: {"how": r[0], "why": r[1] if r[0] is None else None})(desktop_route()),
         "agent": {"enabled": bool(m.get("agent_enabled")), "root": AGENT_ROOT},
         "defaults": {k: DEFAULT_FLOORS[k] for k in MEMORY_MODELS},
         "effective": {"floors": floors(m), "gguf_root": gguf_root(reg), "llama_server": llama_server_exe(reg),
@@ -5275,8 +5281,10 @@ def data_bases():
     if OS == "darwin":
         return [HOME, *(m for m, _ in _mounts() if m.startswith("/Volumes/"))]
     if OS == "windows":
-        # 系統碟只准家目錄；其他固定磁碟整顆都可以（D:\models 這種常見放法）
-        return [HOME, *(m for m, _ in _mounts() if not m.upper().startswith(os.environ.get("SystemDrive", "C:").upper()))]
+        # 系統碟也可以（C:\AI-Models 這種常見放法，LocModel 的預設就是它），但系統資料夾、整個使用者資料夾、AppData 由 check_root 擋；
+        # 其他固定磁碟整顆都可以（D:\models）
+        sysd = os.environ.get("SystemDrive", "C:").upper().rstrip("\\") + "\\"
+        return [HOME, sysd, *(m for m, _ in _mounts() if not m.upper().startswith(sysd[:2]))]
     mounts = [m for m, _ in _mounts()]
     # 家目錄所在的分割區（例：/home 獨立掛載）不能整個當允許位置，否則存放區可以設到別的使用者家目錄裡
     return [HOME, *(m for m in mounts if m != "/" and not m.startswith("/boot") and not HOME.startswith(m.rstrip("/") + "/")),
@@ -5311,6 +5319,12 @@ def check_root(raw):
         return None, "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）"
     if OS == "linux" and any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
         return None, f"{real} 是系統目錄，不能當存放區"
+    if OS == "windows" and not real.lower().startswith(os.path.realpath(HOME).lower() + os.sep):
+        parts = [x for x in re.split(r"[\\/]+", os.path.splitdrive(real)[1]) if x]
+        if not parts or parts[0].lower() in WIN_DENY:
+            return None, f"{real} 是系統資料夾，不能當存放區"
+        if parts[0].lower() == "users" and (len(parts) < 3 or parts[2].lower() == "appdata"):
+            return None, "不能直接放在使用者資料夾或 AppData 裡；請選裡面的一個資料夾，或像 C:\\AI-Models 這樣另外建一個"
     if any(part.startswith(".") for part in re.split(r"[\\/]", real) if part):
         return None, "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡"
     try:
