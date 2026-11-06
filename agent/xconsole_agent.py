@@ -2491,7 +2491,8 @@ def inside(base, name):
     欄位 id、模型 id 雖然都先比對過登錄檔與掃描清單，組路徑時一律再過這一道。"""
     root = os.path.realpath(base)
     full = os.path.realpath(os.path.join(root, name))
-    if not full.startswith(root + os.sep):
+    # 磁碟根目錄（C:\、/）本身就以分隔字元結尾，不能再加一個
+    if not full.startswith(root if root.endswith(os.sep) else root + os.sep) or full == root:
         raise ValueError(f"路徑不在 {base} 內")
     return full
 
