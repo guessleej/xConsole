@@ -628,6 +628,14 @@
 "pattern": false
 },
 {
+"zh": "其他資料夾 {0}",
+"pattern": true
+},
+{
+"zh": "其他資料夾",
+"pattern": false
+},
+{
 "zh": "・看圖",
 "pattern": false
 },
@@ -648,7 +656,11 @@
 "pattern": false
 },
 {
-"zh": "會從 {0} 的磁碟永久刪除 {1}/ 裡這顆模型的檔案（約 {2} GiB），無法復原。",
+"zh": "存放區根目錄",
+"pattern": false
+},
+{
+"zh": "會從 {0} 的磁碟永久刪除 {1} 裡這顆模型的檔案（約 {2} GiB），無法復原。",
 "pattern": true
 },
 {
@@ -660,7 +672,7 @@
 "pattern": false
 },
 {
-"zh": "/ 裡這顆模型的檔案（約",
+"zh": "裡這顆模型的檔案（約",
 "pattern": false
 },
 {
@@ -733,6 +745,122 @@
 },
 {
 "zh": "Strata 引擎只跑 Qwen3.8-Flash-Next 家族，由 Strata 的 setup.sh 安裝；其他模型都是 GGUF，走 llama.cpp。",
+"pattern": false
+},
+{
+"zh": "{0} 的其他模型資料夾",
+"pattern": true
+},
+{
+"zh": "的其他模型資料夾",
+"pattern": false
+},
+{
+"zh": "其他模型資料夾",
+"pattern": false
+},
+{
+"zh": "加入資料夾",
+"pattern": false
+},
+{
+"zh": "別的程式（LM Studio、LocModel）下載的、或自己放的 GGUF 所在的資料夾。xConsole 只讀這些資料夾，不會搬動、複製或刪除裡面的檔案；往下最多找三層。",
+"pattern": false
+},
+{
+"zh": "還沒有加入其他資料夾。",
+"pattern": false
+},
+{
+"zh": "{0} 顆模型",
+"pattern": true
+},
+{
+"zh": "顆模型",
+"pattern": false
+},
+{
+"zh": "資料夾不見了（拔掉的外接碟？）",
+"pattern": false
+},
+{
+"zh": "移出清單",
+"pattern": false
+},
+{
+"zh": "只是不再列出，檔案不會被刪",
+"pattern": false
+},
+{
+"zh": "已移出清單，檔案沒有動",
+"pattern": false
+},
+{
+"zh": "找到 {0} 個模型檔，共 {1} GiB",
+"pattern": true
+},
+{
+"zh": "找到",
+"pattern": false
+},
+{
+"zh": "個模型檔，共",
+"pattern": false
+},
+{
+"zh": "加入",
+"pattern": false
+},
+{
+"zh": "已加入 {0}",
+"pattern": true
+},
+{
+"zh": "已加入",
+"pattern": false
+},
+{
+"zh": "{0}（{1} 個，{2} GiB）",
+"pattern": true
+},
+{
+"zh": "個",
+"pattern": false
+},
+{
+"zh": "{0} 上已經有 {1} 個模型檔：{2}。",
+"pattern": true
+},
+{
+"zh": "上已經有",
+"pattern": false
+},
+{
+"zh": "個模型檔",
+"pattern": false
+},
+{
+"zh": "加進模型庫就能直接執行，檔案不搬、不複製，也不會被刪。",
+"pattern": false
+},
+{
+"zh": "全部加入",
+"pattern": false
+},
+{
+"zh": "加入模型庫",
+"pattern": false
+},
+{
+"zh": "已加入，到「已安裝」看",
+"pattern": false
+},
+{
+"zh": "不用",
+"pattern": false
+},
+{
+"zh": "之後也可以在「存放區」分頁加入或移出",
 "pattern": false
 },
 {
@@ -1604,7 +1732,7 @@
 "pattern": false
 },
 {
-"zh": "上下文以 {0} 計、低於 {1} tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用）。",
+"zh": "上下文以 {0} 計、低於 {1} tok/s 不算流暢；在這台對話過之後會依實測自動校正。標「中國來源」的模型政府案不得使用。",
 "pattern": true
 },
 {
@@ -1616,7 +1744,7 @@
 "pattern": false
 },
 {
-"zh": "tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用",
+"zh": "tok/s 不算流暢；在這台對話過之後會依實測自動校正。標「中國來源」的模型政府案不得使用",
 "pattern": false
 },
 {
@@ -1636,7 +1764,7 @@
 "pattern": false
 },
 {
-"zh": "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型不能加入。",
+"zh": "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型會自動標出來（政府案不得使用）。",
 "pattern": false
 },
 {
@@ -3529,10 +3657,6 @@
 },
 {
 "zh": "個，對外",
-"pattern": false
-},
-{
-"zh": "個",
 "pattern": false
 },
 {
@@ -6508,6 +6632,10 @@
 "pattern": false
 },
 {
+"zh": "選這台放著模型檔的資料夾",
+"pattern": false
+},
+{
 "zh": "選這台的一個資料夾給 Agent 用",
 "pattern": false
 },
@@ -6530,6 +6658,10 @@
 {
 "zh": "這裡沒有子資料夾。",
 "pattern": false
+},
+{
+"zh": "已加入：{0}",
+"pattern": true
 },
 {
 "zh": "已連結：{0}",
@@ -8948,14 +9080,6 @@
 "pattern": false
 },
 {
-"zh": "{0}：檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
-"pattern": true
-},
-{
-"zh": "檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
-"pattern": false
-},
-{
 "zh": "：照填的檔名湊不出一組完整的檔，請確認每個元件的檔名或檔名開頭",
 "pattern": false
 },
@@ -9129,10 +9253,6 @@
 },
 {
 "zh": "（模型沒有給出回答）",
-"pattern": false
-},
-{
-"zh": "：檔頭判定為中國來源，政府案不得使用，不列入推薦清單",
 "pattern": false
 },
 {
@@ -9853,10 +9973,6 @@
 },
 {
 "zh": "Hugging Face 名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF",
-"pattern": false
-},
-{
-"zh": "政府案不得使用中國來源模型，不列入推薦清單（內部測試可以直接到「從 Hugging Face 下載」）",
 "pattern": false
 },
 {
@@ -11324,18 +11440,6 @@
 "pattern": false
 },
 {
-"zh": "存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）",
-"pattern": false
-},
-{
-"zh": "{0} 是系統目錄，不能當存放區",
-"pattern": true
-},
-{
-"zh": "是系統目錄，不能當存放區",
-"pattern": false
-},
-{
 "zh": "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡",
 "pattern": false
 },
@@ -11349,6 +11453,22 @@
 },
 {
 "zh": "請先調整這個資料夾的權限",
+"pattern": false
+},
+{
+"zh": "{0} 不存在或不是資料夾",
+"pattern": true
+},
+{
+"zh": "不存在或不是資料夾",
+"pattern": false
+},
+{
+"zh": "代理的帳號讀不到 {0}，請先調整這個資料夾的權限",
+"pattern": true
+},
+{
+"zh": "代理的帳號讀不到",
 "pattern": false
 },
 {
@@ -11808,11 +11928,11 @@
 "pattern": false
 },
 {
-"zh": "有欄位正在使用這顆，先換成別的模型再刪",
+"zh": "這顆在其他模型資料夾裡，xConsole 不刪那裡的檔案（可能是別的程式在用）。不想在清單上看到它，到「存放區」把那個資料夾移出清單；檔案本身不會動",
 "pattern": false
 },
 {
-"zh": "只能刪存放區第一層的模型資料夾",
+"zh": "有欄位正在使用這顆，先換成別的模型再刪",
 "pattern": false
 },
 {
@@ -12168,7 +12288,11 @@
 "pattern": false
 },
 {
-"zh": "存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）",
+"zh": "存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）",
+"pattern": false
+},
+{
+"zh": "模型資料夾要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）",
 "pattern": false
 },
 {
@@ -12176,15 +12300,23 @@
 "pattern": false
 },
 {
-"zh": " 是系統目錄，不能當存放區",
+"zh": "模型資料夾要在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）",
 "pattern": false
 },
 {
-"zh": "{0} 是系統資料夾，不能當存放區",
+"zh": "{0} 是系統目錄，不能當存放區",
 "pattern": true
 },
 {
-"zh": "是系統資料夾，不能當存放區",
+"zh": "是系統目錄，不能當存放區",
+"pattern": false
+},
+{
+"zh": "{0} 是系統目錄，不能當模型資料夾",
+"pattern": true
+},
+{
+"zh": "是系統目錄，不能當模型資料夾",
 "pattern": false
 },
 {
@@ -12205,6 +12337,14 @@
 },
 {
 "zh": "，請先調整這個資料夾的權限",
+"pattern": false
+},
+{
+"zh": " 不存在或不是資料夾",
+"pattern": false
+},
+{
+"zh": "代理的帳號讀不到 ",
 "pattern": false
 },
 {
@@ -12648,6 +12788,26 @@
 "pattern": false
 },
 {
+"zh": "分片不齊：有 {0} 個，應有 {1} 個（下載可能還沒完成）",
+"pattern": true
+},
+{
+"zh": "分片不齊：有",
+"pattern": false
+},
+{
+"zh": "個，應有",
+"pattern": false
+},
+{
+"zh": "個（下載可能還沒完成",
+"pattern": false
+},
+{
+"zh": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載",
+"pattern": false
+},
+{
 "zh": "不接受 {0}：這裡只收調校效能與取樣的參數（模型、監聽位址、金鑰、任何檔案路徑由主控台管）",
 "pattern": true
 },
@@ -12748,7 +12908,7 @@
 "pattern": false
 },
 {
-"zh": "路徑不在存放區內",
+"zh": "只能刪存放區第一層的模型資料夾",
 "pattern": false
 },
 {
@@ -13032,11 +13192,55 @@
 "pattern": false
 },
 {
-"zh": " 是系統資料夾，不能當存放區",
+"zh": "存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）",
+"pattern": false
+},
+{
+"zh": "模型資料夾要是磁碟上的一個資料夾，例：C:\\models、D:\\AI-Models（不能是磁碟根目錄本身）",
+"pattern": false
+},
+{
+"zh": " 是系統目錄，不能當存放區",
+"pattern": false
+},
+{
+"zh": " 是系統目錄，不能當模型資料夾",
+"pattern": false
+},
+{
+"zh": "{0} 是系統資料夾，不能當存放區",
+"pattern": true
+},
+{
+"zh": "是系統資料夾，不能當存放區",
+"pattern": false
+},
+{
+"zh": "{0} 是系統資料夾，不能當模型資料夾",
+"pattern": true
+},
+{
+"zh": "是系統資料夾，不能當模型資料夾",
 "pattern": false
 },
 {
 "zh": "建不了 ",
+"pattern": false
+},
+{
+"zh": "這是 xConsole 自己的存放區（或在它裡面），裡面的模型本來就會列出來，不用另外加",
+"pattern": false
+},
+{
+"zh": "其他模型資料夾最多 {0} 個",
+"pattern": true
+},
+{
+"zh": "其他模型資料夾最多",
+"pattern": false
+},
+{
+"zh": "要帶 add 或 remove",
 "pattern": false
 },
 {
@@ -13352,23 +13556,15 @@
 "pattern": false
 },
 {
-"zh": "分片不齊：有 {0} 個，應有 {1} 個（下載可能還沒完成）",
-"pattern": true
-},
-{
-"zh": "分片不齊：有",
+"zh": "分片不齊：有 ",
 "pattern": false
 },
 {
-"zh": "個，應有",
+"zh": " 個，應有 ",
 "pattern": false
 },
 {
-"zh": "個（下載可能還沒完成",
-"pattern": false
-},
-{
-"zh": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載",
+"zh": " 個（下載可能還沒完成）",
 "pattern": false
 },
 {
@@ -13441,6 +13637,10 @@
 },
 {
 "zh": "），可能連線中斷，重新下載會接續",
+"pattern": false
+},
+{
+"zh": "路徑不在存放區內",
 "pattern": false
 },
 {
@@ -13628,6 +13828,26 @@
 "pattern": false
 },
 {
+"zh": " 是系統資料夾，不能當存放區",
+"pattern": false
+},
+{
+"zh": " 是系統資料夾，不能當模型資料夾",
+"pattern": false
+},
+{
+"zh": "其他模型資料夾最多 ",
+"pattern": false
+},
+{
+"zh": " 個",
+"pattern": false
+},
+{
+"zh": "清單裡沒有這個資料夾",
+"pattern": false
+},
+{
 "zh": "底線要填數字（GiB）",
 "pattern": false
 },
@@ -13780,18 +14000,6 @@
 "pattern": false
 },
 {
-"zh": "分片不齊：有 ",
-"pattern": false
-},
-{
-"zh": " 個，應有 ",
-"pattern": false
-},
-{
-"zh": " 個（下載可能還沒完成）",
-"pattern": false
-},
-{
 "zh": "，不能綁卡；請改回自動",
 "pattern": false
 },
@@ -13892,6 +14100,14 @@
 "pattern": false
 },
 {
+"zh": "欄位 {0} 正在用這個資料夾裡的模型，先換成別的模型再移出",
+"pattern": true
+},
+{
+"zh": "正在用這個資料夾裡的模型，先換成別的模型再移出",
+"pattern": false
+},
+{
 "zh": "手動指定顯示卡的格式不對",
 "pattern": false
 },
@@ -13965,6 +14181,14 @@
 },
 {
 "zh": "%] 下載",
+"pattern": false
+},
+{
+"zh": "欄位 ",
+"pattern": false
+},
+{
+"zh": " 正在用這個資料夾裡的模型，先換成別的模型再移出",
 "pattern": false
 },
 {

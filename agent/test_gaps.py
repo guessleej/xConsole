@@ -370,5 +370,19 @@ finally:
     A.urllib.request.urlopen, A.time.sleep = real_open, real_sleep
 case("GitHub 偶爾回 504：等一下再問，第三次拿到就好", got == [1] and len(tries) == 3, (got, tries))
 
+# ---------------------------------------------------------------- 6. 檔頭的逐層陣列
+# Nemotron 3.5 的 expert_count／expert_used_count 每層一個值（非 MoE 層是 0）：以前 int(list) 直接當掉
+meta = {"general.architecture": "t", "t.expert_count": [0, 64, 64], "t.expert_used_count": [0, 8, 8],
+        "t.block_count": 3, "t.attention.head_count": 8, "t.attention.head_count_kv": [2, 0, 2], "t.embedding_length": 1024,
+        "_tensors": [("blk.1.ffn_up_exps.weight", 0), ("blk.1.attn_q.weight", 1000)], "_data_start": 0}
+wp = A.weight_profile([(meta, 2000)])
+eq("逐層陣列：每次動用的專家取 MoE 層的值", wp["expert_used_frac"], 0.125)
+case("逐層陣列：檔頭推得出 KV（SSM 層 0 不算）", A.gguf_profile(meta)["kv_full_bpt"] == 4 * 128 * 2 * 2, A.gguf_profile(meta))
+
+eq("不能單獨跑的 GGUF：imatrix、DFlash／MTP／EAGLE 草稿頭認得出來，正常量化不誤判",
+   [bool(A.AUX_GGUF_RX.search(x)) for x in ("imatrix_unsloth", "dflash-kquant", "Qwen3.8-27B-MTP-Q8_0", "eagle3-head",
+                                             "Muse-Glimmer-30B-UD-Q4_K_XL", "Meagle-7B-Q4_K_M")],
+   [True, True, True, True, False, False])
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

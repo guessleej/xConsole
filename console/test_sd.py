@@ -15,6 +15,7 @@ os.environ["HOME"] = tempfile.mkdtemp()           # 代理匯入時會建權杖�
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "agent")]
 import recommend as R  # noqa: E402
 import xconsole_agent as A  # noqa: E402
+A.SOFT_FLOOR = False          # 照 Linux 的硬底線測（Windows／macOS 的放寬在 agent/test_admit.py 另外測），在 Mac 上跑才不會誤判
 
 GIB = R.GIB
 OK = True

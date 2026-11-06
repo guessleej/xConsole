@@ -2605,6 +2605,9 @@ def api_test(slot_id):
 
 
 GGUF_ROOT_DEFAULT = "~/models/gguf"
+EXT_MIN_BYTES = 50 << 20                  # 其他模型資料夾裡小於這個的 .gguf 不列（詞表、測試檔）
+EXT_MAX_DIRS = 400                        # 其他模型資料夾最多走這麼多個子資料夾，免得選到整顆碟時掃很久
+MODEL_DIRS_MAX = 8
 ENGINE_DIR = os.path.join(STATE_DIR, "engines")
 DOWNLOADS_FILE = os.path.join(STATE_DIR, "downloads.json")
 SAFE_ID_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
@@ -2633,6 +2636,10 @@ HF_REPO_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,95}/[A-Za-z0-9][\w.-]{0,95}")
 # 政府案不得使用中國來源模型；這裡只負責標示，選不選由人決定（內部測試可以用）
 CN_ORIGIN = ("qwen", "deepseek", "glm", "chatglm", "kimi", "moonshot", "minimax", "hunyuan",
              "internlm", "baichuan", "doubao", "ernie", "seed-oss")
+
+
+# 跟模型放在一起、但自己不能跑的 GGUF：MTP／DFlash／EAGLE 推測解碼草稿頭、imatrix 量化校正資料
+AUX_GGUF_RX = re.compile(r"(?<![a-z])(mtp|dflash|eagle\d*|imatrix)(?![a-z])", re.I)
 
 
 def is_mmproj(name):
@@ -2704,6 +2711,13 @@ def gguf_meta(path, tensors=False):
         return None
 
 
+def _num(v):
+    """檔頭的數值欄位：新架構有的寫成逐層陣列（Nemotron 3.5 的 expert_used_count 每層一個，非 MoE 層是 0），取最大值。"""
+    if isinstance(v, list):
+        return int(max((x for x in v if isinstance(x, (int, float))), default=0))
+    return int(v or 0)
+
+
 def gguf_profile(meta):
     """從檔頭推出：架構、訓練上下文、每個 token 的 KV 位元組（f16）、是否中國來源。
     KV 照每層的 KV 頭數加總（混合架構的 SSM 層 KV 頭數是 0，自然不算）；
@@ -2712,15 +2726,15 @@ def gguf_profile(meta):
         return None
     arch = meta.get("general.architecture") or "?"
     g = lambda k, d=None: meta.get(f"{arch}.{k}", d)  # noqa: E731
-    n_layer = int(g("block_count", 0) or 0)
+    n_layer = _num(g("block_count", 0))
     heads = g("attention.head_count", 0)
     heads = max(heads) if isinstance(heads, list) else int(heads or 0)
-    emb = int(g("embedding_length", 0) or 0)
-    k_len = int(g("attention.key_length", 0) or (emb // heads if heads else 0))
-    v_len = int(g("attention.value_length", 0) or k_len)
+    emb = _num(g("embedding_length", 0))
+    k_len = _num(g("attention.key_length", 0)) or (emb // heads if heads else 0)
+    v_len = _num(g("attention.value_length", 0)) or k_len
     kv_heads = g("attention.head_count_kv", heads)
     per_layer = kv_heads if isinstance(kv_heads, list) else [int(kv_heads or 0)] * n_layer
-    swa = int(g("attention.sliding_window", 0) or 0)
+    swa = _num(g("attention.sliding_window", 0))
     pattern = g("attention.sliding_window_pattern")
     full_b = swa_b = 0
     for i, h in enumerate(per_layer):
@@ -2732,7 +2746,7 @@ def gguf_profile(meta):
             full_b += b
     name = meta.get("general.name") or meta.get("general.basename") or ""
     low = f"{arch} {name}".lower()
-    return {"arch": arch, "meta_name": name, "ctx_train": int(g("context_length", 0) or 0) or None,
+    return {"arch": arch, "meta_name": name, "ctx_train": _num(g("context_length", 0)) or None,
             "kv_full_bpt": full_b, "kv_swa_bpt": swa_b, "swa_window": swa if swa_b else 0,
             "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN)}
 
@@ -2753,8 +2767,8 @@ def weight_profile(parts):
         return None
     meta = parts[0][0]
     arch = meta.get("general.architecture")
-    n_exp = int(meta.get(f"{arch}.expert_count") or 0)
-    used = int(meta.get(f"{arch}.expert_used_count") or 0)
+    n_exp = _num(meta.get(f"{arch}.expert_count"))
+    used = _num(meta.get(f"{arch}.expert_used_count"))
     exps = {n: b for n, b in sizes.items() if "_exps." in n}
     exp_b = sum(exps.values())
     layers = len({n.split(".")[1] for n in exps if n.startswith("blk.")})
@@ -2808,47 +2822,105 @@ def store_hdd(root=None):
     return (store or {}).get("hdd")
 
 
+def _scan_folder(full, folder, id_prefix, models, problems, external=None):
+    """掃一個資料夾裡的 .gguf：同一顆模型的多個量化各自算一顆，分片要齊才算可用。"""
+    try:
+        files = sorted(f for f in os.listdir(full) if f.lower().endswith(".gguf"))
+    except OSError:
+        return
+    mmproj = next((os.path.join(full, f) for f in files if is_mmproj(f)), None)
+    groups = {}
+    for f in files:
+        if is_mmproj(f) or AUX_GGUF_RX.search(f[:-5]):
+            continue
+        base = f[:-5]
+        m = SHARD_RX.search(base)
+        stem = base[:m.start()] if m else base
+        groups.setdefault(stem, []).append((f, int(m.group(2)) if m else 1))
+    for stem, parts in groups.items():
+        want = parts[0][1]
+        paths = [os.path.join(full, f) for f, _ in sorted(parts)]
+        size = sum(os.path.getsize(p) for p in paths if os.path.exists(p))
+        mm_size = os.path.getsize(mmproj) if mmproj else 0
+        name, quant = pretty_model(paths[0])
+        mid = f"{id_prefix}{folder or '.'}/{stem}"
+        if len(parts) != want:
+            problems.append({"name": mid, "missing": f"分片不齊：有 {len(parts)} 個，應有 {want} 個（下載可能還沒完成）"})
+            continue
+        if external and size < EXT_MIN_BYTES:
+            continue                                          # 別的程式留下的小檔（詞表、測試檔）不當成模型
+        prof = _profile_cached(paths[0])
+        if not prof:
+            problems.append({"name": mid, "missing": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載"})
+            continue
+        models.append({
+            # 存放區的用檔頭裡的正式名稱（例 Gemma-4-E4B-It），沒有才用檔名推。其他資料夾的用檔名：
+            # 別人轉檔的檔頭常留著訓練時的代號（「Fable Ep2」），使用者認得的是自己下載時看到的檔名
+            "engine": "llama", "id": mid, "name": name if external else prof.get("meta_name") or name, "quant": quant,
+            "folder": folder or os.path.basename(full.rstrip("\\/")), "dir": full, "external": external,
+            "path": paths[0], "shards": want, "size_gib": round(size / GIB, 1),
+            "mmproj": mmproj, "mmproj_gib": round(mm_size / GIB, 1), "vision": bool(mmproj),
+            **prof})
+
+
+def _walk_dirs(base, depth, skip=()):
+    """base 與它底下 depth 層以內的資料夾（相對路徑用 / 連接）；隱藏資料夾不進去，最多走 EXT_MAX_DIRS 個。
+    skip：不要走進去的資料夾（xConsole 自己的存放區、畫圖模型區；~/models 底下就是預設存放區，不然會算兩次）。"""
+    skip = {os.path.normcase(os.path.realpath(x)) for x in skip}
+    out, todo = [], [("", 0)]
+    while todo and len(out) < EXT_MAX_DIRS:
+        rel, d = todo.pop(0)
+        full = os.path.join(base, *rel.split("/")) if rel else base
+        if os.path.normcase(os.path.realpath(full)) in skip:
+            continue
+        out.append((rel, full))
+        if d >= depth:
+            continue
+        try:
+            subs = sorted(x for x in os.listdir(full) if not x.startswith(".") and os.path.isdir(os.path.join(full, x)))
+        except OSError:
+            continue
+        todo += [((rel + "/" if rel else "") + x, d + 1) for x in subs]
+    return out
+
+
+def _under(path, base):
+    """path 是不是 base 本身或在它底下。"""
+    p, b = os.path.normcase(os.path.realpath(path)), os.path.normcase(os.path.realpath(base))
+    return p == b or p.startswith(b.rstrip(os.sep) + os.sep)
+
+
+def model_dirs(reg=None):
+    """管理者加進來的其他模型資料夾（別的程式下載的、自己放的）。只讀：xConsole 不在裡面寫入、搬動或刪檔。"""
+    reg = reg or registry()
+    return [d for d in (reg["machine"].get("model_dirs") or []) if isinstance(d, str)]
+
+
+def dir_tag(d):
+    """其他模型資料夾的代號：放進模型 id 前面，同名資料夾在不同位置也不會撞在一起。"""
+    return "@" + hashlib.sha1(os.path.normcase(os.path.realpath(d)).encode("utf-8")).hexdigest()[:8]
+
+
 def scan_gguf(reg=None):
-    """掃存放區：一個資料夾裡可以放同一顆模型的多個量化，各自算一顆；分片要齊才算可用。"""
+    """掃存放區（第一層的每個資料夾＋直接放在根目錄的檔），再掃管理者加進來的其他模型資料夾（往下三層）。"""
     reg = reg or registry()
     root = gguf_root(reg)
     models, problems = [], []
-    if not os.path.isdir(root):
-        return root, models, problems
-    for folder in sorted(os.listdir(root)):
-        full = os.path.join(root, folder)
-        if not os.path.isdir(full) or folder.startswith("."):
+    if os.path.isdir(root):
+        _scan_folder(root, "", "", models, problems)
+        for folder in sorted(os.listdir(root)):
+            full = os.path.join(root, folder)
+            if os.path.isdir(full) and not folder.startswith("."):
+                _scan_folder(full, folder, "", models, problems)
+    seen = {os.path.normcase(os.path.realpath(root))}
+    own = [root, sd_root(reg)]
+    for d in model_dirs(reg):
+        real = os.path.normcase(os.path.realpath(d))
+        if real in seen or not os.path.isdir(d) or _under(d, root):
             continue
-        files = sorted(f for f in os.listdir(full) if f.endswith(".gguf"))
-        mmproj = next((os.path.join(full, f) for f in files if is_mmproj(f)), None)
-        groups = {}
-        for f in files:
-            if is_mmproj(f):
-                continue
-            base = f[:-5]
-            m = SHARD_RX.search(base)
-            stem = base[:m.start()] if m else base
-            groups.setdefault(stem, []).append((f, int(m.group(2)) if m else 1))
-        for stem, parts in groups.items():
-            want = parts[0][1]
-            paths = [os.path.join(full, f) for f, _ in sorted(parts)]
-            size = sum(os.path.getsize(p) for p in paths if os.path.exists(p))
-            mm_size = os.path.getsize(mmproj) if mmproj else 0
-            name, quant = pretty_model(paths[0])
-            mid = f"{folder}/{stem}"
-            if len(parts) != want:
-                problems.append({"name": mid, "missing": f"分片不齊：有 {len(parts)} 個，應有 {want} 個（下載可能還沒完成）"})
-                continue
-            prof = _profile_cached(paths[0])
-            if not prof:
-                problems.append({"name": mid, "missing": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載"})
-                continue
-            models.append({
-                # 名稱用檔頭裡的正式名稱（例 Gemma-4-E4B-It），沒有才用檔名推
-                "engine": "llama", "id": mid, "name": prof.get("meta_name") or name, "quant": quant, "folder": folder,
-                "path": paths[0], "shards": want, "size_gib": round(size / GIB, 1),
-                "mmproj": mmproj, "mmproj_gib": round(mm_size / GIB, 1), "vision": bool(mmproj),
-                **prof})
+        seen.add(real)
+        for rel, full in _walk_dirs(d, 3, own + [x for x in model_dirs(reg) if x != d]):   # 巢狀加入的另一個資料夾各掃各的
+            _scan_folder(full, rel, dir_tag(d) + "/", models, problems, external=d)
     return root, models, problems
 
 
@@ -3671,6 +3743,9 @@ def library():
     return {"root": root, "free_gib": free_gib, "hdd": store_hdd(root),
             "total_gib": total_gib,
             "gguf": ggufs, "strata": strata, "problems": problems,
+            "model_dirs": [{"path": d, "exists": os.path.isdir(d),
+                            "count": sum(1 for m in ggufs if m.get("external") == d)} for d in model_dirs(reg)],
+            "dir_suggestions": model_dir_suggestions(reg),
             "llama_server": llama_server_exe(reg), "downloads": jobs}
 
 
@@ -3780,7 +3855,8 @@ def hf_files(repo, token=""):
         sub = os.path.dirname(g["files"][0])
         # 推測解碼用的 MTP 草稿頭、放在子資料夾的檔案不是主模型：標出來、排到最後（實際踩到：0.1 GiB 的 MTP
         # 檔排在清單第一列，看起來像最小的量化）
-        aux = "mtp" in g["stem"].lower() or (bool(sub) and not SHARD_RX.search(os.path.basename(g["files"][0])[:-5]))
+        # 另外兩種也不是主模型：imatrix_unsloth.gguf（量化用的校正資料）、dflash-*.gguf（推測解碼的草稿頭）
+        aux = bool(AUX_GGUF_RX.search(g["stem"])) or (bool(sub) and not SHARD_RX.search(os.path.basename(g["files"][0])[:-5]))
         out.append({"stem": g["stem"], "name": name, "quant": quant, "files": sorted(g["files"]), "dir": sub,
                     "aux": aux, "size_gib": gib, "fits_disk": free is None or gib + 10 < free,
                     "cn_origin": any(c in f"{repo} {name}".lower() for c in CN_ORIGIN)})
@@ -4118,17 +4194,23 @@ def delete_model(model_id):
     broken = next((p for p in problems if p["name"] == model_id), None)
     if not m and not broken:
         return 404, {"error": "存放區沒有這顆"}
+    if (m or {}).get("external") or model_id.startswith("@"):
+        return 400, {"error": "這顆在其他模型資料夾裡，xConsole 不刪那裡的檔案（可能是別的程式在用）。"
+                              "不想在清單上看到它，到「存放區」把那個資料夾移出清單；檔案本身不會動"}
     lib = library()
     if m and next((x for x in lib["gguf"] if x["id"] == model_id), {}).get("in_use"):
         return 409, {"error": "有欄位正在使用這顆，先換成別的模型再刪"}
-    folder, stem = model_id.split("/", 1)
+    folder, stem = model_id.rsplit("/", 1)
     root = gguf_root(reg)
-    try:
-        full = inside(root, folder)
-    except ValueError:
-        return 400, {"error": "路徑不在存放區內"}
-    if os.path.dirname(full) != os.path.realpath(root):
-        return 400, {"error": "只能刪存放區第一層的模型資料夾"}
+    if folder == ".":
+        full = os.path.realpath(root)                    # 直接放在存放區根目錄的檔
+    else:
+        try:
+            full = inside(root, folder)
+        except ValueError:
+            return 400, {"error": "路徑不在存放區內"}
+        if os.path.dirname(full) != os.path.realpath(root):
+            return 400, {"error": "只能刪存放區第一層的模型資料夾"}
     removed, freed = [], 0
     for f in os.listdir(full):
         base = f[:-5] if f.endswith(".gguf") else f[:-10] if f.endswith(".gguf.part") else None
@@ -4145,7 +4227,7 @@ def delete_model(model_id):
                 freed += os.path.getsize(p)
                 os.remove(p)
                 removed.append(f)
-        if not os.listdir(full):
+        if folder != "." and not os.listdir(full):
             os.rmdir(full)
     return 200, {"ok": True, "removed": removed, "freed_gib": round(freed / GIB, 1)}
 
@@ -5481,6 +5563,7 @@ def machine_info():
                      "ram_floor_gib": m.get("ram_floor_gib"),
                      "vram_floor_gib": m.get("vram_floor_gib"), "note": m.get("note", ""),
                      "gguf_root": m.get("gguf_root") or "", "llama_server": m.get("llama_server") or "",
+                     "model_dirs": model_dirs(reg),
                      "bandwidth_gbs": m.get("bandwidth_gbs"), "ram_bandwidth_gbs": m.get("ram_bandwidth_gbs"),
                      "sd_cli": m.get("sd_cli") or "", "agent_enabled": bool(m.get("agent_enabled")),
                      "gpu_override": m.get("gpu_override"), "hf_mirror": m.get("hf_mirror") or "",
@@ -5534,28 +5617,44 @@ def contained(raw, bases):
     return None
 
 
-def check_root(raw):
-    """存放區：在允許的位置底下、不是隱藏資料夾、不在系統目錄、建得起來而且寫得進去。"""
+def _place_ok(raw, store, allow_hidden=()):
+    """存放區（store=True）／其他模型資料夾共用的位置檢查：在允許的位置底下、不是系統目錄、不是整個使用者資料夾或 AppData、
+    不是隱藏資料夾。allow_hidden：可以在隱藏資料夾裡的例外（LM Studio 的 ~/.lmstudio/models），要完全等於或在它底下。
+    訊息分兩組寫死（不用「{名稱}要…」拼字），介面翻譯才對得上整句。"""
     p = expand(str(raw or "").strip())
-    if not p:
-        return "", None
     if not os.path.isabs(p):
-        return None, "存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）"
+        return None, ("存放區要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）" if store
+                      else "模型資料夾要寫完整路徑（/ 開頭、磁碟代號開頭，或 ~/ 開頭）")
     bases = data_bases()
     real = contained(p, bases)
     if real is None:
-        return None, ("存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）" if OS == "windows"
-                      else "存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）")
+        if OS == "windows":
+            return None, ("存放區要放在磁碟上的一個資料夾裡，例：C:\\AI-Models、D:\\models（不能是磁碟根目錄本身）" if store
+                          else "模型資料夾要是磁碟上的一個資料夾，例：C:\\models、D:\\AI-Models（不能是磁碟根目錄本身）")
+        return None, ("存放區要放在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）" if store
+                      else "模型資料夾要在家目錄、另外掛載的資料碟，或 /data、/models、/srv、/opt 底下（不能是這些位置本身）")
     if OS == "linux" and any(real == d or real.startswith(d + "/") for d in SYSTEM_DIRS):
-        return None, f"{real} 是系統目錄，不能當存放區"
+        return None, f"{real} 是系統目錄，不能當存放區" if store else f"{real} 是系統目錄，不能當模型資料夾"
     if OS == "windows" and not real.lower().startswith(os.path.realpath(HOME).lower() + os.sep):
         parts = [x for x in re.split(r"[\\/]+", os.path.splitdrive(real)[1]) if x]
         if not parts or parts[0].lower() in WIN_DENY:
-            return None, f"{real} 是系統資料夾，不能當存放區"
+            return None, f"{real} 是系統資料夾，不能當存放區" if store else f"{real} 是系統資料夾，不能當模型資料夾"
         if parts[0].lower() == "users" and (len(parts) < 3 or parts[2].lower() == "appdata"):
             return None, "不能直接放在使用者資料夾或 AppData 裡；請選裡面的一個資料夾，或像 C:\\AI-Models 這樣另外建一個"
-    if any(part.startswith(".") for part in re.split(r"[\\/]", real) if part):
+    ok_hidden = any(os.path.normcase(real) == os.path.normcase(h) or os.path.normcase(real).startswith(os.path.normcase(h) + os.sep)
+                    for h in (os.path.realpath(x) for x in allow_hidden))
+    if not ok_hidden and any(part.startswith(".") for part in re.split(r"[\\/]", real) if part):
         return None, "不能放在隱藏資料夾（例 ~/.ssh、~/.config）裡"
+    return real, None
+
+
+def check_root(raw):
+    """存放區：在允許的位置底下、不是隱藏資料夾、不在系統目錄、建得起來而且寫得進去。"""
+    if not str(raw or "").strip():
+        return "", None
+    real, err = _place_ok(raw, True)
+    if err:
+        return None, err
     try:
         os.makedirs(real, exist_ok=True)
     except OSError as ex:
@@ -5564,6 +5663,95 @@ def check_root(raw):
         return None, f"代理的帳號寫不進 {real}，請先調整這個資料夾的權限"
     return real, None
 
+
+
+def known_model_dirs():
+    """別的程式常把 GGUF 放的地方：LM Studio、自己建的 models 資料夾、LocModel 的預設 C:\\AI-Models。"""
+    c = [os.path.join(HOME, ".lmstudio", "models"), os.path.join(HOME, ".cache", "lm-studio", "models"),
+         os.path.join(HOME, "models"), os.path.join(HOME, "AI-Models")]
+    if OS == "windows":
+        for drv, _ in _mounts():
+            c += [os.path.join(drv, x) for x in ("models", "AI-Models", "LLM", "gguf")]
+    return c
+
+
+def check_model_dir(raw):
+    """其他模型資料夾：位置規則跟存放區一樣（LM Studio 的隱藏資料夾例外），要已經存在；不必寫得進去，xConsole 只讀。"""
+    real, err = _place_ok(raw, False, allow_hidden=[d for d in known_model_dirs() if os.sep + "." in d])
+    if err:
+        return None, err
+    if not os.path.isdir(real):
+        return None, f"{real} 不存在或不是資料夾"
+    if not os.access(real, os.R_OK):
+        return None, f"代理的帳號讀不到 {real}，請先調整這個資料夾的權限"
+    return real, None
+
+
+_SUGGEST = {"at": 0, "out": []}
+
+
+def model_dir_suggestions(reg=None):
+    """這台已經有 GGUF、但還沒加進來的資料夾（給模型庫頁一鍵加入）。60 秒內重複問直接回上次的結果。"""
+    if time.time() - _SUGGEST["at"] < 60:
+        return _SUGGEST["out"]
+    reg = reg or registry()
+    have = {os.path.normcase(os.path.realpath(x)) for x in [gguf_root(reg), *model_dirs(reg)]}
+    out = []
+    for d in known_model_dirs():
+        real = os.path.realpath(d)
+        if os.path.normcase(real) in have or not os.path.isdir(real) or _under(real, gguf_root(reg)) \
+                or any(_under(real, x) for x in model_dirs(reg)) or check_model_dir(real)[1]:
+            continue
+        n, size = 0, 0
+        for _, full in _walk_dirs(real, 3, [gguf_root(reg), sd_root(reg), *model_dirs(reg)]):
+            try:
+                for f in os.listdir(full):
+                    fp = os.path.join(full, f)
+                    if f.lower().endswith(".gguf") and not is_mmproj(f) and not AUX_GGUF_RX.search(f[:-5]) and os.path.isfile(fp):
+                        sz = os.path.getsize(fp)
+                        if sz >= EXT_MIN_BYTES:
+                            n, size = n + 1, size + sz
+            except OSError:
+                continue
+        if n:
+            out.append({"path": real, "count": n, "size_gib": round(size / GIB, 1)})
+    _SUGGEST.update(at=time.time(), out=out)
+    return out
+
+
+@_locked
+def set_model_dirs(body):
+    """加入或移出一個其他模型資料夾。移出只是不再列出，檔案不動。"""
+    reg = registry()
+    cur = model_dirs(reg)
+    if body.get("add"):
+        real, err = check_model_dir(body["add"])
+        if err:
+            return 400, {"error": err}
+        if _under(real, gguf_root(reg)):
+            return 400, {"error": "這是 xConsole 自己的存放區（或在它裡面），裡面的模型本來就會列出來，不用另外加"}
+        if any(os.path.normcase(os.path.realpath(x)) == os.path.normcase(real) for x in cur):
+            return 200, {"ok": True, "dirs": cur}
+        if len(cur) >= MODEL_DIRS_MAX:
+            return 400, {"error": f"其他模型資料夾最多 {MODEL_DIRS_MAX} 個"}
+        cur = [*cur, real]
+    elif body.get("remove"):
+        want = os.path.normcase(os.path.realpath(expand(str(body["remove"]))))
+        left = [x for x in cur if os.path.normcase(os.path.realpath(x)) != want]
+        if len(left) == len(cur):
+            return 404, {"error": "清單裡沒有這個資料夾"}
+        gone = {os.path.realpath(x) for x in cur} - {os.path.realpath(x) for x in left}
+        for sl in reg["slots"]:
+            c = slot_config(sl) or {}
+            if c.get("_native") and any(os.path.realpath(c["_native"]).startswith(g + os.sep) for g in gone):
+                return 409, {"error": f"欄位 {sl['id']} 正在用這個資料夾裡的模型，先換成別的模型再移出"}
+        cur = left
+    else:
+        return 400, {"error": "要帶 add 或 remove"}
+    reg["machine"]["model_dirs"] = cur
+    save_json(REGISTRY, reg)
+    _SUGGEST["at"] = 0
+    return 200, {"ok": True, "dirs": cur}
 
 def check_llama(raw):
     """llama-server：只准家目錄、/opt、/usr/local 底下，檔名就是 llama-server，--version 跑得起來（代理會執行它）。"""
@@ -5997,9 +6185,19 @@ def agent_links(reg=None):
 
 
 def agent_browse(path=""):
-    """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個標出能不能選。沒給路徑＝從家目錄開始。"""
+    """資料夾瀏覽器（Agent 工作資料夾用）。"""
     if not agent_enabled():
         return _agent_off()
+    return browse_dirs(path, agent_link_denied)
+
+
+def model_dir_browse(path=""):
+    """資料夾瀏覽器（加入其他模型資料夾用）：能不能選照 check_model_dir 判斷。"""
+    return browse_dirs(path, lambda p: check_model_dir(p)[1])
+
+
+def browse_dirs(path, denied):
+    """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個用 denied(路徑) 標出能不能選。沒給路徑＝從家目錄開始。"""
     path = str(path or "").strip() or HOME
     if "\x00" in path or len(path) > 1000:
         return 400, {"error": "路徑不對"}
@@ -6017,7 +6215,7 @@ def agent_browse(path=""):
         p = os.path.join(full, n)
         if n.startswith(".") or not os.path.isdir(p) or os.path.islink(p):
             continue
-        why = agent_link_denied(p)
+        why = denied(p)
         dirs.append({"name": n, "path": p, "ok": why is None, "why": why})
     roots = [{"name": "家目錄", "path": os.path.realpath(HOME)}]
     if OS == "windows":
@@ -6029,7 +6227,7 @@ def agent_browse(path=""):
     parent = os.path.dirname(full)
     parent = parent if parent != full and in_browse_roots(parent) else None
     return 200, {"path": full, "parent": parent, "dirs": dirs, "roots": roots,
-                 "ok": agent_link_denied(full) is None, "why": agent_link_denied(full)}
+                 "ok": denied(full) is None, "why": denied(full)}
 
 
 def agent_link(path, name=None):
@@ -7319,6 +7517,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/llama/args":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             return self._send(*llama_args_get((q.get("model") or [""])[0]))
+        if path == "/library/browse":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self._send(*model_dir_browse((q.get("path") or [""])[0]))
         if path == "/agent/browse":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             return self._send(*agent_browse((q.get("path") or [""])[0]))
@@ -7412,6 +7613,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/library/download/([0-9a-f]{8})/cancel", path)
         if m:
             return self._send(*cancel_download(m.group(1)))
+        if path == "/library/dirs":
+            return self._send(*set_model_dirs(body))
         if path == "/library/delete":
             return self._send(*delete_model(str(body.get("id") or "")))
         m = re.fullmatch(r"/apiinfo/([\w.-]+)/settings", path)
@@ -7446,7 +7649,7 @@ class Handler(BaseHTTPRequestHandler):
             # 只開模型存放區、畫圖模型區與 Agent 工作資料夾底下的資料夾（「開啟位置」用），不必打開操作電腦
             full = os.path.realpath(str(body.get("path") or ""))
             reg = registry()
-            roots = [gguf_root(reg), sd_root(reg), AGENT_ROOT, *agent_links(reg).values()]
+            roots = [gguf_root(reg), sd_root(reg), AGENT_ROOT, *agent_links(reg).values(), *model_dirs(reg)]
             if not any(full == os.path.realpath(r) or full.startswith(os.path.realpath(r) + os.sep) for r in roots if r):
                 return self._send(400, {"error": "只能打開模型存放區或 Agent 工作資料夾底下的資料夾"})
             return self._send(*desktop_call("POST", "/desktop/open", {"path": full}, timeout=20))

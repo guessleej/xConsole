@@ -67,7 +67,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-09",
-  "refreshed": 1793982497
+  "refreshed": 1794007606
  },
  {
   "repo": "xCloudinfo/Gemma-4-26B-A4B-TAIDE-zhTW-GGUF",
@@ -137,7 +137,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-06",
-  "refreshed": 1793982502
+  "refreshed": 1794007609
  },
  {
   "repo": "xCloudinfo/Granite-4.2-30B-xVITA-zhTW-GGUF",
@@ -201,7 +201,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2026-10",
-  "refreshed": 1793982509
+  "refreshed": 1794007613
  },
  {
   "repo": "xCloudinfo/gpt-oss-120b-TAIDE-zhTW-GGUF",
@@ -242,7 +242,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2026-06",
-  "refreshed": 1793982513
+  "refreshed": 1794007616
  },
  {
   "repo": "xCloudinfo/gpt-oss-20b-TAIDE-zhTW-GGUF",
@@ -283,7 +283,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2026-06",
-  "refreshed": 1793982520
+  "refreshed": 1794007619
  },
  {
   "repo": "unsloth/gemma-4-26B-A4B-it-GGUF",
@@ -435,7 +435,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-04",
-  "refreshed": 1793982524
+  "refreshed": 1794007621
  },
  {
   "repo": "unsloth/gemma-4-E4B-it-GGUF",
@@ -587,7 +587,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-04",
-  "refreshed": 1793982528
+  "refreshed": 1794007624
  },
  {
   "repo": "unsloth/gemma-4-E2B-it-GGUF",
@@ -740,7 +740,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-04",
-  "refreshed": 1793982533
+  "refreshed": 1794007627
  },
  {
   "repo": "unsloth/gemma-4-12b-it-GGUF",
@@ -891,7 +891,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-05",
-  "refreshed": 1793982540
+  "refreshed": 1794007630
  },
  {
   "repo": "unsloth/gemma-3-12b-it-qat-GGUF",
@@ -1068,7 +1068,7 @@
   ],
   "license": "gemma",
   "released": "2025-04",
-  "refreshed": 1793982545
+  "refreshed": 1794007633
  },
  {
   "repo": "unsloth/gemma-4-31B-it-GGUF",
@@ -1224,7 +1224,7 @@
   ],
   "license": "apache-2.0",
   "released": "2026-04",
-  "refreshed": 1793982550
+  "refreshed": 1794007636
  },
  {
   "repo": "unsloth/gpt-oss-20b-GGUF",
@@ -1339,7 +1339,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2025-08",
-  "refreshed": 1793982555
+  "refreshed": 1794007639
  },
  {
   "repo": "unsloth/gpt-oss-120b-GGUF",
@@ -1454,7 +1454,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2025-08",
-  "refreshed": 1793982564
+  "refreshed": 1794007645
  },
  {
   "repo": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF",
@@ -1603,7 +1603,7 @@
   "mmproj": [],
   "license": "other",
   "released": "2025-12",
-  "refreshed": 1793982568
+  "refreshed": 1794007648
  },
  {
   "repo": "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF",
@@ -1779,7 +1779,7 @@
   ],
   "license": "apache-2.0",
   "released": "2025-06",
-  "refreshed": 1793982574
+  "refreshed": 1794007651
  },
  {
   "repo": "unsloth/Llama-3.3-70B-Instruct-GGUF",
@@ -1952,7 +1952,4662 @@
   "mmproj": [],
   "license": "llama3.3",
   "released": "2024-12",
-  "refreshed": 1793982580
+  "refreshed": 1794007654
+ },
+ {
+  "repo": "unsloth/gemma-3-1b-it-GGUF",
+  "title": "Gemma 3 1B",
+  "use": "chat",
+  "vendor": "Google",
+  "desc": "Google 1B 小模型，不到 1 GB，最舊的筆電也跑得動；簡單問答、改寫用",
+  "tags": [
+   "小模型",
+   "入門"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "gemma3",
+   "meta_name": "Gemma-3-1B-It",
+   "ctx_train": 32768,
+   "kv_full_bpt": 26624,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 26,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "gemma-3-1b-it-Q4_K_M",
+  "quants": [
+   {
+    "stem": "gemma-3-1b-it-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "gemma-3-1b-it-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "gemma-3-1b-it-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "gemma-3-1b-it-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "gemma-3-1b-it-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "gemma-3-1b-it-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "gemma-3-1b-it-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "gemma-3-1b-it-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "gemma-3-1b-it-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "gemma-3-1b-it-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "gemma-3-1b-it-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "gemma-3-1b-it-BF16",
+    "quant": "BF16",
+    "size_gib": 1.9
+   }
+  ],
+  "mmproj": [],
+  "license": "gemma",
+  "released": "2025-03",
+  "refreshed": 1794007657
+ },
+ {
+  "repo": "unsloth/Llama-3.2-1B-Instruct-GGUF",
+  "title": "Llama 3.2 1B",
+  "use": "chat",
+  "vendor": "Meta",
+  "desc": "Meta 1B 小模型，回應很快；記憶體最少的機器先用它試",
+  "tags": [
+   "小模型",
+   "入門"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "llama",
+   "meta_name": "Llama-3.2-1B-Instruct",
+   "ctx_train": 131072,
+   "kv_full_bpt": 32768,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 16,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Llama-3.2-1B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 0.4
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 0.4
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 0.4
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 1.1
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Llama-3.2-1B-Instruct-F16",
+    "quant": "F16",
+    "size_gib": 2.3
+   }
+  ],
+  "mmproj": [],
+  "license": "llama3.2",
+  "released": "2024-09",
+  "refreshed": 1794007660
+ },
+ {
+  "repo": "unsloth/LFM2.5-1.2B-Instruct-GGUF",
+  "title": "LFM2.5 1.2B",
+  "use": "chat",
+  "vendor": "Liquid AI",
+  "desc": "Liquid AI 為筆電與手機設計的混合架構小模型，只用 CPU 也算得快",
+  "tags": [
+   "小模型",
+   "入門"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "lfm2",
+   "meta_name": "Lfm2.5-1.2B-Instruct",
+   "ctx_train": 128000,
+   "kv_full_bpt": 12288,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 16,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "LFM2.5-1.2B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 0.5
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 0.6
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 0.7
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "LFM2.5-1.2B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 2.2
+   }
+  ],
+  "mmproj": [],
+  "license": "other",
+  "released": "2026-01",
+  "refreshed": 1794007663
+ },
+ {
+  "repo": "unsloth/Llama-3.2-3B-Instruct-GGUF",
+  "title": "Llama 3.2 3B",
+  "use": "chat",
+  "vendor": "Meta",
+  "desc": "Meta 3B 小模型，8 GB 筆電的好選擇，多國語言",
+  "tags": [
+   "小模型",
+   "入門"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "llama",
+   "meta_name": "Llama-3.2-3B-Instruct",
+   "ctx_train": 131072,
+   "kv_full_bpt": 114688,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 28,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Llama-3.2-3B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 0.8
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 2.5
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.2
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 6.0
+   },
+   {
+    "stem": "Llama-3.2-3B-Instruct-F16",
+    "quant": "F16",
+    "size_gib": 6.0
+   }
+  ],
+  "mmproj": [],
+  "license": "llama3.2",
+  "released": "2024-09",
+  "refreshed": 1794007666
+ },
+ {
+  "repo": "unsloth/Ministral-3-3B-Instruct-2512-GGUF",
+  "title": "Ministral 3 3B",
+  "use": "chat",
+  "vendor": "Mistral AI",
+  "desc": "Mistral 的 3B 小模型，能看圖，Apache 2.0",
+  "tags": [
+   "小模型",
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "mistral3",
+   "meta_name": "Ministral-3-3B-Instruct-2512",
+   "ctx_train": 262144,
+   "kv_full_bpt": 106496,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 26,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Ministral-3-3B-Instruct-2512-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.5
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 4.2
+   },
+   {
+    "stem": "Ministral-3-3B-Instruct-2512-BF16",
+    "quant": "BF16",
+    "size_gib": 6.4
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.78
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.78
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.56
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2025-12",
+  "refreshed": 1794007669
+ },
+ {
+  "repo": "unsloth/SmolLM3-3B-GGUF",
+  "title": "SmolLM3 3B",
+  "use": "chat",
+  "vendor": "Hugging Face",
+  "desc": "Hugging Face 完全公開訓練資料的 3B 模型，可切換思考模式",
+  "tags": [
+   "小模型",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "smollm3",
+   "meta_name": "Smollm3-3B",
+   "ctx_train": 65536,
+   "kv_full_bpt": 73728,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 36,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "SmolLM3-3B-Q4_K_M",
+  "quants": [
+   {
+    "stem": "SmolLM3-3B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 0.9
+   },
+   {
+    "stem": "SmolLM3-3B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.1
+   },
+   {
+    "stem": "SmolLM3-3B-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "SmolLM3-3B-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "SmolLM3-3B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "SmolLM3-3B-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "SmolLM3-3B-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 1.5
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 1.5
+   },
+   {
+    "stem": "SmolLM3-3B-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "SmolLM3-3B-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "SmolLM3-3B-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "SmolLM3-3B-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "SmolLM3-3B-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "SmolLM3-3B-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "SmolLM3-3B-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "SmolLM3-3B-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "SmolLM3-3B-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "SmolLM3-3B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "SmolLM3-3B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 3.6
+   },
+   {
+    "stem": "SmolLM3-3B-BF16",
+    "quant": "BF16",
+    "size_gib": 5.7
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2025-07",
+  "refreshed": 1794007673
+ },
+ {
+  "repo": "unsloth/granite-4.1-3b-GGUF",
+  "title": "Granite 4.1 3B",
+  "use": "chat",
+  "vendor": "IBM",
+  "desc": "IBM 企業用小模型，工具呼叫與 RAG 穩定，Apache 2.0",
+  "tags": [
+   "小模型",
+   "工具呼叫"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "granite",
+   "meta_name": "Granite-4.1-3B",
+   "ctx_train": 131072,
+   "kv_full_bpt": 81920,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "granite-4.1-3b-Q4_K_M",
+  "quants": [
+   {
+    "stem": "granite-4.1-3b-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "granite-4.1-3b-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "granite-4.1-3b-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.5
+   },
+   {
+    "stem": "granite-4.1-3b-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 1.7
+   },
+   {
+    "stem": "granite-4.1-3b-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "granite-4.1-3b-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "granite-4.1-3b-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "granite-4.1-3b-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "granite-4.1-3b-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "granite-4.1-3b-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "granite-4.1-3b-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "granite-4.1-3b-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "granite-4.1-3b-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "granite-4.1-3b-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "granite-4.1-3b-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "granite-4.1-3b-BF16",
+    "quant": "BF16",
+    "size_gib": 6.3
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2026-04",
+  "refreshed": 1794007677
+ },
+ {
+  "repo": "unsloth/Phi-4-mini-instruct-GGUF",
+  "title": "Phi-4 mini 3.8B",
+  "use": "chat",
+  "vendor": "Microsoft",
+  "desc": "Microsoft 3.8B 小模型，數學與推理在同級裡算強，MIT 授權",
+  "tags": [
+   "小模型",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "phi3",
+   "meta_name": "Phi 4 Mini Instruct",
+   "ctx_train": 131072,
+   "kv_full_bpt": 131072,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 32,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Phi-4-mini-instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Phi-4-mini-instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Phi-4-mini-instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Phi-4-mini-instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Phi-4-mini-instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Phi-4-mini-instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Phi-4-mini-instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 2.9
+   },
+   {
+    "stem": "Phi-4-mini-instruct.Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.8
+   },
+   {
+    "stem": "Phi-4-mini-instruct.BF16",
+    "quant": "BF16",
+    "size_gib": 7.2
+   }
+  ],
+  "mmproj": [],
+  "license": "mit",
+  "released": "2025-02",
+  "refreshed": 1794007679
+ },
+ {
+  "repo": "unsloth/gemma-3-4b-it-GGUF",
+  "title": "Gemma 3 4B",
+  "use": "chat",
+  "vendor": "Google",
+  "desc": "Google 4B，能看圖，8 GB 筆電放得下",
+  "tags": [
+   "小模型",
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "gemma3",
+   "meta_name": "Gemma-3-4B-It",
+   "ctx_train": 131072,
+   "kv_full_bpt": 139264,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 34,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "gemma-3-4b-it-Q4_K_M",
+  "quants": [
+   {
+    "stem": "gemma-3-4b-it-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 1.1
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 1.3
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.5
+   },
+   {
+    "stem": "gemma-3-4b-it-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "gemma-3-4b-it-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "gemma-3-4b-it-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "gemma-3-4b-it-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "gemma-3-4b-it-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "gemma-3-4b-it-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "gemma-3-4b-it-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "gemma-3-4b-it-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "gemma-3-4b-it-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "gemma-3-4b-it-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "gemma-3-4b-it-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "gemma-3-4b-it-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "gemma-3-4b-it-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "gemma-3-4b-it-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 3.8
+   },
+   {
+    "stem": "gemma-3-4b-it-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 4.8
+   },
+   {
+    "stem": "gemma-3-4b-it-BF16",
+    "quant": "BF16",
+    "size_gib": 7.2
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.79
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.79
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.56
+   }
+  ],
+  "license": "gemma",
+  "released": "2025-03",
+  "refreshed": 1794007682
+ },
+ {
+  "repo": "unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF",
+  "title": "Nemotron 3.5 Bolt E4B",
+  "use": "chat",
+  "vendor": "NVIDIA",
+  "desc": "NVIDIA 的小型模型，回應快，適合邊緣裝置與筆電",
+  "tags": [
+   "小模型"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "gemma4",
+   "meta_name": "NVIDIA-Nemotron-3.5-Bolt-E4B",
+   "ctx_train": 131072,
+   "kv_full_bpt": 28672,
+   "kv_swa_bpt": 143360,
+   "swa_window": 512,
+   "layers": 42,
+   "cn_origin": false,
+   "active_frac": 0.6857,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q4_K_XL",
+  "quants": [
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 3.5
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 5.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 6.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 7.6
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-E4B-BF16",
+    "quant": "BF16",
+    "size_gib": 14.0
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-Q8_0.gguf",
+    "gib": 0.52
+   },
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.92
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.92
+   }
+  ],
+  "license": "other",
+  "released": "2026-10",
+  "refreshed": 1794007685
+ },
+ {
+  "repo": "unsloth/Olmo-3-7B-Instruct-GGUF",
+  "title": "OLMo 3 7B",
+  "use": "chat",
+  "vendor": "Allen AI",
+  "desc": "Allen AI 完全開源（權重、資料、訓練程式都公開）的 7B 模型，Apache 2.0",
+  "tags": [],
+  "match": "",
+  "profile": {
+   "arch": "olmo2",
+   "meta_name": "Olmo-3-7B-Instruct",
+   "ctx_train": 65536,
+   "kv_full_bpt": 131072,
+   "kv_swa_bpt": 393216,
+   "swa_window": 4096,
+   "layers": 32,
+   "cn_origin": false,
+   "active_frac": 0.9483,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Olmo-3-7B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 2.5
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 3.6
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 4.2
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 4.3
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 4.3
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 4.9
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 4.9
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 5.6
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 6.3
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 7.2
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "Olmo-3-7B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 13.6
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2025-11",
+  "refreshed": 1794007688
+ },
+ {
+  "repo": "unsloth/Llama-3.1-8B-Instruct-GGUF",
+  "title": "Llama 3.1 8B",
+  "use": "chat",
+  "vendor": "Meta",
+  "desc": "Meta 8B，最多人用的通用模型之一，相容的工具最多",
+  "tags": [],
+  "match": "",
+  "profile": {
+   "arch": "llama",
+   "meta_name": "Llama-3.1-8B-Instruct",
+   "ctx_train": 131072,
+   "kv_full_bpt": 131072,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 32,
+   "cn_origin": false,
+   "active_frac": 0.9399,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Llama-3.1-8B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 3.2
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 4.2
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 4.6
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 4.8
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 5.2
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 5.3
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 5.3
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 6.1
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 6.8
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 9.8
+   },
+   {
+    "stem": "Llama-3.1-8B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 15.0
+   }
+  ],
+  "mmproj": [],
+  "license": "llama3.1",
+  "released": "2025-04",
+  "refreshed": 1794007691
+ },
+ {
+  "repo": "unsloth/Ministral-3-8B-Instruct-2512-GGUF",
+  "title": "Ministral 3 8B",
+  "use": "chat",
+  "vendor": "Mistral AI",
+  "desc": "Mistral 8B，能看圖，Apache 2.0",
+  "tags": [
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "mistral3",
+   "meta_name": "Ministral-3-8B-Instruct-2512",
+   "ctx_train": 262144,
+   "kv_full_bpt": 139264,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 34,
+   "cn_origin": false,
+   "active_frac": 0.9418,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Ministral-3-8B-Instruct-2512-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 2.5
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 3.2
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 3.6
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 4.1
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 4.6
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 4.6
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 4.6
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 4.8
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 4.9
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 5.5
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 5.6
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 5.7
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 6.5
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 7.2
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 8.4
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 10.3
+   },
+   {
+    "stem": "Ministral-3-8B-Instruct-2512-BF16",
+    "quant": "BF16",
+    "size_gib": 15.8
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.8
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.8
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.6
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2025-12",
+  "refreshed": 1794007694
+ },
+ {
+  "repo": "unsloth/granite-4.1-8b-GGUF",
+  "title": "Granite 4.1 8B",
+  "use": "chat",
+  "vendor": "IBM",
+  "desc": "IBM 8B 企業用模型，工具呼叫與 RAG 穩定，Apache 2.0",
+  "tags": [
+   "工具呼叫"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "granite",
+   "meta_name": "Granite-4.1-8B",
+   "ctx_train": 131072,
+   "kv_full_bpt": 163840,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 0.9567,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "granite-4.1-8b-Q4_K_M",
+  "quants": [
+   {
+    "stem": "granite-4.1-8b-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "granite-4.1-8b-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "granite-4.1-8b-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "granite-4.1-8b-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 4.3
+   },
+   {
+    "stem": "granite-4.1-8b-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 4.5
+   },
+   {
+    "stem": "granite-4.1-8b-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "granite-4.1-8b-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "granite-4.1-8b-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "granite-4.1-8b-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 5.1
+   },
+   {
+    "stem": "granite-4.1-8b-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 5.2
+   },
+   {
+    "stem": "granite-4.1-8b-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 5.7
+   },
+   {
+    "stem": "granite-4.1-8b-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 5.8
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 5.9
+   },
+   {
+    "stem": "granite-4.1-8b-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 6.7
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 7.4
+   },
+   {
+    "stem": "granite-4.1-8b-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "granite-4.1-8b-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 10.5
+   },
+   {
+    "stem": "granite-4.1-8b-BF16",
+    "quant": "BF16",
+    "size_gib": 16.4
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2026-04",
+  "refreshed": 1794007697
+ },
+ {
+  "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
+  "title": "LFM2.5 8B-A1B",
+  "use": "chat",
+  "vendor": "Liquid AI",
+  "desc": "Liquid AI 的 MoE，每次只動用約 1B 參數，只用 CPU 也有不錯的速度",
+  "tags": [
+   "MoE"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "lfm2moe",
+   "meta_name": "Lfm2.5-8B-A1B",
+   "ctx_train": 128000,
+   "kv_full_bpt": 12288,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 24,
+   "cn_origin": false,
+   "active_frac": 0.2263,
+   "moe": true,
+   "expert_layers": 22,
+   "expert_used_frac": 0.125,
+   "expert_layer_frac": 0.04019
+  },
+  "profiled": "LFM2.5-8B-A1B-UD-Q4_K_M",
+  "quants": [
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 2.5
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ3_S",
+    "quant": "UD-IQ3_S",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q3_K_M",
+    "quant": "UD-Q3_K_M",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ4_XS",
+    "quant": "UD-IQ4_XS",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-IQ4_NL",
+    "quant": "UD-IQ4_NL",
+    "size_gib": 4.1
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q4_K_S",
+    "quant": "UD-Q4_K_S",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-MXFP4_MOE",
+    "quant": "MXFP4_MOE",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q4_K_M",
+    "quant": "UD-Q4_K_M",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q5_K_S",
+    "quant": "UD-Q5_K_S",
+    "size_gib": 5.6
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q5_K_M",
+    "quant": "UD-Q5_K_M",
+    "size_gib": 5.9
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 6.0
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q6_K",
+    "quant": "UD-Q6_K",
+    "size_gib": 6.6
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 7.2
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 8.4
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "LFM2.5-8B-A1B-BF16",
+    "quant": "BF16",
+    "size_gib": 15.8
+   }
+  ],
+  "mmproj": [],
+  "license": "other",
+  "released": "2026-05",
+  "refreshed": 1794007700
+ },
+ {
+  "repo": "unsloth/gemma-4-12B-it-qat-GGUF",
+  "title": "Gemma 4 12B QAT",
+  "use": "chat",
+  "vendor": "Google",
+  "desc": "Gemma 4 12B 的量化感知訓練版：4 位元品質接近原版，能看圖",
+  "tags": [
+   "看圖",
+   "QAT"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "gemma4",
+   "meta_name": "Gemma-4 12B IT (smart Q4_0, QAT-lossless)",
+   "ctx_train": 262144,
+   "kv_full_bpt": 16384,
+   "kv_swa_bpt": 655360,
+   "swa_window": 1024,
+   "layers": 48,
+   "cn_origin": false,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "gemma-4-12B-it-qat-UD-Q4_K_XL",
+  "quants": [
+   {
+    "stem": "gemma-4-12B-it-qat-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 6.3
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.16
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.16
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 0.2
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-06",
+  "refreshed": 1794007703
+ },
+ {
+  "repo": "unsloth/Ministral-3-14B-Instruct-2512-GGUF",
+  "title": "Ministral 3 14B",
+  "use": "chat",
+  "vendor": "Mistral AI",
+  "desc": "Mistral 14B，能看圖，Apache 2.0",
+  "tags": [
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "mistral3",
+   "meta_name": "Ministral-3-14B-Instruct-2512",
+   "ctx_train": 262144,
+   "kv_full_bpt": 163840,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 0.9541,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Ministral-3-14B-Instruct-2512-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 3.2
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 3.8
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 4.6
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 4.9
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 5.1
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 5.1
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 5.7
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 6.2
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 6.5
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 6.9
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 7.3
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 7.3
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 7.3
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 7.7
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 7.8
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 8.0
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 9.0
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 9.0
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 10.3
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 11.3
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 13.4
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 15.9
+   },
+   {
+    "stem": "Ministral-3-14B-Instruct-2512-BF16",
+    "quant": "BF16",
+    "size_gib": 25.2
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.82
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.82
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.64
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2025-12",
+  "refreshed": 1794007706
+ },
+ {
+  "repo": "unsloth/Phi-4-reasoning-plus-GGUF",
+  "title": "Phi-4 reasoning plus 14B",
+  "use": "chat",
+  "vendor": "Microsoft",
+  "desc": "Microsoft 14B 推理模型，數學、科學、寫程式的推理強，MIT 授權",
+  "tags": [
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "phi3",
+   "meta_name": "Phi-4-Reasoning-Plus",
+   "ctx_train": 32768,
+   "kv_full_bpt": 204800,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 0.9681,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Phi-4-reasoning-plus-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Phi-4-reasoning-plus-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 3.6
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 4.9
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 5.2
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 5.3
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 5.4
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 5.5
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 6.1
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 6.9
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 6.9
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 7.4
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 7.8
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 7.8
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 8.3
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 8.4
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 8.6
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 9.7
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 9.9
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 11.2
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 12.2
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 14.5
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 16.8
+   },
+   {
+    "stem": "Phi-4-reasoning-plus-BF16",
+    "quant": "BF16",
+    "size_gib": 27.3
+   }
+  ],
+  "mmproj": [],
+  "license": "mit",
+  "released": "2025-05",
+  "refreshed": 1794007709
+ },
+ {
+  "repo": "unsloth/LFM2.5-24B-A2B-GGUF",
+  "title": "LFM2.5 24B-A2B",
+  "use": "chat",
+  "vendor": "Liquid AI",
+  "desc": "Liquid AI 的 MoE，每次只動用約 2B 參數，大模型裡速度很快",
+  "tags": [
+   "MoE"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "lfm2moe",
+   "meta_name": "LFM2.5-24B-A2B-Preview",
+   "ctx_train": 131072,
+   "kv_full_bpt": 20480,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 0.1295,
+   "moe": true,
+   "expert_layers": 38,
+   "expert_used_frac": 0.0625,
+   "expert_layer_frac": 0.024436
+  },
+  "profiled": "LFM2.5-24B-A2B-UD-Q3_K_XL",
+  "quants": [
+   {
+    "stem": "LFM2.5-24B-A2B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 7.0
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 7.0
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 7.5
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 8.3
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 10.2
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 13.9
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 16.7
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 20.4
+   },
+   {
+    "stem": "LFM2.5-24B-A2B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 23.7
+   }
+  ],
+  "mmproj": [],
+  "license": "other",
+  "released": "2026-10",
+  "refreshed": 1794007712
+ },
+ {
+  "repo": "unsloth/Magistral-Small-2509-GGUF",
+  "title": "Magistral Small 24B",
+  "use": "chat",
+  "vendor": "Mistral AI",
+  "desc": "Mistral 的推理模型，會先想再答，能看圖，Apache 2.0",
+  "tags": [
+   "推理",
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "llama",
+   "meta_name": "Magistral-Small-2509",
+   "ctx_train": 131072,
+   "kv_full_bpt": 163840,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": false,
+   "active_frac": 0.9737,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Magistral-Small-2509-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Magistral-Small-2509-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 6.3
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 7.7
+   },
+   {
+    "stem": "Magistral-Small-2509-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 8.3
+   },
+   {
+    "stem": "Magistral-Small-2509-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 8.4
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 8.8
+   },
+   {
+    "stem": "Magistral-Small-2509-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 9.7
+   },
+   {
+    "stem": "Magistral-Small-2509-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 10.7
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 11.0
+   },
+   {
+    "stem": "Magistral-Small-2509-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 11.9
+   },
+   {
+    "stem": "Magistral-Small-2509-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 12.5
+   },
+   {
+    "stem": "Magistral-Small-2509-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 12.6
+   },
+   {
+    "stem": "Magistral-Small-2509-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 12.6
+   },
+   {
+    "stem": "Magistral-Small-2509-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 13.3
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 13.5
+   },
+   {
+    "stem": "Magistral-Small-2509-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 13.9
+   },
+   {
+    "stem": "Magistral-Small-2509-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 15.2
+   },
+   {
+    "stem": "Magistral-Small-2509-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 15.6
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 15.6
+   },
+   {
+    "stem": "Magistral-Small-2509-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 18.0
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 19.4
+   },
+   {
+    "stem": "Magistral-Small-2509-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 23.3
+   },
+   {
+    "stem": "Magistral-Small-2509-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 27.0
+   },
+   {
+    "stem": "Magistral-Small-2509-BF16",
+    "quant": "BF16",
+    "size_gib": 43.9
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.82
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.82
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.64
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2025-09",
+  "refreshed": 1794007715
+ },
+ {
+  "repo": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+  "title": "Gemma 4 26B-A4B QAT",
+  "use": "chat",
+  "vendor": "Google",
+  "desc": "Gemma 4 MoE 的量化感知訓練版，4 位元品質接近原版",
+  "tags": [
+   "MoE",
+   "看圖",
+   "QAT"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "gemma4",
+   "meta_name": "Gemma-4 26B-A4B IT (smart Q4_0, QAT-lossless)",
+   "ctx_train": 262144,
+   "kv_full_bpt": 20480,
+   "kv_swa_bpt": 409600,
+   "swa_window": 1024,
+   "layers": 30,
+   "cn_origin": false,
+   "active_frac": 0.1538,
+   "moe": true,
+   "expert_layers": 30,
+   "expert_used_frac": 0.0625,
+   "expert_layer_frac": 0.030085
+  },
+  "profiled": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL",
+  "quants": [
+   {
+    "stem": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 13.3
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 1.11
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 1.11
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 2.13
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-06",
+  "refreshed": 1794007718
+ },
+ {
+  "repo": "unsloth/Muse-Glimmer-30B-GGUF",
+  "title": "Muse Glimmer 30B",
+  "use": "chat",
+  "vendor": "Meta",
+  "desc": "Meta 30B，通用能力完整，Apache 2.0",
+  "tags": [],
+  "match": "",
+  "profile": {
+   "arch": "muse-glimmer",
+   "meta_name": "Muse-Glimmer-30B",
+   "ctx_train": 131072,
+   "kv_full_bpt": 53248,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 52,
+   "cn_origin": false,
+   "active_frac": 0.9523,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Muse-Glimmer-30B-UD-Q4_K_XL",
+  "quants": [
+   {
+    "stem": "Muse-Glimmer-30B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 10.0
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-IQ2_XS",
+    "quant": "UD-IQ2_XS",
+    "size_gib": 10.7
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 11.4
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 11.6
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 12.2
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 12.4
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-IQ3_M",
+    "quant": "UD-IQ3_M",
+    "size_gib": 13.2
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 14.8
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q5_K_M",
+    "quant": "UD-Q5_K_M",
+    "size_gib": 17.9
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q5_K_L",
+    "quant": "UD-Q5_K_L",
+    "size_gib": 18.4
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 20.3
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 24.5
+   },
+   {
+    "stem": "Muse-Glimmer-30B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 27.6
+   },
+   {
+    "stem": "Muse-Glimmer-30B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 30.1
+   },
+   {
+    "stem": "Muse-Glimmer-30B-BF16",
+    "quant": "BF16",
+    "size_gib": 51.9
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-kquant.gguf",
+    "gib": 1.3
+   },
+   {
+    "path": "mmproj-Muse-Glimmer-30B-Q8_0.gguf",
+    "gib": 1.91
+   },
+   {
+    "path": "mmproj-Muse-Glimmer-30B-BF16.gguf",
+    "gib": 3.58
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-08",
+  "refreshed": 1794007721
+ },
+ {
+  "repo": "unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF",
+  "title": "Nemotron 3.5 Lightning 30B-A3B",
+  "use": "chat",
+  "vendor": "NVIDIA",
+  "desc": "NVIDIA 混合架構 MoE，每次只動用約 3B 參數，長上下文成本低",
+  "tags": [
+   "MoE",
+   "長上下文"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "nemotron_h_moe",
+   "meta_name": "Nvidia-Nemotron-3.5-Lightning-30B-A3B",
+   "ctx_train": 1048576,
+   "kv_full_bpt": 7168,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 53,
+   "cn_origin": false,
+   "active_frac": 0.1237,
+   "moe": true,
+   "expert_layers": 24,
+   "expert_used_frac": 0.0469,
+   "expert_layer_frac": 0.03766
+  },
+  "profiled": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_M",
+  "quants": [
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 18.1
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 18.1
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 18.1
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 18.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ3_S",
+    "quant": "UD-IQ3_S",
+    "size_gib": 19.7
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ4_NL",
+    "quant": "UD-IQ4_NL",
+    "size_gib": 19.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 19.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-MXFP4_MOE",
+    "quant": "MXFP4_MOE",
+    "size_gib": 21.6
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_S",
+    "quant": "UD-Q4_K_S",
+    "size_gib": 22.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_M",
+    "quant": "UD-Q4_K_M",
+    "size_gib": 23.5
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 23.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q5_K_S",
+    "quant": "UD-Q5_K_S",
+    "size_gib": 24.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q5_K_M",
+    "quant": "UD-Q5_K_M",
+    "size_gib": 28.1
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 28.3
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 32.6
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 32.6
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 36.0
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16",
+    "quant": "BF16",
+    "size_gib": 61.3
+   }
+  ],
+  "mmproj": [],
+  "license": "other",
+  "released": "2026-08",
+  "refreshed": 1794007724
+ },
+ {
+  "repo": "unsloth/NVIDIA-Nemotron-3.5-Bolt-74B-A9B-GGUF",
+  "title": "Nemotron 3.5 Bolt 74B-A9B",
+  "use": "chat",
+  "vendor": "NVIDIA",
+  "desc": "NVIDIA 74B MoE，每次動用約 9B 參數；64 GB 以上的機器",
+  "tags": [
+   "MoE",
+   "大模型"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "nemotron_h_moe",
+   "meta_name": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 8192,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 88,
+   "cn_origin": false,
+   "active_frac": 0.1919,
+   "moe": true,
+   "expert_layers": 40,
+   "expert_used_frac": 0.0181,
+   "expert_layer_frac": 0.020221
+  },
+  "profiled": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ3_XXS",
+  "quants": [
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 17.2
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 18.9
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-IQ2_XXS",
+    "quant": "IQ2_XXS",
+    "size_gib": 20.5
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 20.5
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 22.9
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 26.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 29.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 36.3
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 46.8
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 54.9
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 67.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 73.4
+   },
+   {
+    "stem": "NVIDIA-Nemotron-3.5-Bolt-74B-A9B-BF16",
+    "quant": "BF16",
+    "size_gib": 138.0
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 1.61
+   }
+  ],
+  "license": "other",
+  "released": "2026-10",
+  "refreshed": 1794007728
+ },
+ {
+  "repo": "unsloth/Qwen3.5-4B-GGUF",
+  "title": "Qwen3.5 4B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 4B 小模型，中文與推理能力在同級裡強",
+  "tags": [
+   "小模型",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35",
+   "meta_name": "Qwen3.5-4B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 131072,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 32,
+   "cn_origin": true,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen3.5-4B-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.5-4B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Qwen3.5-4B-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Qwen3.5-4B-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Qwen3.5-4B-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Qwen3.5-4B-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "Qwen3.5-4B-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "Qwen3.5-4B-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "Qwen3.5-4B-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "Qwen3.5-4B-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Qwen3.5-4B-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Qwen3.5-4B-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.9
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "Qwen3.5-4B-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 3.9
+   },
+   {
+    "stem": "Qwen3.5-4B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 4.2
+   },
+   {
+    "stem": "Qwen3.5-4B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 5.5
+   },
+   {
+    "stem": "Qwen3.5-4B-BF16",
+    "quant": "BF16",
+    "size_gib": 7.8
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.63
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.63
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.24
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-03",
+  "refreshed": 1794007730
+ },
+ {
+  "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+  "title": "Qwen3 4B Instruct 2507",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen3 4B 指令版，不思考直接回答，回應快",
+  "tags": [
+   "小模型"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen3",
+   "meta_name": "Qwen3-4B-Instruct-2507",
+   "ctx_train": 262144,
+   "kv_full_bpt": 147456,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 36,
+   "cn_origin": true,
+   "active_frac": 1.0,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen3-4B-Instruct-2507-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 1.0
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 1.1
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 1.2
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 1.4
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 1.6
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 1.8
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 1.9
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 2.0
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 2.1
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 2.2
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 2.3
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 2.4
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 2.6
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 2.7
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 3.1
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "Qwen3-4B-Instruct-2507-F16",
+    "quant": "F16",
+    "size_gib": 7.5
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2025-08",
+  "refreshed": 1794007733
+ },
+ {
+  "repo": "unsloth/Qwen3.5-9B-GGUF",
+  "title": "Qwen3.5 9B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 9B，中文、推理與工具呼叫都好，16 GB 筆電放得下",
+  "tags": [
+   "推理",
+   "工具呼叫"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35",
+   "meta_name": "Qwen3.5-9B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 131072,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 32,
+   "cn_origin": true,
+   "active_frac": 0.8991,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen3.5-9B-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.5-9B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 3.0
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 3.4
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 3.7
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 3.8
+   },
+   {
+    "stem": "Qwen3.5-9B-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Qwen3.5-9B-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 4.7
+   },
+   {
+    "stem": "Qwen3.5-9B-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 4.8
+   },
+   {
+    "stem": "Qwen3.5-9B-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Qwen3.5-9B-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Qwen3.5-9B-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Qwen3.5-9B-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 5.3
+   },
+   {
+    "stem": "Qwen3.5-9B-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 5.4
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 5.6
+   },
+   {
+    "stem": "Qwen3.5-9B-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 5.9
+   },
+   {
+    "stem": "Qwen3.5-9B-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 6.1
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 6.3
+   },
+   {
+    "stem": "Qwen3.5-9B-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 6.9
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 8.2
+   },
+   {
+    "stem": "Qwen3.5-9B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 8.9
+   },
+   {
+    "stem": "Qwen3.5-9B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 12.1
+   },
+   {
+    "stem": "Qwen3.5-9B-BF16",
+    "quant": "BF16",
+    "size_gib": 16.7
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.86
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.86
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.7
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-02",
+  "refreshed": 1794007736
+ },
+ {
+  "repo": "unsloth/Qwen3.6-27B-GGUF",
+  "title": "Qwen3.6 27B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 27B 稠密模型，中文與推理強",
+  "tags": [
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35",
+   "meta_name": "Qwen3.6-27B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 262144,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 64,
+   "cn_origin": true,
+   "active_frac": 0.9574,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen3.6-27B-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.6-27B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 8.7
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 10.1
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 11.0
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 11.2
+   },
+   {
+    "stem": "Qwen3.6-27B-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 11.5
+   },
+   {
+    "stem": "Qwen3.6-27B-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 12.7
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 13.5
+   },
+   {
+    "stem": "Qwen3.6-27B-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 14.4
+   },
+   {
+    "stem": "Qwen3.6-27B-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 14.7
+   },
+   {
+    "stem": "Qwen3.6-27B-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 14.8
+   },
+   {
+    "stem": "Qwen3.6-27B-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 15.0
+   },
+   {
+    "stem": "Qwen3.6-27B-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 15.7
+   },
+   {
+    "stem": "Qwen3.6-27B-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 16.1
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 16.4
+   },
+   {
+    "stem": "Qwen3.6-27B-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 17.7
+   },
+   {
+    "stem": "Qwen3.6-27B-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 18.2
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 18.7
+   },
+   {
+    "stem": "Qwen3.6-27B-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 21.0
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 23.9
+   },
+   {
+    "stem": "Qwen3.6-27B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 26.6
+   },
+   {
+    "stem": "Qwen3.6-27B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 32.9
+   },
+   {
+    "stem": "Qwen3.6-27B-BF16",
+    "quant": "BF16",
+    "size_gib": 50.1
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.86
+   },
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.87
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.72
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-04",
+  "refreshed": 1794007739
+ },
+ {
+  "repo": "unsloth/Qwen3.8-27B-GGUF",
+  "title": "Qwen3.8 27B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 最新的 27B 稠密模型，能看圖",
+  "tags": [
+   "推理",
+   "看圖"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35",
+   "meta_name": "Qwen3.8-27B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 266240,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 65,
+   "cn_origin": true,
+   "active_frac": 0.9565,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen3.8-27B-UD-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.8-27B-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 5.8
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 6.3
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 6.8
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ2_S",
+    "quant": "UD-IQ2_S",
+    "size_gib": 7.8
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 9.2
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 10.2
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ3_S",
+    "quant": "UD-IQ3_S",
+    "size_gib": 11.2
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 12.2
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-IQ4_XS",
+    "quant": "UD-IQ4_XS",
+    "size_gib": 13.3
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q4_K_S",
+    "quant": "UD-Q4_K_S",
+    "size_gib": 14.3
+   },
+   {
+    "stem": "Qwen3.8-27B-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 15.0
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q4_K_M",
+    "quant": "UD-Q4_K_M",
+    "size_gib": 15.3
+   },
+   {
+    "stem": "Qwen3.8-27B-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 16.3
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 16.4
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q5_K_S",
+    "quant": "UD-Q5_K_S",
+    "size_gib": 17.4
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q5_K_M",
+    "quant": "UD-Q5_K_M",
+    "size_gib": 18.4
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 19.4
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q6_K",
+    "quant": "UD-Q6_K",
+    "size_gib": 20.5
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q6_K_M",
+    "quant": "UD-Q6_K_M",
+    "size_gib": 21.5
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q6_K_L",
+    "quant": "UD-Q6_K_L",
+    "size_gib": 22.5
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 23.6
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q8_K_L",
+    "quant": "UD-Q8_K_L",
+    "size_gib": 26.1
+   },
+   {
+    "stem": "Qwen3.8-27B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 27.1
+   },
+   {
+    "stem": "Qwen3.8-27B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 29.3
+   },
+   {
+    "stem": "Qwen3.8-27B-BF16",
+    "quant": "BF16",
+    "size_gib": 50.9
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.86
+   },
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.87
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-08",
+  "refreshed": 1794007742
+ },
+ {
+  "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+  "title": "Qwen3.6 35B-A3B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen MoE，每次只動用約 3B 參數，速度快",
+  "tags": [
+   "MoE",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35moe",
+   "meta_name": "Qwen3.6-35B-A3B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 81920,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 40,
+   "cn_origin": true,
+   "active_frac": 0.1187,
+   "moe": true,
+   "expert_layers": 40,
+   "expert_used_frac": 0.0312,
+   "expert_layer_frac": 0.022113
+  },
+  "profiled": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 9.4
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 10.0
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 10.7
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 11.4
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 12.3
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ3_S",
+    "quant": "UD-IQ3_S",
+    "size_gib": 12.7
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q3_K_S",
+    "quant": "UD-Q3_K_S",
+    "size_gib": 14.3
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q3_K_M",
+    "quant": "UD-Q3_K_M",
+    "size_gib": 15.5
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 15.7
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ4_XS",
+    "quant": "UD-IQ4_XS",
+    "size_gib": 16.5
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ4_NL",
+    "quant": "UD-IQ4_NL",
+    "size_gib": 16.8
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-IQ4_NL_XL",
+    "quant": "UD-IQ4_NL_XL",
+    "size_gib": 18.2
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q4_K_S",
+    "quant": "UD-Q4_K_S",
+    "size_gib": 19.5
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-MXFP4_MOE",
+    "quant": "MXFP4_MOE",
+    "size_gib": 20.2
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q4_K_M",
+    "quant": "UD-Q4_K_M",
+    "size_gib": 20.6
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 20.8
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q5_K_S",
+    "quant": "UD-Q5_K_S",
+    "size_gib": 23.2
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q5_K_M",
+    "quant": "UD-Q5_K_M",
+    "size_gib": 24.6
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 24.8
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q6_K",
+    "quant": "UD-Q6_K",
+    "size_gib": 27.3
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 29.7
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 34.4
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 35.8
+   },
+   {
+    "stem": "Qwen3.6-35B-A3B-BF16",
+    "quant": "BF16",
+    "size_gib": 64.6
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.84
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.84
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.66
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-04",
+  "refreshed": 1794007745
+ },
+ {
+  "repo": "unsloth/Qwen3.8-Flash-Next-GGUF",
+  "title": "Qwen3.8 Flash-Next",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 最新的 MoE，長上下文與速度兼顧（Strata 引擎跑的也是這一家族）",
+  "tags": [
+   "MoE",
+   "長上下文"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen4exp",
+   "meta_name": "Qwen3.8 Flash Next",
+   "ctx_train": 262144,
+   "kv_full_bpt": 98304,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 48,
+   "cn_origin": true,
+   "active_frac": 0.0585,
+   "moe": true,
+   "expert_layers": 48,
+   "expert_used_frac": 0.0195,
+   "expert_layer_frac": 0.013083
+  },
+  "profiled": "Qwen3.8-Flash-Next-UD-Q3_K_XL",
+  "quants": [
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 61.8
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 63.3
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q2_0",
+    "quant": "UD-Q2_0",
+    "size_gib": 65.7
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-IQ2_XS",
+    "quant": "UD-IQ2_XS",
+    "size_gib": 70.6
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 74.1
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 77.9
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 83.3
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-IQ4_XS",
+    "quant": "UD-IQ4_XS",
+    "size_gib": 87.2
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 103.7
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 147.4
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 157.5
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 175.3
+   },
+   {
+    "stem": "Qwen3.8-Flash-Next-BF16",
+    "quant": "BF16",
+    "size_gib": 329.7
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.84
+   },
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.85
+   }
+  ],
+  "license": "other",
+  "released": "2026-08",
+  "refreshed": 1794007755
+ },
+ {
+  "repo": "unsloth/GLM-4.7-Flash-GGUF",
+  "title": "GLM-4.7 Flash",
+  "use": "chat",
+  "vendor": "智譜 Z.ai",
+  "desc": "智譜的 MoE，中文對話與寫程式都不錯，MIT 授權",
+  "tags": [
+   "MoE"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "deepseek2",
+   "meta_name": "Glm-4.7-Flash",
+   "ctx_train": 202752,
+   "kv_full_bpt": 102272,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 47,
+   "cn_origin": true,
+   "active_frac": 0.1313,
+   "moe": true,
+   "expert_layers": 46,
+   "expert_used_frac": 0.0625,
+   "expert_layer_frac": 0.019918
+  },
+  "profiled": "GLM-4.7-Flash-Q4_K_M",
+  "quants": [
+   {
+    "stem": "GLM-4.7-Flash-UD-TQ1_0",
+    "quant": null,
+    "size_gib": 7.8
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 8.6
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 9.1
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 9.8
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 10.2
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 10.6
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 10.6
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 11.1
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 12.0
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 12.4
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 12.8
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 13.6
+   },
+   {
+    "stem": "GLM-4.7-Flash-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 15.2
+   },
+   {
+    "stem": "GLM-4.7-Flash-MXFP4_MOE",
+    "quant": "MXFP4_MOE",
+    "size_gib": 15.8
+   },
+   {
+    "stem": "GLM-4.7-Flash-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 16.0
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 16.0
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 16.1
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 16.3
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 17.1
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 17.7
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 19.4
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 19.9
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 20.2
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 23.0
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 24.4
+   },
+   {
+    "stem": "GLM-4.7-Flash-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 29.7
+   },
+   {
+    "stem": "GLM-4.7-Flash-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 33.2
+   },
+   {
+    "stem": "GLM-4.7-Flash-BF16",
+    "quant": "BF16",
+    "size_gib": 55.8
+   }
+  ],
+  "mmproj": [],
+  "license": "mit",
+  "released": "2026-01",
+  "refreshed": 1794007757
+ },
+ {
+  "repo": "unsloth/Qwen3.5-122B-A10B-GGUF",
+  "title": "Qwen3.5 122B-A10B",
+  "use": "chat",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 122B MoE，每次動用約 10B 參數；96 GB 以上的機器",
+  "tags": [
+   "MoE",
+   "大模型",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen35moe",
+   "meta_name": "Qwen3.5-122B-A10B",
+   "ctx_train": 262144,
+   "kv_full_bpt": 98304,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 48,
+   "cn_origin": true,
+   "active_frac": 0.1025,
+   "moe": true,
+   "expert_layers": 48,
+   "expert_used_frac": 0.0312,
+   "expert_layer_frac": 0.019073
+  },
+  "profiled": "Qwen3.5-122B-A10B-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 31.9
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 34.1
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 36.5
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 39.0
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 41.7
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ3_S",
+    "quant": "UD-IQ3_S",
+    "size_gib": 43.4
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 48.9
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 52.5
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 53.1
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ4_XS",
+    "quant": "UD-IQ4_XS",
+    "size_gib": 56.1
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-IQ4_NL",
+    "quant": "UD-IQ4_NL",
+    "size_gib": 57.2
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 66.8
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-MXFP4_MOE",
+    "quant": "MXFP4_MOE",
+    "size_gib": 69.5
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 71.3
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 71.7
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 80.5
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 85.2
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 85.6
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 94.1
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 104.7
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 121.0
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 159.1
+   },
+   {
+    "stem": "Qwen3.5-122B-A10B-BF16",
+    "quant": "BF16",
+    "size_gib": 227.5
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.85
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.85
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.68
+   }
+  ],
+  "license": "apache-2.0",
+  "released": "2026-02",
+  "refreshed": 1794007765
  },
  {
   "repo": "xCloudinfo/xGemable-12B-coder-v2-fullft-GGUF",
@@ -2006,7 +6661,7 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2026-07",
-  "refreshed": 1793982585
+  "refreshed": 1794007769
  },
  {
   "repo": "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF",
@@ -2183,7 +6838,7 @@
   ],
   "license": "other",
   "released": "2025-12",
-  "refreshed": 1793982590
+  "refreshed": 1794007772
  },
  {
   "repo": "xCloudinfo/gpt-oss-20b-Code-xCloud-GGUF",
@@ -2223,7 +6878,177 @@
   "mmproj": [],
   "license": "apache-2.0",
   "released": "2026-06",
-  "refreshed": 1793982595
+  "refreshed": 1794007775
+ },
+ {
+  "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+  "title": "Qwen3 Coder 30B-A3B",
+  "use": "code",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 的寫程式 MoE，每次只動用約 3B 參數，接 Agent 模式或 IDE 用",
+  "tags": [
+   "寫程式",
+   "MoE",
+   "Agent"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen3moe",
+   "meta_name": "Qwen3-Coder-30B-A3B-Instruct",
+   "ctx_train": 262144,
+   "kv_full_bpt": 98304,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 48,
+   "cn_origin": true,
+   "active_frac": 0.1035,
+   "moe": true,
+   "expert_layers": 48,
+   "expert_used_frac": 0.0625,
+   "expert_layer_frac": 0.019713
+  },
+  "profiled": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-TQ1_0",
+    "quant": null,
+    "size_gib": 7.5
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 8.3
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 9.0
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 9.6
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-IQ2_M",
+    "quant": "UD-IQ2_M",
+    "size_gib": 10.1
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 10.5
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q2_K_L",
+    "quant": "Q2_K_L",
+    "size_gib": 10.6
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 11.0
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-IQ3_XXS",
+    "quant": "UD-IQ3_XXS",
+    "size_gib": 12.0
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 12.4
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q3_K_XL",
+    "quant": "UD-Q3_K_XL",
+    "size_gib": 12.9
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 13.7
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 15.3
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-IQ4_NL",
+    "quant": "IQ4_NL",
+    "size_gib": 16.1
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q4_0",
+    "quant": "Q4_0",
+    "size_gib": 16.2
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 16.3
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 16.5
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 17.3
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q4_1",
+    "quant": "Q4_1",
+    "size_gib": 17.9
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 19.6
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 20.2
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q5_K_XL",
+    "quant": "UD-Q5_K_XL",
+    "size_gib": 20.2
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 23.4
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q6_K_XL",
+    "quant": "UD-Q6_K_XL",
+    "size_gib": 24.5
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 30.3
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 33.5
+   },
+   {
+    "stem": "Qwen3-Coder-30B-A3B-Instruct-BF16",
+    "quant": "BF16",
+    "size_gib": 56.9
+   }
+  ],
+  "mmproj": [],
+  "license": "apache-2.0",
+  "released": "2025-07",
+  "refreshed": 1794007779
  },
  {
   "repo": "xCloudinfo/Gemma-4-E4B-xReadable-zhTW-OCR-v1",
@@ -2268,6 +7093,109 @@
   ],
   "license": "gemma",
   "released": "2026-07",
-  "refreshed": 1793982601
+  "refreshed": 1794007782
+ },
+ {
+  "repo": "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF",
+  "title": "Qwen2.5-VL 7B",
+  "use": "vision",
+  "vendor": "阿里巴巴 Qwen",
+  "desc": "Qwen 的看圖模型，看圖說明、讀圖表與文件",
+  "tags": [
+   "看圖",
+   "OCR"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "qwen2vl",
+   "meta_name": "Qwen2.5 VL 7B Instruct",
+   "ctx_train": 128000,
+   "kv_full_bpt": 57344,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 28,
+   "cn_origin": true,
+   "active_frac": 0.9345,
+   "moe": false,
+   "expert_layers": 0,
+   "expert_used_frac": null,
+   "expert_layer_frac": 0.0
+  },
+  "profiled": "Qwen2.5-VL-7B-Instruct.Q4_K_M",
+  "quants": [
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q2_K",
+    "quant": "Q2_K",
+    "size_gib": 2.8
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q3_K_S",
+    "quant": "Q3_K_S",
+    "size_gib": 3.3
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q3_K_M",
+    "quant": "Q3_K_M",
+    "size_gib": 3.5
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q3_K_L",
+    "quant": "Q3_K_L",
+    "size_gib": 3.8
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.IQ4_XS",
+    "quant": "IQ4_XS",
+    "size_gib": 4.0
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q4_K_S",
+    "quant": "Q4_K_S",
+    "size_gib": 4.2
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q4_K_M",
+    "quant": "Q4_K_M",
+    "size_gib": 4.4
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q5_K_S",
+    "quant": "Q5_K_S",
+    "size_gib": 5.0
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q5_K_M",
+    "quant": "Q5_K_M",
+    "size_gib": 5.1
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q6_K",
+    "quant": "Q6_K",
+    "size_gib": 5.8
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.Q8_0",
+    "quant": "Q8_0",
+    "size_gib": 7.5
+   },
+   {
+    "stem": "Qwen2.5-VL-7B-Instruct.f16",
+    "quant": "f16",
+    "size_gib": 14.2
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf",
+    "gib": 0.79
+   },
+   {
+    "path": "Qwen2.5-VL-7B-Instruct.mmproj-f16.gguf",
+    "gib": 1.26
+   }
+  ],
+  "license": null,
+  "released": "2025-04",
+  "refreshed": 1794007785
  }
 ]

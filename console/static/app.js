@@ -735,6 +735,7 @@ async function viewLib() {
     wrap.appendChild(jc);
     watchLibJobs(v, jc, jobs);
   }
+  ok.forEach(({ n, lib }) => { const f = foundDirsNote(n, lib); if (f) wrap.appendChild(f); });
   const tabs = el("div", "tabbar lib-tabs");
   wrap.append(tabs, body);
 
@@ -828,7 +829,8 @@ function libInstalledCard(ok, models, jobs) {
     const nm = el("td");
     nm.appendChild(el("div", null, `${m.name}${m.quant ? " " + m.quant : ""}`));
     nm.appendChild(el("div", "small muted", [m.engine === "llama" ? "llama.cpp" : "Strata", m.shards > 1 ? `${m.shards} 個分片` : null,
-      m.imported ? "匯入" : null, m.cn_origin ? "中國來源・政府案不可用" : null].filter(Boolean).join("・")));
+      m.imported ? "匯入" : null, m.external ? `其他資料夾 ${m.external}` : null,
+      m.cn_origin ? "中國來源・政府案不可用" : null].filter(Boolean).join("・")));
     tr.appendChild(nm);
     if (ok.length > 1) tr.appendChild(el("td", null, n.name));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
@@ -847,13 +849,13 @@ function libInstalledCard(ok, models, jobs) {
       loc.onclick = () => openModelFolder(n, m);
       td.appendChild(loc);
     }
-    if (m.engine === "llama") {
+    if (m.engine === "llama" && !m.external) {
       const b = el("button", "btn sm danger", "刪除");
       b.disabled = !!m.in_use;
       b.title = m.in_use ? "有欄位正在用，先換成別的模型" : "";
       b.onclick = () => {
         const d = el("div");
-        d.appendChild(el("p", "note bad", `會從 ${n.name} 的磁碟永久刪除 ${m.folder}/ 裡這顆模型的檔案（約 ${fmt(m.size_gib)} GiB），無法復原。`));
+        d.appendChild(el("p", "note bad", `會從 ${n.name} 的磁碟永久刪除 ${m.id.startsWith("./") ? "存放區根目錄" : m.folder + "/"} 裡這顆模型的檔案（約 ${fmt(m.size_gib)} GiB），無法復原。`));
         modal({ title: `刪除 ${m.name}${m.quant ? " " + m.quant : ""}`, bodyNode: d, confirmText: "永久刪除", danger: true, onConfirm: async () => {
           try { const r = await api(`/api/node/${n.id}/library/delete`, { method: "POST", body: { id: m.id } }); toast(`已刪除，釋出 ${r.freed_gib} GiB`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
           if (S.rec) delete S.rec[n.id];
@@ -912,7 +914,84 @@ function libStoreCard(ok) {
   ssb.appendChild(stb);
   sc.appendChild(ssb);
   sc.appendChild(el("p", "small muted", "Strata 引擎只跑 Qwen3.8-Flash-Next 家族，由 Strata 的 setup.sh 安裝；其他模型都是 GGUF，走 llama.cpp。"));
+  ok.forEach(({ n, lib }) => sc.appendChild(modelDirsBox(n, lib, ok.length > 1)));
   return sc;
+}
+
+// 其他模型資料夾（LM Studio、自己放的 C:\models）：只讀，加進來就列在「已安裝」，檔案不搬、不複製、不刪
+async function modelDirAct(n, body, okText) {
+  try { await api(`/api/node/${n.id}/library/dirs`, { method: "POST", body }); toast(okText, "ok"); }
+  catch (ex) { toast(ex.message, "bad"); return; }
+  if (S.rec) delete S.rec[n.id];
+  viewLib();
+}
+
+function modelDirsBox(n, lib, many) {
+  const box = el("div", "stack");
+  const h = el("div", "card-head");
+  h.appendChild(el("h3", null, many ? `${n.name} 的其他模型資料夾` : "其他模型資料夾"));
+  h.appendChild(el("span", "spacer"));
+  const add = el("button", "btn sm", "加入資料夾");
+  add.onclick = () => openFolderBrowser(n, () => { if (S.rec) delete S.rec[n.id]; viewLib(); }, { kind: "models" });
+  h.appendChild(add);
+  box.appendChild(h);
+  box.appendChild(el("p", "small muted", "別的程式（LM Studio、LocModel）下載的、或自己放的 GGUF 所在的資料夾。xConsole 只讀這些資料夾，不會搬動、複製或刪除裡面的檔案；往下最多找三層。"));
+  const dirs = lib.model_dirs || [];
+  if (!dirs.length) box.appendChild(el("p", "small muted", "還沒有加入其他資料夾。"));
+  dirs.forEach((x) => {
+    const r = el("div", "hw-row");
+    r.appendChild(el("span", "mono small", x.path));
+    r.appendChild(el("span", "small " + (x.exists ? "muted" : "bad-t"), x.exists ? `${x.count} 顆模型` : "資料夾不見了（拔掉的外接碟？）"));
+    r.appendChild(el("span", "spacer"));
+    const rm = el("button", "btn sm", "移出清單");
+    rm.title = "只是不再列出，檔案不會被刪";
+    rm.onclick = () => modelDirAct(n, { remove: x.path }, "已移出清單，檔案沒有動");
+    r.appendChild(rm);
+    box.appendChild(r);
+  });
+  (lib.dir_suggestions || []).forEach((x) => {
+    const r = el("div", "hw-row");
+    r.appendChild(el("span", "mono small", x.path));
+    r.appendChild(el("span", "small muted", `找到 ${x.count} 個模型檔，共 ${fmt(x.size_gib, 0)} GiB`));
+    r.appendChild(el("span", "spacer"));
+    const b = el("button", "btn sm primary", "加入");
+    b.onclick = () => modelDirAct(n, { add: x.path }, `已加入 ${x.path}`);
+    r.appendChild(b);
+    box.appendChild(r);
+  });
+  return box;
+}
+
+// 只給「不用再提醒」這種個人偏好用；無痕模式或封鎖儲存時讀寫會丟錯，當成沒存
+function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* 存不了就下次再提醒 */ } }
+
+// 模型庫頁首：這台已經有別的程式下載的模型 → 一鍵加進來（不要叫人重新下載一份）
+function foundDirsNote(n, lib) {
+  const found = (lib.dir_suggestions || []).filter((x) => !lsGet(`xc-dirhide:${n.id}:${x.path}`));
+  if (!found.length) return null;
+  const w = el("div", "note warn");
+  const total = found.reduce((a, x) => a + x.count, 0);
+  w.appendChild(el("div", null, `${n.name} 上已經有 ${total} 個模型檔：${found.map((x) => `${x.path}（${x.count} 個，${fmt(x.size_gib, 0)} GiB）`).join("、")}。`
+    + "加進模型庫就能直接執行，檔案不搬、不複製，也不會被刪。"));
+  const row = el("div", "slot-actions");
+  const b = el("button", "btn sm primary", found.length > 1 ? "全部加入" : "加入模型庫");
+  b.onclick = async () => {
+    b.disabled = true;
+    for (const x of found) {
+      try { await api(`/api/node/${n.id}/library/dirs`, { method: "POST", body: { add: x.path } }); }
+      catch (ex) { toast(`${x.path}：${ex.message}`, "bad"); }
+    }
+    toast("已加入，到「已安裝」看", "ok");
+    if (S.rec) delete S.rec[n.id];
+    S.libTab = "installed";
+    viewLib();
+  };
+  const no = el("button", "btn sm", "不用");
+  no.onclick = () => { found.forEach((x) => lsSet(`xc-dirhide:${n.id}:${x.path}`, "1")); w.remove(); };
+  row.append(b, no, el("span", "small muted", "之後也可以在「存放區」分頁加入或移出"));
+  w.appendChild(row);
+  return w;
 }
 
 function libDownloadCard(ok, only) {
@@ -1502,6 +1581,7 @@ function recRow(n, it, lib, ctx) {
     const t = el("div", "rec-title");
     t.appendChild(el("b", null, it.title));
     (it.tags || []).slice(0, 3).forEach((x) => t.appendChild(el("span", "chip" + (x === "自家" ? " brand" : ""), x)));
+    if (it.cn_origin) t.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
     if (it.released) {
       const [y, mo] = it.released.split("-");
       t.appendChild(el("span", "small muted", mo ? `${y} 年 ${Number(mo)} 月發布` : `${y} 年發布`));
@@ -1620,7 +1700,7 @@ function recList(n, rec, lib, ctx) {
   c.append(bar, list);
   const a = rec.assumptions;
   c.appendChild(el("p", "small muted", `速度是估算：記憶體頻寬 × ${Math.round(a.efficiency * 100)}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），`
-    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。推薦清單不含中國來源模型（政府案不得使用）。`));
+    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。標「中國來源」的模型政府案不得使用。`));
   return c;
 }
 
@@ -1651,7 +1731,7 @@ async function openCatalog() {
     try { data = await api("/api/catalog"); } catch (ex) { errNote(body, ex.message); return; }
     body.textContent = "";
     body.appendChild(el("p", "small muted", "這份清單決定每台機器的「推薦模型」列出哪些；順序就是同等級時的排列先後。"
-      + "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型不能加入。"));
+      + "大小、量化、架構與 MoE 比例都由機器從 Hugging Face 的檔頭讀，不必手填。中國來源的模型會自動標出來（政府案不得使用）。"));
     const sb = el("div", "scrollbox cat-box");
     const tb = el("table", "api-table");
     tb.innerHTML = "<thead><tr><th>名稱</th><th>Hugging Face</th><th>用途</th><th>量化</th><th>更新於</th><th></th></tr></thead>";

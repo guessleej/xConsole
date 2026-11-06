@@ -424,6 +424,8 @@ def recommend(state, library, catalog):
     cap = capacity(state)
     lib = library or {}
     installed = {m["id"]: m for m in lib.get("gguf") or []}
+    # 其他模型資料夾（LM Studio、C:\models）裡的檔名跟清單上的量化一樣，也算已經有了，不必再下載一份
+    by_stem = {m["id"].rsplit("/", 1)[-1].lower(): m for m in lib.get("gguf") or [] if m.get("external")}
     jobs = lib.get("downloads") or []
     items = []
     for i, e in enumerate(catalog):
@@ -437,7 +439,7 @@ def recommend(state, library, catalog):
         plans = []
         for q in e["quants"]:
             p = plan_quant(cap, prof, q, mm, lib.get("hdd"))
-            got = installed.get(f"{folder}/{q['stem']}")
+            got = installed.get(f"{folder}/{q['stem']}") or by_stem.get(q["stem"].lower())
             p["installed_id"] = got["id"] if got else None
             p["in_use"] = got.get("in_use") if got else None
             p["fits_disk"] = lib.get("free_gib") is None or q["size_gib"] + mm + 10 < lib["free_gib"]
@@ -473,7 +475,12 @@ def recommend(state, library, catalog):
 def _public(e):
     return {k: e.get(k) for k in ("repo", "title", "use", "desc", "tags", "vendor", "license", "released",
                                   "mmproj", "refreshed", "match")} | {"vision": bool(e.get("mmproj")),
-                                                             "profile": e.get("profile")}
+                                                             "profile": e.get("profile"), "cn_origin": is_cn(e)}
+
+
+def is_cn(e):
+    """中國來源：檔頭判定的（架構、名稱）或 repo 名稱看得出來的。清單照樣列，只在畫面上標出來。"""
+    return bool((e.get("profile") or {}).get("cn_origin")) or any(c in str(e.get("repo") or "").lower() for c in CN_ORIGIN)
 
 
 # ---------------------------------------------------------------- 推薦清單的存放
@@ -558,8 +565,6 @@ def check_fields(body):
     repo = str(body.get("repo") or "").strip()
     if not REPO_RX.fullmatch(repo):
         return None, "Hugging Face 名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF"
-    if any(c in repo.lower() for c in CN_ORIGIN):
-        return None, "政府案不得使用中國來源模型，不列入推薦清單（內部測試可以直接到「從 Hugging Face 下載」）"
     out = {"repo": repo}
     title = str(body.get("title") or "").strip()
     if not 1 <= len(title) <= 60:
