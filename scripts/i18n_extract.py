@@ -17,7 +17,7 @@ CJK = re.compile(r"[㐀-鿿豈-﫿]")
 JS = ["console/static/app.js", "console/static/pages.js", "console/static/chat.js"]
 HTML = ["console/static/index.html"]
 PY = ["console/xconsole_server.py", "console/chats.py", "console/computer.py", "console/recommend.py",
-      "console/extract.py", "console/tls.py", "agent/xconsole_agent.py"]
+      "console/extract.py", "console/tls.py", "console/updater.py", "agent/xconsole_agent.py"]
 
 
 def js_strings(src):
@@ -139,7 +139,8 @@ def main():
         src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
         for s, pat in fn(src):
             # 樣板裡被 {n} 切開的每一段中文本身也收（畫面上常是好幾段拼起來的）
-            pieces = [s] + ([x for x in re.split(r"\{\d+\}", s) if x.strip()] if pat else [])
+            pieces = [s] + ([x for x in re.split(r"\{\d+\}", s) if x.strip()] if pat else []) \
+                + ([x.strip() for x in re.findall(r">([^<>]+)<", s)] if "<" in s else [])   # innerHTML 字串裡標籤之間的字
             for i, t in enumerate(pieces):
                 t = t if i == 0 else t.strip(" ，、：；。（）()・")
                 if keep(t) and t not in seen:

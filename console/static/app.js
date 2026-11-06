@@ -19,7 +19,7 @@ const el = (tag, cls, text) => {
   return n;
 };
 const fmt = (n, d = 1) => (n === null || n === undefined || Number.isNaN(n)) ? "—" : Number(n).toFixed(d);
-const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString("zh-TW");
+const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString(uiLocale());
 
 function toast(msg, kind) {
   const t = el("div", "toast" + (kind ? " " + kind : ""), msg);
@@ -1633,7 +1633,7 @@ async function openCatalog() {
       tr.appendChild(el("td", "mono small", e.repo));
       tr.appendChild(el("td", "small nowrap", data.uses[e.use] || "—"));
       tr.appendChild(el("td", "small nowrap", e.quants?.length ? `${e.quants.length} 種` : "還沒讀到"));
-      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString("zh-TW") : "—"));
+      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString(uiLocale()) : "—"));
       const td = el("td", "row-acts");
       const mv = (t, step, dis) => {
         const b = el("button", "btn sm", t);
@@ -2182,7 +2182,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     if (!jobs.length) recent.appendChild(el("p", "small muted", "還沒有產出。"));
     jobs.forEach((j) => {
       const r = el("button", "sd-job");
-      r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString("zh-TW", { hour12: false }).slice(5, 16)));
+      r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString(uiLocale(), { hour12: false }).slice(5, 16)));
       r.appendChild(el("span", "sd-job-p", j.prompt));
       r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"),
         { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
@@ -2339,7 +2339,7 @@ async function openSdCatalog(after) {
       tr.appendChild(el("td", "mono small", e.repo));
       tr.appendChild(el("td", "small nowrap", data.kinds[e.kind]));
       tr.appendChild(el("td", "small", e.parts.map((p) => data.roles[p.role]).join("、")));
-      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString("zh-TW") : "—"));
+      tr.appendChild(el("td", "small nowrap", e.refreshed ? new Date(e.refreshed * 1000).toLocaleDateString(uiLocale()) : "—"));
       const td = el("td", "row-acts");
       const mv = (t, step, dis) => {
         const b = el("button", "btn sm", t);
@@ -2798,7 +2798,7 @@ function viewApis() {
       cells[4].textContent = int(info.max_context);
       cells[5].textContent = info.api_key_set ? "有" : "沒有";
       cells[6].textContent = info.last_test
-        ? `${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}` : "還沒測";
+        ? `${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString(uiLocale(), { hour12: false })}` : "還沒測";
     }).catch((ex) => { cells[2].textContent = ex.message; });
   });
   tb.appendChild(body);
@@ -2932,7 +2932,7 @@ async function viewApi() {
   /* ---- 實測 ｜ 工具設定範例 */
   const pair2 = el("div", "grid pair");
   wrap.appendChild(pair2);
-  const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString("zh-TW", { hour12: false })}（台北時間）` : "還沒測過");
+  const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString(uiLocale(), { hour12: false })}（台北時間）` : "還沒測過");
   tc.appendChild(el("p", "small muted", "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。"));
   let fTestKey = null;
   if (info.api_key_set && !newKey) {
@@ -3046,7 +3046,7 @@ function viewOverview() {
     nodes.length === online.length ? "全部連得上" : "有機器連不上代理"));
   tiles.appendChild(tile("模型運作中", `${slotsOn} / ${slotsTotal}`, "已登錄的欄位"));
   tiles.appendChild(tile("顯示記憶體使用", `${fmt(vram, 0)} GiB`, `共 ${fmt(vramTotal, 0)} GiB`));
-  tiles.appendChild(tile("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString("zh-TW"), "每 15 秒自動更新"));
+  tiles.appendChild(tile("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString(uiLocale()), "每 15 秒自動更新"));
   hw.appendChild(tiles);
   hero.appendChild(hw);
 
@@ -3564,7 +3564,7 @@ async function settingsUpdate(wrap) {
     let r;
     try { r = await api("/api/update/check", { method: "POST", body: {} }); } catch (ex) { chk.textContent = ""; errNote(chk, ex.message); return; }
     chk.textContent = "";
-    chk.appendChild(el("p", "note " + (r.newer ? "warn" : ""), r.newer ? `有新版 ${r.latest}（目前 ${r.current}）${r.published ? "，" + new Date(r.published).toLocaleDateString("zh-TW") + " 發布" : ""}` : `目前就是最新版（${r.current}）`));
+    chk.appendChild(el("p", "note " + (r.newer ? "warn" : ""), r.newer ? `有新版 ${r.latest}（目前 ${r.current}）${r.published ? "，" + new Date(r.published).toLocaleDateString(uiLocale()) + " 發布" : ""}` : `目前就是最新版（${r.current}）`));
     if (r.notes) { const pre = el("pre", "code-pre small upd-notes"); pre.textContent = r.notes; chk.appendChild(pre); }
     if (r.newer && r.asset) {
       chk.appendChild(el("p", "small muted", `安裝包 ${r.asset.name}（${fmt((r.asset.size || 0) / 1048576, 1)} MB），sha256 ${r.asset.sha256 ? r.asset.sha256.slice(0, 16) + "…" : "GitHub 沒有提供，不能自動更新"}`));
@@ -3613,7 +3613,7 @@ async function settingsUpdate(wrap) {
   // ---- 退回上一版
   if (ov.backups?.length) {
     const b = ov.backups[0];
-    const rb = el("button", "btn sm", `退回上一版（${b.version}，${new Date(b.at * 1000).toLocaleString("zh-TW", { hour12: false })} 備份）`);
+    const rb = el("button", "btn sm", `退回上一版（${b.version}，${new Date(b.at * 1000).toLocaleString(uiLocale(), { hour12: false })} 備份）`);
     rb.onclick = () => modal({ title: "退回上一版", bodyNode: el("p", null, `把主控台換回 ${b.version}，然後重新啟動。各機代理不會跟著退，需要的話在下面個別處理。`),
       confirmText: "退回", danger: true, onConfirm: async () => {
         try { await api("/api/update/rollback", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
@@ -4126,7 +4126,7 @@ async function settingsReport(wrap) {
   box.appendChild(el("p", "small muted", `${r.period.from} 至 ${r.period.to}（台北時間）`));
   if (r.period.note) box.appendChild(el("p", "note warn", r.period.note));
 
-  const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString("zh-TW");
+  const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString(uiLocale());
   const t = r.build_vs_buy.local;
   const tiles = el("div", "tiles light");
   const tile = (k, v, s) => { const d = el("div", "tile"); d.appendChild(el("div", "k", k)); d.appendChild(el("div", "v", v)); if (s) d.appendChild(el("div", "s", s)); return d; };
@@ -4249,7 +4249,7 @@ async function settingsAccount(wrap) {
     const body = el("tbody");
     items.forEach((a) => {
       const tr = el("tr");
-      [new Date(a.ts * 1000).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", hour12: false }),
+      [new Date(a.ts * 1000).toLocaleString(uiLocale(), { timeZone: "Asia/Taipei", hour12: false }),
        a.user || "—", a.ip || "—", LABEL[a.action] || a.action, a.target || "—",
        a.ok ? "成功" : ((a.detail && a.detail.blocked) ? "被准入擋下" : "失敗")].forEach((v) => tr.appendChild(el("td", null, v)));
       body.appendChild(tr);

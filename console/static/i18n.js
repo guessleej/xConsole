@@ -12,6 +12,11 @@ const I18N_LANGS = [["auto", "跟隨系統"], ["zh-TW", "繁體中文"], ["en", 
 const I18N_KEY = "xconsole-lang";
 const I18N_SKIP = ".msg-text, pre, code, textarea, input, .mono, .code-block, .msg-think, [data-i18n-skip], script, style";
 
+// 日期、時間、數字的格式跟著介面語言
+function uiLocale() {
+  return { en: "en-US", ja: "ja-JP", ko: "ko-KR" }[I18N.lang] || "zh-TW";
+}
+
 function i18nPref() {
   try { return localStorage.getItem(I18N_KEY) || "auto"; } catch (_) { return "auto"; }
 }

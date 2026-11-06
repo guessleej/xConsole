@@ -413,7 +413,7 @@ async function viewChat() {
       if (cur.id === it.id) row.setAttribute("aria-current", "true");
       const b = el("button", "chat-item-main");
       b.appendChild(el("span", "chat-item-t", it.title || "新對話"));
-      b.appendChild(el("span", "small muted", it.snippet || new Date(it.updated * 1000).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })));
+      b.appendChild(el("span", "small muted", it.snippet || new Date(it.updated * 1000).toLocaleString(uiLocale(), { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })));
       b.onclick = () => pickChat(it);
       const ren = el("button", "icon-btn", "改名");
       ren.onclick = () => renameChat(it, () => { if (cur.id === it.id) cur.title = it.title; drawSide(); });

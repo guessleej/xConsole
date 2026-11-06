@@ -27,7 +27,22 @@ def check(name, cond, detail=""):
 
 
 def main():
-    src = [r["zh"] for r in json.load(open(os.path.join(ROOT, "scripts", "i18n_source.json"), encoding="utf-8"))]
+    # 現抽一次：新加的介面字串沒翻，涵蓋率就會掉（不靠提交進來的 i18n_source.json）
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import i18n_extract as X
+    tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".i18n_check.json")
+    real = X.os.path.join
+    X_out = []
+    for rel, fn in [(p, X.js_strings) for p in X.JS] + [(p, X.html_strings) for p in X.HTML] + [(p, X.py_strings) for p in X.PY]:
+        for s0, pat in fn(open(os.path.join(ROOT, rel), encoding="utf-8").read()):
+            pieces = [s0] + ([x for x in re.split(r"\{\d+\}", s0) if x.strip()] if pat else []) \
+                + ([x.strip() for x in re.findall(r">([^<>]+)<", s0)] if "<" in s0 else [])
+            for i, t in enumerate(pieces):
+                t = t if i == 0 else t.strip(" ，、：；。（）()・")
+                if X.keep(t):
+                    X_out.append(t)
+    src = list(dict.fromkeys(X_out))
+    del tmp, real
     dicts = {}
     for lang in ("en", "ja", "ko"):
         p = os.path.join(ST, f"i18n-{lang}.json")

@@ -700,6 +700,14 @@
 "pattern": false
 },
 {
+"zh": "剩餘空間",
+"pattern": false
+},
+{
+"zh": "硬碟",
+"pattern": false
+},
+{
 "zh": "機械硬碟（載入慢）",
 "pattern": false
 },
@@ -813,6 +821,10 @@
 },
 {
 "zh": "<thead><tr><th>量化</th><th class='num'>大小</th><th>這台跑起來</th><th></th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "量化",
 "pattern": false
 },
 {
@@ -1624,6 +1636,18 @@
 "pattern": false
 },
 {
+"zh": "名稱",
+"pattern": false
+},
+{
+"zh": "用途",
+"pattern": false
+},
+{
+"zh": "更新於",
+"pattern": false
+},
+{
 "zh": "{0} 種",
 "pattern": true
 },
@@ -1721,10 +1745,6 @@
 },
 {
 "zh": "顯示名稱",
-"pattern": false
-},
-{
-"zh": "用途",
 "pattern": false
 },
 {
@@ -2033,6 +2053,14 @@
 },
 {
 "zh": "<thead><tr><th>名稱</th><th>種類</th><th class='num'>大小</th><th>狀態</th><th>實測</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "種類",
+"pattern": false
+},
+{
+"zh": "狀態",
 "pattern": false
 },
 {
@@ -2400,6 +2428,14 @@
 "pattern": false
 },
 {
+"zh": "主體",
+"pattern": false
+},
+{
+"zh": "元件",
+"pattern": false
+},
+{
 "zh": "只從清單拿掉；已經下載到各台的不受影響。",
 "pattern": false
 },
@@ -2460,15 +2496,7 @@
 "pattern": false
 },
 {
-"zh": "種類",
-"pattern": false
-},
-{
 "zh": "一句話：擅長什麼、適合誰用（最多 160 字）",
-"pattern": false
-},
-{
-"zh": "元件",
 "pattern": false
 },
 {
@@ -3112,10 +3140,6 @@
 "pattern": false
 },
 {
-"zh": "更新於",
-"pattern": false
-},
-{
 "zh": "每 15 秒自動更新",
 "pattern": false
 },
@@ -3492,6 +3516,22 @@
 "pattern": false
 },
 {
+"zh": "埠",
+"pattern": false
+},
+{
+"zh": "類別",
+"pattern": false
+},
+{
+"zh": "是什麼",
+"pattern": false
+},
+{
+"zh": "範圍",
+"pattern": false
+},
+{
 "zh": "對外",
 "pattern": false
 },
@@ -3548,7 +3588,255 @@
 "pattern": false
 },
 {
+"zh": "版本與更新",
+"pattern": false
+},
+{
 "zh": "品牌與外觀",
+"pattern": false
+},
+{
+"zh": "主控台與各機代理的版本；更新前一律核對 sha256 並先備份",
+"pattern": false
+},
+{
+"zh": "主控台版本",
+"pattern": false
+},
+{
+"zh": "來源：github.com/{0}",
+"pattern": true
+},
+{
+"zh": "來源：github.com/",
+"pattern": false
+},
+{
+"zh": "各機代理",
+"pattern": false
+},
+{
+"zh": "{0}/{1} 台是最新",
+"pattern": true
+},
+{
+"zh": "台是最新",
+"pattern": false
+},
+{
+"zh": "跟主控台隨附的那一份比",
+"pattern": false
+},
+{
+"zh": "檢查更新包…",
+"pattern": false
+},
+{
+"zh": "下載中…{0}",
+"pattern": true
+},
+{
+"zh": "下載中…",
+"pattern": false
+},
+{
+"zh": "安裝相依套件…",
+"pattern": false
+},
+{
+"zh": "備份並換上新版…",
+"pattern": false
+},
+{
+"zh": "換好了，主控台重新啟動中（備份 {0}）…",
+"pattern": true
+},
+{
+"zh": "換好了，主控台重新啟動中（備份",
+"pattern": false
+},
+{
+"zh": "更新沒有成功：{0}",
+"pattern": true
+},
+{
+"zh": "更新沒有成功",
+"pattern": false
+},
+{
+"zh": "主控台重新啟動中，等它回來…",
+"pattern": false
+},
+{
+"zh": "已更新到 {0}，重新載入頁面",
+"pattern": true
+},
+{
+"zh": "已更新到",
+"pattern": false
+},
+{
+"zh": "重新載入頁面",
+"pattern": false
+},
+{
+"zh": "主控台",
+"pattern": false
+},
+{
+"zh": "檢查新版",
+"pattern": false
+},
+{
+"zh": " 發布",
+"pattern": false
+},
+{
+"zh": "有新版 {0}（目前 {1}）{2}",
+"pattern": true
+},
+{
+"zh": "有新版",
+"pattern": false
+},
+{
+"zh": "目前就是最新版（{0}）",
+"pattern": true
+},
+{
+"zh": "目前就是最新版",
+"pattern": false
+},
+{
+"zh": "GitHub 沒有提供，不能自動更新",
+"pattern": false
+},
+{
+"zh": "安裝包 {0}（{1} MB），sha256 {2}",
+"pattern": true
+},
+{
+"zh": "安裝包",
+"pattern": false
+},
+{
+"zh": "更新到 {0}",
+"pattern": true
+},
+{
+"zh": "更新到",
+"pattern": false
+},
+{
+"zh": "會先備份目前的檔，換上新版後主控台重新啟動（大約十幾秒，頁面會自動重新載入）。正在跑的模型不受影響。",
+"pattern": false
+},
+{
+"zh": "開始更新",
+"pattern": false
+},
+{
+"zh": "不能連外：手動上傳更新包",
+"pattern": false
+},
+{
+"zh": "從 GitHub 版本頁抄 sha256（64 碼）",
+"pattern": false
+},
+{
+"zh": "上傳並更新",
+"pattern": false
+},
+{
+"zh": "在能上網的電腦到 github.com/{0}/releases 下載 xconsole-版本.tar.gz，並抄下它的 sha256；兩樣都對了才會更新。",
+"pattern": true
+},
+{
+"zh": "在能上網的電腦到 github.com/",
+"pattern": false
+},
+{
+"zh": "/releases 下載 xconsole-版本.tar.gz，並抄下它的 sha256；兩樣都對了才會更新",
+"pattern": false
+},
+{
+"zh": "更新包",
+"pattern": false
+},
+{
+"zh": "先選更新包",
+"pattern": false
+},
+{
+"zh": "sha256 要是 64 碼的十六進位",
+"pattern": false
+},
+{
+"zh": "更新包要在 64 MB 以內",
+"pattern": false
+},
+{
+"zh": "退回上一版（{0}，{1} 備份）",
+"pattern": true
+},
+{
+"zh": "退回上一版",
+"pattern": false
+},
+{
+"zh": "備份",
+"pattern": false
+},
+{
+"zh": "把主控台換回 {0}，然後重新啟動。各機代理不會跟著退，需要的話在下面個別處理。",
+"pattern": true
+},
+{
+"zh": "把主控台換回",
+"pattern": false
+},
+{
+"zh": "然後重新啟動。各機代理不會跟著退，需要的話在下面個別處理",
+"pattern": false
+},
+{
+"zh": "退回",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>機器</th><th>狀態</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "代理太舊（沒有線上更新），請用安裝程式或部署腳本更新一次",
+"pattern": false
+},
+{
+"zh": "最新",
+"pattern": false
+},
+{
+"zh": "跟主控台隨附的不同（{0}）",
+"pattern": true
+},
+{
+"zh": "跟主控台隨附的不同",
+"pattern": false
+},
+{
+"zh": "更新這台代理",
+"pattern": false
+},
+{
+"zh": "已送出新版，代理重新啟動中…",
+"pattern": false
+},
+{
+"zh": "已重新啟動，但版本還是不同",
+"pattern": false
+},
+{
+"zh": "代理一分鐘內沒有回來，請到那台看服務狀態",
 "pattern": false
 },
 {
@@ -3621,6 +3909,26 @@
 },
 {
 "zh": "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>代理憑證</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "群組",
+"pattern": false
+},
+{
+"zh": "位址",
+"pattern": false
+},
+{
+"zh": "記憶體架構",
+"pattern": false
+},
+{
+"zh": "連線",
+"pattern": false
+},
+{
+"zh": "代理憑證",
 "pattern": false
 },
 {
@@ -3976,6 +4284,10 @@
 "pattern": false
 },
 {
+"zh": "把憑證檔拖到這裡，或點這裡選檔",
+"pattern": false
+},
+{
 "zh": "PFX 匯出時設定的密碼",
 "pattern": false
 },
@@ -4196,6 +4508,26 @@
 "pattern": false
 },
 {
+"zh": "在線比例",
+"pattern": false
+},
+{
+"zh": "池子平均／峰值",
+"pattern": false
+},
+{
+"zh": "系統記憶體最低",
+"pattern": false
+},
+{
+"zh": "低於底線",
+"pattern": false
+},
+{
+"zh": "運作中欄位",
+"pattern": false
+},
+{
 "zh": "{0}／{1} GiB（共 {2}）",
 "pattern": true
 },
@@ -4384,6 +4716,18 @@
 "pattern": false
 },
 {
+"zh": "時間（台北",
+"pattern": false
+},
+{
+"zh": "動作",
+"pattern": false
+},
+{
+"zh": "對象",
+"pattern": false
+},
+{
 "zh": "成功",
 "pattern": false
 },
@@ -4501,14 +4845,6 @@
 },
 {
 "zh": "不是，這是新的一台",
-"pattern": false
-},
-{
-"zh": "名稱",
-"pattern": false
-},
-{
-"zh": "群組",
 "pattern": false
 },
 {
@@ -4636,10 +4972,6 @@
 "pattern": false
 },
 {
-"zh": "位址",
-"pattern": false
-},
-{
 "zh": "主控台連這台代理用的 IP 或主機名稱；改了會先實際連一次，連不上就不改",
 "pattern": false
 },
@@ -4677,10 +5009,6 @@
 },
 {
 "zh": "預設",
-"pattern": false
-},
-{
-"zh": "記憶體架構",
 "pattern": false
 },
 {
@@ -5036,10 +5364,6 @@
 "pattern": false
 },
 {
-"zh": "埠",
-"pattern": false
-},
-{
 "zh": "這個服務聽的埠（選填）",
 "pattern": false
 },
@@ -5385,10 +5709,6 @@
 },
 {
 "zh": "選填，64 個字元",
-"pattern": false
-},
-{
-"zh": "安裝包",
 "pattern": false
 },
 {
@@ -6405,6 +6725,10 @@
 },
 {
 "zh": "<thead><tr><th>機器</th><th>llama.cpp</th><th>畫圖引擎</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "畫圖引擎",
 "pattern": false
 },
 {
@@ -7516,6 +7840,10 @@
 "pattern": false
 },
 {
+"zh": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"代理沒有起來，請看記錄：$LOGHINT\"; exit 1; }\necho \"== 4/4 加入主控台 ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -",
+"pattern": false
+},
+{
 "zh": "# xConsole 節點代理安裝（Windows）：由主控台",
 "pattern": false
 },
@@ -8124,6 +8452,10 @@
 "pattern": false
 },
 {
+"zh": "手動上傳",
+"pattern": false
+},
+{
 "zh": "（沒有結論）",
 "pattern": false
 },
@@ -8329,6 +8661,10 @@
 },
 {
 "zh": "分塊的位置或大小不對",
+"pattern": false
+},
+{
+"zh": "只接受 application/octet-stream，並要帶 X-XConsole-Upload",
 "pattern": false
 },
 {
@@ -8544,6 +8880,10 @@
 "pattern": false
 },
 {
+"zh": "主控台這裡沒有隨附的代理程式",
+"pattern": false
+},
+{
 "zh": "這個任務現在沒有在等核准",
 "pattern": false
 },
@@ -8665,6 +9005,10 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址",
+"pattern": false
+},
+{
+"zh": "這一版沒有可以核對的安裝包",
 "pattern": false
 },
 {
@@ -9936,6 +10280,182 @@
 "pattern": false
 },
 {
+"zh": "下載的檔 sha256 對不上 GitHub 公布的（{0}… ≠ {1}…），不更新",
+"pattern": true
+},
+{
+"zh": "下載的檔 sha256 對不上 GitHub 公布的",
+"pattern": false
+},
+{
+"zh": "…），不更新",
+"pattern": false
+},
+{
+"zh": "退回 {0}，重新啟動主控台",
+"pattern": true
+},
+{
+"zh": "重新啟動主控台",
+"pattern": false
+},
+{
+"zh": "下載的檔 sha256 對不上 GitHub 公布的（",
+"pattern": false
+},
+{
+"zh": "更新包的檔案太多",
+"pattern": false
+},
+{
+"zh": "這不是 xConsole 的更新包（少了 {0}）",
+"pattern": true
+},
+{
+"zh": "這不是 xConsole 的更新包（少了",
+"pattern": false
+},
+{
+"zh": "相依套件有變，安裝中",
+"pattern": false
+},
+{
+"zh": "換檔失敗，已還原：{0}",
+"pattern": true
+},
+{
+"zh": "換檔失敗，已還原",
+"pattern": false
+},
+{
+"zh": "要有 64 碼的 sha256 才能核對更新包（GitHub 的版本頁上每個附件都有）",
+"pattern": false
+},
+{
+"zh": "沒有可以退回的備份",
+"pattern": false
+},
+{
+"zh": "退回 ",
+"pattern": false
+},
+{
+"zh": "，重新啟動主控台",
+"pattern": false
+},
+{
+"zh": "連不上 GitHub（{0}）。這台不能連外的話，請在別台下載安裝包，用「手動上傳更新包」",
+"pattern": true
+},
+{
+"zh": "連不上 GitHub",
+"pattern": false
+},
+{
+"zh": "這台不能連外的話，請在別台下載安裝包，用「手動上傳更新包」",
+"pattern": false
+},
+{
+"zh": "更新包太大（上限 64 MB）",
+"pattern": false
+},
+{
+"zh": "更新包裡有不安全的路徑：{0}",
+"pattern": true
+},
+{
+"zh": "更新包裡有不安全的路徑",
+"pattern": false
+},
+{
+"zh": "更新包裡有連結或特殊檔：{0}",
+"pattern": true
+},
+{
+"zh": "更新包裡有連結或特殊檔",
+"pattern": false
+},
+{
+"zh": "這不是 xConsole 的更新包（少了 ",
+"pattern": false
+},
+{
+"zh": "新版的相依套件裝不起來（這台要能連 pypi.org）：",
+"pattern": false
+},
+{
+"zh": "換檔失敗，已還原：",
+"pattern": false
+},
+{
+"zh": "已經在更新了",
+"pattern": false
+},
+{
+"zh": "檢查更新包",
+"pattern": false
+},
+{
+"zh": "備份並換上新版",
+"pattern": false
+},
+{
+"zh": "連不上 GitHub（",
+"pattern": false
+},
+{
+"zh": "）。這台不能連外的話，請在別台下載安裝包，用「手動上傳更新包」",
+"pattern": false
+},
+{
+"zh": "更新包裡有不安全的路徑：",
+"pattern": false
+},
+{
+"zh": "更新包裡有連結或特殊檔：",
+"pattern": false
+},
+{
+"zh": "上傳的檔 sha256 對不上（算出來是 {0}），不更新",
+"pattern": true
+},
+{
+"zh": "上傳的檔 sha256 對不上（算出來是",
+"pattern": false
+},
+{
+"zh": "不更新",
+"pattern": false
+},
+{
+"zh": "新版的 {0}/{1} 編譯不過，不更新：{2}",
+"pattern": true
+},
+{
+"zh": "新版的",
+"pattern": false
+},
+{
+"zh": "編譯不過，不更新",
+"pattern": false
+},
+{
+"zh": "上傳的檔 sha256 對不上（算出來是 ",
+"pattern": false
+},
+{
+"zh": "），不更新",
+"pattern": false
+},
+{
+"zh": "新版的 ",
+"pattern": false
+},
+{
+"zh": " 編譯不過，不更新：",
+"pattern": false
+},
+{
 "zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：用硬碟執行時，檔案映射的頁快取吃的是系統那一小塊，擠爆會把整台拖死（連代理與 SSH 一起），所以一律不允許。請換小一點的量化，或縮短上下文",
 "pattern": false
 },
@@ -9977,10 +10497,6 @@
 },
 {
 "zh": "遠端桌面",
-"pattern": false
-},
-{
-"zh": "主控台",
 "pattern": false
 },
 {
@@ -10061,6 +10577,10 @@
 },
 {
 "zh": "沒有偵測到 GPU；先照獨立顯存算，確認後可以改",
+"pattern": false
+},
+{
+"zh": "只能選家目錄、資料磁碟或外接碟裡的資料夾",
 "pattern": false
 },
 {
@@ -10477,6 +10997,10 @@
 },
 {
 "zh": "是系統資料夾",
+"pattern": false
+},
+{
+"zh": "不能直接用整個使用者資料夾；請選裡面的一個資料夾（例：文件、桌面底下的專案）",
 "pattern": false
 },
 {
@@ -11304,6 +11828,10 @@
 "pattern": false
 },
 {
+"zh": " 是隱藏的設定資料夾（可能有金鑰或登入資料）",
+"pattern": false
+},
+{
 "zh": "這是系統資料夾",
 "pattern": false
 },
@@ -11312,11 +11840,11 @@
 "pattern": false
 },
 {
-"zh": " 是隱藏的設定資料夾（可能有金鑰或登入資料）",
+"zh": "路徑不對",
 "pattern": false
 },
 {
-"zh": "路徑不對",
+"zh": "只能瀏覽家目錄、資料磁碟或外接碟",
 "pattern": false
 },
 {
@@ -11589,6 +12117,18 @@
 },
 {
 "zh": "缺少截圖尺寸，請先截一張圖",
+"pattern": false
+},
+{
+"zh": "只能打開家目錄、資料磁碟或外接碟裡的資料夾",
+"pattern": false
+},
+{
+"zh": "程式內容的 sha256 對不上，不更新",
+"pattern": false
+},
+{
+"zh": "這不像 xConsole 的代理程式",
 "pattern": false
 },
 {
@@ -12232,10 +12772,6 @@
 "pattern": false
 },
 {
-"zh": "量化",
-"pattern": false
-},
-{
 "zh": "這顆含中國來源的元件（",
 "pattern": false
 },
@@ -12357,6 +12893,18 @@
 },
 {
 "zh": "捲動量要是整數",
+"pattern": false
+},
+{
+"zh": "程式內容格式不對",
+"pattern": false
+},
+{
+"zh": "新版編譯不過，不更新：{0}",
+"pattern": true
+},
+{
+"zh": "新版編譯不過，不更新",
 "pattern": false
 },
 {
@@ -12769,6 +13317,10 @@
 },
 {
 "zh": "請確認有人登入這台的桌面",
+"pattern": false
+},
+{
+"zh": "新版編譯不過，不更新：",
 "pattern": false
 },
 {

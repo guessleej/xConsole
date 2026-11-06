@@ -1314,3 +1314,8 @@ input.switch:checked::after { transform: translateX(18px); }
 @media (max-width: 860px) { #langpick-top { display: none; } }
 .mnav-lang { padding: 12px 16px; }
 .upd-notes { max-height: 220px; overflow: auto; } .upd-manual { margin: 14px 0; } .upd-manual summary { cursor: pointer; font-weight: 600; }
+@media (min-width: 861px) {
+  .chat-main .chat-bar { flex-wrap: nowrap; }
+  .chat-main .chat-bar .chat-status { flex: 1 1 0; }
+  .chat-main .chat-bar .btn { flex: none; }
+}

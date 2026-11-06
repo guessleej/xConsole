@@ -153,7 +153,7 @@ function viewHome() {
       pool ? `共 ${fmt(pool.total_gib, 0)} GiB` : ""),
     tileOf("推理引擎", st.engine?.llama_server ? "llama.cpp" : st.engine?.building ? "安裝中" : "還沒安裝",
       st.engine?.llama_server ? "已安裝" : "第二步一鍵安裝"),
-    tileOf("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString("zh-TW"), "每 15 秒自動更新"));
+    tileOf("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString(uiLocale()), "每 15 秒自動更新"));
   hw.appendChild(tiles);
   hero.appendChild(hw);
 
