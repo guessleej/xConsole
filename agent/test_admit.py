@@ -294,6 +294,11 @@ def main():
         a_old = A.llama_argv(dict(raw, fit=False), reg={"machine": {}})
         ok &= case("多卡搬專家：交給 --fit，不帶 -ngl 與 --n-cpu-moe",
                    ("-ngl" in a_fit, "--n-cpu-moe" in a_fit, "-c" in a_fit), (False, False, True))
+        A._llama_help = lambda exe: "-fit, --fit [on|off]  ...\n-fitt, --fit-target MiB0,MiB1  target margin per device"
+        a_tgt = A.llama_argv(dict(raw, fit=True), reg={"machine": {"memory_model": "discrete", "vram_floor_gib": 3}})
+        ok &= case("  --fit 每張卡保留的量＝這台的顯存底線（不是 llama.cpp 預設的 1024 MiB）",
+                   a_tgt[a_tgt.index("--fit-target") + 1], "3072")
+        A._llama_help = lambda exe: "-fit,  --fit [on|off]  whether to adjust unset arguments"
         ok &= case("  沒開 fit 照舊帶 -ngl 999 與 --n-cpu-moe 5",
                    (a_old[a_old.index("-ngl") + 1], a_old[a_old.index("--n-cpu-moe") + 1]), ("999", "5"))
         A._llama_help = lambda exe: "no such option here"

@@ -3261,6 +3261,9 @@ def llama_argv(raw, reg=None):
         argv += ["--mmproj", raw["mmproj"]]
     if raw.get("cpu_moe") and not own_layers and not use_fit:
         argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
+    if use_fit and "--fit-target" in _llama_help(raw["exe"]):
+        # --fit 預設每張卡只留 1024 MiB；改成這台設定的顯存底線，准入算過的保留量不會被它吃掉
+        argv += ["--fit", "on", "--fit-target", str(int(floors(reg["machine"]).get("vram", 1) * 1024))]
     argv += reasoning_args(raw["exe"], raw.get("reasoning"))
     if raw.get("max_tokens"):
         argv += ["-n", str(int(raw["max_tokens"]))]
