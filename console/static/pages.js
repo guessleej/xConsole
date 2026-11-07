@@ -836,13 +836,15 @@ async function openPreview(html) {
    （可以勾「這個任務之後不再問」）。檔案只能動工作資料夾裡的；指令在這台以代理的身分執行。 */
 
 // 資料夾瀏覽器：只列子資料夾（不列檔案），不能選的標出原因；選好就連結給 Agent 用
-function openFolderBrowser(n, done) {
+// 資料夾瀏覽器。opts.kind="models"：挑一個放著模型檔的資料夾加進模型庫（只讀）；沒給＝Agent 工作資料夾
+function openFolderBrowser(n, done, opts = {}) {
+  const models = opts.kind === "models";
   const d = el("div", "fb");
   const head = el("div", "fb-head");
   const list = el("div", "fb-list scrollbox");
   const err = el("div");
   d.append(head, list, err);
-  const ov = modal({ title: "選這台的一個資料夾給 Agent 用", bodyNode: d, hasInput: true });
+  const ov = modal({ title: models ? "選這台放著模型檔的資料夾" : "選這台的一個資料夾給 Agent 用", bodyNode: d, hasInput: true });
   ov.querySelector(".modal").classList.add("wide");
   let cur = null;
   const pick = el("button", "btn primary", "用這個資料夾");
@@ -850,7 +852,7 @@ function openFolderBrowser(n, done) {
   const go2 = async (path) => {
     loading(list);
     let r;
-    try { r = await api(`/api/node/${n.id}/agent/browse?path=${encodeURIComponent(path || "")}`); } catch (ex) { errNote(list, ex.message); return; }
+    try { r = await api(`/api/node/${n.id}/${models ? "library" : "agent"}/browse?path=${encodeURIComponent(path || "")}`); } catch (ex) { errNote(list, ex.message); return; }
     cur = r;
     head.textContent = "";
     const roots = el("div", "chips");
@@ -871,10 +873,13 @@ function openFolderBrowser(n, done) {
   pick.onclick = async () => {
     if (!cur?.ok) return;
     let r;
-    try { r = await api(`/api/node/${n.id}/agent/folders/link`, { method: "POST", body: { path: cur.path } }); } catch (ex) { errNote(err, ex.message); return; }
+    try {
+      r = models ? await api(`/api/node/${n.id}/library/dirs`, { method: "POST", body: { add: cur.path } })
+        : await api(`/api/node/${n.id}/agent/folders/link`, { method: "POST", body: { path: cur.path } });
+    } catch (ex) { errNote(err, ex.message); return; }
     ov.remove();
-    toast(`已連結：${r.name}`, "ok");
-    done(r.name);
+    toast(models ? `已加入：${cur.path}` : `已連結：${r.name}`, "ok");
+    done(models ? cur.path : r.name);
   };
   go2("");
 }

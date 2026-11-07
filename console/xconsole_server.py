@@ -2260,9 +2260,6 @@ class Handler(BaseHTTPRequestHandler):
                 if hf is None:
                     errors.append(f"{fields['repo']}：{last or '沒有連得上的機器可以讀 Hugging Face'}")
                     continue
-                if hf["profile"].get("cn_origin"):
-                    errors.append(f"{fields['repo']}：檔頭判定為中國來源，政府案不得使用，不列入推薦清單")
-                    continue
             done.append(CATALOG.upsert(fields if not all_rows else {"repo": fields["repo"]}, hf)["repo"])
         self._audit("catalog.refresh-all" if all_rows else "catalog.save", "" if all_rows else todo[0][0]["repo"],
                     not errors, {"updated": done, "message": "；".join(errors)[:300] if errors else None})
@@ -2450,10 +2447,10 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             q = (parse_qs(urlparse(self.path).query).get("model") or [""])[0]
             return self._json(*call_node(m.group(1), "/llama/args?model=" + urllib.parse.quote(q[:400]), timeout=30))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/agent/browse", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(agent|library)/browse", path)
         if m:
             q = (parse_qs(urlparse(self.path).query).get("path") or [""])[0]
-            return self._json(*call_node(m.group(1), "/agent/browse?path=" + urllib.parse.quote(q[:1000]), timeout=30))
+            return self._json(*call_node(m.group(1), f"/{m.group(2)}/browse?path=" + urllib.parse.quote(q[:1000]), timeout=30))
         m = re.fullmatch(r"/api/node/([\w.-]+)/agent/folders", path)
         if m:
             return self._json(*call_node(m.group(1), "/agent/folders", timeout=30))
@@ -2955,9 +2952,14 @@ class Handler(BaseHTTPRequestHandler):
                          "network": (out.get("network") or {}).get("ok")})
             return self._json(code, out)
         # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
-        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete|dirs)", path)
         if m:
             node_id, act = m.groups()
+            if act == "dirs":
+                want = {k: str(body[k]) for k in ("add", "remove") if body.get(k)}
+                code, out = call_node(node_id, "/library/dirs", "POST", want, timeout=60)
+                self._audit("library.dirs", node_id, code == 200, {**want, "message": out.get("error")})
+                return self._json(code, out)
             if act == "hf/tree":
                 return self._json(*call_node(node_id, "/library/hf/tree", "POST",
                                              {"repo": body.get("repo"), "token": body.get("token")}, timeout=60))

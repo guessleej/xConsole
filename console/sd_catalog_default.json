@@ -1,15 +1,131 @@
 [
  {
+  "repo": "leejet/Z-Image-Turbo-GGUF",
+  "title": "Z-Image Turbo",
+  "kind": "image",
+  "desc": "速度快，8 步出圖，中文提示詞友好，4 GB 視訊記憶體也能跑",
+  "vendor": "阿里通義",
+  "license": "apache-2.0",
+  "released": "2025-11",
+  "tags": [
+   "畫圖"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "leejet/Z-Image-Turbo-GGUF",
+    "match": "z_image_turbo-"
+   },
+   {
+    "role": "llm",
+    "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "path": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+   },
+   {
+    "role": "vae",
+    "repo": "Comfy-Org/Z-Image-Turbo",
+    "path": "split_files/vae/ae.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 8,
+   "cfg": 1.0,
+   "sampler": "euler"
+  },
+  "files": {
+   "leejet/Z-Image-Turbo-GGUF": {
+    "z_image_turbo-Q2_K.gguf": 2592442304,
+    "z_image_turbo-Q3_K.gguf": 3143559104,
+    "z_image_turbo-Q4_0.gguf": 3683370944,
+    "z_image_turbo-Q4_K.gguf": 3864250304,
+    "z_image_turbo-Q5_0.gguf": 4542547904,
+    "z_image_turbo-Q6_K.gguf": 5263239104,
+    "z_image_turbo-Q8_0.gguf": 6577440704
+   },
+   "unsloth/Qwen3-4B-Instruct-2507-GGUF": {
+    "Qwen3-4B-Instruct-2507-Q4_K_M.gguf": 2497281120
+   },
+   "Comfy-Org/Z-Image-Turbo": {
+    "split_files/vae/ae.safetensors": 335304388
+   }
+  },
+  "refreshed": 1794024967
+ },
+ {
+  "repo": "QuantStack/Qwen-Image-GGUF",
+  "title": "Qwen-Image",
+  "kind": "image",
+  "desc": "畫面裡的中文、英文文字最準，適合海報、封面、帶字的圖",
+  "vendor": "阿里 Qwen",
+  "license": "apache-2.0",
+  "released": "2025-08",
+  "tags": [
+   "畫圖"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "QuantStack/Qwen-Image-GGUF",
+    "match": "Qwen_Image-"
+   },
+   {
+    "role": "vae",
+    "repo": "QuantStack/Qwen-Image-GGUF",
+    "path": "VAE/Qwen_Image-VAE.safetensors"
+   },
+   {
+    "role": "llm",
+    "repo": "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF",
+    "path": "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 20,
+   "cfg": 2.5,
+   "sampler": "euler",
+   "flow_shift": 3.0
+  },
+  "files": {
+   "QuantStack/Qwen-Image-GGUF": {
+    "Qwen_Image-Q2_K.gguf": 7062518304,
+    "Qwen_Image-Q3_K_M.gguf": 9679567392,
+    "Qwen_Image-Q3_K_S.gguf": 8952609312,
+    "Qwen_Image-Q4_0.gguf": 11852773920,
+    "Qwen_Image-Q4_1.gguf": 12843678240,
+    "Qwen_Image-Q4_K_M.gguf": 13065746976,
+    "Qwen_Image-Q4_K_S.gguf": 12140608032,
+    "Qwen_Image-Q5_0.gguf": 14400813600,
+    "Qwen_Image-Q5_1.gguf": 15391717920,
+    "Qwen_Image-Q5_K_M.gguf": 14934899232,
+    "Qwen_Image-Q5_K_S.gguf": 14117698080,
+    "Qwen_Image-Q6_K.gguf": 16824990240,
+    "Qwen_Image-Q8_0.gguf": 21761817120,
+    "VAE/Qwen_Image-VAE.safetensors": 253806246
+   },
+   "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF": {
+    "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf": 4683072512
+   }
+  },
+  "refreshed": 1794024968
+ },
+ {
   "repo": "leejet/FLUX.1-schnell-gguf",
   "title": "FLUX.1 schnell",
   "kind": "image",
-  "desc": "四步就出圖，看得懂長句提示詞、能在圖裡寫英文字；Apache 2.0 可商用，第一顆先裝它",
+  "desc": "畫質標竿，4 步出圖，寫實照片和插畫都很強（英文提示詞效果最好）",
   "vendor": "Black Forest Labs",
   "license": "apache-2.0",
+  "released": "2024-08",
   "tags": [
-   "快速",
-   "可商用"
+   "畫圖"
   ],
+  "cn_origin": false,
   "parts": [
    {
     "role": "diffusion",
@@ -67,7 +183,134 @@
     "diffusion_pytorch_model.safetensors": 167666902
    }
   },
-  "refreshed": 1793465650
+  "refreshed": 1794024969
+ },
+ {
+  "repo": "leejet/FLUX.2-klein-4B-GGUF",
+  "title": "FLUX.2 klein 4B",
+  "kind": "image",
+  "desc": "又小又快，4 步出圖；還能按一句話改圖：換背景、改顏色、加減東西，8 GB 視訊記憶體可用",
+  "vendor": "Black Forest Labs",
+  "license": "apache-2.0",
+  "released": "2026-01",
+  "tags": [
+   "畫圖",
+   "能改圖"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "leejet/FLUX.2-klein-4B-GGUF",
+    "match": "flux-2-klein-4b-"
+   },
+   {
+    "role": "llm",
+    "repo": "unsloth/Qwen3-4B-GGUF",
+    "path": "Qwen3-4B-Q4_K_M.gguf"
+   },
+   {
+    "role": "vae",
+    "repo": "Comfy-Org/Flux-2-Klein-4B",
+    "path": "split_files/vae/flux2-vae.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler": "euler",
+   "image": "ref"
+  },
+  "files": {
+   "leejet/FLUX.2-klein-4B-GGUF": {
+    "flux-2-klein-4b-Q4_0.gguf": 2460378560,
+    "flux-2-klein-4b-Q8_0.gguf": 4300629440
+   },
+   "unsloth/Qwen3-4B-GGUF": {
+    "Qwen3-4B-Q4_K_M.gguf": 2497281312
+   },
+   "Comfy-Org/Flux-2-Klein-4B": {
+    "split_files/vae/flux2-vae.safetensors": 336211292
+   }
+  },
+  "refreshed": 1794024970
+ },
+ {
+  "repo": "unsloth/Qwen-Image-Edit-2511-GGUF",
+  "title": "Qwen-Image-Edit 改圖",
+  "kind": "image",
+  "desc": "專門改圖：一句話換背景、換衣服、改圖裡的文字，人物長相基本不變，中文指令最準（2511 版）",
+  "vendor": "阿里 Qwen",
+  "license": "apache-2.0",
+  "released": "2025-12",
+  "tags": [
+   "畫圖",
+   "只能改圖"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "unsloth/Qwen-Image-Edit-2511-GGUF",
+    "match": "qwen-image-edit-2511-"
+   },
+   {
+    "role": "vae",
+    "repo": "QuantStack/Qwen-Image-GGUF",
+    "path": "VAE/Qwen_Image-VAE.safetensors"
+   },
+   {
+    "role": "llm",
+    "repo": "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF",
+    "path": "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf"
+   },
+   {
+    "role": "llm_vision",
+    "repo": "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF",
+    "path": "Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf"
+   }
+  ],
+  "defaults": {
+   "width": 1024,
+   "height": 1024,
+   "steps": 20,
+   "cfg": 2.5,
+   "sampler": "euler",
+   "flow_shift": 3.0,
+   "model_args": "qwen_image_zero_cond_t=true",
+   "image": "ref",
+   "needs_image": true
+  },
+  "files": {
+   "unsloth/Qwen-Image-Edit-2511-GGUF": {
+    "qwen-image-edit-2511-BF16.gguf": 40872114784,
+    "qwen-image-edit-2511-F16.gguf": 40872114784,
+    "qwen-image-edit-2511-Q2_K.gguf": 7736355424,
+    "qwen-image-edit-2511-Q3_K_L.gguf": 10581408352,
+    "qwen-image-edit-2511-Q3_K_M.gguf": 9920805472,
+    "qwen-image-edit-2511-Q3_K_S.gguf": 9274468960,
+    "qwen-image-edit-2511-Q4_0.gguf": 11852773984,
+    "qwen-image-edit-2511-Q4_1.gguf": 12843678304,
+    "qwen-image-edit-2511-Q4_K_M.gguf": 12842830432,
+    "qwen-image-edit-2511-Q4_K_S.gguf": 12466227808,
+    "qwen-image-edit-2511-Q5_0.gguf": 14400813664,
+    "qwen-image-edit-2511-Q5_1.gguf": 15391717984,
+    "qwen-image-edit-2511-Q5_K_M.gguf": 15395662432,
+    "qwen-image-edit-2511-Q5_K_S.gguf": 14381017696,
+    "qwen-image-edit-2511-Q6_K.gguf": 17947757152,
+    "qwen-image-edit-2511-Q8_0.gguf": 22354590304
+   },
+   "QuantStack/Qwen-Image-GGUF": {
+    "VAE/Qwen_Image-VAE.safetensors": 253806246
+   },
+   "mradermacher/Qwen2.5-VL-7B-Instruct-GGUF": {
+    "Qwen2.5-VL-7B-Instruct.Q4_K_M.gguf": 4683072512,
+    "Qwen2.5-VL-7B-Instruct.mmproj-Q8_0.gguf": 853119712
+   }
+  },
+  "refreshed": 1794024971
  },
  {
   "repo": "silveroxides/Chroma-GGUF",
@@ -76,10 +319,12 @@
   "desc": "以 FLUX.1 schnell 為底重新訓練的高畫質模型，細節與寫實感更好，步數多、比較慢",
   "vendor": "Lodestone Rock",
   "license": "apache-2.0",
+  "released": "2025-08",
   "tags": [
-   "高畫質",
-   "可商用"
+   "畫圖",
+   "高畫質"
   ],
+  "cn_origin": false,
   "parts": [
    {
     "role": "diffusion",
@@ -127,7 +372,7 @@
     "diffusion_pytorch_model.safetensors": 167666902
    }
   },
-  "refreshed": 1793465651
+  "refreshed": 1794024972
  },
  {
   "repo": "second-state/stable-diffusion-3.5-medium-GGUF",
@@ -136,9 +381,11 @@
   "desc": "Stability AI 的中型模型，畫質與速度均衡；年營收一百萬美元以下可免費商用",
   "vendor": "Stability AI",
   "license": "stabilityai-community",
+  "released": "2024-10",
   "tags": [
-   "均衡"
+   "畫圖"
   ],
+  "cn_origin": false,
   "parts": [
    {
     "role": "model",
@@ -194,7 +441,7 @@
     "t5xxl-Q8_0.gguf": 5199794784
    }
   },
-  "refreshed": 1793465651
+  "refreshed": 1794024972
  },
  {
   "repo": "second-state/stable-diffusion-v1-5-GGUF",
@@ -203,9 +450,12 @@
   "desc": "最經典的小模型，檔案 2 GB 以內、產一張約要 4 GB；記憶體小的機器也跑得動，畫質普通、適合試流程",
   "vendor": "Runway／Stability AI",
   "license": "creativeml-openrail-m",
+  "released": "2022-10",
   "tags": [
+   "畫圖",
    "小模型"
   ],
+  "cn_origin": false,
   "parts": [
    {
     "role": "model",
@@ -231,19 +481,157 @@
     "stable-diffusion-v1-5-pruned-emaonly-f32.gguf": 4265059488
    }
   },
-  "refreshed": 1793465651
+  "refreshed": 1794024972
+ },
+ {
+  "repo": "Comfy-Org/Wan-2.1",
+  "title": "Wan2.1 文生影片 1.3B",
+  "kind": "video",
+  "desc": "最輕量的影片模型，8 GB 視訊記憶體就能生成 480P 短影片，適合先體驗",
+  "vendor": "阿里通義萬相",
+  "license": "apache-2.0",
+  "released": "2025-02",
+  "tags": [
+   "影片"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "Comfy-Org/Wan-2.1",
+    "path": "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "city96/umt5-xxl-encoder-gguf",
+    "match": "umt5-xxl-encoder-"
+   },
+   {
+    "role": "vae",
+    "repo": "Comfy-Org/Wan-2.1",
+    "path": "split_files/vae/wan_2.1_vae.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 832,
+   "height": 480,
+   "steps": 20,
+   "cfg": 6.0,
+   "sampler": "euler",
+   "frames": 33,
+   "fps": 16,
+   "frame_step": 4,
+   "flow_shift": 3.0
+  },
+  "files": {
+   "Comfy-Org/Wan-2.1": {
+    "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors": 2838303560,
+    "split_files/vae/wan_2.1_vae.safetensors": 253815318
+   },
+   "city96/umt5-xxl-encoder-gguf": {
+    "umt5-xxl-encoder-F16.gguf": 11368687456,
+    "umt5-xxl-encoder-F32.gguf": 22730008416,
+    "umt5-xxl-encoder-Q3_K_M.gguf": 3055097696,
+    "umt5-xxl-encoder-Q3_K_S.gguf": 2858489696,
+    "umt5-xxl-encoder-Q4_K_M.gguf": 3655145312,
+    "umt5-xxl-encoder-Q4_K_S.gguf": 3497596768,
+    "umt5-xxl-encoder-Q5_K_M.gguf": 4145878880,
+    "umt5-xxl-encoder-Q5_K_S.gguf": 4052293472,
+    "umt5-xxl-encoder-Q6_K.gguf": 4667283296,
+    "umt5-xxl-encoder-Q8_0.gguf": 6043068256
+   }
+  },
+  "refreshed": 1794024973
+ },
+ {
+  "repo": "QuantStack/Wan2.2-TI2V-5B-GGUF",
+  "title": "Wan2.2 影片 5B",
+  "kind": "video",
+  "desc": "畫質明顯更好，支援文字生成影片，也能上傳一張圖片讓它動起來",
+  "vendor": "阿里通義萬相",
+  "license": "apache-2.0",
+  "released": "2025-07",
+  "tags": [
+   "影片",
+   "圖生影片",
+   "720P"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "QuantStack/Wan2.2-TI2V-5B-GGUF",
+    "match": "Wan2.2-TI2V-5B-"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "city96/umt5-xxl-encoder-gguf",
+    "match": "umt5-xxl-encoder-"
+   },
+   {
+    "role": "vae",
+    "repo": "QuantStack/Wan2.2-TI2V-5B-GGUF",
+    "path": "VAE/Wan2.2_VAE.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 832,
+   "height": 480,
+   "steps": 20,
+   "cfg": 6.0,
+   "sampler": "euler",
+   "frames": 33,
+   "fps": 24,
+   "frame_step": 4,
+   "flow_shift": 3.0
+  },
+  "files": {
+   "QuantStack/Wan2.2-TI2V-5B-GGUF": {
+    "Wan2.2-TI2V-5B-Q2_K.gguf": 1853862240,
+    "Wan2.2-TI2V-5B-Q3_K_M.gguf": 2547790176,
+    "Wan2.2-TI2V-5B-Q3_K_S.gguf": 2294755680,
+    "Wan2.2-TI2V-5B-Q4_0.gguf": 3029086560,
+    "Wan2.2-TI2V-5B-Q4_1.gguf": 3253219680,
+    "Wan2.2-TI2V-5B-Q4_K_M.gguf": 3433116000,
+    "Wan2.2-TI2V-5B-Q4_K_S.gguf": 3116380512,
+    "Wan2.2-TI2V-5B-Q5_0.gguf": 3642503520,
+    "Wan2.2-TI2V-5B-Q5_1.gguf": 3866636640,
+    "Wan2.2-TI2V-5B-Q5_K_M.gguf": 3810603360,
+    "Wan2.2-TI2V-5B-Q5_K_S.gguf": 3559928160,
+    "Wan2.2-TI2V-5B-Q6_K.gguf": 4211683680,
+    "Wan2.2-TI2V-5B-Q8_0.gguf": 5400179040,
+    "VAE/Wan2.2_VAE.safetensors": 1409400960
+   },
+   "city96/umt5-xxl-encoder-gguf": {
+    "umt5-xxl-encoder-F16.gguf": 11368687456,
+    "umt5-xxl-encoder-F32.gguf": 22730008416,
+    "umt5-xxl-encoder-Q3_K_M.gguf": 3055097696,
+    "umt5-xxl-encoder-Q3_K_S.gguf": 2858489696,
+    "umt5-xxl-encoder-Q4_K_M.gguf": 3655145312,
+    "umt5-xxl-encoder-Q4_K_S.gguf": 3497596768,
+    "umt5-xxl-encoder-Q5_K_M.gguf": 4145878880,
+    "umt5-xxl-encoder-Q5_K_S.gguf": 4052293472,
+    "umt5-xxl-encoder-Q6_K.gguf": 4667283296,
+    "umt5-xxl-encoder-Q8_0.gguf": 6043068256
+   }
+  },
+  "refreshed": 1794024974
  },
  {
   "repo": "unsloth/LTX-2.3-GGUF",
-  "title": "LTX-2.3 影片（蒸餾版）",
+  "title": "LTX-2.3 有聲影片",
   "kind": "video",
-  "desc": "文字產生一段有聲影片；蒸餾版 8 步就好。文字編碼器用 Google Gemma 3 12B，需要 32 GB 以上記憶體",
+  "desc": "影片和聲音一起生成（對白、音效、背景音樂），支援 720P 和圖片動起來；蒸餾版 8 步出片，速度快",
   "vendor": "Lightricks",
   "license": "ltx-2-community",
+  "released": "2026",
   "tags": [
    "影片",
-   "有聲"
+   "圖生影片",
+   "帶聲音",
+   "720P"
   ],
+  "cn_origin": false,
   "parts": [
    {
     "role": "diffusion",
@@ -334,6 +722,224 @@
     "gemma-3-12b-it-UD-Q8_K_XL.gguf": 14394193376
    }
   },
-  "refreshed": 1793465652
+  "refreshed": 1794024974
+ },
+ {
+  "repo": "unsloth/MiniMax-H3-GGUF",
+  "title": "MiniMax-H3 有聲影片",
+  "kind": "video",
+  "desc": "畫面＋立體聲一起生成，人物動作和鏡頭運動自然，可以上傳圖片當第一幀；模型很大，建議 24 GB 視訊記憶體＋64 GB 記憶體",
+  "vendor": "MiniMax 海螺",
+  "license": "other",
+  "released": "2026",
+  "tags": [
+   "影片",
+   "圖生影片",
+   "首尾幀",
+   "帶聲音"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "match": "minimax_h3_fl2va_pruned-"
+   },
+   {
+    "role": "llm",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "qwen3vl_32b_minimax_h3-Q4_K_M.gguf"
+   },
+   {
+    "role": "vae",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "vae/minimax_h3_video_vae_fp16.safetensors"
+   },
+   {
+    "role": "audio_vae",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "vae/minimax_h3_audio_vae_fp32.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 864,
+   "height": 480,
+   "steps": 20,
+   "cfg": 1.0,
+   "sampler": "euler",
+   "frames": 56,
+   "fps": 24,
+   "frame_step": 1
+  },
+  "files": {
+   "unsloth/MiniMax-H3-GGUF": {
+    "minimax_h3_fl2va_pruned-Q2_K.gguf": 6724190304,
+    "minimax_h3_fl2va_pruned-Q3_K.gguf": 8759328864,
+    "minimax_h3_fl2va_pruned-Q4_K.gguf": 11420663904,
+    "minimax_h3_fl2va_pruned-Q5_0.gguf": 13923170400,
+    "minimax_h3_fl2va_pruned-Q6_K.gguf": 16586784864,
+    "minimax_h3_fl2va_pruned-Q8_0.gguf": 21437786208,
+    "minimax_h3_fl2va_pruned-UD-Q2_K_XL.gguf": 8063029344,
+    "minimax_h3_fl2va_pruned-UD-Q3_K_XL.gguf": 9558675552,
+    "qwen3vl_32b_minimax_h3-Q4_K_M.gguf": 18218065024,
+    "vae/minimax_h3_video_vae_fp16.safetensors": 5207808496,
+    "vae/minimax_h3_audio_vae_fp32.safetensors": 605254808
+   }
+  },
+  "refreshed": 1794024975
+ },
+ {
+  "repo": "leejet/MiniMax-H3-GGUF",
+  "title": "MiniMax-H3 多圖參考影片",
+  "kind": "video",
+  "desc": "上傳參考圖（人物、商品、場景），生成的影片裡會出現它們，同時生成聲音；和「MiniMax-H3 有聲影片」共用文字編碼器和 VAE，已經下過只需再下主體",
+  "vendor": "MiniMax 海螺",
+  "license": "other",
+  "released": "2026",
+  "tags": [
+   "影片",
+   "多圖參考",
+   "帶聲音",
+   "需要上傳圖片"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "leejet/MiniMax-H3-GGUF",
+    "match": "minimax_h3_ref2va_pruned-"
+   },
+   {
+    "role": "llm",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "qwen3vl_32b_minimax_h3-Q4_K_M.gguf"
+   },
+   {
+    "role": "vae",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "vae/minimax_h3_video_vae_fp16.safetensors"
+   },
+   {
+    "role": "audio_vae",
+    "repo": "unsloth/MiniMax-H3-GGUF",
+    "path": "vae/minimax_h3_audio_vae_fp32.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 864,
+   "height": 480,
+   "steps": 20,
+   "cfg": 1.0,
+   "sampler": "euler",
+   "frames": 56,
+   "fps": 24,
+   "frame_step": 1,
+   "image": "ref",
+   "needs_image": true
+  },
+  "files": {
+   "leejet/MiniMax-H3-GGUF": {
+    "minimax_h3_ref2va_pruned-Q2_K_M.gguf": 6724190304,
+    "minimax_h3_ref2va_pruned-Q4_K_M.gguf": 11420663904
+   },
+   "unsloth/MiniMax-H3-GGUF": {
+    "qwen3vl_32b_minimax_h3-Q4_K_M.gguf": 18218065024,
+    "vae/minimax_h3_video_vae_fp16.safetensors": 5207808496,
+    "vae/minimax_h3_audio_vae_fp32.safetensors": 605254808
+   }
+  },
+  "refreshed": 1794024975
+ },
+ {
+  "repo": "QuantStack/Wan2.2-I2V-A14B-GGUF",
+  "title": "Wan2.2 圖生影片 A14B",
+  "kind": "video",
+  "desc": "開源圖生影片畫質天花板：上傳一張圖讓它動起來，動作幅度大、細節穩定；兩個 14B 專家輪流工作，較慢",
+  "vendor": "阿里通義萬相",
+  "license": "apache-2.0",
+  "released": "2025-07",
+  "tags": [
+   "影片",
+   "需要上傳圖片"
+  ],
+  "cn_origin": true,
+  "parts": [
+   {
+    "role": "diffusion",
+    "repo": "QuantStack/Wan2.2-I2V-A14B-GGUF",
+    "match": "LowNoise/Wan2.2-I2V-A14B-LowNoise-"
+   },
+   {
+    "role": "high_noise",
+    "repo": "QuantStack/Wan2.2-I2V-A14B-GGUF",
+    "match": "HighNoise/Wan2.2-I2V-A14B-HighNoise-"
+   },
+   {
+    "role": "t5xxl",
+    "repo": "city96/umt5-xxl-encoder-gguf",
+    "match": "umt5-xxl-encoder-"
+   },
+   {
+    "role": "vae",
+    "repo": "QuantStack/Wan2.2-I2V-A14B-GGUF",
+    "path": "VAE/Wan2.1_VAE.safetensors"
+   }
+  ],
+  "defaults": {
+   "width": 832,
+   "height": 480,
+   "steps": 10,
+   "cfg": 3.5,
+   "sampler": "euler",
+   "frames": 33,
+   "fps": 16,
+   "frame_step": 4,
+   "flow_shift": 3.0,
+   "needs_image": true,
+   "high_steps": 8,
+   "high_cfg": 3.5
+  },
+  "files": {
+   "QuantStack/Wan2.2-I2V-A14B-GGUF": {
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q2_K.gguf": 5300957696,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q3_K_M.gguf": 7176106496,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q3_K_S.gguf": 6515012096,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_0.gguf": 8558096896,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_1.gguf": 9259332096,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf": 9651728896,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_S.gguf": 8748151296,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q5_0.gguf": 10314461696,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q5_1.gguf": 11015696896,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q5_K_M.gguf": 10792055296,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q5_K_S.gguf": 10137514496,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q6_K.gguf": 12003652096,
+    "LowNoise/Wan2.2-I2V-A14B-LowNoise-Q8_0.gguf": 15406608896,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q2_K.gguf": 5300957696,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q3_K_M.gguf": 7176106496,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q3_K_S.gguf": 6515012096,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf": 9651728896,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_S.gguf": 8748151296,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q5_0.gguf": 10314461696,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q5_1.gguf": 11015696896,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q5_K_M.gguf": 10792055296,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q5_K_S.gguf": 10137514496,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q6_K.gguf": 12003652096,
+    "HighNoise/Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf": 15406608896,
+    "VAE/Wan2.1_VAE.safetensors": 253815318
+   },
+   "city96/umt5-xxl-encoder-gguf": {
+    "umt5-xxl-encoder-F16.gguf": 11368687456,
+    "umt5-xxl-encoder-F32.gguf": 22730008416,
+    "umt5-xxl-encoder-Q3_K_M.gguf": 3055097696,
+    "umt5-xxl-encoder-Q3_K_S.gguf": 2858489696,
+    "umt5-xxl-encoder-Q4_K_M.gguf": 3655145312,
+    "umt5-xxl-encoder-Q4_K_S.gguf": 3497596768,
+    "umt5-xxl-encoder-Q5_K_M.gguf": 4145878880,
+    "umt5-xxl-encoder-Q5_K_S.gguf": 4052293472,
+    "umt5-xxl-encoder-Q6_K.gguf": 4667283296,
+    "umt5-xxl-encoder-Q8_0.gguf": 6043068256
+   }
+  },
+  "refreshed": 1794024976
  }
 ]

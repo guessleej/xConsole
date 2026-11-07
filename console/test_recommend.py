@@ -241,14 +241,22 @@ def main():
          (pl["level"], pl["load_est_sec"], pl["load_sec"], pl["guess"]), ("smooth", R.load_seconds(17.4, True), 41, False))
 
     # ---- 管理者送來的欄位
-    case("中國來源不能加入推薦清單", R.check_fields({"repo": "unsloth/Qwen3-8B-GGUF", "title": "x"})[1] is not None, True)
+    case("中國來源也能加入推薦清單（照列、畫面標示）", R.check_fields({"repo": "unsloth/Qwen3-8B-GGUF", "title": "x"})[1], None)
+    case("中國來源在推薦結果裡標 cn_origin", (R.is_cn({"repo": "unsloth/Qwen3-8B-GGUF"}), R.is_cn({"repo": "unsloth/gemma-4-E4B-it-GGUF"}),
+                                            R.is_cn({"repo": "x/y", "profile": {"cn_origin": True}})), (True, False, True))
     case("名稱格式要對", R.check_fields({"repo": "../../etc", "title": "x"})[1] is not None, True)
     f, err = R.check_fields({"repo": "a/b-GGUF", "title": "名稱", "tags": "繁中、看圖", "use": "code"})
     case("標籤可用頓號分隔", (err, f["tags"]), (None, ["繁中", "看圖"]))
     with open(os.path.join(HERE, "catalog_default.json"), encoding="utf-8") as fh:
         default = json.load(fh)
-    case("隨附的推薦清單沒有中國來源", [e["repo"] for e in default if any(c in e["repo"].lower() for c in R.CN_ORIGIN)
-                                       or (e.get("profile") or {}).get("cn_origin")], [])
+    # 這是給一般人用的軟體，推薦清單放進所有熱門模型（含中國來源，只標示不遮蔽）；但非中國來源的選擇要比 LocModel 多
+    cn = [e["repo"] for e in default if R.is_cn(e)]
+    case("隨附的推薦清單含中國來源，且檔頭或名稱都判得出來",
+         bool(cn) and all((e.get("profile") or {}).get("cn_origin") for e in default if e["repo"] in cn), True)
+    case("隨附的推薦清單：非中國來源至少 40 顆，每個用途都有", (len(default) - len(cn) >= 40,
+         {u for u in R.USES} <= {e["use"] for e in default if not R.is_cn(e)}), (True, True))
+    case("隨附的推薦清單：入門小模型（2 GiB 以下的量化）至少 5 顆",
+         sum(1 for e in default if min((q["size_gib"] for q in e["quants"]), default=99) <= 2) >= 5, True)
     case("隨附的推薦清單每一筆都讀到了大小與架構", [e["repo"] for e in default if not e.get("quants") or not e.get("profile")], [])
 
     # ---- 推薦清單的增改刪
