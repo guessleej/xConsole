@@ -306,13 +306,16 @@ m_ltx = {"kind": "video", "parts": [{"role": "diffusion", "repo": "unsloth/LTX-2
                                     {"role": "llm", "repo": "unsloth/gemma-3-12b-it-GGUF", "path": "gemma-3-12b-it-UD-Q8_K_XL.gguf", "size": 13 << 30}]}
 m_flux = {"kind": "image", "parts": [{"role": "diffusion", "repo": "leejet/FLUX.1-schnell-gguf", "path": "flux1-schnell-q8_0.gguf", "size": 12 << 30}]}
 eq("認得 LTX（看擴散模型的來源與檔名）", (A._is_ltx(m_ltx), A._is_ltx(m_flux), A._is_ltx(m_vid)), (True, False, False))
-orig_fa = {k: getattr(A, k) for k in ("pools", "has_nvidia", "probe_amd_sysfs", "registry")}
+orig_fa = {k: getattr(A, k) for k in ("pools", "has_nvidia", "probe_amd_sysfs", "registry", "gpu_override")}
 A.registry = lambda: {}
 A.pools = lambda reg, hw: {"memory_model": "discrete", "floors": {"ram": 8, "vram": 1}, "bindable": True,
                            "gpus": [{"id": 0, "free_gib": 47.0}], "ram": {"free_gib": 100.0}}
 A.has_nvidia, A.probe_amd_sysfs = (lambda: True), (lambda: [])
 eq("NVIDIA：LTX 關 flash attention、FLUX 照開", (A.sd_admit(m_ltx, 768, 512, 33, hw={})["plan"]["fa_off"],
                                                   A.sd_admit(m_flux, 1024, 1024, 1, hw={})["plan"]["fa_off"]), (True, False))
+A.has_nvidia, A.gpu_override = (lambda: False), (lambda: {"vendor": "nvidia", "name": "RTX 4090", "vram_gib": 24})
+eq("手動指定 NVIDIA（偵測不到卡）：LTX 一樣關", A.sd_admit(m_ltx, 768, 512, 33, hw={})["plan"]["fa_off"], True)
+A.gpu_override = lambda: None
 A.has_nvidia, A.probe_amd_sysfs = (lambda: False), (lambda: [{"id": "0"}])
 eq("AMD：一律關（原本的規則不變）", A.sd_admit(m_flux, 1024, 1024, 1, hw={})["plan"]["fa_off"], True)
 for k, v in orig_fa.items():

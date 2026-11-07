@@ -7208,7 +7208,9 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
     # NVIDIA 跑 LTX 也關：實測 2× RTX PRO 5000（sm_120、sd.cpp master-1053 編 sm_90）開著產出整段全白、聲音滿格，
     # 記錄卻沒有任何錯誤；關掉後畫面與聲音都正常（同機同參數 CPU 也正常，VAE 改用 CPU 仍全白，所以是擴散／文字編碼的
     # flash attention）。同一支執行檔的 FLUX 開著正常，只關 LTX；小尺寸實測關掉反而快（14.6 秒對 19.6 秒）
-    plan["fa_off"] = (not has_nvidia() and bool(probe_amd_sysfs())) or (has_nvidia() and _is_ltx(m))
+    ov = gpu_override()     # 偵測失敗時管理者手動指定 NVIDIA（Windows 常見），裝的也是 CUDA 版，一樣要關
+    nv = (isinstance(ov, dict) and ov.get("vendor") == "nvidia") or (not isinstance(ov, dict) and has_nvidia())
+    plan["fa_off"] = (not nv and bool(probe_amd_sysfs())) or (nv and _is_ltx(m))
     return {"allow": not reasons, "memory_model": mm, "need_gib": need, "weights_gib": weights,
             "measured": bool((m.get("measured") or {}).get("peak_gib")),
             "reasons": reasons, "warnings": warnings, "pools": detail, "plan": plan}
