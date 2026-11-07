@@ -384,5 +384,8 @@ eq("不能單獨跑的 GGUF：imatrix、DFlash／MTP／EAGLE 草稿頭認得出�
                                              "Muse-Glimmer-30B-UD-Q4_K_XL", "Meagle-7B-Q4_K_M")],
    [True, True, True, True, False, False])
 
+eq("三元量化 TQ1_0／TQ2_0 認得出來", [A.pretty_model(x)[1] for x in ("Kimi-K3-UD-TQ1_0-00001-of-00010.gguf", "GLM-4.7-Flash-UD-TQ2_0.gguf")],
+   ["UD-TQ1_0", "UD-TQ2_0"])
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

@@ -6302,7 +6302,7 @@
   "quants": [
    {
     "stem": "GLM-4.7-Flash-UD-TQ1_0",
-    "quant": null,
+    "quant": "UD-TQ1_0",
     "size_gib": 7.8
    },
    {
@@ -6610,6 +6610,100 @@
   "refreshed": 1794007765
  },
  {
+  "repo": "unsloth/Kimi-K3-GGUF",
+  "title": "Kimi K3",
+  "use": "chat",
+  "vendor": "月之暗面 Moonshot",
+  "desc": "Kimi 的兆級參數 MoE，能看圖；最小的量化也要 434 GiB，只適合多卡伺服器（例：8 張 B300）",
+  "tags": [
+   "MoE",
+   "大模型",
+   "看圖",
+   "推理"
+  ],
+  "match": "",
+  "profile": {
+   "arch": "kimi-k3",
+   "meta_name": "Kimi-K3",
+   "ctx_train": 1048576,
+   "kv_full_bpt": 31200,
+   "kv_swa_bpt": 0,
+   "swa_window": 0,
+   "layers": 93,
+   "cn_origin": true,
+   "active_frac": 0.1101,
+   "moe": true,
+   "expert_layers": 92,
+   "expert_used_frac": 0.0179,
+   "expert_layer_frac": 0.009828
+  },
+  "profiled": "Kimi-K3-UD-IQ1_M",
+  "quants": [
+   {
+    "stem": "Kimi-K3-UD-Q1_0",
+    "quant": "UD-Q1_0",
+    "size_gib": 434.3
+   },
+   {
+    "stem": "Kimi-K3-UD-TQ1_0",
+    "quant": "UD-TQ1_0",
+    "size_gib": 474.0
+   },
+   {
+    "stem": "Kimi-K3-UD-TQ2_0",
+    "quant": "UD-TQ2_0",
+    "size_gib": 513.6
+   },
+   {
+    "stem": "Kimi-K3-UD-IQ1_S",
+    "quant": "UD-IQ1_S",
+    "size_gib": 553.2
+   },
+   {
+    "stem": "Kimi-K3-UD-IQ1_M",
+    "quant": "UD-IQ1_M",
+    "size_gib": 604.3
+   },
+   {
+    "stem": "Kimi-K3-UD-IQ2_XXS",
+    "quant": "UD-IQ2_XXS",
+    "size_gib": 662.2
+   },
+   {
+    "stem": "Kimi-K3-UD-Q2_K_XL",
+    "quant": "UD-Q2_K_XL",
+    "size_gib": 802.1
+   },
+   {
+    "stem": "Kimi-K3-UD-Q4_K_XL",
+    "quant": "UD-Q4_K_XL",
+    "size_gib": 1405.1
+   },
+   {
+    "stem": "Kimi-K3-UD-Q8_K_XL",
+    "quant": "UD-Q8_K_XL",
+    "size_gib": 1453.9
+   }
+  ],
+  "mmproj": [
+   {
+    "path": "mmproj-BF16.gguf",
+    "gib": 0.84
+   },
+   {
+    "path": "mmproj-F16.gguf",
+    "gib": 0.84
+   },
+   {
+    "path": "mmproj-F32.gguf",
+    "gib": 1.67
+   }
+  ],
+  "license": "other",
+  "released": "2026-07",
+  "refreshed": 1794008907
+ },
+ {
   "repo": "xCloudinfo/xGemable-12B-coder-v2-fullft-GGUF",
   "title": "xGemable 12B Coder v2",
   "use": "code",
@@ -6911,7 +7005,7 @@
   "quants": [
    {
     "stem": "Qwen3-Coder-30B-A3B-Instruct-UD-TQ1_0",
-    "quant": null,
+    "quant": "UD-TQ1_0",
     "size_gib": 7.5
    },
    {

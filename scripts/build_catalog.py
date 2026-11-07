@@ -122,6 +122,8 @@ SEED = [
      "智譜的 MoE，中文對話與寫程式都不錯，MIT 授權", ["MoE"]),
     ("unsloth/Qwen3.5-122B-A10B-GGUF", "Qwen3.5 122B-A10B", "chat", "阿里巴巴 Qwen",
      "Qwen 122B MoE，每次動用約 10B 參數；96 GB 以上的機器", ["MoE", "大模型", "推理"]),
+    ("unsloth/Kimi-K3-GGUF", "Kimi K3", "chat", "月之暗面 Moonshot",
+     "Kimi 的兆級參數 MoE，能看圖；最小的量化也要 434 GiB，只適合多卡伺服器（例：8 張 B300）", ["MoE", "大模型", "看圖", "推理"]),
     # 寫程式
     ("xCloudinfo/xGemable-12B-coder-v2-fullft-GGUF", "xGemable 12B Coder v2", "code", "云碩 xCloudinfo",
      "以 Gemma 4 12B 全參數微調的寫程式模型，給 IDE 補全與改程式用", ["寫程式", "自家"], "coder-v2"),

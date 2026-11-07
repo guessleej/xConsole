@@ -1911,7 +1911,7 @@ def slot_progress(slot_id):
     return 200, out
 
 
-QUANT_RX = re.compile(r"[-_.]((?:UD-)?(?:I?Q\d\w*|F16|BF16|MXFP4\w*))$", re.I)
+QUANT_RX = re.compile(r"[-_.]((?:UD-)?(?:I?Q\d\w*|TQ\d\w*|F16|BF16|MXFP4\w*))$", re.I)   # TQ1_0／TQ2_0：三元量化
 
 
 def pretty_model(native):
