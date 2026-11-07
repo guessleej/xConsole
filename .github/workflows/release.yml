@@ -10,7 +10,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: 版本檔要跟標籤一致
         run: |
           test "v$(cat VERSION)" = "${GITHUB_REF_NAME}" || { echo "VERSION 是 $(cat VERSION)，標籤是 ${GITHUB_REF_NAME}"; exit 1; }
