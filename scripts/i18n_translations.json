@@ -18038,5 +18038,385 @@
 "en": "Size, quantization, architecture, and MoE ratio are read automatically from the Hugging Face file headers; no manual entry needed. China-origin models are marked automatically (not allowed in government projects).",
 "ja": "サイズ、量子化、アーキテクチャ、MoE 比率は Hugging Face のファイルヘッダーから自動で読み取るため、手入力は不要です。中国製モデルは自動で表示されます（官公庁案件では使用不可）。",
 "ko": "크기, 양자화, 아키텍처, MoE 비율은 Hugging Face의 파일 헤더에서 자동으로 읽으므로 직접 입력할 필요가 없습니다. 중국산 모델은 자동으로 표시됩니다(정부 사업 사용 불가)."
+},
+"很慢": {
+"en": "Very slow",
+"ja": "とても遅い",
+"ko": "매우 느림"
+},
+"{0}年{1}月釋出": {
+"en": "Released {1}/{0}",
+"ja": "{0}年{1}月リリース",
+"ko": "{0}년 {1}월 출시"
+},
+"月釋出": {
+"en": " released",
+"ja": "月リリース",
+"ko": "월 출시"
+},
+"{0}年": {
+"en": "{0}",
+"ja": "{0}年",
+"ko": "{0}년"
+},
+"新": {
+"en": "New",
+"ja": "新着",
+"ko": "신규"
+},
+"繁中": {
+"en": "Trad. Chinese",
+"ja": "繁体字中国語",
+"ko": "번체 중국어"
+},
+"這台記憶體不夠，下載了也跑不動": {
+"en": "This machine doesn't have enough memory; it won't run even if downloaded",
+"ja": "このマシンはメモリ不足のため、ダウンロードしても動きません",
+"ko": "이 컴퓨터는 메모리가 부족해 내려받아도 실행되지 않습니다"
+},
+"適合我的電腦": {
+"en": "Fits my computer",
+"ja": "このPCに合う",
+"ko": "내 컴퓨터에 맞음"
+},
+"程式設計": {
+"en": "Coding",
+"ja": "プログラミング",
+"ko": "프로그래밍"
+},
+"推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或跑不動的，或到「搜尋 HuggingFace」找小一點的。": {
+"en": "No recommended model runs smoothly on this machine. Tap All to see slow or unsupported ones, or search Hugging Face for a smaller one.",
+"ja": "このマシンで快適に動くおすすめモデルはありません。「すべて」で遅いものや動かないものを見るか、「HuggingFace を検索」で小さいものを探してください。",
+"ko": "이 컴퓨터에서 원활하게 실행되는 추천 모델이 없습니다. '전체'에서 느리거나 실행되지 않는 모델을 보거나 'HuggingFace 검색'에서 더 작은 모델을 찾으세요."
+},
+"這個分類裡沒有模型。": {
+"en": "No models in this category.",
+"ja": "このカテゴリーにはモデルがありません。",
+"ko": "이 분류에는 모델이 없습니다."
+},
+"每顆模型包含主體、文字編碼器和 VAE，一鍵全部下載。照這台的記憶體推薦了合適的量化版本，也可以自己選。": {
+"en": "Each model includes the main model, text encoder and VAE, all downloaded in one click. A suitable quantization is recommended for this machine's memory, or pick your own.",
+"ja": "各モデルは本体・テキストエンコーダー・VAE を含み、ワンクリックでまとめてダウンロードします。このマシンのメモリに合う量子化をおすすめしていますが、自分で選ぶこともできます。",
+"ko": "각 모델은 본체, 텍스트 인코더, VAE를 포함하며 한 번에 모두 내려받습니다. 이 컴퓨터의 메모리에 맞는 양자화를 추천하며 직접 고를 수도 있습니다."
+},
+"存放在 {0}，剩 {1} GB。": {
+"en": "Stored in {0}, {1} GB free.",
+"ja": "保存先 {0}、空き {1} GB。",
+"ko": "저장 위치 {0}, 남은 공간 {1} GB."
+},
+"存放在": {
+"en": "Stored in",
+"ja": "保存先",
+"ko": "저장 위치"
+},
+"自己組一顆": {
+"en": "Build your own",
+"ja": "自分で組む",
+"ko": "직접 구성"
+},
+"不在清單上的模型：自己挑主體、文字編碼器、VAE 的檔案": {
+"en": "For a model not on the list: pick the main model, text encoder and VAE files yourself",
+"ja": "リストにないモデル：本体・テキストエンコーダー・VAE のファイルを自分で選びます",
+"ko": "목록에 없는 모델: 본체, 텍스트 인코더, VAE 파일을 직접 고릅니다"
+},
+"正在安裝畫圖 / 影片引擎…": {
+"en": "Installing the image / video engine…",
+"ja": "画像 / 動画エンジンをインストール中…",
+"ko": "이미지 / 동영상 엔진 설치 중…"
+},
+"先安裝畫圖 / 影片引擎": {
+"en": "Install the image / video engine first",
+"ja": "まず画像 / 動画エンジンをインストール",
+"ko": "먼저 이미지 / 동영상 엔진을 설치하세요"
+},
+"第一次使用要下載 stable-diffusion.cpp（依這台的顯示卡挑版本），畫圖和影片共用，以後不用再裝。": {
+"en": "First use downloads stable-diffusion.cpp (the build matching this machine's GPU). Images and video share it; you only install it once.",
+"ja": "初回は stable-diffusion.cpp（このマシンの GPU に合う版）をダウンロードします。画像と動画で共用し、以降は不要です。",
+"ko": "처음 사용할 때 stable-diffusion.cpp(이 컴퓨터의 GPU에 맞는 버전)를 내려받습니다. 이미지와 동영상이 함께 쓰며 한 번만 설치하면 됩니다."
+},
+"畫圖模型": {
+"en": "Image models",
+"ja": "画像モデル",
+"ko": "이미지 모델"
+},
+"影片模型": {
+"en": "Video models",
+"ja": "動画モデル",
+"ko": "동영상 모델"
+},
+"產過一次後顯示這台的實測。標「中國來源」的模型（含文字編碼器、VAE）政府案不得使用。": {
+"en": "after one run this machine's measurements are shown. Models marked China-origin (including text encoders and VAEs) are not allowed in government projects.",
+"ja": "一度生成するとこのマシンの実測値を表示します。「中国製」と表示されたモデル（テキストエンコーダー・VAE を含む）は官公庁案件では使用できません。",
+"ko": "한 번 생성하면 이 컴퓨터의 실측값을 표시합니다. '중국산'으로 표시된 모델(텍스트 인코더, VAE 포함)은 정부 사업에 사용할 수 없습니다."
+},
+"較慢": {
+"en": "Slower",
+"ja": "遅め",
+"ko": "느림"
+},
+"部分放記憶體，生成較慢": {
+"en": "Partly in system memory; generation is slower",
+"ja": "一部をメモリに置くため生成が遅め",
+"ko": "일부를 메모리에 두어 생성이 느림"
+},
+"視訊記憶體和記憶體都不夠": {
+"en": "Not enough VRAM or memory",
+"ja": "VRAM もメモリも不足",
+"ko": "VRAM과 메모리가 모두 부족"
+},
+"能改圖": {
+"en": "Can edit",
+"ja": "編集可",
+"ko": "편집 가능"
+},
+"只能改圖": {
+"en": "Edit only",
+"ja": "編集専用",
+"ko": "편집 전용"
+},
+"圖生影片": {
+"en": "Image to video",
+"ja": "画像から動画",
+"ko": "이미지→동영상"
+},
+"多圖參考": {
+"en": "Multi-reference",
+"ja": "複数参照",
+"ko": "다중 참조"
+},
+"需要上傳圖片": {
+"en": "Needs an image",
+"ja": "画像が必要",
+"ko": "이미지 필요"
+},
+"首尾幀": {
+"en": "First/last frame",
+"ja": "最初/最後のフレーム",
+"ko": "첫/끝 프레임"
+},
+"帶聲音": {
+"en": "With audio",
+"ja": "音声付き",
+"ko": "오디오 포함"
+},
+"共 {0} GB": {
+"en": "{0} GB total",
+"ja": "合計 {0} GB",
+"ko": "총 {0} GB"
+},
+"{0}，產的時候要約 {1} GiB": {
+"en": "{0}; needs about {1} GiB while generating",
+"ja": "{0}、生成時に約 {1} GiB 必要",
+"ko": "{0}, 생성 시 약 {1} GiB 필요"
+},
+"產的時候要約": {
+"en": "needs about, while generating,",
+"ja": "生成時に約",
+"ko": "생성 시 약"
+},
+"去產影片": {
+"en": "Make a video",
+"ja": "動画を作る",
+"ko": "동영상 만들기"
+},
+"去畫圖": {
+"en": "Make an image",
+"ja": "画像を作る",
+"ko": "이미지 만들기"
+},
+"下載 {0} GB": {
+"en": "Download {0} GB",
+"ja": "{0} GB をダウンロード",
+"ko": "{0} GB 내려받기"
+},
+"{0}，產圖時要約 {1} GiB。下載在背景進行，中斷了再按一次會接續；完成後在這一列按「去畫圖」或「去產影片」。": {
+"en": "{0}; needs about {1} GiB while generating. The download runs in the background and resumes if you press again after an interruption; when done, press Make an image or Make a video on this row.",
+"ja": "{0}、生成時に約 {1} GiB 必要です。ダウンロードはバックグラウンドで行い、中断しても再度押すと続きから再開します。完了したらこの行の「画像を作る」または「動画を作る」を押してください。",
+"ko": "{0}, 생성 시 약 {1} GiB가 필요합니다. 다운로드는 백그라운드에서 진행되며 중단되면 다시 누르면 이어서 받습니다. 끝나면 이 행의 '이미지 만들기' 또는 '동영상 만들기'를 누르세요."
+},
+"GiB。下載在背景進行，中斷了再按一次會接續；完成後在這一列按「去畫圖」或「去產影片」": {
+"en": "GiB. The download runs in the background and resumes if you press again after an interruption; when done, press Make an image or Make a video on this row",
+"ja": "GiB。ダウンロードはバックグラウンドで行い、中断しても再度押すと続きから再開します。完了したらこの行の「画像を作る」または「動画を作る」を押してください",
+"ko": "GiB. 다운로드는 백그라운드에서 진행되며 중단되면 다시 누르면 이어서 받습니다. 끝나면 이 행의 '이미지 만들기' 또는 '동영상 만들기'를 누르세요"
+},
+"（選填）": {
+"en": " (optional)",
+"ja": "（任意）",
+"ko": "(선택)"
+},
+"參考圖{0}": {
+"en": "Reference image{0}",
+"ja": "参照画像{0}",
+"ko": "참조 이미지{0}"
+},
+"要改的圖{0}": {
+"en": "Image to edit{0}",
+"ja": "編集する画像{0}",
+"ko": "편집할 이미지{0}"
+},
+"要改的圖": {
+"en": "Image to edit",
+"ja": "編集する画像",
+"ko": "편집할 이미지"
+},
+"第一格畫面{0}": {
+"en": "First frame{0}",
+"ja": "最初のフレーム{0}",
+"ko": "첫 프레임{0}"
+},
+"第一格畫面": {
+"en": "First frame",
+"ja": "最初のフレーム",
+"ko": "첫 프레임"
+},
+"影片裡會出現這張圖的人物、商品或場景": {
+"en": "The people, products or scenes in this image will appear in the video",
+"ja": "この画像の人物・商品・場面が動画に登場します",
+"ko": "이 이미지의 인물, 상품, 장면이 동영상에 나옵니다"
+},
+"照提示詞改這張圖：換背景、改顏色、改圖裡的文字、加減東西": {
+"en": "Edit this image per the prompt: change the background, colors or text, add or remove things",
+"ja": "プロンプトどおりにこの画像を編集：背景・色・文字の変更、物の追加や削除",
+"ko": "프롬프트대로 이 이미지를 편집: 배경, 색, 글자 변경, 물체 추가/제거"
+},
+"。這顆一定要先選一張圖": {
+"en": ". This model requires an image first",
+"ja": "。このモデルは先に画像を選ぶ必要があります",
+"ko": ". 이 모델은 먼저 이미지를 골라야 합니다"
+},
+"高雜訊擴散模型": {
+"en": "High-noise diffusion model",
+"ja": "高ノイズ拡散モデル",
+"ko": "고잡음 확산 모델"
+},
+"看圖元件": {
+"en": "Vision component",
+"ja": "画像認識コンポーネント",
+"ko": "비전 구성 요소"
+},
+"影格規則只能是 1（不限）、4（4n+1）、8（8n+1）": {
+"en": "Frame rule must be 1 (any), 4 (4n+1) or 8 (8n+1)",
+"ja": "フレーム規則は 1（任意）、4（4n+1）、8（8n+1）のいずれかです",
+"ko": "프레임 규칙은 1(제한 없음), 4(4n+1), 8(8n+1) 중 하나입니다"
+},
+"影格數 1～241{0}，每秒格數 1～60": {
+"en": "Frames 1–241{0}; frames per second 1–60",
+"ja": "フレーム数 1～241{0}、毎秒フレーム数 1～60",
+"ko": "프레임 수 1~241{0}, 초당 프레임 1~60"
+},
+"影格數 1～241": {
+"en": "Frames 1–241",
+"ja": "フレーム数 1～241",
+"ko": "프레임 수 1~241"
+},
+"每秒格數 1～60": {
+"en": "frames per second 1–60",
+"ja": "毎秒フレーム数 1～60",
+"ko": "초당 프레임 1~60"
+},
+"參考圖的用法只能是 init 或 ref": {
+"en": "Image use must be init or ref",
+"ja": "画像の使い方は init か ref のみです",
+"ko": "이미지 용도는 init 또는 ref만 가능합니다"
+},
+"釋出時間寫成 2025 或 2025-08": {
+"en": "Write the release date as 2025 or 2025-08",
+"ja": "リリース時期は 2025 または 2025-08 の形式で書いてください",
+"ko": "출시 시기는 2025 또는 2025-08 형식으로 쓰세요"
+},
+"，每秒格數 1～60": {
+"en": "; frames per second 1–60",
+"ja": "、毎秒フレーム数 1～60",
+"ko": ", 초당 프레임 1~60"
+},
+"flow shift 要在 0～20 之間": {
+"en": "flow shift must be between 0 and 20",
+"ja": "flow shift は 0～20 の範囲です",
+"ko": "flow shift는 0~20 사이여야 합니다"
+},
+"模型參數格式是 名稱=值（最多 4 組，逗號分隔）": {
+"en": "Model arguments must be name=value (up to 4, comma separated)",
+"ja": "モデル引数は 名前=値 の形式です（最大 4 組、カンマ区切り）",
+"ko": "모델 인수는 이름=값 형식입니다(최대 4개, 쉼표 구분)"
+},
+"高雜訊步數 1～150、引導強度 0～30": {
+"en": "High-noise steps 1–150, guidance 0–30",
+"ja": "高ノイズのステップ数 1～150、ガイダンス 0～30",
+"ko": "고잡음 단계 1~150, 가이던스 0~30"
+},
+"flow shift 要是數字": {
+"en": "flow shift must be a number",
+"ja": "flow shift は数値です",
+"ko": "flow shift는 숫자여야 합니다"
+},
+"高雜訊步數、引導強度要是數字": {
+"en": "High-noise steps and guidance must be numbers",
+"ja": "高ノイズのステップ数とガイダンスは数値です",
+"ko": "고잡음 단계와 가이던스는 숫자여야 합니다"
+},
+" 且是 {0} 的倍數加 1": {
+"en": " and a multiple of {0} plus 1",
+"ja": "かつ {0} の倍数＋1",
+"ko": ", {0}의 배수+1"
+},
+"且是": {
+"en": "and",
+"ja": "かつ",
+"ko": "그리고"
+},
+"的倍數加 1": {
+"en": "multiple plus 1",
+"ja": "の倍数＋1",
+"ko": "의 배수+1"
+},
+" 且是 ": {
+"en": " and ",
+"ja": "かつ ",
+"ko": ", "
+},
+" 的倍數加 1": {
+"en": " multiple plus 1",
+"ja": " の倍数＋1",
+"ko": "의 배수+1"
+},
+"影格規則只能是 1、4、8": {
+"en": "Frame rule must be 1, 4 or 8",
+"ja": "フレーム規則は 1、4、8 のいずれかです",
+"ko": "프레임 규칙은 1, 4, 8 중 하나입니다"
+},
+"影格數要在 1～241 之間，而且是 {0} 的倍數加 1（例：{1}）": {
+"en": "Frames must be 1–241 and a multiple of {0} plus 1 (e.g. {1})",
+"ja": "フレーム数は 1～241 で、{0} の倍数＋1 にしてください（例：{1}）",
+"ko": "프레임 수는 1~241이며 {0}의 배수+1이어야 합니다(예: {1})"
+},
+"影格數要在 1～241 之間，而且是": {
+"en": "Frames must be 1–241 and a",
+"ja": "フレーム数は 1～241 で、",
+"ko": "프레임 수는 1~241이며"
+},
+"的倍數加 1（例": {
+"en": "multiple plus 1 (e.g.",
+"ja": "の倍数＋1（例",
+"ko": "의 배수+1(예"
+},
+"參考圖的用法只能是 init（當起始畫面）或 ref（當參考圖）": {
+"en": "Image use must be init (starting frame) or ref (reference image)",
+"ja": "画像の使い方は init（開始画像）か ref（参照画像）のみです",
+"ko": "이미지 용도는 init(시작 화면) 또는 ref(참조 이미지)만 가능합니다"
+},
+"影格數要在 1～241 之間，而且是 ": {
+"en": "Frames must be 1–241 and a multiple of ",
+"ja": "フレーム数は 1～241 で、",
+"ko": "프레임 수는 1~241이며 "
+},
+" 的倍數加 1（例：": {
+"en": " plus 1 (e.g. ",
+"ja": " の倍数＋1（例：",
+"ko": "의 배수+1(예: "
+},
+"這顆要先上傳一張圖片（圖生影片／改圖的模型）": {
+"en": "This model needs an image uploaded first (image-to-video / editing model)",
+"ja": "このモデルは先に画像をアップロードする必要があります（画像から動画／編集モデル）",
+"ko": "이 모델은 먼저 이미지를 올려야 합니다(이미지→동영상/편집 모델)"
 }
 }

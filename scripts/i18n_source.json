@@ -1352,11 +1352,11 @@
 "pattern": false
 },
 {
-"zh": "勉強",
+"zh": "能跑",
 "pattern": false
 },
 {
-"zh": "要用硬碟",
+"zh": "很慢",
 "pattern": false
 },
 {
@@ -1556,11 +1556,7 @@
 "pattern": false
 },
 {
-"zh": "自家",
-"pattern": false
-},
-{
-"zh": "{0} 年 {1} 月發布",
+"zh": "{0}年{1}月釋出",
 "pattern": true
 },
 {
@@ -1568,23 +1564,23 @@
 "pattern": false
 },
 {
-"zh": "月發布",
+"zh": "月釋出",
 "pattern": false
 },
 {
-"zh": "{0} 年發布",
+"zh": "{0}年",
 "pattern": true
 },
 {
-"zh": "年發布",
+"zh": "新",
 "pattern": false
 },
 {
-"zh": "授權 {0}",
-"pattern": true
+"zh": "自家",
+"pattern": false
 },
 {
-"zh": "授權",
+"zh": "繁中",
 "pattern": false
 },
 {
@@ -1604,23 +1600,15 @@
 "pattern": false
 },
 {
-"zh": "共 {0} GiB",
-"pattern": true
-},
-{
-"zh": "共",
-"pattern": false
-},
-{
 "zh": "速度未知",
 "pattern": false
 },
 {
-"zh": "下載 {0} GiB",
-"pattern": true
+"zh": "存放區空間不夠（另需保留 10 GiB）",
+"pattern": false
 },
 {
-"zh": "存放區空間不夠（另需保留 10 GiB）",
+"zh": "這台記憶體不夠，下載了也跑不動",
 "pattern": false
 },
 {
@@ -1664,19 +1652,7 @@
 "pattern": false
 },
 {
-"zh": "為 {0} 推薦",
-"pattern": true
-},
-{
-"zh": "為",
-"pattern": false
-},
-{
-"zh": "管理推薦清單",
-"pattern": false
-},
-{
-"zh": "適合這台",
+"zh": "適合我的電腦",
 "pattern": false
 },
 {
@@ -1684,15 +1660,7 @@
 "pattern": false
 },
 {
-"zh": "對話與知識",
-"pattern": false
-},
-{
-"zh": "寫程式",
-"pattern": false
-},
-{
-"zh": "看圖與 OCR",
+"zh": "程式設計",
 "pattern": false
 },
 {
@@ -1700,23 +1668,15 @@
 "pattern": false
 },
 {
-"zh": "隱藏放不下的",
+"zh": "管理推薦清單",
 "pattern": false
 },
 {
-"zh": "也顯示放不下的",
+"zh": "推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或跑不動的，或到「搜尋 HuggingFace」找小一點的。",
 "pattern": false
 },
 {
-"zh": "推薦清單是空的，按「管理推薦清單」新增。",
-"pattern": false
-},
-{
-"zh": "推薦清單裡沒有這台跑得順的模型；按「全部」看要用硬碟或放不下的，或到「搜尋 Hugging Face」找小一點的。",
-"pattern": false
-},
-{
-"zh": "這個分類裡沒有這台放得下的模型；按「也顯示放不下的」看全部。",
+"zh": "這個分類裡沒有模型。",
 "pattern": false
 },
 {
@@ -1992,39 +1952,35 @@
 "pattern": false
 },
 {
-"zh": "產生圖片與影片",
+"zh": "每顆模型包含主體、文字編碼器和 VAE，一鍵全部下載。照這台的記憶體推薦了合適的量化版本，也可以自己選。",
 "pattern": false
 },
 {
-"zh": "已下載（{0}）",
+"zh": "存放在 {0}，剩 {1} GB。",
 "pattern": true
 },
 {
-"zh": "畫圖與影片：{0}",
-"pattern": true
-},
-{
-"zh": "畫圖與影片",
+"zh": "存放在",
 "pattern": false
 },
 {
-"zh": "{0}・存放區 {1}，剩 {2} GiB",
-"pattern": true
-},
-{
-"zh": "手動組一顆（內部測試）",
+"zh": "自己組一顆",
 "pattern": false
 },
 {
-"zh": "安裝畫圖引擎",
+"zh": "不在清單上的模型：自己挑主體、文字編碼器、VAE 的檔案",
 "pattern": false
 },
 {
-"zh": "正在編譯 stable-diffusion.cpp…",
+"zh": "正在安裝畫圖 / 影片引擎…",
 "pattern": false
 },
 {
-"zh": "依這台的顯示卡自動選 CUDA／ROCm，在網頁上一鍵編譯 stable-diffusion.cpp（約 10～20 分鐘）",
+"zh": "先安裝畫圖 / 影片引擎",
+"pattern": false
+},
+{
+"zh": "第一次使用要下載 stable-diffusion.cpp（依這台的顯示卡挑版本），畫圖和影片共用，以後不用再裝。",
 "pattern": false
 },
 {
@@ -2032,35 +1988,19 @@
 "pattern": false
 },
 {
-"zh": "下載一顆模型",
+"zh": "畫圖模型",
 "pattern": false
 },
 {
-"zh": "主體、文字編碼器、VAE 一次下載齊；照這台的記憶體建議量化，標好流暢或能跑",
+"zh": "影片模型",
 "pattern": false
 },
 {
-"zh": "看推薦",
+"zh": "「要約」＝所有權重加上產圖時的計算緩衝（以清單的預設尺寸計）。擴散模型吃的是算力不是頻寬，速度不估算，",
 "pattern": false
 },
 {
-"zh": "產生第一張",
-"pattern": false
-},
-{
-"zh": "產之前先試算這台還剩多少記憶體，不夠就擋下；產過一次會記下實測的時間與用量",
-"pattern": false
-},
-{
-"zh": "去產圖",
-"pattern": false
-},
-{
-"zh": "看步驟",
-"pattern": false
-},
-{
-"zh": "收起步驟",
+"zh": "產過一次後顯示這台的實測。標「中國來源」的模型（含文字編碼器、VAE）政府案不得使用。",
 "pattern": false
 },
 {
@@ -2088,19 +2028,43 @@
 "pattern": false
 },
 {
-"zh": "管理清單",
+"zh": "較慢",
 "pattern": false
 },
 {
-"zh": "清單是空的，按「管理清單」新增。",
+"zh": "部分放記憶體，生成較慢",
 "pattern": false
 },
 {
-"zh": "「要約」＝所有權重加上產圖時的計算緩衝（以清單的預設尺寸計）。擴散模型吃的是算力不是頻寬，速度不估算，",
+"zh": "視訊記憶體和記憶體都不夠",
 "pattern": false
 },
 {
-"zh": "產過一次後顯示這台的實測。清單不含中國來源模型——文字編碼器與 VAE 也算（政府案不得使用）。",
+"zh": "能改圖",
+"pattern": false
+},
+{
+"zh": "只能改圖",
+"pattern": false
+},
+{
+"zh": "圖生影片",
+"pattern": false
+},
+{
+"zh": "多圖參考",
+"pattern": false
+},
+{
+"zh": "需要上傳圖片",
+"pattern": false
+},
+{
+"zh": "首尾幀",
+"pattern": false
+},
+{
+"zh": "帶聲音",
 "pattern": false
 },
 {
@@ -2112,28 +2076,36 @@
 "pattern": false
 },
 {
-"zh": "共 {0} GiB，{1} 個檔",
+"zh": "共 {0} GB",
 "pattern": true
 },
 {
-"zh": "個檔",
+"zh": "共",
 "pattern": false
 },
 {
-"zh": "{0}，要約 {1} GiB",
+"zh": "{0}，產的時候要約 {1} GiB",
 "pattern": true
 },
 {
-"zh": "要約",
+"zh": "產的時候要約",
 "pattern": false
 },
 {
-"zh": "產過一次後顯示實測速度",
+"zh": "去產影片",
+"pattern": false
+},
+{
+"zh": "去畫圖",
 "pattern": false
 },
 {
 "zh": "補齊下載",
 "pattern": false
+},
+{
+"zh": "下載 {0} GB",
+"pattern": true
 },
 {
 "zh": "加入（檔案都在了）",
@@ -2145,6 +2117,10 @@
 },
 {
 "zh": "？共",
+"pattern": false
+},
+{
+"zh": "個檔",
 "pattern": false
 },
 {
@@ -2160,7 +2136,7 @@
 "pattern": false
 },
 {
-"zh": "{0}，產圖時要約 {1} GiB。下載在背景進行，中斷了再按一次會接續；完成後到「產生圖片與影片」。",
+"zh": "{0}，產圖時要約 {1} GiB。下載在背景進行，中斷了再按一次會接續；完成後在這一列按「去畫圖」或「去產影片」。",
 "pattern": true
 },
 {
@@ -2168,7 +2144,7 @@
 "pattern": false
 },
 {
-"zh": "GiB。下載在背景進行，中斷了再按一次會接續；完成後到「產生圖片與影片」",
+"zh": "GiB。下載在背景進行，中斷了再按一次會接續；完成後在這一列按「去畫圖」或「去產影片」",
 "pattern": false
 },
 {
@@ -2273,6 +2249,10 @@
 },
 {
 "zh": "這台還沒有下載好的",
+"pattern": false
+},
+{
+"zh": "看推薦",
 "pattern": false
 },
 {
@@ -2400,11 +2380,43 @@
 "pattern": false
 },
 {
-"zh": "第一格畫面（選填）",
+"zh": "（選填）",
+"pattern": false
+},
+{
+"zh": "參考圖{0}",
+"pattern": true
+},
+{
+"zh": "要改的圖{0}",
+"pattern": true
+},
+{
+"zh": "要改的圖",
+"pattern": false
+},
+{
+"zh": "第一格畫面{0}",
+"pattern": true
+},
+{
+"zh": "第一格畫面",
+"pattern": false
+},
+{
+"zh": "影片裡會出現這張圖的人物、商品或場景",
+"pattern": false
+},
+{
+"zh": "照提示詞改這張圖：換背景、改顏色、改圖裡的文字、加減東西",
 "pattern": false
 },
 {
 "zh": "從這張圖開始，照提示詞接著往下演",
+"pattern": false
+},
+{
+"zh": "。這顆一定要先選一張圖",
 "pattern": false
 },
 {
@@ -2649,6 +2661,10 @@
 },
 {
 "zh": "例：快速、可商用（最多 6 個）",
+"pattern": false
+},
+{
+"zh": "授權",
 "pattern": false
 },
 {
@@ -3290,6 +3306,10 @@
 {
 "zh": "顯示記憶體使用",
 "pattern": false
+},
+{
+"zh": "共 {0} GiB",
+"pattern": true
 },
 {
 "zh": "每 15 秒自動更新",
@@ -6064,6 +6084,14 @@
 "pattern": false
 },
 {
+"zh": "看步驟",
+"pattern": false
+},
+{
+"zh": "收起步驟",
+"pattern": false
+},
+{
 "zh": "這台的晶片",
 "pattern": false
 },
@@ -6961,6 +6989,10 @@
 },
 {
 "zh": "更新畫圖引擎",
+"pattern": false
+},
+{
+"zh": "安裝畫圖引擎",
 "pattern": false
 },
 {
@@ -9352,7 +9384,7 @@
 "pattern": false
 },
 {
-"zh": "能跑",
+"zh": "要用硬碟",
 "pattern": false
 },
 {
@@ -9896,7 +9928,27 @@
 "pattern": false
 },
 {
+"zh": "對話與知識",
+"pattern": false
+},
+{
+"zh": "寫程式",
+"pattern": false
+},
+{
+"zh": "看圖與 OCR",
+"pattern": false
+},
+{
 "zh": "文字編碼器（LLM）",
+"pattern": false
+},
+{
+"zh": "高雜訊擴散模型",
+"pattern": false
+},
+{
+"zh": "看圖元件",
 "pattern": false
 },
 {
@@ -10000,7 +10052,23 @@
 "pattern": false
 },
 {
-"zh": "影格數 1～241 且是 8 的倍數加 1，每秒格數 1～60",
+"zh": "影格規則只能是 1（不限）、4（4n+1）、8（8n+1）",
+"pattern": false
+},
+{
+"zh": "影格數 1～241{0}，每秒格數 1～60",
+"pattern": true
+},
+{
+"zh": "影格數 1～241",
+"pattern": false
+},
+{
+"zh": "每秒格數 1～60",
+"pattern": false
+},
+{
+"zh": "參考圖的用法只能是 init 或 ref",
 "pattern": false
 },
 {
@@ -10009,6 +10077,10 @@
 },
 {
 "zh": "種類只能是畫圖或影片",
+"pattern": false
+},
+{
+"zh": "釋出時間寫成 2025 或 2025-08",
 "pattern": false
 },
 {
@@ -10021,18 +10093,6 @@
 },
 {
 "zh": "最多 8 個元件",
-"pattern": false
-},
-{
-"zh": "含中國來源的元件（{0}），政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆）",
-"pattern": true
-},
-{
-"zh": "含中國來源的元件",
-"pattern": false
-},
-{
-"zh": "政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆",
 "pattern": false
 },
 {
@@ -10092,6 +10152,22 @@
 "pattern": false
 },
 {
+"zh": "，每秒格數 1～60",
+"pattern": false
+},
+{
+"zh": "flow shift 要在 0～20 之間",
+"pattern": false
+},
+{
+"zh": "模型參數格式是 名稱=值（最多 4 組，逗號分隔）",
+"pattern": false
+},
+{
+"zh": "高雜訊步數 1～150、引導強度 0～30",
+"pattern": false
+},
+{
 "zh": "元件種類不合法或重複：{0}",
 "pattern": true
 },
@@ -10121,14 +10197,6 @@
 },
 {
 "zh": "的檔名只收 .gguf、.safetensors、.sft",
-"pattern": false
-},
-{
-"zh": "含中國來源的元件（",
-"pattern": false
-},
-{
-"zh": "），政府案不得使用，不列入推薦清單（內部測試可以到「從 Hugging Face 下載」手動組一顆）",
 "pattern": false
 },
 {
@@ -10176,7 +10244,19 @@
 "pattern": true
 },
 {
+"zh": "要約",
+"pattern": false
+},
+{
 "zh": "GiB，這台最多",
+"pattern": false
+},
+{
+"zh": "flow shift 要是數字",
+"pattern": false
+},
+{
+"zh": "高雜訊步數、引導強度要是數字",
 "pattern": false
 },
 {
@@ -10216,6 +10296,18 @@
 "pattern": false
 },
 {
+"zh": " 且是 {0} 的倍數加 1",
+"pattern": true
+},
+{
+"zh": "且是",
+"pattern": false
+},
+{
+"zh": "的倍數加 1",
+"pattern": false
+},
+{
 "zh": "顯示卡放不下的 MoE 模型，會自動把部分專家層放到系統記憶體繼續跑，只是比較慢",
 "pattern": false
 },
@@ -10225,6 +10317,14 @@
 },
 {
 "zh": " 層專家放系統記憶體",
+"pattern": false
+},
+{
+"zh": " 且是 ",
+"pattern": false
+},
+{
+"zh": " 的倍數加 1",
 "pattern": false
 },
 {
@@ -11604,7 +11704,23 @@
 "pattern": false
 },
 {
-"zh": "影格數要在 1～241 之間，而且是 8 的倍數加 1（例：17、33、49、121）",
+"zh": "影格規則只能是 1、4、8",
+"pattern": false
+},
+{
+"zh": "影格數要在 1～241 之間，而且是 {0} 的倍數加 1（例：{1}）",
+"pattern": true
+},
+{
+"zh": "影格數要在 1～241 之間，而且是",
+"pattern": false
+},
+{
+"zh": "的倍數加 1（例",
+"pattern": false
+},
+{
+"zh": "參考圖的用法只能是 init（當起始畫面）或 ref（當參考圖）",
 "pattern": false
 },
 {
@@ -12496,6 +12612,14 @@
 "pattern": false
 },
 {
+"zh": "影格數要在 1～241 之間，而且是 ",
+"pattern": false
+},
+{
+"zh": " 的倍數加 1（例：",
+"pattern": false
+},
+{
 "zh": "模型代號只能有英數、底線、連字號（最多 64 字）",
 "pattern": false
 },
@@ -12509,18 +12633,6 @@
 },
 {
 "zh": "名稱格式是「作者/模型」",
-"pattern": false
-},
-{
-"zh": "這顆含中國來源的元件（{0}），政府案不得使用；內部測試要勾「內部測試」才能下載",
-"pattern": true
-},
-{
-"zh": "這顆含中國來源的元件",
-"pattern": false
-},
-{
-"zh": "政府案不得使用；內部測試要勾「內部測試」才能下載",
 "pattern": false
 },
 {
@@ -12569,6 +12681,10 @@
 },
 {
 "zh": "這台還沒安裝 stable-diffusion.cpp，先按「安裝畫圖引擎」",
+"pattern": false
+},
+{
+"zh": "這顆要先上傳一張圖片（圖生影片／改圖的模型）",
 "pattern": false
 },
 {
@@ -13381,14 +13497,6 @@
 },
 {
 "zh": "檔名不合法（只收 .gguf、.safetensors、.sft",
-"pattern": false
-},
-{
-"zh": "這顆含中國來源的元件（",
-"pattern": false
-},
-{
-"zh": "），政府案不得使用；內部測試要勾「內部測試」才能下載",
 "pattern": false
 },
 {

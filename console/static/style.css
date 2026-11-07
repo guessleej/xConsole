@@ -374,9 +374,10 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
   white-space: nowrap;            /* 卡片窄的時候整顆換行，不要擠成一個字一行（「重／啟」） */
   transition: background .15s ease;
 }
-:root[data-theme="dark"] .btn { background: rgba(255, 255, 255, .09); }
+/* 深色模式只換一般按鈕的底；主要／危險按鈕要保留自己的顏色（以前這兩條權重較高，把「下載」「開始」都蓋成灰色） */
+:root[data-theme="dark"] .btn:not(.primary):not(.danger) { background: rgba(255, 255, 255, .09); }
 .btn:hover { background: rgba(22, 32, 42, .12); }
-:root[data-theme="dark"] .btn:hover { background: rgba(255, 255, 255, .15); }
+:root[data-theme="dark"] .btn:not(.primary):not(.danger):hover { background: rgba(255, 255, 255, .15); }
 .btn.primary { background: var(--brand); color: #fff; }
 .btn.primary:hover { background: var(--brand-dark); }
 .btn.danger { background: rgba(198, 40, 40, .12); color: var(--bad); }
@@ -903,19 +904,36 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
 }
 
 .rec-for { align-items: center; margin-bottom: 12px; }
-.rec-list { max-height: min(400px, 42vh); overflow-y: auto; margin: 6px -4px 10px; padding: 0 4px; overscroll-behavior: contain; }
-.rec-row {
-  display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(150px, 1fr) minmax(160px, 1.1fr) 132px;
-  gap: 16px; align-items: center; padding: 13px 14px; border-radius: var(--radius-sm);
+/* 推薦清單照 LocModel：上面一排圓角篩選，下面一個圓角容器、一列一顆、列間細分隔。
+   清單在容器內捲（全域規則：頁面不准無限往下長），容器高度撐到視窗底，看起來跟整頁捲一樣 */
+.rec-wrap > p { margin-top: 10px; }
+.chip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.pill {
+  border: 0; border-radius: 999px; padding: 6px 15px; font: inherit; font-size: 14px; cursor: pointer;
+  background: var(--panel); color: var(--ink-2);
 }
-.rec-row:nth-child(odd) { background: var(--panel); }
+.pill:hover { background: var(--bg-hover); color: var(--ink); }
+.pill[aria-current="true"] { background: rgba(191, 24, 31, .16); color: var(--brand); font-weight: 700; }
+.pill:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.rec-list {
+  max-height: calc(100vh - 290px); min-height: 240px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.rec-list > p.pad { padding: 18px; }
+.rec-row {
+  display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(150px, .9fr) minmax(170px, 1.1fr) 104px;
+  gap: 16px; align-items: center; padding: 14px 18px;
+}
+.rec-row + .rec-row { box-shadow: inset 0 1px 0 var(--line); }
+.rec-fit-line { display: flex; align-items: center; gap: 8px; }
+.chip.new { background: rgba(198, 40, 40, .14); color: var(--bad); }
+.chip.info { background: rgba(8, 145, 178, .14); color: var(--cyan, #0891b2); }
 .rec-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 2px; }
 .rec-title b { font-size: 15px; }
 .rec-quant, .rec-fit { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .rec-fit .chip { align-self: flex-start; font-weight: 700; }
 .rec-quant select { width: 100%; }
 .rec-act { display: flex; justify-content: flex-end; }
-.card .rec-row:nth-child(odd) { background: var(--panel); }
 
 @media (max-width: 860px) {
   .card.hw { grid-template-columns: 1fr; gap: 16px; }
@@ -1345,3 +1363,14 @@ input.switch:checked::after { transform: translateX(18px); }
 
 .modal .small, .modal .note, .modal label.field { overflow-wrap: anywhere; }
 .modal .form-row > * { min-width: 0; }
+
+/* 畫圖／影片模型分頁（照 LocModel）：說明列、「先安裝引擎」橫幅、畫圖與影片兩區，各一個圓角清單 */
+.sd-intro { display: flex; align-items: center; gap: 12px; }
+.sd-intro > .small { line-height: 1.7; }
+.sd-engine {
+  display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: var(--radius);
+  background: rgba(191, 24, 31, .10);
+}
+.sd-engine b { display: block; color: var(--brand); margin-bottom: 4px; }
+h3.sd-sec { margin: 24px 0 10px; font-size: 16px; }
+.rec-list.sd-list { max-height: none; min-height: 0; overflow: visible; }

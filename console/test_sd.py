@@ -55,6 +55,22 @@ FLUX = {"repo": "leejet/FLUX.1-schnell-gguf", "title": "FLUX.1 schnell", "kind":
                   "diffusers/FLUX.1-vae": {"diffusion_pytorch_model.safetensors": 0.16 * G}}}
 
 
+def _err(fn):
+    try:
+        fn()
+    except ValueError as ex:
+        return str(ex)
+    return ""
+
+
+def _agent_defaults_ok(row):
+    try:
+        A.sd_check_defaults(row.get("defaults"), row["kind"])
+        return True
+    except ValueError:
+        return False
+
+
 def main():
     # ---- 檔名 → 量化、位元數
     case("量化：小寫 q4_k", R.sd_quant("flux1-schnell-q4_k.gguf"), "Q4_K")
@@ -112,10 +128,17 @@ def main():
         {"role": "diffusion", "repo": "leejet/FLUX.2-klein-4B-GGUF", "match": "flux-2-klein-4b-"},
         {"role": "llm", "repo": "unsloth/Qwen3-4B-GGUF", "match": "Qwen3-4B-"},
         {"role": "vae", "repo": "black-forest-labs/FLUX.2-dev", "path": "vae/diffusion_pytorch_model.safetensors"}]}
-    case("清單欄位：主體非中國、文字編碼器是 Qwen 也不收", "中國來源" in (R.check_sd_fields(klein)[1] or ""), True)
+    kf, kerr = R.check_sd_fields(klein)
+    case("清單欄位：文字編碼器是 Qwen 也收，標中國來源（放入所有模型，只標示）", (kerr, kf and kf["cn_origin"]), (None, True))
     krea = {**flux_in, "parts": flux_in["parts"][:1] + [
         {"role": "vae", "repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged", "path": "split_files/vae/wan_2.1_vae.safetensors"}]}
-    case("清單欄位：Wan 的 VAE 也不收", "中國來源" in (R.check_sd_fields(krea)[1] or ""), True)
+    case("清單欄位：Wan 的 VAE 也標中國來源", R.check_sd_fields(krea)[0]["cn_origin"], True)
+    case("清單欄位：FLUX 不標中國來源", R.check_sd_fields(flux_in)[0]["cn_origin"], False)
+    case("清單欄位：影片影格 4n+1（Wan）", (R.check_sd_defaults({"frames": 33, "frame_step": 4}, "video")[1],
+                                       R.check_sd_defaults({"frames": 31, "frame_step": 4}, "video")[1] is not None), (None, True))
+    case("清單欄位：H3 影格不限（引擎自己對齊 17k+5）", R.check_sd_defaults({"frames": 56, "frame_step": 1}, "video")[1], None)
+    case("清單欄位：模型參數只收 名稱=值", (R.check_sd_defaults({"model_args": "qwen_image_zero_cond_t=true"}, "image")[1],
+                                       R.check_sd_defaults({"model_args": "x=1; rm -rf /"}, "image")[1] is not None), (None, True))
     case("中國來源比對：swan、wander 不算 Wan", bool(R.SD_CN_RX.search("swan-lake wander")), False)
     two = {**flux_in, "parts": flux_in["parts"] + [{"role": "model", "repo": FLUX["repo"], "path": "x.gguf"}]}
     case("清單欄位：兩個主體不收", R.check_sd_fields(two)[1], "要有、而且只能有一個主體（完整模型或擴散模型）")
@@ -128,10 +151,14 @@ def main():
     case("元件種類與取樣方法：兩邊一致", (set(R.SD_ROLES), R.SD_SAMPLERS), (set(A.SD_ROLES), A.SD_SAMPLERS))
     # ---- 隨附的預設清單
     rows = json.load(open(os.path.join(HERE, "sd_catalog_default.json"), encoding="utf-8"))
-    case("預設清單：每一筆都過得了欄位檢查（含中國來源過濾）",
+    case("預設清單：每一筆都過得了欄位檢查",
          [r["repo"] for r in rows if R.check_sd_fields(r)[1]], [])
     case("預設清單：每一筆都湊得出至少一組完整的檔", [r["repo"] for r in rows if not R.sd_resolve(r)], [])
     case("預設清單：有畫圖也有影片", sorted({r["kind"] for r in rows}), ["image", "video"])
+    lm = ["Z-Image Turbo", "Qwen-Image", "FLUX.1 schnell", "FLUX.2 klein 4B", "Qwen-Image-Edit 改圖", "Wan2.1 文生影片 1.3B",
+          "Wan2.2 影片 5B", "LTX-2.3 有聲影片", "MiniMax-H3 有聲影片", "MiniMax-H3 多圖參考影片", "Wan2.2 圖生影片 A14B"]
+    case("預設清單：LocModel 的 11 顆都有", [t for t in lm if t not in {r["title"] for r in rows}], [])
+    case("預設清單：代理端也收每一筆的預設參數", [r["repo"] for r in rows if not _agent_defaults_ok(r)], [])
 
     # ---- 代理：macOS／Windows 裝官方預編譯版（檔名照 master-1030 實際的 release）
     dg = {"digest": "sha256:" + "a" * 64, "browser_download_url": "https://x"}
@@ -153,8 +180,8 @@ def main():
          "只能有一個主體" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "x.gguf"},
                                                                 {"role": "model", "repo": "a/b", "path": "y.gguf"}]})[1] or ""), True)
     case("代理：不是模型檔的副檔名不收", "檔名不合法" in (A.sd_check_spec({**spec, "parts": [{"role": "diffusion", "repo": "a/b", "path": "x.sh"}]})[1] or ""), True)
-    case("代理：中國來源沒勾內部測試，連 Hugging Face 都不去問就擋",
-         A.sd_download({**spec, "parts": [{"role": "diffusion", "repo": "Qwen/Qwen-Image", "path": "q.gguf"}]})[0], 400)
+    case("代理：缺必填欄位的規格照樣擋（中國來源不再因來源被擋，只標示）",
+         A.sd_download({**spec, "parts": []})[0], 400)
     # ---- 代理：准入（三種記憶體架構）
     m = {"kind": "image", "parts": [{"size": 6 * G}, {"size": 3 * G}, {"size": 1 * G}]}
 
@@ -209,6 +236,25 @@ def main():
          [x in argv for x in ("vid_gen", "--diffusion-model", "--llm", "--video-frames", "--max-vram", "--vae-tiling")]
          + [argv[argv.index("--flash-attn") + 1]], [True] * 6 + ["off"])
     case("提示詞是一個獨立參數（不經過 shell）", argv[argv.index("-p") + 1], "a cat")
+    # Qwen-Image-Edit：參考圖走 -r、model-args、flow-shift、看圖元件；Wan 2.2 A14B：高雜訊專家與它的參數
+    ed = {"kind": "image", "parts": [{"role": "diffusion", "folder": "a", "file": "e.gguf"},
+                                     {"role": "llm_vision", "folder": "b", "file": "mmproj.gguf"}]}
+    pe = A.sd_check_defaults({"steps": 20, "cfg": 2.5, "flow_shift": 3, "model_args": "qwen_image_zero_cond_t=true",
+                              "image": "ref", "needs_image": True}, "image")
+    av = A.sd_argv("/bin/sd-cli", ed, root, {**pe, "prompt": "x", "negative": "", "seed": 1, "init": "/in.png", "strength": 0.7},
+                   "/o.png", {"offload": False})
+    case("改圖：參考圖走 -r（不是 -i、沒有 strength）、flow-shift、model-args、--llm_vision",
+         ("-r" in av and "-i" not in av and "--strength" not in av, av[av.index("--flow-shift") + 1],
+          av[av.index("--model-args") + 1], "--llm_vision" in av), (True, "3.0", "qwen_image_zero_cond_t=true", True))
+    wa = {"kind": "video", "parts": [{"role": "diffusion", "folder": "a", "file": "low.gguf"},
+                                     {"role": "high_noise", "folder": "a", "file": "high.gguf"}]}
+    pw = A.sd_check_defaults({"width": 832, "height": 480, "steps": 10, "cfg": 3.5, "frames": 33, "fps": 16, "frame_step": 4,
+                              "flow_shift": 3, "high_steps": 8, "high_cfg": 3.5, "needs_image": True}, "video")
+    aw = A.sd_argv("/bin/sd-cli", wa, root, {**pw, "prompt": "x", "negative": "", "seed": 1, "init": "/in.png"}, "/o.webm", {"offload": False})
+    case("Wan 2.2 A14B：高雜訊模型與它的步數、引導強度、取樣方法；起始畫面走 -i",
+         ("--high-noise-diffusion-model" in aw, aw[aw.index("--high-noise-steps") + 1], aw[aw.index("--high-noise-cfg-scale") + 1],
+          aw[aw.index("--high-noise-sampling-method") + 1], "-i" in aw), (True, "8", "3.5", "euler", True))
+    case("影格 4n+1：31 格不收", "4 的倍數加 1" in _err(lambda: A.sd_check_defaults({"frames": 31, "frame_step": 4}, "video")), True)
     # ---- 進度
     log = ("|####| 196/196 -   1.13GB/s\r|==>  | 1/4 -   2.10s/it\r|====>| 3/4 -   1.64s/it\n"
            "[I] loading tensors completed\r|##| 504/776 - 2.12GB/s")

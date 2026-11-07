@@ -606,7 +606,9 @@ def check_fields(body):
 # 擴散模型吃的是算力不是頻寬，速度估不準：不寫估算，產過一次後顯示這台的實測。
 SD_KINDS = {"image": "畫圖", "video": "影片"}
 SD_ROLES = {"model": "完整模型", "diffusion": "擴散模型", "clip_l": "CLIP-L", "clip_g": "CLIP-G", "t5xxl": "T5-XXL",
-            "llm": "文字編碼器（LLM）", "vae": "VAE", "audio_vae": "音訊 VAE", "connectors": "嵌入連接器"}
+            "llm": "文字編碼器（LLM）", "vae": "VAE", "audio_vae": "音訊 VAE", "connectors": "嵌入連接器",
+            "high_noise": "高雜訊擴散模型", "llm_vision": "看圖元件"}
+SD_MODEL_ARGS_RX = re.compile(r"[a-z][a-z0-9_]{0,40}=[A-Za-z0-9_.]{1,20}(?:,[a-z][a-z0-9_]{0,40}=[A-Za-z0-9_.]{1,20}){0,3}")
 SD_MAIN = ("model", "diffusion")
 SD_SAMPLERS = ("euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m", "dpm++2mv2", "ipndm", "ipndm_v", "lcm",
                "ddim_trailing", "tcd")
@@ -773,7 +775,8 @@ def recommend_sd(state, sdlib, catalog):
         best = sd_pick(plans)
         mine = next((p for p in plans if p["ready"]), None) or next((p for p in plans if p["installed_id"]), None)
         job = next((j for j in jobs if j.get("sd_model") in {sd_model_id(e["repo"], p["quant"]) for p in plans}), None)
-        items.append({**{k: e.get(k) for k in ("repo", "title", "kind", "desc", "tags", "vendor", "license", "defaults", "refreshed")},
+        items.append({**{k: e.get(k) for k in ("repo", "title", "kind", "desc", "tags", "vendor", "license", "defaults", "refreshed",
+                                               "released", "cn_origin")},
                       "order": i, "plans": plans, "pick": best["path"] if best else None,
                       "installed": mine["path"] if mine else None,
                       "level": (mine or best or {"level": "no" if plans else "unknown"})["level"],
@@ -801,8 +804,39 @@ def check_sd_defaults(d, kind):
         return None, "步數 1～150、引導強度 0～30"
     if out["sampler"] not in SD_SAMPLERS:
         return None, "取樣方法只能是：" + "、".join(SD_SAMPLERS)
-    if kind == "video" and not (1 <= out["frames"] <= 241 and out["frames"] % 8 == 1 and 1 <= out["fps"] <= 60):
-        return None, "影格數 1～241 且是 8 的倍數加 1，每秒格數 1～60"
+    step = d.get("frame_step") or 8
+    if step not in (1, 4, 8):
+        return None, "影格規則只能是 1（不限）、4（4n+1）、8（8n+1）"
+    if kind == "video" and not (1 <= out["frames"] <= 241 and (step == 1 or out["frames"] % step == 1) and 1 <= out["fps"] <= 60):
+        return None, f"影格數 1～241{'' if step == 1 else f' 且是 {step} 的倍數加 1'}，每秒格數 1～60"
+    if step != 8:
+        out["frame_step"] = step
+    # 這顆模型固定的參數（與代理 sd_check_defaults 同一套規則）
+    if d.get("flow_shift") not in (None, ""):
+        try:
+            fs = float(d["flow_shift"])
+        except (TypeError, ValueError):
+            return None, "flow shift 要是數字"
+        if not 0 < fs <= 20:
+            return None, "flow shift 要在 0～20 之間"
+        out["flow_shift"] = fs
+    if d.get("model_args"):
+        if not SD_MODEL_ARGS_RX.fullmatch(str(d["model_args"])):
+            return None, "模型參數格式是 名稱=值（最多 4 組，逗號分隔）"
+        out["model_args"] = str(d["model_args"])
+    if (d.get("image") or "init") not in ("init", "ref"):
+        return None, "參考圖的用法只能是 init 或 ref"
+    if d.get("image") == "ref":
+        out["image"] = "ref"
+    if d.get("needs_image"):
+        out["needs_image"] = True
+    if d.get("high_steps") not in (None, ""):
+        try:
+            out["high_steps"], out["high_cfg"] = int(d["high_steps"]), float(d.get("high_cfg") if d.get("high_cfg") is not None else out["cfg"])
+        except (TypeError, ValueError):
+            return None, "高雜訊步數、引導強度要是數字"
+        if not 1 <= out["high_steps"] <= 150 or not 0 <= out["high_cfg"] <= 30:
+            return None, "高雜訊步數 1～150、引導強度 0～30"
     return out, None
 
 
@@ -823,6 +857,10 @@ def check_sd_fields(body):
         if len(v) > lim or re.search(r"[\x00-\x1f]", v):
             return None, f"{name}最多 {lim} 字，不能有控制字元"
         out[k] = v
+    rel = str(body.get("released") or "").strip()
+    if rel and not re.fullmatch(r"20\d\d(?:-(?:0[1-9]|1[0-2]))?", rel):
+        return None, "釋出時間寫成 2025 或 2025-08"
+    out["released"] = rel
     tags = body.get("tags") or []
     if isinstance(tags, str):
         tags = [t for t in re.split(r"[,，、\s]+", tags) if t]
@@ -850,10 +888,7 @@ def check_sd_fields(body):
     if len(parts) > 8:
         return None, "最多 8 個元件"
     words = " ".join([title, repo] + [f"{p['repo']} {p.get('path') or p.get('match')}" for p in parts])
-    cn = SD_CN_RX.search(words)
-    if cn:
-        return None, (f"含中國來源的元件（{cn.group(1)}），政府案不得使用，不列入推薦清單"
-                      "（內部測試可以到「從 Hugging Face 下載」手動組一顆）")
+    out["cn_origin"] = bool(SD_CN_RX.search(words))   # 照樣列，畫面標「中國來源・政府案不可用」（含文字編碼器、VAE）
     out["parts"] = parts
     d, err = check_sd_defaults(body.get("defaults"), kind)
     if err:

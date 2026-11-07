@@ -6717,7 +6717,10 @@ class AgentTLSServer(ThreadingHTTPServer):
 # 產圖途中再由看門狗盯著，跌破底線就中止（統一記憶體機吃爆會把整台拖死）。
 SD_ROLES = {"model": "-m", "diffusion": "--diffusion-model", "clip_l": "--clip_l", "clip_g": "--clip_g",
             "t5xxl": "--t5xxl", "llm": "--llm", "vae": "--vae", "audio_vae": "--audio-vae",
-            "connectors": "--embeddings-connectors"}
+            "connectors": "--embeddings-connectors",
+            # Wan 2.2 A14B 是兩個 14B 專家輪流：高雜訊那個另外給；Qwen-Image-Edit 的看圖元件（mmproj）另外給
+            "high_noise": "--high-noise-diffusion-model", "llm_vision": "--llm_vision"}
+SD_MODEL_ARGS_RX = re.compile(r"[a-z][a-z0-9_]{0,40}=[A-Za-z0-9_.]{1,20}(?:,[a-z][a-z0-9_]{0,40}=[A-Za-z0-9_.]{1,20}){0,3}")
 SD_SAMPLERS = ("euler", "euler_a", "heun", "dpm2", "dpm++2s_a", "dpm++2m", "dpm++2mv2", "ipndm", "ipndm_v", "lcm",
                "ddim_trailing", "tcd")
 SD_EXT = (".gguf", ".safetensors", ".sft")
@@ -6849,8 +6852,42 @@ def sd_check_defaults(d, kind):
         raise ValueError("步數要在 1～150 之間")
     if not 0 <= out["cfg"] <= 30:
         raise ValueError("引導強度要在 0～30 之間")
-    if kind == "video" and not (1 <= out["frames"] <= 241 and out["frames"] % 8 == 1):
-        raise ValueError("影格數要在 1～241 之間，而且是 8 的倍數加 1（例：17、33、49、121）")
+    # 各家影格規則不同：LTX 8n+1、Wan 4n+1、MiniMax-H3 引擎自己對齊（step 1＝不限）
+    step = int(d.get("frame_step") or 8)
+    if step not in (1, 4, 8):
+        raise ValueError("影格規則只能是 1、4、8")
+    if kind == "video" and not (1 <= out["frames"] <= 241 and (step == 1 or out["frames"] % step == 1)):
+        raise ValueError(f"影格數要在 1～241 之間，而且是 {step} 的倍數加 1（例：{'、'.join(str(step * k + 1) for k in (2, 4, 6))}）")
+    if step != 8:
+        out["frame_step"] = step
+    # 這顆模型固定的參數（清單上寫，使用者這次產圖不能改）
+    if d.get("flow_shift") not in (None, ""):
+        try:
+            fs = float(d["flow_shift"])
+        except (TypeError, ValueError):
+            raise ValueError("flow shift 要是數字") from None
+        if not 0 < fs <= 20:
+            raise ValueError("flow shift 要在 0～20 之間")
+        out["flow_shift"] = fs
+    if d.get("model_args"):
+        if not SD_MODEL_ARGS_RX.fullmatch(str(d["model_args"])):
+            raise ValueError("模型參數格式是 名稱=值（最多 4 組，逗號分隔）")
+        out["model_args"] = str(d["model_args"])
+    img = d.get("image") or "init"
+    if img not in ("init", "ref"):
+        raise ValueError("參考圖的用法只能是 init（當起始畫面）或 ref（當參考圖）")
+    if img != "init":
+        out["image"] = img
+    if d.get("needs_image"):
+        out["needs_image"] = True
+    if d.get("high_steps") not in (None, ""):
+        try:
+            hs, hc = int(d["high_steps"]), float(d.get("high_cfg") if d.get("high_cfg") is not None else out["cfg"])
+        except (TypeError, ValueError):
+            raise ValueError("高雜訊步數、引導強度要是數字") from None
+        if not 1 <= hs <= 150 or not 0 <= hc <= 30:
+            raise ValueError("高雜訊步數 1～150、引導強度 0～30")
+        out["high_steps"], out["high_cfg"] = hs, hc
     if not 1 <= out["fps"] <= 60:
         raise ValueError("每秒格數要在 1～60 之間")
     s = d.get("sampler") or "euler"
@@ -6923,8 +6960,7 @@ def sd_download(spec, token=""):
         return 400, {"error": err}
     words = " ".join([spec["id"], spec["title"]] + [f"{p['repo']} {p['path']}" for p in spec["parts"]])
     cn = SD_CN_RX.search(words)
-    if cn and not spec["internal"]:
-        return 400, {"error": f"這顆含中國來源的元件（{cn.group(1)}），政府案不得使用；內部測試要勾「內部測試」才能下載"}
+    spec["cn_origin"] = bool(cn)                       # 照樣下載，畫面標「中國來源・政府案不可用」
     trees = {}
     for p in spec["parts"]:
         if p["repo"] not in trees:
@@ -7088,8 +7124,19 @@ def sd_argv(exe, m, root, prm, out, plan):
         a += ["-n", prm["negative"]]
     if m["kind"] == "video":
         a += ["--video-frames", prm["frames"], "--fps", prm["fps"]]
-    if prm.get("init"):
-        # 畫圖：參考圖重繪（strength 越大改越多）；影片：當第一格畫面，接著往下演（LTX 的 I2V）
+    if prm.get("flow_shift"):
+        a += ["--flow-shift", prm["flow_shift"]]
+    if prm.get("model_args"):
+        a += ["--model-args", prm["model_args"]]
+    if prm.get("high_steps"):
+        # Wan 2.2 A14B：高雜訊專家自己的步數與引導強度，取樣方法跟主體一樣
+        a += ["--high-noise-steps", prm["high_steps"], "--high-noise-cfg-scale", prm["high_cfg"],
+              "--high-noise-sampling-method", prm["sampler"]]
+    if prm.get("init") and prm.get("image") == "ref":
+        # 改圖（Qwen-Image-Edit、FLUX.2 klein）與多圖參考（MiniMax-H3 Ref2VA）：圖片當參考，不是起始畫面
+        a += ["-r", prm["init"]]
+    elif prm.get("init"):
+        # 畫圖：參考圖重繪（strength 越大改越多）；影片：當第一格畫面，接著往下演（LTX、Wan、H3 的圖生影片）
         a += ["-i", prm["init"]] + (["--strength", prm["strength"]] if m["kind"] == "image" else [])
     if m["kind"] == "image" and (prm.get("count") or 1) > 1:
         a += ["-b", prm["count"]]              # 一次多張：sd-cli 存成 <檔名>_<序號>.png
@@ -7276,11 +7323,13 @@ def sd_generate(body):
         init, init_ext = sd_init_image(body.get("init_image"))
     except (TypeError, ValueError) as ex:
         return 400, {"error": str(ex) if str(ex) else "種子、張數、重繪強度要是數字"}
+    if prm.get("needs_image") and init is None:
+        return 400, {"error": "這顆要先上傳一張圖片（圖生影片／改圖的模型）"}
     if m["kind"] == "image":
         if not 1 <= count <= 4:
             return 400, {"error": "一次可以產 1～4 張"}
         prm["count"] = count
-        if init is not None:
+        if init is not None and prm.get("image") != "ref":
             if not 0.05 <= strength <= 1.0:
                 return 400, {"error": "重繪強度要在 0.05～1 之間（越大改越多）"}
             prm["strength"] = round(strength, 2)

@@ -51,9 +51,10 @@
 | 27 | 一般人的電腦也跑得動 | 放不下先縮上下文；Windows／macOS 記憶體底線改成建議；推薦清單補入門小模型（Gemma 4 E2B）與 LocModel 有的非中國來源模型 | 完成（PR #33） |
 | 28 | 任何 Hugging Face 模型 | 直接貼網址；原始權重的 repo 自動列出社群轉好的 GGUF | 完成（PR #33） |
 | 29 | 畫圖與影片的說法 | 中文提示詞先用執行中的對話模型翻成英文；影片長度用秒數、畫幅用 480P／720P 橫式／直式 | 完成（PR #33）；畫圖與影片清單補上 LocModel 的中國來源模型見第 32 項 |
-| 30 | 推薦清單放入所有模型 | LocModel 內建 16 顆（8 顆中國來源）全部收進來，再加 Meta、Microsoft、IBM、NVIDIA、Mistral、Liquid AI、Allen AI、Hugging Face 的熱門模型，共 55 顆；中國來源只標示不遮蔽（使用者拍板） | 完成（待開 PR） |
-| 31 | 電腦裡已經有的模型 | 自動找到 LM Studio、LocModel（C:\AI-Models）、C:\models 等資料夾，模型庫頁首一鍵加入；只讀，不搬、不複製、不刪；存放區根目錄的散檔也認得 | 完成（待開 PR） |
-| 32 | 畫圖與影片放入所有模型 | Z-Image Turbo、Qwen-Image／Edit、FLUX.2 klein、Wan 2.1／2.2、MiniMax-H3：要補「高雜訊模型」「看圖元件」兩種元件與各家參數，逐顆實測 | 待做 |
+| 30 | 推薦清單放入所有模型 | LocModel 內建 16 顆（8 顆中國來源）全部收進來，再加 Meta、Microsoft、IBM、NVIDIA、Mistral、Liquid AI、Allen AI、Hugging Face 的熱門模型，共 56 顆（含 Kimi K3）；中國來源只標示不遮蔽（使用者拍板） | 完成（PR #34） |
+| 31 | 電腦裡已經有的模型 | 自動找到 LM Studio、LocModel（C:\AI-Models）、C:\models 等資料夾，模型庫頁首一鍵加入；只讀，不搬、不複製、不刪；存放區根目錄的散檔也認得 | 完成（PR #34） |
+| 32 | 畫圖與影片放入所有模型 | LocModel 的 11 顆全收（Z-Image Turbo、Qwen-Image、FLUX.1 schnell、FLUX.2 klein、Qwen-Image-Edit、Wan2.1 1.3B、Wan2.2 5B、LTX-2.3、MiniMax-H3 有聲影片、MiniMax-H3 多圖參考、Wan2.2 A14B），共 14 顆；引擎補「高雜訊模型」「看圖元件」、參考圖 -r、flow-shift、model-args、各家影格規則 | 完成（PR #34）；逐顆實際產圖待做 |
+| 33 | 模型頁與畫圖／影片頁的版面 | 照 HP 上 LocModel 並排比對：模型頁拿掉硬體卡、一排篩選＋一列一顆；畫圖／影片頁說明＋先安裝引擎橫幅＋畫圖、影片兩區，跑不動的也列並寫原因；等級字樣流暢／能跑／很慢／跑不動、較慢 | 完成（PR #34） |
 
 ## 五、交付
 
