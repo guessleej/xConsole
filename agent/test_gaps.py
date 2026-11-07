@@ -391,6 +391,8 @@ eq("三元量化 TQ1_0／TQ2_0 認得出來", [A.pretty_model(x)[1] for x in ("K
 real_sh, real_shutil = A.sh, A.shutil
 DRY = "#$ cicc --c++17 --gnu_version=130400 --display_error_number"
 VER = {"c++": "15"}
+VTXT = {"c++": "c++ (Ubuntu 15.2.0-4ubuntu4) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.",
+        "clang++": "Ubuntu clang version 20.1.8\nTarget: x86_64-pc-linux-gnu"}
 
 
 class GccShutil:
@@ -401,14 +403,25 @@ class GccShutil:
         return "/usr/bin/" + x if x in cls.have else None
 
 
-A.shutil = GccShutil
-A.sh = lambda argv, timeout=20: (0, "", DRY) if "--dryrun" in argv else (0, VER.get(os.path.basename(argv[0]), ""), "")
+def fake_sh(argv, timeout=20):
+    b = os.path.basename(argv[0])
+    if "--dryrun" in argv:
+        return 0, "", DRY
+    if "--version" in argv:
+        return 0, VTXT.get(b, ""), ""
+    return 0, VER.get(b, ""), ""
+
+
+A.shutil, A.sh = GccShutil, fake_sh
 eq("CUDA 綁 GCC 13、系統 GCC 15：改用 gcc-13／g++-13", A.cuda_host_gcc("/usr/bin/nvcc"),
    ("/usr/bin/gcc-13", "/usr/bin/g++-13", 13, 15))
 VER["c++"] = "13.4.0"
 eq("同一版就不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
 VER["c++"] = "15"
-GccShutil.have = {"c++"}
+GccShutil.have = {"clang++", "gcc-13", "g++-13"}
+eq("只有 clang++（沒有 c++）：也改用 gcc-13", A.cuda_host_gcc("/usr/bin/nvcc", "/usr/bin/clang++"),
+   ("/usr/bin/gcc-13", "/usr/bin/g++-13", 13, "clang"))
+GccShutil.have = {"c++", "clang++"}
 eq("缺 gcc-13 套件：回版本讓畫面說要裝什麼", A.cuda_host_gcc("/usr/bin/nvcc"), (None, None, 13, 15))
 A.sh = lambda argv, timeout=20: (1, "", "nvcc fatal")
 eq("讀不出 nvcc 的 GCC 版本：不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
