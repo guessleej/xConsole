@@ -23,8 +23,8 @@ jobs:
     name: 0 Tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: 准入試算
@@ -41,6 +41,8 @@ jobs:
         run: cd console && python test_recommend.py
       - name: 客戶品牌與頁尾（名稱與 Logo 驗證、偽裝圖檔、未登入、稽核）
         run: cd console && python test_branding.py
+      - name: API 實測的位址檢查（單機部署放行本機網卡、遠端與 metadata 一律擋）
+        run: cd console && python test_network_test.py
       - name: 畫圖與影片（准入三種架構、中國來源含文字編碼器、sd-cli 參數、看門狗）
         run: cd console && python test_sd.py
       - name: 補齊 LocModel 差距（Intel、SSD、引擎續傳與匯入、參考圖與多張）
@@ -84,7 +86,7 @@ jobs:
       matrix:
         language: [python, javascript-typescript]
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           languages: ${{ matrix.language }}
@@ -100,7 +102,7 @@ jobs:
     env:
       GITLEAKS_VERSION: 8.30.1
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }
       - name: 安裝 gitleaks（核對官方 checksum）
         run: |
@@ -111,7 +113,7 @@ jobs:
           tar xzf "$f" gitleaks
       - name: 掃全部歷史（有命中就 fail）
         run: ./gitleaks git . --redact --verbose --report-format sarif --report-path gitleaks.sarif
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with: { name: gitleaks-report, path: gitleaks.sarif, retention-days: 90 }
 
@@ -120,8 +122,8 @@ jobs:
     name: 3 Dependencies (pip-audit)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
       - run: python -m pip install --disable-pip-version-check pip-audit==2.10.1
       - name: 主控台與報表產生器的依賴（有已知弱點就 fail）
@@ -132,8 +134,8 @@ jobs:
     name: 4+5 SBOM (syft) + Vulns (grype)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
       - name: 建立跟正式環境一樣的執行環境
         run: python -m venv .venv-runtime && .venv-runtime/bin/pip install --disable-pip-version-check -r requirements.txt
@@ -166,7 +168,7 @@ jobs:
           severity-cutoff: high
           output-format: table
       - name: 上傳證據（SBOM，保留 90 天）
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: sbom-${{ github.sha }}
@@ -178,8 +180,8 @@ jobs:
     name: 6 DAST (OWASP ZAP baseline)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: 起一個測試用主控台（暫用自簽、隨機密碼）
