@@ -3246,17 +3246,20 @@ def llama_argv(raw, reg=None):
     flags = {t.split("=", 1)[0] for t in custom if t.startswith("-")}
     own_layers, own_ctx = bool(flags & LLAMA_AUTO_LAYERS), bool(flags & LLAMA_AUTO_CTX)
     ctx, par = int(raw.get("ctx", 4096)), int(raw.get("parallel", 1))
+    # fit：多張卡又要把專家搬到系統記憶體時，交給 llama.cpp 的 --fit 依每張卡當下實際剩多少去分。
+    # 自己帶 --n-cpu-moe 只會搬「前幾層」，那幾層全在第一張卡，後面那張一點都沒變輕（2× 48 GB 換 118B MoE 實測爆在卡 1）
+    use_fit = bool(raw.get("fit")) and not own_layers and "--fit" in _llama_help(raw["exe"])
     argv = [raw["exe"], "-m", raw["model"], "--host", raw.get("host", "0.0.0.0"), "--port", str(raw["port"])]
     if not own_ctx:
         argv += ["-c", str(ctx * par)]
     if not flags & {"-np", "--parallel"}:
         argv += ["-np", str(par)]
-    if not own_layers:
+    if not own_layers and not use_fit:
         argv += ["-ngl", str(raw.get("ngl", 999))]
     argv += ["--alias", raw["alias"], "--jinja"]
     if raw.get("mmproj"):
         argv += ["--mmproj", raw["mmproj"]]
-    if raw.get("cpu_moe") and not own_layers:
+    if raw.get("cpu_moe") and not own_layers and not use_fit:
         argv += ["--n-cpu-moe", str(int(raw["cpu_moe"]))]
     argv += reasoning_args(raw["exe"], raw.get("reasoning"))
     if raw.get("max_tokens"):
@@ -3489,6 +3492,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
         split = card_split(_usage_reclaim(old)[0], old.get("gpu_ids"), cards)
         back = sum(v for cid, v in split.items() if not gpu_ids or cid in [str(g) for g in gpu_ids])
     lay = llama_layout(m, reg["machine"], cards, gpu_ids, want_ctx, par, back)
+    multi = len([c for c in cards if not gpu_ids or str(c["id"]) in [str(g) for g in gpu_ids]]) > 1
     base_raw = {"engine": "llama", "exe": exe, "model": m["path"], "mmproj": m.get("mmproj"),
                 "host": host, "port": int(port), "ctx": want_ctx, "parallel": par,
                 "alias": alias, "max_tokens": carry_max if carry_max and carry_max < want_ctx else None,
@@ -3496,7 +3500,8 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
                 **({"lan_chosen": True} if lan_chosen else {})}
 
     def raw_for(ly):
-        r = {**base_raw, "ngl": ly["ngl"], "cpu_moe": ly["cpu_moe"] or None}
+        # 多卡又要搬專家：交給 llama.cpp 的 --fit（#27）
+        r = {**base_raw, "ngl": ly["ngl"], "cpu_moe": ly["cpu_moe"] or None, "fit": bool(ly["cpu_moe"]) and multi}
         if ly["mode"] == "disk":
             r.update(mmap=True, disk=True, kv_ram_frac=ly["kv_ram_frac"])
         return r
@@ -3529,7 +3534,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
          "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
          "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
 
-    def undo(msg, code=500, extra=None):
+    def undo(msg, code=500, extra=None, restart_old=True):
+        """restart_old=False：還沒動到在跑的服務就失敗（例：准入擋下），只還原設定，不重啟原服務。
+        以前一律重啟，關鍵服務會因為一次被擋下的換模型白白中斷好幾分鐘。"""
         if old_unit != unit:
             sysctl(unit, "stop")
             sysctl(unit, "disable", timeout=30)
@@ -3548,7 +3555,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
         if old_unit:
             if old_enabled:
                 sysctl(old_unit, "enable", timeout=30)
-            if old_alive:
+            if old_alive and restart_old:
                 sysctl(old_unit, "reset-failed", timeout=20)
                 sysctl(old_unit, "restart")
                 back_ok, _ = wait_healthy(old, seconds=600)
@@ -3604,12 +3611,17 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
                 break
     if not verdict["allow"] and not force:
         return undo("記憶體不夠" + ("（用硬碟執行也放不下：KV、計算緩衝與放 GPU 的層仍要占記憶體）"
-                                   if lay["mode"] == "disk" else ""), 409, {"admit": verdict})
+                                   if lay["mode"] == "disk" else ""), 409, {"admit": verdict}, restart_old=False)
 
+    used_before = gpu_used_gib()
     if old_unit and old_unit != unit:
         sysctl(old_unit, "stop")
         if old_enabled:
             sysctl(old_unit, "disable", timeout=30)      # 開機自啟一起換，不然重開機兩個引擎搶同一個埠
+    elif old_alive:
+        sysctl(unit, "stop")
+    if old_alive:
+        wait_vram_released(used_before, old_v)
     sysctl(unit, "reset-failed", timeout=20)
     sysctl(unit, "enable", timeout=30)
     _load_mark(slot_id)                                  # 記錄檔從這裡之後才是這一次的載入
@@ -3646,13 +3658,39 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
                  "warnings": verdict.get("warnings") or []}
 
 
+def gpu_used_gib():
+    """各卡顯存用量加總（GiB），直接問驅動不走快取；讀不到回 None。"""
+    gpus = probe_gpus()
+    if not gpus or any(g.get("vram_used") is None for g in gpus):
+        return None
+    return sum(g["vram_used"] for g in gpus) / GIB
+
+
+def wait_vram_released(before_gib, expect_gib, seconds=60):
+    """停掉舊模型後，等驅動真的把顯存收回再啟動新的。llama.cpp 照「啟動當下每張卡剩多少」分層，
+    還沒收回的那張分得少、另一張被塞爆（實測：48 GB 的卡被分到 58 GB 而 OOM，平台自動換回原模型）。
+    讀不到用量、或預期釋出不到 1 GiB 就不等；等不到也不擋，交給後面的健康檢查與還原。"""
+    if before_gib is None or not expect_gib or expect_gib < 1:
+        return True
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        now = gpu_used_gib()
+        if now is None or now <= before_gib - expect_gib * 0.9:
+            return True
+        time.sleep(1)
+    return False
+
+
 def _usage_reclaim(old_slot):
     """切換引擎時，舊引擎占的量要算成「會被釋放」。用舊欄位的原樣去量。"""
     reg = registry()
     hw = hardware()
+    # 量「換之前」的樣子：換模型時登錄檔裡這個欄位已經先寫成新模型的預估，沒綁卡時顯存是照各欄位的預估比例分攤，
+    # 分母若用新的、分子用舊的，舊模型會釋出的量就被少算（128B 換 118B 時 93.1 GiB 只算成 80.6，誤擋下來）
+    probe = dict(old_slot)
+    reg["slots"] = [probe if sl.get("id") == probe.get("id") else sl for sl in reg["slots"]]
     for sl in reg["slots"]:
         sl["_busy_cache"] = _alive(sl)
-    probe = dict(old_slot)
     st = slot_state(probe, reg, hw)
     return (float(st["vram_gib"] or 0), float(st["ram_gib"] or 0)) if st["busy"] else (0.0, 0.0)
 

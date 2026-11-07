@@ -260,7 +260,56 @@ def main():
         ok &= case("  BIOS 切兩塊的機器：系統那塊不放寬", v["allow"], False)
     finally:
         A.SOFT_FLOOR = False
+    # 換模型時舊模型會釋出多少顯存：登錄檔裡這個欄位已經先寫成新模型的預估，量的時候要用舊的
+    # （128B 換 118B 實際踩到：兩張卡共用 93.1 GiB，只算回 80.6，新模型被誤擋）
+    saved = {k: getattr(A, k) for k in ("registry", "hardware", "_alive", "unit_state", "unit_rss_gib",
+                                        "harvest_measurements", "slot_config", "unit_enabled")}
+    cards2 = [{"id": "0", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 47.1 * GIB},
+              {"id": "1", "name": "t", "vram_total": 47.8 * GIB, "vram_used": 46.0 * GIB}]
+    new_slot = {"id": "brain", "role": "主腦", "unit": "x.service", "est_vram_gib": 81.3, "est_ram_gib": 11.6}
+    old_slot = dict(new_slot, est_vram_gib=70.8, est_ram_gib=2.5)
+    A.registry = lambda: {"machine": {"id": "t", "memory_model": "discrete"}, "slots": [dict(new_slot)],
+                          "profiles": {}, "measure": {}}
+    A.hardware = lambda: fake_hw(0, 0, cards2)
+    A._alive = lambda sl: True
+    A.unit_state = lambda u: "active"
+    A.unit_rss_gib = lambda u: 1.9
+    A.harvest_measurements = lambda sl, reg: None
+    A.slot_config = lambda sl: None
+    A.unit_enabled = lambda u: True
+    try:
+        v, r_ = A._usage_reclaim(old_slot)
+        ok &= case("換模型：舊模型釋出的顯存照整機用量全算回（不被新模型的預估稀釋）", v, 93.1)
+    finally:
+        for k, f in saved.items():
+            setattr(A, k, f)
+    # 多卡又要搬專家：交給 llama.cpp 的 --fit，不帶 -ngl／--n-cpu-moe（自己搬只會搬到第一張卡上的那幾層）
+    saved = {k: getattr(A, k) for k in ("_llama_help", "no_mmap_args", "gpu_used_gib")}
+    A._llama_help = lambda exe: "-fit,  --fit [on|off]  whether to adjust unset arguments"
+    A.no_mmap_args = lambda exe: []
+    try:
+        raw = {"exe": "/x/llama-server", "model": "/m.gguf", "port": 8080, "ctx": 65536, "alias": "m",
+               "cpu_moe": 5, "ngl": 999}
+        a_fit = A.llama_argv(dict(raw, fit=True), reg={"machine": {}})
+        a_old = A.llama_argv(dict(raw, fit=False), reg={"machine": {}})
+        ok &= case("多卡搬專家：交給 --fit，不帶 -ngl 與 --n-cpu-moe",
+                   ("-ngl" in a_fit, "--n-cpu-moe" in a_fit, "-c" in a_fit), (False, False, True))
+        ok &= case("  沒開 fit 照舊帶 -ngl 999 與 --n-cpu-moe 5",
+                   (a_old[a_old.index("-ngl") + 1], a_old[a_old.index("--n-cpu-moe") + 1]), ("999", "5"))
+        A._llama_help = lambda exe: "no such option here"
+        a_noflag = A.llama_argv(dict(raw, fit=True), reg={"machine": {}})
+        ok &= case("  舊版 llama.cpp 沒有 --fit：退回自己帶 -ngl", "-ngl" in a_noflag, True)
+        seq = iter([93.0, 70.0, 2.1])
+        A.gpu_used_gib = lambda: next(seq)
+        ok &= case("停掉舊模型後等顯存收回（93 GiB 降到 2 GiB 才算）", A.wait_vram_released(93.1, 93.1, seconds=10), True)
+        A.gpu_used_gib = lambda: 90.0
+        ok &= case("  一直沒收回：時間到回 False，不卡死", A.wait_vram_released(93.1, 93.1, seconds=1), False)
+    finally:
+        for k, f in saved.items():
+            setattr(A, k, f)
     src = open(A.__file__, encoding="utf-8").read()
+    ok &= case("准入擋下時只還原設定、不重啟在跑的服務",
+               'undo("記憶體不夠", 409, {"admit": verdict}, restart_old=False)' in src, True)
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
 
