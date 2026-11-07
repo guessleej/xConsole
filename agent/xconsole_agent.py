@@ -7137,6 +7137,11 @@ def sd_need(m, w, h, frames=1):
     return round(est, 1), round(weights, 1)
 
 
+def _is_ltx(m):
+    """LTX 系列（Lightricks LTX-Video／LTX-2.x）：看擴散模型那個檔的來源與檔名。"""
+    return any(p.get("role") == "diffusion" and "ltx" in f"{p.get('repo', '')}/{p.get('path', '')}".lower()
+               for p in m.get("parts", []))
+
 def sd_admit(m, w, h, frames=1, reg=None, hw=None):
     """產圖前的准入：照三種記憶體架構，用「產圖時最壞剩多少」判斷。plan＝要不要把權重放系統記憶體、用哪張卡。"""
     reg = reg or registry()
@@ -7200,7 +7205,10 @@ def sd_admit(m, w, h, frames=1, reg=None, hw=None):
         plan["max_vram"] = max(1.0, math.floor(plan["max_vram"] * 10) / 10)
     # ponytail: AMD 一律關 flash attention。實測 .27（gfx1151、ROCm 7.1.1）開著會在載入擴散模型時
     # 「ROCm error: unspecified launch failure」整個中止，關掉 512×512 四步 12 秒正常出圖。之後 ROCm／sd.cpp 修好再拿掉
-    plan["fa_off"] = not has_nvidia() and bool(probe_amd_sysfs())
+    # NVIDIA 跑 LTX 也關：實測 2× RTX PRO 5000（sm_120、sd.cpp master-1053 編 sm_90）開著產出整段全白、聲音滿格，
+    # 記錄卻沒有任何錯誤；關掉後畫面與聲音都正常（同機同參數 CPU 也正常，VAE 改用 CPU 仍全白，所以是擴散／文字編碼的
+    # flash attention）。同一支執行檔的 FLUX 開著正常，只關 LTX；小尺寸實測關掉反而快（14.6 秒對 19.6 秒）
+    plan["fa_off"] = (not has_nvidia() and bool(probe_amd_sysfs())) or (has_nvidia() and _is_ltx(m))
     return {"allow": not reasons, "memory_model": mm, "need_gib": need, "weights_gib": weights,
             "measured": bool((m.get("measured") or {}).get("peak_gib")),
             "reasons": reasons, "warnings": warnings, "pools": detail, "plan": plan}
