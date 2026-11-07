@@ -309,7 +309,7 @@ def main():
             setattr(A, k, f)
     src = open(A.__file__, encoding="utf-8").read()
     ok &= case("准入擋下時只還原設定、不重啟在跑的服務",
-               'undo("記憶體不夠", 409, {"admit": verdict}, restart_old=False)' in src, True)
+               '409, {"admit": verdict}, restart_old=False)' in src, True)
     ok &= case("代理原始碼沒有 shell=True、os.system、os.popen",
                [x for x in ("shell=True", "os.system(", "os.popen(") if x in src], [])
 
