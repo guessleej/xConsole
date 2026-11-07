@@ -357,8 +357,11 @@ async function viewRun() {
         st.base = { thinking: run.thinking || "auto", lan: run.lan !== false };
         if (!st.touched.thinking) st.thinking = st.base.thinking;
         if (!st.touched.lan) st.lan = st.base.lan;
-        if (right.isConnected) drawSettings(right, n, models.find((x) => x.id === sel.value), models.find((x) => x.id === sel.value).plan || null,
-          slot, running, st, prog, statusHolder);
+        // 這支要 3～6 秒才回來，這段時間使用者可能已經換選別顆：照「現在選的」重算是不是在跑，
+        // 不能沿用開頁時那顆的 running（不然選了沒在跑的模型，按鈕會寫成「套用設定並重新載入」）
+        const cur = models.find((x) => x.id === sel.value);
+        const curRunning = !!(cur.in_use && slot && cur.in_use === slot.id && slot.busy);
+        if (right.isConnected) drawSettings(right, n, cur, cur.plan || null, slot, curRunning, st, prog, statusHolder);
       }).catch(() => {});
     }
   };

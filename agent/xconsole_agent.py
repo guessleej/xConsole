@@ -5753,6 +5753,9 @@ def model_dir_suggestions(reg=None):
         return _SUGGEST["out"]
     reg = reg or registry()
     have = {os.path.normcase(os.path.realpath(x)) for x in [gguf_root(reg), *model_dirs(reg)]}
+    # 存放區裡用符號連結指過去的檔，已經在模型庫了，不能再提示「加進來」（實機踩到：原檔在 ~/models/<模型>/，存放區放連結）
+    linked = {os.path.normcase(os.path.realpath(p)) for r in [gguf_root(reg), *model_dirs(reg)]
+              for p in glob.glob(os.path.join(glob.escape(r), "**", "*.gguf"), recursive=True)}
     out = []
     for d in known_model_dirs():
         real = os.path.realpath(d)
@@ -5764,7 +5767,8 @@ def model_dir_suggestions(reg=None):
             try:
                 for f in os.listdir(full):
                     fp = os.path.join(full, f)
-                    if f.lower().endswith(".gguf") and not is_mmproj(f) and not AUX_GGUF_RX.search(f[:-5]) and os.path.isfile(fp):
+                    if f.lower().endswith(".gguf") and not is_mmproj(f) and not AUX_GGUF_RX.search(f[:-5]) and os.path.isfile(fp) \
+                            and os.path.normcase(os.path.realpath(fp)) not in linked:
                         sz = os.path.getsize(fp)
                         if sz >= EXT_MIN_BYTES:
                             n, size = n + 1, size + sz

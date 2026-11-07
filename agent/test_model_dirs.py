@@ -68,11 +68,17 @@ case("1. 存放區根目錄的散檔認得", "./loose-Q8_0" in ids, ids)
 case("   存放區子資料夾照舊", "own/own-Q4_K_M" in ids, ids)
 case("   還沒加入的外部資料夾不列", not any(m.get("external") for m in ms))
 
+real_big = os.path.join(ext, "Big-128B", "Q4_K_M", "Big-128B-Q4_K_M.gguf")     # 原檔在 ~/models，存放區放連結
+gguf(real_big)
+os.makedirs(os.path.join(root, "Big-128B"), exist_ok=True)
+os.symlink(real_big, os.path.join(root, "Big-128B", "Big-128B-Q4_K_M.gguf"))
 sug = {x["path"]: x for x in A.model_dir_suggestions()}
 r_ext, r_lms = os.path.realpath(ext), os.path.realpath(lms)
 case("2. 偵測到 ~/models", r_ext in sug, sug)
-case("   ~/models 只算外面那 1 顆（存放區裡的不重算、詞表小檔不算）", sug.get(r_ext, {}).get("count") == 1, sug.get(r_ext))
+case("   ~/models 只算外面那 1 顆（存放區裡的、存放區連結過去的原檔都不重算，詞表小檔不算）", sug.get(r_ext, {}).get("count") == 1, sug.get(r_ext))
 case("   偵測到 LM Studio 的隱藏資料夾，往下三層", sug.get(r_lms, {}).get("count") == 1, sug.get(r_lms))
+os.remove(os.path.join(root, "Big-128B", "Big-128B-Q4_K_M.gguf")); os.rmdir(os.path.join(root, "Big-128B"))   # 後面的測試不受影響
+os.remove(real_big); os.removedirs(os.path.dirname(real_big)) if not os.listdir(os.path.dirname(real_big)) else None
 
 case("3. 不存在的資料夾不能加", A.set_model_dirs({"add": os.path.join(H, "nope")})[0] == 400)
 case("   自己的存放區不能加", A.set_model_dirs({"add": root})[0] == 400)
