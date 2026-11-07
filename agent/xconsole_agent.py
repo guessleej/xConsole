@@ -4770,6 +4770,37 @@ def cuda_arch(nvcc):
     return str(best), f"這版 CUDA 編譯器不認得 sm_{want}，改編 sm_{best}，執行時由驅動即時轉換（第一次載入會慢一點）"
 
 
+def cuda_host_gcc(nvcc, cxx=None):
+    """nvcc 綁的 GCC 跟這次要用的 C++ 編譯器不同版（或根本是 clang）時，回 (gcc-N, g++-N, N, 系統版本或 "clang")，
+    整個專案改用 GCC N 編；同版或查不出來回 None。找不到 gcc-N／g++-N 時前兩個是 None，讓畫面說要裝什麼。
+    CMake 會把 nvcc 那一版的函式庫目錄（/usr/lib/gcc/<平台>/N）放進連結參數，C++ 檔卻用系統的新版 g++（或 clang++）編，
+    連結時就配到舊版 libstdc++。Ubuntu 26.04 的 nvidia-cuda-toolkit 12.4 綁 gcc-13、系統預設 gcc-15，
+    sd-cli 連結失敗缺 __cxa_call_terminate（2× RTX PRO 5000 實機踩到）。版本從 cicc 的 --gnu_version 讀。
+    cxx 要傳 build_prereqs 實際選到的編譯器：只有 clang++ 的機器也要對齊，不能因為找不到 c++ 就跳過。"""
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, "probe.cu")
+        with open(src, "w", encoding="utf-8") as fh:
+            fh.write("int main(){}\n")
+        _, out, err = sh([nvcc, "--dryrun", "-c", src, "-o", os.path.join(d, "probe.o")], timeout=30)
+    m = re.search(r"--gnu_version=(\d+)", out + "\n" + err)
+    cxx = cxx or shutil.which("c++") or shutil.which("g++") or shutil.which("clang++")
+    if not m or not cxx:
+        return None
+    want = int(m.group(1)) // 10000
+    _, ver, _ = sh([cxx, "--version"], timeout=15)
+    if "clang" in ver.lower():
+        have = "clang"
+    else:
+        _, v, _ = sh([cxx, "-dumpversion"], timeout=15)
+        mv = re.match(r"\d+", v.strip())
+        if not mv:
+            return None
+        have = int(mv.group())
+        if have == want:
+            return None
+    cc, cpp = shutil.which(f"gcc-{want}"), shutil.which(f"g++-{want}")
+    return (cc, cpp, want, have) if cc and cpp else (None, None, want, have)
+
 def _vulkan_ready():
     """編 Vulkan 版要的東西：著色器編譯器 glslc 與 Vulkan 標頭（libvulkan-dev）。"""
     return bool(shutil.which("glslc")) and any(os.path.exists(p) for p in ("/usr/include/vulkan/vulkan.h", "/usr/local/include/vulkan/vulkan.h"))
@@ -4793,6 +4824,15 @@ def build_prereqs(kind="llama"):
             arch, why = cuda_arch(nv)
             backend, flags, env = "cuda", [eng["cuda"], f"-DCMAKE_CUDA_ARCHITECTURES={arch}"], {"PATH": os.path.dirname(nv) + ":" + os.environ.get("PATH", "")}
             notes.append(why)
+            host = cuda_host_gcc(nv, cxx)
+            if host:
+                sysc = f"GCC {host[3]}" if isinstance(host[3], int) else "clang"
+            if host and host[0]:
+                flags += [f"-DCMAKE_C_COMPILER={host[0]}", f"-DCMAKE_CXX_COMPILER={host[1]}"]
+                notes.append(f"CUDA 編譯器搭配 GCC {host[2]}，這台預設的 C++ 編譯器是 {sysc}：整個專案改用 GCC {host[2]} 編，連結時才不會混到兩版的 C++ 函式庫")
+            elif host:
+                notes.append(f"CUDA 編譯器搭配 GCC {host[2]}，這台預設的 C++ 編譯器是 {sysc}，但找不到 gcc-{host[2]}／g++-{host[2]}，"
+                             f"連結可能失敗。請 IT 安裝：sudo apt install gcc-{host[2]} g++-{host[2]}")
         else:
             notes.append("有 NVIDIA 顯示卡但沒有 CUDA 編譯器（nvcc），會編成只用 CPU。要用 GPU 請 IT 安裝 CUDA Toolkit（nvidia-cuda-toolkit 或 NVIDIA 官方套件）")
     elif probe_amd_sysfs():
