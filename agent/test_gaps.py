@@ -387,5 +387,32 @@ eq("不能單獨跑的 GGUF：imatrix、DFlash／MTP／EAGLE 草稿頭認得出�
 eq("三元量化 TQ1_0／TQ2_0 認得出來", [A.pretty_model(x)[1] for x in ("Kimi-K3-UD-TQ1_0-00001-of-00010.gguf", "GLM-4.7-Flash-UD-TQ2_0.gguf")],
    ["UD-TQ1_0", "UD-TQ2_0"])
 
+# CUDA 綁的 GCC 跟系統預設不同版（Ubuntu 26.04：CUDA 12.4 綁 gcc-13、系統 gcc-15）：整個專案改用 nvcc 那一版編
+real_sh, real_shutil = A.sh, A.shutil
+DRY = "#$ cicc --c++17 --gnu_version=130400 --display_error_number"
+VER = {"c++": "15"}
+
+
+class GccShutil:
+    have = {"c++", "gcc-13", "g++-13"}
+
+    @classmethod
+    def which(cls, x):
+        return "/usr/bin/" + x if x in cls.have else None
+
+
+A.shutil = GccShutil
+A.sh = lambda argv, timeout=20: (0, "", DRY) if "--dryrun" in argv else (0, VER.get(os.path.basename(argv[0]), ""), "")
+eq("CUDA 綁 GCC 13、系統 GCC 15：改用 gcc-13／g++-13", A.cuda_host_gcc("/usr/bin/nvcc"),
+   ("/usr/bin/gcc-13", "/usr/bin/g++-13", 13, 15))
+VER["c++"] = "13.4.0"
+eq("同一版就不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
+VER["c++"] = "15"
+GccShutil.have = {"c++"}
+eq("缺 gcc-13 套件：回版本讓畫面說要裝什麼", A.cuda_host_gcc("/usr/bin/nvcc"), (None, None, 13, 15))
+A.sh = lambda argv, timeout=20: (1, "", "nvcc fatal")
+eq("讀不出 nvcc 的 GCC 版本：不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
+A.sh, A.shutil = real_sh, real_shutil
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
