@@ -301,6 +301,27 @@ a = A.sd_argv("sd-cli", m_vid, "/m", {**prm, "frames": 33, "fps": 24}, "/g/x.web
 case("影片：第一格畫面帶 -i、不帶 --strength、不帶 -b", "-i" in a and "--strength" not in a and "-b" not in a, a)
 a = A.sd_argv("sd-cli", m_img, "/m", {**prm, "count": 1, "init": None}, "/g/x.png", {})
 case("畫圖：一張、沒有參考圖就不帶這些參數", "-i" not in a and "-b" not in a, a)
+# LTX 在 NVIDIA 上開 flash attention 會產出全白畫面、聲音滿格（2× RTX PRO 5000 實測）：准入要帶 fa_off，參數要帶 --flash-attn off
+m_ltx = {"kind": "video", "parts": [{"role": "diffusion", "repo": "unsloth/LTX-2.3-GGUF", "path": "distilled-1.1/ltx-2.3-22b-distilled-1.1-Q8_0.gguf", "size": 22 << 30},
+                                    {"role": "llm", "repo": "unsloth/gemma-3-12b-it-GGUF", "path": "gemma-3-12b-it-UD-Q8_K_XL.gguf", "size": 13 << 30}]}
+m_flux = {"kind": "image", "parts": [{"role": "diffusion", "repo": "leejet/FLUX.1-schnell-gguf", "path": "flux1-schnell-q8_0.gguf", "size": 12 << 30}]}
+eq("認得 LTX（看擴散模型的來源與檔名）", (A._is_ltx(m_ltx), A._is_ltx(m_flux), A._is_ltx(m_vid)), (True, False, False))
+orig_fa = {k: getattr(A, k) for k in ("pools", "has_nvidia", "probe_amd_sysfs", "registry", "gpu_override")}
+A.registry = lambda: {}
+A.pools = lambda reg, hw: {"memory_model": "discrete", "floors": {"ram": 8, "vram": 1}, "bindable": True,
+                           "gpus": [{"id": 0, "free_gib": 47.0}], "ram": {"free_gib": 100.0}}
+A.has_nvidia, A.probe_amd_sysfs = (lambda: True), (lambda: [])
+eq("NVIDIA：LTX 關 flash attention、FLUX 照開", (A.sd_admit(m_ltx, 768, 512, 33, hw={})["plan"]["fa_off"],
+                                                  A.sd_admit(m_flux, 1024, 1024, 1, hw={})["plan"]["fa_off"]), (True, False))
+A.has_nvidia, A.gpu_override = (lambda: False), (lambda: {"vendor": "nvidia", "name": "RTX 4090", "vram_gib": 24})
+eq("手動指定 NVIDIA（偵測不到卡）：LTX 一樣關", A.sd_admit(m_ltx, 768, 512, 33, hw={})["plan"]["fa_off"], True)
+A.gpu_override = lambda: None
+A.has_nvidia, A.probe_amd_sysfs = (lambda: False), (lambda: [{"id": "0"}])
+eq("AMD：一律關（原本的規則不變）", A.sd_admit(m_flux, 1024, 1024, 1, hw={})["plan"]["fa_off"], True)
+for k, v in orig_fa.items():
+    setattr(A, k, v)
+a = A.sd_argv("sd-cli", m_ltx, "/m", {**prm, "frames": 33, "fps": 24, "init": None, "width": 768, "height": 512}, "/g/x.webm", {"fa_off": True})
+eq("fa_off 時參數帶 --flash-attn off", a[a.index("--flash-attn") + 1] if "--flash-attn" in a else None, "off")
 eq("產出檔：一次多張用 outs", A.sd_outs({"out": "ab.png", "outs": ["ab_0.png", "ab_1.png"]}), ["ab_0.png", "ab_1.png"])
 eq("產出檔：單張用 out", A.sd_outs({"out": "ab.png"}), ["ab.png"])
 
@@ -386,6 +407,46 @@ eq("不能單獨跑的 GGUF：imatrix、DFlash／MTP／EAGLE 草稿頭認得出�
 
 eq("三元量化 TQ1_0／TQ2_0 認得出來", [A.pretty_model(x)[1] for x in ("Kimi-K3-UD-TQ1_0-00001-of-00010.gguf", "GLM-4.7-Flash-UD-TQ2_0.gguf")],
    ["UD-TQ1_0", "UD-TQ2_0"])
+
+# CUDA 綁的 GCC 跟系統預設不同版（Ubuntu 26.04：CUDA 12.4 綁 gcc-13、系統 gcc-15）：整個專案改用 nvcc 那一版編
+real_sh, real_shutil = A.sh, A.shutil
+DRY = "#$ cicc --c++17 --gnu_version=130400 --display_error_number"
+VER = {"c++": "15"}
+VTXT = {"c++": "c++ (Ubuntu 15.2.0-4ubuntu4) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.",
+        "clang++": "Ubuntu clang version 20.1.8\nTarget: x86_64-pc-linux-gnu"}
+
+
+class GccShutil:
+    have = {"c++", "gcc-13", "g++-13"}
+
+    @classmethod
+    def which(cls, x):
+        return "/usr/bin/" + x if x in cls.have else None
+
+
+def fake_sh(argv, timeout=20):
+    b = os.path.basename(argv[0])
+    if "--dryrun" in argv:
+        return 0, "", DRY
+    if "--version" in argv:
+        return 0, VTXT.get(b, ""), ""
+    return 0, VER.get(b, ""), ""
+
+
+A.shutil, A.sh = GccShutil, fake_sh
+eq("CUDA 綁 GCC 13、系統 GCC 15：改用 gcc-13／g++-13", A.cuda_host_gcc("/usr/bin/nvcc"),
+   ("/usr/bin/gcc-13", "/usr/bin/g++-13", 13, 15))
+VER["c++"] = "13.4.0"
+eq("同一版就不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
+VER["c++"] = "15"
+GccShutil.have = {"clang++", "gcc-13", "g++-13"}
+eq("只有 clang++（沒有 c++）：也改用 gcc-13", A.cuda_host_gcc("/usr/bin/nvcc", "/usr/bin/clang++"),
+   ("/usr/bin/gcc-13", "/usr/bin/g++-13", 13, "clang"))
+GccShutil.have = {"c++", "clang++"}
+eq("缺 gcc-13 套件：回版本讓畫面說要裝什麼", A.cuda_host_gcc("/usr/bin/nvcc"), (None, None, 13, 15))
+A.sh = lambda argv, timeout=20: (1, "", "nvcc fatal")
+eq("讀不出 nvcc 的 GCC 版本：不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
+A.sh, A.shutil = real_sh, real_shutil
 
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
