@@ -36,6 +36,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
+from array import array
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 OS = "windows" if os.name == "nt" else ("darwin" if sys.platform == "darwin" else "linux")
@@ -7348,6 +7350,11 @@ def _gen_run(j, argv, env, mm, fl):
         j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
     else:
         peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
+        j["phase"] = "檢查產出中"         # 檢查完才改 done：網頁看到 done 就停止輪詢，要一起拿到 suspect
+        bad = sd_output_check(j)
+        if bad:
+            j["suspect"] = bad
+            print(f"產出 {j['id']}（{j['model']}）看起來是壞的：{'；'.join(bad)}", flush=True)
         j.update(state="done", phase="完成", peak_gib=round(peak, 1),
                  bytes=sum(os.path.getsize(os.path.join(GEN_DIR, f)) for f in sd_outs(j) if os.path.isfile(os.path.join(GEN_DIR, f))))
         # 實測最高用量寫回這顆模型：下次准入改用實測值（取比估算大的那個，不會因為實測偏小就放寬）
@@ -7401,6 +7408,191 @@ def sd_outs(j):
     if j.get("outs"):
         return list(j["outs"])
     return [j["out"]] if j.get("out") else []
+
+
+# ---- 產出檔有沒有壞：引擎在某些卡上會「算壞但不報錯」（LTX 在 NVIDIA 開 flash attention 產出全白、聲音滿格），
+# 只看結束碼會照樣說產好了。只用標準函式庫讀：PNG 自己解，sd-cli 的 webm 是 VP8 每格都是關鍵格＋PCM 聲音，讀容器就夠
+SD_FLAT_STD = 3.0         # 亮度標準差低於這個＝整張幾乎同一個顏色
+SD_FLAT_BPMB = 1.0        # VP8 關鍵格每個 16×16 區塊不到 1 位元組＝整格同一個顏色（全白實測 0.48，正常畫面約 37）
+SD_LOUD_DB = -3.0         # 聲音平均音量高於這個＝整段推到滿格（滿格雜訊實測 0 dB，正常約 -25～-45 dB）
+
+
+def png_stats(path):
+    """PNG 的亮度平均與標準差（0～255，不算透明度）。只解 8 位元、無交錯的格式（sd-cli 寫的就是這種），其他回 None。"""
+    with open(path, "rb") as fh:
+        d = fh.read()
+    if d[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    i, idat, hdr = 8, [], None
+    while i + 8 <= len(d):
+        n, t = int.from_bytes(d[i:i + 4], "big"), d[i + 4:i + 8]
+        if t == b"IHDR":
+            hdr = struct.unpack(">IIBBBBB", d[i + 8:i + 21])
+        elif t == b"IDAT":
+            idat.append(d[i + 8:i + 8 + n])
+        elif t == b"IEND":
+            break
+        i += 12 + n
+    if not hdr or hdr[2] != 8 or hdr[3] not in (0, 2, 4, 6) or hdr[6]:
+        return None
+    w, h, ct = hdr[0], hdr[1], hdr[3]
+    bpp = {0: 1, 2: 3, 4: 2, 6: 4}[ct]
+    col = 1 if ct in (0, 4) else 3                       # 灰階看 1 個通道，彩色看 RGB
+    raw, st = zlib.decompress(b"".join(idat)), w * bpp
+    if len(raw) < h * (st + 1):                          # 掃描線比宣告的高度少：殘缺的檔，不判
+        return None
+    prev, tot, sq, cnt = bytearray(st), 0, 0, 0
+    for y in range(h):
+        f, row = raw[y * (st + 1)], bytearray(raw[y * (st + 1) + 1:(y + 1) * (st + 1)])
+        for x in range(st) if f else ():
+            a = row[x - bpp] if x >= bpp else 0
+            b = prev[x]
+            if f == 1:
+                row[x] = (row[x] + a) & 255
+            elif f == 2:
+                row[x] = (row[x] + b) & 255
+            elif f == 3:
+                row[x] = (row[x] + ((a + b) >> 1)) & 255
+            elif f == 4:
+                c = prev[x - bpp] if x >= bpp else 0
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                row[x] = (row[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        prev = row
+        if y % 4 == 0:                                  # ponytail: 每 4 列抽 1 列算統計就夠判斷單色，省一半以上時間
+            for x in range(0, st, bpp * 4):
+                v = sum(row[x:x + col]) / col
+                tot += v
+                sq += v * v
+                cnt += 1
+    if not cnt:
+        return None
+    m = tot / cnt
+    return m, math.sqrt(max(0.0, sq / cnt - m * m))
+
+
+def _ebml_num(fh):
+    """從檔案讀一個 EBML 可變長度數字：回 (值, 長度, 是不是「長度未知」)。讀到檔尾回 None。"""
+    b = fh.read(1)
+    if not b:
+        return None
+    first, n = b[0], 1
+    while n <= 8 and not first & (0x80 >> (n - 1)):
+        n += 1
+    if n > 8:
+        raise ValueError("EBML 長度錯誤")
+    rest = fh.read(n - 1)
+    if len(rest) != n - 1:
+        raise ValueError("EBML 被截斷")
+    v = first & (0xFF >> n)
+    for c in rest:
+        v = (v << 8) | c
+    return v, n, v == (1 << (7 * n)) - 1
+
+
+def webm_stats(path):
+    """sd-cli 寫的 webm：回 {"key_sizes": [每個 VP8 關鍵格的位元組], "w", "h", "pcm_db": PCM 16 位元的平均音量（沒有聲音是 None）}。
+    邊讀邊算，不把整支影片讀進記憶體（代理服務限 256 MB）。看不懂回 None。"""
+    tracks, sizes, wh, cur = {}, [], [0, 0], {}
+    acc = {"sq": 0, "n": 0, "odd": b""}
+
+    def walk(fh, end):
+        nonlocal cur
+        while fh.tell() < end:
+            r = _ebml_num(fh)
+            if r is None:
+                return
+            eid = r[0] | (1 << (7 * r[1]))                # 還原成規格寫的 ID（含長度標記位元）
+            sr = _ebml_num(fh)
+            if sr is None:
+                raise ValueError("EBML 被截斷")
+            body = fh.tell()
+            stop = end if sr[2] else min(end, body + sr[0])   # 長度未知＝到父層結尾
+            if eid in (0x18538067, 0x1F43B675, 0x1654AE6B, 0xA0, 0xE0):   # Segment、Cluster、Tracks、BlockGroup、Video：往下讀
+                walk(fh, stop)
+            elif eid == 0xAE:                                             # TrackEntry
+                cur = {}
+                walk(fh, stop)
+                if "num" in cur:
+                    tracks[cur["num"]] = cur.get("codec", "")
+            elif eid in (0xD7, 0x86, 0xB0, 0xBA) and stop - body <= 64:
+                v = fh.read(stop - body)
+                if eid == 0x86:
+                    cur["codec"] = v.decode("ascii", "replace")
+                else:
+                    x = int.from_bytes(v, "big")
+                    if eid == 0xD7:
+                        cur["num"] = x
+                    else:
+                        wh[eid == 0xBA] = x
+            elif eid in (0xA3, 0xA1):                                     # SimpleBlock／Block
+                tn = _ebml_num(fh)
+                hdr = fh.read(3)
+                if tn is None or len(hdr) < 3 or hdr[2] & 0x06:           # 有分段打包（lacing）：sd-cli 不會這樣寫，不判
+                    raise ValueError("lacing")
+                left = stop - fh.tell()
+                codec = tracks.get(tn[0], "")
+                if codec == "V_VP8" and left > 0:
+                    if not fh.read(1)[0] & 1:                             # VP8 標頭第 0 位元是 0＝關鍵格
+                        sizes.append(left)
+                elif codec == "A_PCM/INT/LIT":
+                    while left > 0:
+                        chunk = acc["odd"] + fh.read(min(left, 1 << 20))
+                        left -= len(chunk) - len(acc["odd"])
+                        if len(chunk) == len(acc["odd"]):
+                            raise ValueError("PCM 被截斷")
+                        cut = len(chunk) // 2 * 2
+                        a = array("h")
+                        a.frombytes(chunk[:cut])
+                        if sys.byteorder == "big":
+                            a.byteswap()
+                        acc["sq"] += sum(x * x for x in a)
+                        acc["n"] += len(a)
+                        acc["odd"] = chunk[cut:]
+            fh.seek(stop)
+
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(4) != b"\x1a\x45\xdf\xa3":
+                return None
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(0)
+            walk(fh, size)
+    except (ValueError, IndexError):
+        return None
+    db = None
+    if acc["n"]:
+        ms = acc["sq"] / acc["n"]
+        db = 10 * math.log10(ms / 32768 ** 2) if ms else float("-inf")
+    return {"key_sizes": sizes, "w": wh[0], "h": wh[1], "pcm_db": db}
+
+
+def sd_output_check(j):
+    """產好的東西是不是壞的：回找到的問題（每項一句，網頁逐行顯示、逐句翻譯），正常或看不懂就回 None（寧可漏判也不誤判）。"""
+    probs = []
+    try:
+        for i, f in enumerate(sd_outs(j)):
+            path = os.path.join(GEN_DIR, f)
+            if f.endswith(".png"):
+                st = png_stats(path)
+                if st and st[1] < SD_FLAT_STD:
+                    who = f"第 {i + 1} 張" if len(sd_outs(j)) > 1 else "整張"
+                    probs.append(f"{who}幾乎是同一個顏色（亮度 {st[0]:.0f}）")
+            elif f.endswith(".webm"):
+                st = webm_stats(path)
+                if not st:
+                    continue
+                mbs = max(1, ((st["w"] or j["width"]) + 15) // 16 * (((st["h"] or j["height"]) + 15) // 16))
+                if st["key_sizes"] and max(st["key_sizes"]) / mbs < SD_FLAT_BPMB:
+                    probs.append("畫面整段幾乎是同一個顏色")
+                db = st["pcm_db"]
+                if db is not None and db > SD_LOUD_DB:
+                    probs.append(f"聲音整段推到滿格（平均 {round(db, 1) or 0.0:.1f} dB）")
+    except (OSError, ValueError, IndexError, zlib.error, struct.error) as ex:  # 讀檔失敗、檔案殘缺：不標，也不影響這件「產好了」
+        print(f"產出檢查略過 {j.get('id')}：{ex}", flush=True)
+        return None
+    return probs or None
 
 
 def sd_generate(body):

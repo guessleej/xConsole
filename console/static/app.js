@@ -2302,8 +2302,8 @@ function sdGen(n, rec, redraw, toRec, kind) {
       const r = el("button", "sd-job");
       r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString(uiLocale(), { hour12: false }).slice(5, 16)));
       r.appendChild(el("span", "sd-job-p", j.prompt));
-      r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"),
-        { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
+      r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : j.suspect ? "warn-t" : "muted"),
+        j.suspect ? "可能壞了" : { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
       r.onclick = () => (j.state === "running" ? watchGen(n, j.id, out, recent, go) : showJob(n, j, out, recent, form));
       recent.appendChild(r);
     });
@@ -2364,6 +2364,15 @@ function sdJobDelete(n, j, out, url) {
   return del;
 }
 
+// 引擎算壞但沒報錯（例：LTX 開 flash attention 全白、聲音滿格）：代理檢查產出後回的問題，每項一行（逐句翻譯）
+function sdSuspectNote(probs) {
+  const p = el("div", "note warn");
+  p.appendChild(el("strong", "", "產出看起來是壞的"));
+  [].concat(probs).forEach((t) => p.appendChild(el("div", "", t)));
+  p.appendChild(el("div", "small", "這多半是推理引擎在這台算錯，不是提示詞的問題，換描述也不會好；請回報管理者。"));
+  return p;
+}
+
 async function showJob(n, j, out, recent, form) {
   clearTimeout(S.genTimer);
   out.textContent = "";
@@ -2380,6 +2389,7 @@ async function showJob(n, j, out, recent, form) {
   } else {
     const box = el("div", "sd-media");
     box.appendChild(el("p", "small muted", "讀取中…"));
+    if (j.suspect) out.appendChild(sdSuspectNote(j.suspect));
     out.append(box, info);
     // 一次多張：第一張先出來，其他張接著抓；點縮圖換大圖，下載的是目前這張
     const fetchOut = async (i) => {
