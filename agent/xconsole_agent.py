@@ -7350,12 +7350,13 @@ def _gen_run(j, argv, env, mm, fl):
         j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
     else:
         peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
-        j.update(state="done", phase="完成", peak_gib=round(peak, 1),
-                 bytes=sum(os.path.getsize(os.path.join(GEN_DIR, f)) for f in sd_outs(j) if os.path.isfile(os.path.join(GEN_DIR, f))))
+        j["phase"] = "檢查產出中"         # 檢查完才改 done：網頁看到 done 就停止輪詢，要一起拿到 suspect
         bad = sd_output_check(j)
         if bad:
             j["suspect"] = bad
             print(f"產出 {j['id']}（{j['model']}）看起來是壞的：{'；'.join(bad)}", flush=True)
+        j.update(state="done", phase="完成", peak_gib=round(peak, 1),
+                 bytes=sum(os.path.getsize(os.path.join(GEN_DIR, f)) for f in sd_outs(j) if os.path.isfile(os.path.join(GEN_DIR, f))))
         # 實測最高用量寫回這顆模型：下次准入改用實測值（取比估算大的那個，不會因為實測偏小就放寬）
         with _SD_LOCK:
             rows = sd_manifest()
@@ -7438,6 +7439,8 @@ def png_stats(path):
     bpp = {0: 1, 2: 3, 4: 2, 6: 4}[ct]
     col = 1 if ct in (0, 4) else 3                       # 灰階看 1 個通道，彩色看 RGB
     raw, st = zlib.decompress(b"".join(idat)), w * bpp
+    if len(raw) < h * (st + 1):                          # 掃描線比宣告的高度少：殘缺的檔，不判
+        return None
     prev, tot, sq, cnt = bytearray(st), 0, 0, 0
     for y in range(h):
         f, row = raw[y * (st + 1)], bytearray(raw[y * (st + 1) + 1:(y + 1) * (st + 1)])
@@ -7468,83 +7471,101 @@ def png_stats(path):
     return m, math.sqrt(max(0.0, sq / cnt - m * m))
 
 
-def _ebml_num(d, i):
-    """EBML 的可變長度數字：回 (值, 長度)。"""
-    first = d[i]
-    n = 1
+def _ebml_num(fh):
+    """從檔案讀一個 EBML 可變長度數字：回 (值, 長度, 是不是「長度未知」)。讀到檔尾回 None。"""
+    b = fh.read(1)
+    if not b:
+        return None
+    first, n = b[0], 1
     while n <= 8 and not first & (0x80 >> (n - 1)):
         n += 1
     if n > 8:
         raise ValueError("EBML 長度錯誤")
+    rest = fh.read(n - 1)
+    if len(rest) != n - 1:
+        raise ValueError("EBML 被截斷")
     v = first & (0xFF >> n)
-    for k in range(1, n):
-        v = (v << 8) | d[i + k]
-    return v, n
+    for c in rest:
+        v = (v << 8) | c
+    return v, n, v == (1 << (7 * n)) - 1
 
 
 def webm_stats(path):
-    """sd-cli 寫的 webm：回 {"key_sizes": [每個 VP8 關鍵格的位元組], "w", "h", "pcm": PCM 16 位元聲音（沒有就 None）}。看不懂回 None。"""
-    with open(path, "rb") as fh:
-        d = fh.read()
-    if d[:4] != b"\x1a\x45\xdf\xa3":
-        return None
-    tracks, sizes, pcm, wh = {}, [], bytearray(), None
-    cur = {}
+    """sd-cli 寫的 webm：回 {"key_sizes": [每個 VP8 關鍵格的位元組], "w", "h", "pcm_db": PCM 16 位元的平均音量（沒有聲音是 None）}。
+    邊讀邊算，不把整支影片讀進記憶體（代理服務限 256 MB）。看不懂回 None。"""
+    tracks, sizes, wh, cur = {}, [], [0, 0], {}
+    acc = {"sq": 0, "n": 0, "odd": b""}
 
-    def walk(i, end):
-        nonlocal cur, wh
-        while i < end:
-            eid, n = _ebml_num(d, i)
-            eid |= 1 << (7 * n)                          # 還原成規格寫的 ID（含長度標記位元）
-            size, m = _ebml_num(d, i + n)
-            body = i + n + m
-            stop = min(end, body + size) if size != (1 << (7 * m)) - 1 else end   # 長度未知＝到父層結尾
-            if eid in (0x18538067, 0x1F43B675, 0x1654AE6B, 0xA0):    # Segment、Cluster、Tracks、BlockGroup：往下讀
-                walk(body, stop)
-            elif eid == 0xAE:                                         # TrackEntry
+    def walk(fh, end):
+        nonlocal cur
+        while fh.tell() < end:
+            r = _ebml_num(fh)
+            if r is None:
+                return
+            eid = r[0] | (1 << (7 * r[1]))                # 還原成規格寫的 ID（含長度標記位元）
+            sr = _ebml_num(fh)
+            if sr is None:
+                raise ValueError("EBML 被截斷")
+            body = fh.tell()
+            stop = end if sr[2] else min(end, body + sr[0])   # 長度未知＝到父層結尾
+            if eid in (0x18538067, 0x1F43B675, 0x1654AE6B, 0xA0, 0xE0):   # Segment、Cluster、Tracks、BlockGroup、Video：往下讀
+                walk(fh, stop)
+            elif eid == 0xAE:                                             # TrackEntry
                 cur = {}
-                walk(body, stop)
+                walk(fh, stop)
                 if "num" in cur:
                     tracks[cur["num"]] = cur.get("codec", "")
-            elif eid == 0xD7:
-                cur["num"] = int.from_bytes(d[body:stop], "big")
-            elif eid == 0x86:
-                cur["codec"] = d[body:stop].decode("ascii", "replace")
-            elif eid == 0xE0:                                         # Video：讀寬高
-                walk(body, stop)
-            elif eid == 0xB0:
-                wh = (int.from_bytes(d[body:stop], "big"), (wh or (0, 0))[1])
-            elif eid == 0xBA:
-                wh = ((wh or (0, 0))[0], int.from_bytes(d[body:stop], "big"))
-            elif eid in (0xA3, 0xA1):                                 # SimpleBlock／Block
-                tn, k = _ebml_num(d, body)
-                if d[body + k + 2] & 0x06:                            # 有分段打包（lacing）：sd-cli 不會這樣寫，不判
+            elif eid in (0xD7, 0x86, 0xB0, 0xBA) and stop - body <= 64:
+                v = fh.read(stop - body)
+                if eid == 0x86:
+                    cur["codec"] = v.decode("ascii", "replace")
+                else:
+                    x = int.from_bytes(v, "big")
+                    if eid == 0xD7:
+                        cur["num"] = x
+                    else:
+                        wh[eid == 0xBA] = x
+            elif eid in (0xA3, 0xA1):                                     # SimpleBlock／Block
+                tn = _ebml_num(fh)
+                hdr = fh.read(3)
+                if tn is None or len(hdr) < 3 or hdr[2] & 0x06:           # 有分段打包（lacing）：sd-cli 不會這樣寫，不判
                     raise ValueError("lacing")
-                data = d[body + k + 3:stop]
-                codec = tracks.get(tn, "")
-                if codec == "V_VP8" and data and not data[0] & 1:   # VP8 標頭第 0 位元是 0＝關鍵格
-                    sizes.append(len(data))
+                left = stop - fh.tell()
+                codec = tracks.get(tn[0], "")
+                if codec == "V_VP8" and left > 0:
+                    if not fh.read(1)[0] & 1:                             # VP8 標頭第 0 位元是 0＝關鍵格
+                        sizes.append(left)
                 elif codec == "A_PCM/INT/LIT":
-                    pcm.extend(data)
-            i = stop
+                    while left > 0:
+                        chunk = acc["odd"] + fh.read(min(left, 1 << 20))
+                        left -= len(chunk) - len(acc["odd"])
+                        if len(chunk) == len(acc["odd"]):
+                            raise ValueError("PCM 被截斷")
+                        cut = len(chunk) // 2 * 2
+                        a = array("h")
+                        a.frombytes(chunk[:cut])
+                        if sys.byteorder == "big":
+                            a.byteswap()
+                        acc["sq"] += sum(x * x for x in a)
+                        acc["n"] += len(a)
+                        acc["odd"] = chunk[cut:]
+            fh.seek(stop)
 
     try:
-        walk(0, len(d))
+        with open(path, "rb") as fh:
+            if fh.read(4) != b"\x1a\x45\xdf\xa3":
+                return None
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(0)
+            walk(fh, size)
     except (ValueError, IndexError):
         return None
-    return {"key_sizes": sizes, "w": (wh or (0, 0))[0], "h": (wh or (0, 0))[1], "pcm": bytes(pcm) if pcm else None}
-
-
-def pcm_db(raw):
-    """16 位元小端 PCM 的平均音量（dBFS）；聲音全靜音回 -inf。"""
-    a = array("h")
-    a.frombytes(raw[:len(raw) // 2 * 2])
-    if sys.byteorder == "big":
-        a.byteswap()
-    if not a:
-        return None
-    ms = sum(x * x for x in a) / len(a)
-    return 10 * math.log10(ms / 32768 ** 2) if ms else float("-inf")
+    db = None
+    if acc["n"]:
+        ms = acc["sq"] / acc["n"]
+        db = 10 * math.log10(ms / 32768 ** 2) if ms else float("-inf")
+    return {"key_sizes": sizes, "w": wh[0], "h": wh[1], "pcm_db": db}
 
 
 def sd_output_check(j):
@@ -7565,10 +7586,10 @@ def sd_output_check(j):
                 mbs = max(1, ((st["w"] or j["width"]) + 15) // 16 * (((st["h"] or j["height"]) + 15) // 16))
                 if st["key_sizes"] and max(st["key_sizes"]) / mbs < SD_FLAT_BPMB:
                     probs.append("畫面整段幾乎是同一個顏色")
-                db = pcm_db(st["pcm"]) if st["pcm"] else None
+                db = st["pcm_db"]
                 if db is not None and db > SD_LOUD_DB:
                     probs.append(f"聲音整段推到滿格（平均 {round(db, 1) or 0.0:.1f} dB）")
-    except (OSError, ValueError, zlib.error, struct.error) as ex:  # 讀檔失敗不影響這件「產好了」
+    except (OSError, ValueError, IndexError, zlib.error, struct.error) as ex:  # 讀檔失敗、檔案殘缺：不標，也不影響這件「產好了」
         print(f"產出檢查略過 {j.get('id')}：{ex}", flush=True)
         return None
     return probs or None

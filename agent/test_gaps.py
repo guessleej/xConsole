@@ -478,9 +478,10 @@ def ebml(eid, body):
 
 
 def mk_webm(path, w, h, frame_bytes, pcm):
+    pcms = pcm if isinstance(pcm, list) else [pcm] * 3
     trk = ebml(0x1654AE6B, ebml(0xAE, ebml(0xD7, b"\x01") + ebml(0x86, b"V_VP8") + ebml(0xE0, ebml(0xB0, w.to_bytes(2, "big")) + ebml(0xBA, h.to_bytes(2, "big"))))
                + ebml(0xAE, ebml(0xD7, b"\x02") + ebml(0x86, b"A_PCM/INT/LIT")))
-    blocks = b"".join(ebml(0xA3, b"\x81\x00\x00\x80" + b"\x00" + bytes(frame_bytes - 1)) + ebml(0xA3, b"\x82\x00\x00\x80" + pcm) for _ in range(3))
+    blocks = b"".join(ebml(0xA3, b"\x81\x00\x00\x80" + b"\x00" + bytes(frame_bytes - 1)) + ebml(0xA3, b"\x82\x00\x00\x80" + pc) for pc in pcms)
     with open(path, "wb") as fh:
         fh.write(ebml(0x1A45DFA3, b"") + ebml(0x18538067, trk + ebml(0x1F43B675, blocks)))
 
@@ -504,8 +505,31 @@ quiet = struct.pack("<4800h", *[rnd.randrange(-300, 300) for _ in range(4800)])
 mk_webm(f"{chk}/bad.webm", 768, 512, 740, loud)          # 實測全白那支每格 740 位元組
 mk_webm(f"{chk}/ok.webm", 768, 512, 56000, quiet)
 st = A.webm_stats(f"{chk}/bad.webm")
-eq("webm：讀得到寬高、3 個關鍵格、聲音", (st["w"], st["h"], st["key_sizes"], len(st["pcm"])), (768, 512, [740] * 3, 3 * 9600))
-case("PCM：滿格約 0 dB、安靜的很低", abs(A.pcm_db(loud)) < 0.1 and A.pcm_db(quiet) < -30, (A.pcm_db(loud), A.pcm_db(quiet)))
+eq("webm：讀得到寬高、3 個關鍵格", (st["w"], st["h"], st["key_sizes"]), (768, 512, [740] * 3))
+ok_db = A.webm_stats(f"{chk}/ok.webm")["pcm_db"]
+case("PCM：滿格約 0 dB、安靜的很低", abs(st["pcm_db"]) < 0.1 and ok_db < -30, (st["pcm_db"], ok_db))
+mk_webm(f"{chk}/odd.webm", 64, 64, 900, [(loud * 3)[:9601], (loud * 3)[9601:19201], (loud * 3)[19201:]])   # 區塊 9601／9600／9599 位元組：樣本跨區塊
+case("PCM 區塊奇數位元組：照樣算對", abs(A.webm_stats(f"{chk}/odd.webm")["pcm_db"]) < 0.2, A.webm_stats(f"{chk}/odd.webm")["pcm_db"])
+with open(f"{chk}/bad.webm", "rb") as fh:
+    whole = fh.read()
+crash = []
+for cut in range(0, len(whole), 97):                    # 從每個位置截斷（含元素標頭中間）：都不能丟例外
+    with open(f"{chk}/cut.webm", "wb") as fh:
+        fh.write(whole[:cut])
+    try:
+        A.sd_output_check({"id": "t", "out": "cut.webm", "width": 768, "height": 512})
+    except Exception as ex:  # noqa: BLE001
+        crash.append((cut, repr(ex)))
+eq("webm 在任何位置被截斷：檢查都不會出錯", crash[:3], [])
+mk_png(f"{chk}/short.png", 16, 16, lambda x, y: (255, 255, 255), 0)
+with open(f"{chk}/short.png", "rb") as fh:
+    d = fh.read()
+i = d.index(b"IDAT") - 4
+n = int.from_bytes(d[i:i + 4], "big")
+half = zlib.compress(zlib.decompress(d[i + 8:i + 8 + n])[:5 * 49])        # 宣告 16 列，只留 5 列
+with open(f"{chk}/short.png", "wb") as fh:
+    fh.write(d[:i] + struct.pack(">I", len(half)) + b"IDAT" + half + struct.pack(">I", zlib.crc32(b"IDAT" + half)) + d[i + 12 + n:])
+eq("PNG 掃描線不夠：看不懂、不標也不出錯", (A.png_stats(f"{chk}/short.png"), A.sd_output_check({"id": "s", "out": "short.png"})), (None, None))
 bad = A.sd_output_check({"id": "a", "out": "bad.webm", "width": 768, "height": 512})
 eq("全白＋滿格的影片：兩項都標出來", bad, ["畫面整段幾乎是同一個顏色", "聲音整段推到滿格（平均 0.0 dB）"])
 eq("正常影片：不標", A.sd_output_check({"id": "b", "out": "ok.webm", "width": 768, "height": 512}), None)
@@ -517,6 +541,17 @@ with open(f"{chk}/junk.webm", "wb") as fh:
     fh.write(b"\x1a\x45\xdf\xa3\xff\xff")
 eq("看不懂的檔、檔案不見：不標也不出錯", (A.sd_output_check({"id": "e", "out": "junk.webm", "width": 8, "height": 8}),
                                      A.sd_output_check({"id": "f", "out": "gone.png"})), (None, None))
+# 檢查完才改成 done：網頁看到 done 就不再輪詢，suspect 要在同一次回應裡
+seen = {}
+real_chk, real_sample, real_save = A.sd_output_check, A._gen_sample, A._sd_jobs_save
+A._gen_sample, A._sd_jobs_save = (lambda: (100.0, {})), (lambda: None)
+A.sd_output_check = lambda j: seen.setdefault("state", (j["state"], j["phase"])) and ["畫面整段幾乎是同一個顏色"]
+jr = {"id": "race", "out": "race.png", "kind": "image", "steps": 1, "_cancel": False, "state": "running", "phase": "產生中", "model": "m"}
+A._gen_run(jr, [sys.executable, "-c", f"import shutil; shutil.copy({os.path.join(chk, 'w0.png')!r}, {os.path.join(chk, 'race.png')!r})"],
+           {}, "discrete", {"ram": 1})
+eq("檢查時還沒 done、檢查完 done 與 suspect 一起出現", (seen.get("state"), jr["state"], jr.get("suspect")),
+   (("running", "檢查產出中"), "done", ["畫面整段幾乎是同一個顏色"]))
+A.sd_output_check, A._gen_sample, A._sd_jobs_save = real_chk, real_sample, real_save
 A.GEN_DIR = real_gen
 shutil.rmtree(chk, ignore_errors=True)
 
