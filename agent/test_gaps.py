@@ -448,5 +448,77 @@ A.sh = lambda argv, timeout=20: (1, "", "nvcc fatal")
 eq("讀不出 nvcc 的 GCC 版本：不動", A.cuda_host_gcc("/usr/bin/nvcc"), None)
 A.sh, A.shutil = real_sh, real_shutil
 
+# ---- 產出檢查：全白／全黑、聲音滿格要標出來；正常的、看不懂的都不標（LTX 開 flash attention 產出全白卻說產好了）
+import random, struct, zlib
+
+
+def mk_png(path, w, h, px, filt):
+    """px(x, y) 回 (r, g, b)；每列用指定的 PNG 濾波（0～4）寫，測解碼每一種都對。"""
+    rows, prev = [], bytes(w * 3)
+    for y in range(h):
+        raw = bytes(c for x in range(w) for c in px(x, y))
+        out = bytearray()
+        for i, v in enumerate(raw):
+            a = raw[i - 3] if i >= 3 else 0
+            b, c = prev[i], (prev[i - 3] if i >= 3 else 0)
+            p = a + b - c
+            pr = a if abs(p - a) <= abs(p - b) and abs(p - a) <= abs(p - c) else b if abs(p - b) <= abs(p - c) else c
+            out.append((v - (0, a, b, (a + b) >> 1, pr)[filt]) & 255)
+        rows.append(bytes([filt]) + bytes(out))
+        prev = raw
+    chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
+    with open(path, "wb") as fh:
+        fh.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                 + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
+
+
+def ebml(eid, body):
+    idb = eid.to_bytes((eid.bit_length() + 7) // 8, "big")
+    return idb + (len(body) | (1 << 56)).to_bytes(8, "big") + body       # 長度一律用 8 位元組寫
+
+
+def mk_webm(path, w, h, frame_bytes, pcm):
+    trk = ebml(0x1654AE6B, ebml(0xAE, ebml(0xD7, b"\x01") + ebml(0x86, b"V_VP8") + ebml(0xE0, ebml(0xB0, w.to_bytes(2, "big")) + ebml(0xBA, h.to_bytes(2, "big"))))
+               + ebml(0xAE, ebml(0xD7, b"\x02") + ebml(0x86, b"A_PCM/INT/LIT")))
+    blocks = b"".join(ebml(0xA3, b"\x81\x00\x00\x80" + b"\x00" + bytes(frame_bytes - 1)) + ebml(0xA3, b"\x82\x00\x00\x80" + pcm) for _ in range(3))
+    with open(path, "wb") as fh:
+        fh.write(ebml(0x1A45DFA3, b"") + ebml(0x18538067, trk + ebml(0x1F43B675, blocks)))
+
+
+chk = tempfile.mkdtemp()
+real_gen = A.GEN_DIR
+A.GEN_DIR = chk
+rnd = random.Random(1)
+for f in range(5):
+    mk_png(f"{chk}/w{f}.png", 24, 16, lambda x, y: (255, 255, 255), f)
+    mk_png(f"{chk}/n{f}.png", 24, 16, lambda x, y: (rnd.randrange(256), rnd.randrange(256), rnd.randrange(256)), f)
+eq("PNG 五種濾波都解得對：全白 255±0", [tuple(round(v) for v in A.png_stats(f"{chk}/w{f}.png")) for f in range(5)], [(255, 0)] * 5)
+for f in range(5):
+    mk_png(f"{chk}/g{f}.png", 24, 16, lambda x, y: (x * 5 + y * 3, x * 5 + y * 3, x * 5 + y * 3), f)
+gv = [x * 5 + y * 3 for y in range(0, 16, 4) for x in range(0, 24, 4)]     # 解碼抽樣：每 4 列、每 4 個像素
+gm = sum(gv) / len(gv)
+eq("PNG 五種濾波都解得對：漸層的平均與標準差", [tuple(round(v, 3) for v in A.png_stats(f"{chk}/g{f}.png")) for f in range(5)],
+   [(round(gm, 3), round((sum(v * v for v in gv) / len(gv) - gm * gm) ** 0.5, 3))] * 5)
+loud = struct.pack("<4800h", *[32767 if i % 2 else -32768 for i in range(4800)])
+quiet = struct.pack("<4800h", *[rnd.randrange(-300, 300) for _ in range(4800)])
+mk_webm(f"{chk}/bad.webm", 768, 512, 740, loud)          # 實測全白那支每格 740 位元組
+mk_webm(f"{chk}/ok.webm", 768, 512, 56000, quiet)
+st = A.webm_stats(f"{chk}/bad.webm")
+eq("webm：讀得到寬高、3 個關鍵格、聲音", (st["w"], st["h"], st["key_sizes"], len(st["pcm"])), (768, 512, [740] * 3, 3 * 9600))
+case("PCM：滿格約 0 dB、安靜的很低", abs(A.pcm_db(loud)) < 0.1 and A.pcm_db(quiet) < -30, (A.pcm_db(loud), A.pcm_db(quiet)))
+bad = A.sd_output_check({"id": "a", "out": "bad.webm", "width": 768, "height": 512})
+eq("全白＋滿格的影片：兩項都標出來", bad, ["畫面整段幾乎是同一個顏色", "聲音整段推到滿格（平均 0.0 dB）"])
+eq("正常影片：不標", A.sd_output_check({"id": "b", "out": "ok.webm", "width": 768, "height": 512}), None)
+eq("一次多張有一張全白：說是第幾張", A.sd_output_check({"id": "c", "out": "x.png", "outs": ["n0.png", "w3.png"]}), ["第 2 張幾乎是同一個顏色（亮度 255）"])
+eq("單張全黑", A.sd_output_check({"id": "c2", "out": "k.png"}) if mk_png(f"{chk}/k.png", 8, 8, lambda x, y: (0, 0, 0), 4) is None else 0,
+   ["整張幾乎是同一個顏色（亮度 0）"])
+eq("正常圖片：不標", A.sd_output_check({"id": "d", "out": "n4.png"}), None)
+with open(f"{chk}/junk.webm", "wb") as fh:
+    fh.write(b"\x1a\x45\xdf\xa3\xff\xff")
+eq("看不懂的檔、檔案不見：不標也不出錯", (A.sd_output_check({"id": "e", "out": "junk.webm", "width": 8, "height": 8}),
+                                     A.sd_output_check({"id": "f", "out": "gone.png"})), (None, None))
+A.GEN_DIR = real_gen
+shutil.rmtree(chk, ignore_errors=True)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

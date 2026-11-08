@@ -329,6 +329,7 @@ async function watchChatGen(g, paint) {
     if (j.state === "running") { paint(); await new Promise((ok) => setTimeout(ok, 2000)); continue; }
     g.state = j.state === "done" ? "done" : "failed";
     if (j.state !== "done") g.error = j.error || { cancelled: "已取消", interrupted: "代理重啟過，這件沒產完" }[j.state] || j.state;
+    if (j.suspect) g.suspect = j.suspect;
     paint();
     return;
   }
@@ -1088,6 +1089,7 @@ function paintGen(m, b, acts) {
   }
   const holder = el("div", "msg-media");
   holder.appendChild(el("p", "small muted", "讀取中…"));
+  if (g.suspect) b.appendChild(sdSuspectNote(g.suspect));
   b.appendChild(holder);
   b.appendChild(el("div", "small muted", `${g.title || ""}${g.edit ? "・改圖" : ""}・提示詞：${g.prompt || g.asked || ""}`));
   const row = el("div", "msg-acts");
