@@ -46,6 +46,7 @@ import updater  # noqa: E402
 import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
+import agentlink  # noqa: E402
 from store import Store  # noqa: E402
 
 # Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
@@ -490,9 +491,29 @@ def _read_capped(resp, deadline):
     return json.loads(b"".join(chunks) or b"{}")
 
 
+LINK = agentlink.Link(log=lambda m: print(m, flush=True))
+PUSH = "push"            # node_request() 對主動連回的節點回這個當 TLS 設定：agent_open() 認得它
+
+
+def node_url(node, path):
+    """主控台連代理（link=pull，伺服器）用 https；代理主動連回（link=push，工作站）的排進那台的佇列。"""
+    if node.get("link") == "push":
+        return f"push://{node['id']}{path}"
+    h = node["host"]
+    return f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
+
+
 def agent_open(req, ctx, timeout):
     """連各機代理：一律不走代理伺服器。代理都在內網；macOS 的 urllib 會讀系統的代理設定，
-    單機版連自己的 127.0.0.1 也會被送去代理而連不上。"""
+    單機版連自己的 127.0.0.1 也會被送去代理而連不上。
+    push:// 的請求排進那台的長輪詢佇列，回來的物件跟 urllib 的回應一樣用（4xx／5xx 一樣丟 HTTPError）。"""
+    if req.full_url.startswith("push://"):
+        nid, _, rest = req.full_url[7:].partition("/")
+        resp = LINK.open(nid, req.get_method(), "/" + rest, req.data,
+                         req.get_header("Content-type") or "application/json", timeout)
+        if resp.status >= 400:
+            raise urllib.error.HTTPError(req.full_url, resp.status, resp.reason, resp.headers, resp)
+        return resp
     op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
     return op.open(req, timeout=timeout)
 
@@ -502,12 +523,10 @@ def node_request(node_id, path, data, ctype="application/json"):
     node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
     if not node:
         return None, "沒有這台機器"
-    ctx = tls.client_context(trust_file(node_id))
+    ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
     if ctx is None:
         return None, f"還沒信任 {node['name']} 的代理憑證"
-    h = node["host"]
-    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
-    return urllib.request.Request(url, data=data, method="POST", headers={
+    return urllib.request.Request(node_url(node, path), data=data, method="POST", headers={
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": ctype}), ctx
 
 
@@ -572,13 +591,12 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
     if not node:
         return 404, {"error": f"沒有這台機器：{node_id}"}
-    ctx = tls.client_context(trust_file(node_id))
+    ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
     if ctx is None:
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
         return 502, {"error": f"還沒信任 {node['name']} 的代理憑證，請重新執行 deploy_console.sh "
                               f"或在「設定 → 機器」匯入該機憑證", "offline": True, "untrusted": True}
-    h = node["host"]
-    url = f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
+    url = node_url(node, path)
     data = json.dumps(body or {}).encode() if method == "POST" else None
     req = urllib.request.Request(url, data=data, method=method, headers={
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
@@ -592,6 +610,10 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
             return exc.code, _read_capped(exc, deadline)
         except Exception:  # noqa: BLE001
             return exc.code, {"error": f"代理回 {exc.code}"}
+    except agentlink.Deadline as exc:
+        return 504, {"error": f"{node['name']} 超過期限沒有回：{exc}"}
+    except agentlink.Offline as exc:
+        return 502, {"error": f"{node['name']} 連不上：{exc}", "offline": True}
     except Exception as exc:  # noqa: BLE001
         msg = str(exc)
         if "CERTIFICATE_VERIFY_FAILED" in msg or "certificate verify failed" in msg:
@@ -648,6 +670,9 @@ JOIN_FAIL_MAX = 10
 _JOINS = {}                      # 加入碼雜湊 → 狀態（只放記憶體：主控台重啟就作廢，重新產一個即可）
 _JOIN_FAILS = {}
 _JOIN_LOCK = threading.Lock()
+AGENT_FAIL_MAX = 30
+_AGENT_FAILS = {}
+_AGENT_FAIL_LOCK = threading.Lock()
 NODE_ID_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,39}")
 HOST_RX = re.compile(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
                      r"|\[[0-9A-Fa-f:]+\])(?::\d{1,5})?")
@@ -809,7 +834,7 @@ RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" "$PY" - <<'PY' | curl -sSk -m 150 --p
 {JOIN_PAYLOAD_PY}PY
 ) || {{ echo "連不到主控台 $C"; exit 1; }}
 STATUS=$(printf '%s' "$RESP" | tail -n 1)
-printf '%s' "$RESP" | sed '$d' | "$PY" -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("error") or d)'
+printf '%s' "$RESP" | sed '$d' | XCONSOLE_HOME="$HOME" "$PY" -c '{JOIN_SAVE_PY}'
 [ "$STATUS" = 200 ] || exit 1
 [ "$LINGER" = no ] && echo "提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER"
 [ "$OSN" = Darwin ] && echo "提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台"
@@ -826,10 +851,28 @@ try:
 except OSError:
     pass
 print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
-                  "linger": os.environ.get("XC_LINGER", "yes") == "yes",
+                  "linger": os.environ.get("XC_LINGER", "yes") == "yes", "push": True,
                   "token": open(os.path.join(home, ".xconsole", "token")).read().strip(),
                   "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
 """
+
+# 讀主控台對加入的回應：印出訊息；主控台連不進這台時，把連回的位址與主控台憑證寫給代理（代理每 5 秒看一次）。
+# 給 bash 的 -c '...' 用，所以整段不能有單引號
+JOIN_SAVE_PY = """import json, os, sys
+src = open(sys.argv[1], encoding="utf-8-sig") if len(sys.argv) > 1 else sys.stdin
+d = json.load(src)
+print(d.get("message") or d.get("error") or d)
+c = d.get("console") or {}
+if d.get("link") == "push" and c.get("url") and c.get("cert"):
+    sd = os.path.join(os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~"), ".xconsole")
+    for name, data in (("agent-link.pem", c["cert"]), ("agent-link.json", json.dumps({"url": c["url"], "node": c["node"]}))):
+        tmp = os.path.join(sd, name + ".tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(data)
+        os.replace(tmp, os.path.join(sd, name))
+"""
+assert "'" not in JOIN_SAVE_PY
 
 
 def install_script_ps1(code, j):
@@ -917,8 +960,11 @@ $payload = @'
 $req = New-Object Net.WebClient; $req.Headers.Add('Content-Type', 'application/json'); $req.Encoding = [Text.Encoding]::UTF8
 try {{ $resp = $req.UploadString("$C/api/join", $payload); $ok = $true }} catch [Net.WebException] {{
   $resp = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd(); $ok = $false }}
-$d = $resp | ConvertFrom-Json
-if ($d.message) {{ Write-Host $d.message }} elseif ($d.error) {{ Write-Host $d.error }} else {{ Write-Host $resp }}
+$tf = Join-Path $base '.xconsole\\join-resp.json'
+[IO.File]::WriteAllText($tf, $resp, (New-Object Text.UTF8Encoding $false))
+@'
+{JOIN_SAVE_PY}'@ | & $vpy - $tf
+Remove-Item -Force $tf -ErrorAction SilentlyContinue
 if (-not $ok) {{ exit 1 }}
 if (-not $admin) {{ Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }}
 """
@@ -1038,11 +1084,15 @@ def _join_node(handler, body):
                         break
             except Exception as exc:  # noqa: BLE001
                 why = str(exc)[:160]           # 只寫進操作紀錄，不回給請求方（不讓人拿加入端點分辨埠的狀態）
+        link = "pull"
         if not good:
             os.remove(tmp)
             STORE.audit("", ip, "node.join_probe", "", False, {"hosts": hosts, "port": port, "why": why})
-            return fail(f"主控台連不到這台的代理（試過 {', '.join(f'{h}:{port}' for h in hosts)}）。"
-                        f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
+            if not body.get("push"):
+                return fail(f"主控台連不到這台的代理（試過 {', '.join(f'{h}:{port}' for h in hosts)}）。"
+                            f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
+            # 工作站：防火牆擋連入、IP 會換。改由這台用長輪詢連回主控台，權杖由它第一次連回時證明
+            link, good = "push", ip
         nid = None
 
         def put(cfg):
@@ -1051,17 +1101,20 @@ def _join_node(handler, body):
             # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）
             same = next((n for n in cfg["nodes"] if n["id"] == j.get("replace")), None)
             if same:                                   # 指定重新安裝的那台：換新的權杖、位址與憑證，名稱群組不動
-                same.update(host=good, agent_port=port, token=tls.seal(CERTS.p, token.encode()))
+                same.update(host=good, agent_port=port, link=link, token=tls.seal(CERTS.p, token.encode()))
                 nid = same["id"]
                 return
             taken = {n["id"] for n in cfg["nodes"]}
             base = hostname if NODE_ID_RX.fullmatch(hostname) else "node"
             nid = base if base not in taken else next(f"{base}-{i}" for i in range(2, 999) if f"{base}-{i}" not in taken)
             cfg["nodes"].append({"id": nid, "name": j.get("name") or hostname, "host": good,
-                                 "group": j.get("group") or "未分類", "agent_port": port,
+                                 "group": j.get("group") or "未分類", "agent_port": port, "link": link,
                                  "token": tls.seal(CERTS.p, token.encode())})
         update_fleet(put)
-        os.replace(tmp, trust_file(nid))
+        if link == "pull":
+            os.replace(tmp, trust_file(nid))
+        elif os.path.exists(trust_file(nid)):
+            os.remove(trust_file(nid))             # 重新安裝成主動連回：舊的代理憑證不再用
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
@@ -1069,10 +1122,18 @@ def _join_node(handler, body):
         j["node_id"] = nid
         j["linger"] = bool(body.get("linger"))
         j["error"] = None
-    STORE.audit(j["by"], ip, "node.join", nid, True, {"host": good, "port": port,
+    STORE.audit(j["by"], ip, "node.join", nid, True, {"host": good, "port": port, "link": link,
                                                        "fingerprint256": r["summary"]["fingerprint256"]})
     name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
-    return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
+    if link == "pull":
+        return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
+    with open(CERTS.p.live_cert) as fh:
+        console_pem = fh.read()
+    # 安裝腳本把這些寫進 ~/.xconsole/agent-link.json：代理看到就開始連回，只認這張主控台憑證
+    return 200, {"ok": True, "id": nid, "link": "push",
+                 "console": {"url": f"https://{j['console']}", "node": nid, "cert": console_pem},
+                 "message": f"已加入主控台：{name}。主控台連不進這台（防火牆擋連入），改由這台主動連回，"
+                            f"幾秒內網頁就看得到它。"}
 
 # ---------------------------------------------------------------- Hugging Face 量化清單附等級
 _HF_CACHE = {}                   # (機器, repo, match) → (時間, 代理 hf_profile 的回應)：讀遠端檔頭要抓十幾 MB，10 分鐘內不重抓
@@ -2366,6 +2427,43 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             pass
 
+    def _agent_link(self, path):
+        """代理主動連回（工作站模式）：先驗節點權杖再讀本文。驗過的連線改依節點計連線數（tls.TLSServer.promote），
+        幾百台工作站在 NAT 後面共用一個 IP 也不會被「同一來源 64 條」擋下。"""
+        nid = str(self.headers.get("X-XConsole-Node") or "")[:40]
+        got = self.headers.get("Authorization") or ""
+        with _AGENT_FAIL_LOCK:
+            fails = [t for t in _AGENT_FAILS.get(self.ip, []) if t > time.time() - 900]
+            _AGENT_FAILS[self.ip] = fails
+        node = next((n for n in fleet()["nodes"] if n["id"] == nid and n.get("link") == "push"), None)
+        ok = len(fails) < AGENT_FAIL_MAX and bool(node) and got.startswith("Bearer ") \
+            and hmac.compare_digest(got[7:].encode(), node_token(node).encode())
+        if not ok:
+            if self._body(MAX_ANON_BODY) is None:
+                return None
+            self._headers_done()
+            if len(fails) >= AGENT_FAIL_MAX:
+                return self._json(429, {"error": "權杖錯太多次，請 15 分鐘後再試"})
+            with _AGENT_FAIL_LOCK:
+                _AGENT_FAILS.setdefault(self.ip, []).append(time.time())
+            if not fails:                          # 每個來源每一輪只記一筆，免得灌爆稽核表
+                STORE.audit("", self.ip, "agent.auth", nid, False)
+            time.sleep(0.5)
+            return self._json(401, {"error": "節點權杖不對，或這台不是主動連回的機器"})
+        promote = getattr(self.server, "promote", None)
+        if promote is not None and not promote(nid):
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            self.close_connection = True
+            return self._json(429, {"error": "這台同時開的連線太多"})
+        body = self._body(MAX_BODY)
+        self._headers_done()
+        if body is None:
+            return self._json(413, {"error": "請求內容太大"})
+        if path == "/api/agent/poll":
+            return self._json(200, {"cmds": LINK.poll(nid, body.get("seen"))})
+        return self._json(200, {"ok": LINK.result(nid, body)})
+
     def _headers_done(self):
         t = getattr(self, "_hdr_timer", None)
         if t:
@@ -2607,6 +2705,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._headers_done()
                 return self._json(400, {"error": "桌面版用安裝檔更新；請到「版本與更新」按更新，或到 GitHub 的版本頁下載安裝檔"})
             return self._update_upload(ctype)
+        if path in ("/api/agent/poll", "/api/agent/result"):
+            return self._agent_link(path)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -2704,6 +2804,7 @@ class Handler(BaseHTTPRequestHandler):
                 update_fleet(lambda cfg: cfg.__setitem__("nodes", [n for n in cfg["nodes"] if n["id"] != nid]))
                 if os.path.exists(trust_file(nid)):
                     os.remove(trust_file(nid))
+                LINK.forget(nid)
                 self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"]})
                 return self._json(200, {"ok": True})
             name = str(body.get("name", node["name"]) or "").strip()

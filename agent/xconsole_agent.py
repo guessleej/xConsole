@@ -17,6 +17,7 @@ import base64
 import functools
 import glob
 import hashlib
+import http.client
 import io
 import json
 import math
@@ -8743,6 +8744,240 @@ def desktop_first_run():
         print(f"桌面版第一次啟動：記憶體架構自動套用偵測結果 {sug}", flush=True)
 
 
+# ---------------------------------------------------------------- 主動連回主控台（工作站模式）
+# 主控台連不進來的機器（防火牆擋連入、IP 會換）：這台用 HTTPS 長輪詢連回主控台拿指令。
+# 加入時安裝腳本寫下 agent-link.json（主控台網址、節點編號）與 agent-link.pem（主控台憑證），有這兩個檔才會連。
+# 每筆指令轉給本機自己這支代理（https://127.0.0.1:PORT），路由、權杖檢查、串流都跟主控台直接連進來一樣。
+# 協定與主控台那一側見 console/agentlink.py。
+LINK_FILE = os.path.join(STATE_DIR, "agent-link.json")
+LINK_CERT = os.path.join(STATE_DIR, "agent-link.pem")
+LINK_FRAME = 4 * 1024 * 1024        # 結果超過這麼大就分片送
+LINK_REPLY_MAX = 32 * 1024 * 1024   # 跟主控台收代理回應的上限一樣
+LINK_KEEP = 1024 * 1024             # 做完的結果小於這個才留著，同一筆指令再送來時直接重送結果
+LINK_RECENT_TTL, LINK_RECENT_MAX = 3600, 256
+
+
+class AgentLink:
+    def __init__(self):
+        self.recent = {}                 # 指令編號 → {"ts", "frames"}；frames 做完才有
+        self.inflight = {}               # 指令編號 → 本機連線的 socket（收到取消就關掉）
+        self.lock = threading.Lock()
+        self.res = None                  # 送結果用的連線（keep-alive，送一片鎖一次）
+        self.res_lock = threading.Lock()
+        self.last_err = None
+
+    @staticmethod
+    def config():
+        try:
+            with open(LINK_FILE, encoding="utf-8") as fh:
+                c = json.load(fh)
+            with open(LINK_CERT, encoding="utf-8") as fh:
+                pem = fh.read()
+            u = urllib.parse.urlsplit(str(c.get("url") or ""))
+            first = pem.split("-----END CERTIFICATE-----")[0] + "-----END CERTIFICATE-----\n"
+            fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(first)).hexdigest()
+            port = u.port or 443
+        except (OSError, ValueError, AttributeError):
+            return None
+        if u.scheme != "https" or not u.hostname or not re.fullmatch(r"[A-Za-z0-9][\w.-]{0,39}", str(c.get("node") or "")):
+            return None
+        return {"host": u.hostname, "port": port, "node": c["node"], "fp": fp}
+
+    @staticmethod
+    def connect(cfg, timeout):
+        """只信加入時拿到的那張主控台憑證：用它當信任依據驗證，再比對整張憑證的 SHA-256。不准退回不驗證。"""
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        ctx.check_hostname = False       # 主控台網址常是 IP、不一定在憑證的名稱裡：改由釘住整張憑證確認是它
+        ctx.load_verify_locations(LINK_CERT)
+        if hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
+            ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN   # 正式憑證：信那張本身就好，不必帶根憑證
+        conn = http.client.HTTPSConnection(cfg["host"], cfg["port"], context=ctx, timeout=timeout)
+        conn.connect()
+        der = conn.sock.getpeercert(binary_form=True) or b""
+        if not secrets.compare_digest(hashlib.sha256(der).hexdigest(), cfg["fp"]):
+            conn.close()
+            raise ssl.SSLError("主控台送出的憑證跟加入時釘住的不同，拒絕連線")
+        return conn
+
+    @staticmethod
+    def post(conn, cfg, path, obj, timeout):
+        if conn.sock is not None:
+            conn.sock.settimeout(timeout)
+        conn.request("POST", path, body=json.dumps(obj).encode(), headers={
+            "Authorization": f"Bearer {TOKEN}", "X-XConsole-Node": cfg["node"], "Content-Type": "application/json"})
+        r = conn.getresponse()
+        data = r.read(LINK_REPLY_MAX * 2)
+        try:
+            return r.status, json.loads(data or b"{}")
+        except ValueError:
+            return r.status, {}
+
+    def _log(self, msg):
+        if msg != self.last_err:         # 一直連不上時同一句只印一次
+            self.last_err = msg
+            print(msg, flush=True)
+
+    def seen(self):
+        with self.lock:
+            now = time.time()
+            for k in [k for k, v in self.recent.items() if now - v["ts"] > LINK_RECENT_TTL]:
+                self.recent.pop(k)
+            while len(self.recent) > LINK_RECENT_MAX:
+                self.recent.pop(next(iter(self.recent)))
+            return list(self.recent)
+
+    def run(self):
+        conn, back = None, 2
+        while True:
+            cfg = self.config()
+            if not cfg:
+                time.sleep(5)
+                continue
+            try:
+                if conn is None:
+                    conn = self.connect(cfg, 40)
+                st, out = self.post(conn, cfg, "/api/agent/poll", {"seen": self.seen()}, 40)
+                if st == 200:
+                    if self.last_err:
+                        self._log(None)
+                        print("已連回主控台", flush=True)
+                    back = 2
+                    for c in out.get("cmds") or []:
+                        if isinstance(c, dict):
+                            self.dispatch(cfg, c)
+                    continue
+                self._log(f"主控台拒絕連回（{st}）：{out.get('error') or ''}")
+                conn.close()
+                conn = None
+                time.sleep(60 if st in (401, 403, 429) else back)
+            except Exception as exc:  # noqa: BLE001
+                self._log(f"連不回主控台 {cfg['host']}:{cfg['port']}：{str(exc)[:160]}")
+                if conn is not None:
+                    conn.close()
+                    conn = None
+                time.sleep(back + secrets.randbelow(1000) / 1000)
+                back = min(back * 2, 60)
+
+    def dispatch(self, cfg, c):
+        cid = str(c.get("id") or "")
+        if not re.fullmatch(r"[0-9a-f]{24}", cid):
+            return
+        if c.get("cancel"):
+            with self.lock:
+                self.recent.setdefault(cid, {"ts": time.time(), "frames": []})
+                sk = self.inflight.get(str(c["cancel"]))
+            if sk is not None:
+                try:
+                    sk.shutdown(socket.SHUT_RDWR)   # 本機那條連線一斷，模型服務那邊也跟著停（對話按停止）
+                except OSError:
+                    pass
+            return
+        with self.lock:
+            r = self.recent.get(cid)
+            if r is None:
+                self.recent[cid] = {"ts": time.time(), "frames": None}
+        if r is not None:
+            # 網路重送的同一筆：做完了就重送上次的結果，還在做就不理它，絕不重做一次
+            if r["frames"]:
+                threading.Thread(target=self._resend, args=(cfg, r["frames"]), daemon=True).start()
+            return
+        threading.Thread(target=self.execute, args=(cfg, c), daemon=True).start()
+
+    def _resend(self, cfg, frames):
+        for fr in frames:
+            if not self.send(cfg, fr):
+                return
+
+    def send(self, cfg, fr):
+        """送一片結果，失敗重連再試，共三次。"""
+        for i in range(3):
+            with self.res_lock:
+                try:
+                    if self.res is None:
+                        self.res = self.connect(cfg, 60)
+                    st, _ = self.post(self.res, cfg, "/api/agent/result", fr, 60)
+                    if st == 200:
+                        return True
+                    if st in (401, 403, 413):
+                        return False
+                except Exception:  # noqa: BLE001
+                    pass
+                if self.res is not None:
+                    self.res.close()
+                    self.res = None
+            time.sleep(1 + i)
+        return False
+
+    def execute(self, cfg, c):
+        cid, seq, keep = c["id"], 0, []
+
+        def frame(status=None, ctype=None, data=b"", more=True):
+            nonlocal seq
+            fr = {"id": cid, "seq": seq, "data": base64.b64encode(data).decode(), "more": more}
+            if seq == 0:
+                fr.update(status=status, ctype=ctype)
+            seq += 1
+            if keep is not None:
+                keep.append(fr)
+            ok = self.send(cfg, fr)
+            if not ok:
+                raise ConnectionError("結果送不回主控台")
+
+        lc = None
+        try:
+            path = str(c.get("path") or "")
+            if not path.startswith("/") or any(ch in path for ch in "\r\n "):
+                return frame(400, "application/json", json.dumps({"error": "指令的路徑不對"}).encode(), False)
+            method = "POST" if c.get("method") == "POST" else "GET"
+            body = base64.b64decode(c.get("body") or "")
+            to = max(5, min(int(c.get("timeout") or 40), 3600))
+            lc = http.client.HTTPSConnection("127.0.0.1", PORT, timeout=to,
+                                             context=ssl.create_default_context(cafile=CERT_FILE))
+            lc.connect()
+            with self.lock:
+                self.inflight[cid] = lc.sock     # 存 socket 本身：回應是 Connection: close 時 http.client 會把 lc.sock 清成 None
+            lc.request(method, path, body=body if method == "POST" else None, headers={
+                "Authorization": f"Bearer {TOKEN}", "Content-Type": str(c.get("ctype") or "application/json")[:120],
+                "Connection": "close"})          # 一筆一條：不留 keep-alive，代理那端不會等下一個請求等到被重置
+            r = lc.getresponse()
+            ctype = r.getheader("Content-Type") or "application/json"
+            if "event-stream" in ctype:
+                keep = None                      # 串流不留著重送
+                frame(r.status, ctype)
+                buf, last = b"", time.time()
+                for line in r:                   # 對話一行一行來：累積一小段再送，免得每個字一個請求
+                    buf += line
+                    if len(buf) >= 65536 or time.time() - last >= 0.05:
+                        frame(data=buf)
+                        buf, last = b"", time.time()
+                return frame(data=buf, more=False)
+            data = r.read(LINK_REPLY_MAX + 1)
+            if len(data) > LINK_REPLY_MAX:
+                return frame(502, "application/json", json.dumps({"error": "代理回應太大"}).encode(), False)
+            if len(data) > LINK_KEEP:
+                keep = None
+            parts = [data[i:i + LINK_FRAME] for i in range(0, len(data), LINK_FRAME)] or [b""]
+            frame(r.status, ctype, parts[0], len(parts) > 1)
+            for i, part in enumerate(parts[1:], 2):
+                frame(data=part, more=i < len(parts))
+        except Exception as exc:  # noqa: BLE001
+            try:
+                if seq == 0:
+                    frame(502, "application/json", json.dumps({"error": f"這台執行指令失敗：{str(exc)[:160]}"}).encode(), False)
+                else:
+                    frame(more=False)
+            except Exception:  # noqa: BLE001
+                pass
+        finally:
+            with self.lock:
+                self.inflight.pop(cid, None)
+                if cid in self.recent and keep:
+                    self.recent[cid]["frames"] = keep
+            if lc is not None:
+                lc.close()
+
+
 def _watch_parent(pid):
     """父行程（xConsole 應用程式）不在了就停掉自己帶起來的模型服務並結束。"""
     while True:
@@ -8783,6 +9018,7 @@ def main():
         threading.Thread(target=_watch_parent, args=(int(sys.argv[sys.argv.index("--parent-pid") + 1]),), daemon=True).start()
     srv = AgentTLSServer((bind, PORT), Handler)
     srv.ctx = ctx
+    threading.Thread(target=AgentLink().run, daemon=True).start()    # 沒有 agent-link.json 就只是每 5 秒看一次
     print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
 
