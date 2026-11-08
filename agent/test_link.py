@@ -4,6 +4,7 @@
 跑法：python3 test_link.py（只用標準函式庫＋代理本身，Linux／macOS／Windows 都能跑）
 """
 import base64
+import hashlib
 import json
 import os
 import socket
@@ -108,6 +109,72 @@ def main():
         case("指紋不同：拒絕連線", False)
     except ssl.SSLError as exc:
         case("指紋不同：拒絕連線", "釘住" in str(exc), exc)
+
+    # ---- 2b. 主控台用 CA 簽的憑證（根憑證不在這台）：新版 Python 驗證通過；Python 3.9 沒有 PARTIAL_CHAIN 時靠指紋
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        import datetime as dt
+        import ipaddress
+    except ImportError:
+        x509 = None
+        print("（沒有 cryptography，略過 CA 簽的主控台憑證）")
+    if x509 is not None:
+        now = dt.datetime.now(dt.timezone.utc)
+        ck = ec.generate_private_key(ec.SECP256R1())
+        cn = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test Root")])
+        ca = (x509.CertificateBuilder().subject_name(cn).issuer_name(cn).public_key(ck.public_key())
+              .serial_number(1).not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=30))
+              .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+              .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False), critical=True)
+              .add_extension(x509.SubjectKeyIdentifier.from_public_key(ck.public_key()), critical=False)
+              .sign(ck, hashes.SHA256()))
+        lk = ec.generate_private_key(ec.SECP256R1())
+        leaf = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "console")]))
+                .issuer_name(cn).public_key(lk.public_key()).serial_number(2)
+                .not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=30))
+                .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+                .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), critical=False)
+                .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ck.public_key()), critical=False)
+                .add_extension(x509.SubjectKeyIdentifier.from_public_key(lk.public_key()), critical=False)
+                .sign(ck, hashes.SHA256()))
+        d = tempfile.mkdtemp(prefix="xc-ca-")
+        lp, kp = os.path.join(d, "leaf.pem"), os.path.join(d, "leaf.key")
+        open(lp, "wb").write(leaf.public_bytes(serialization.Encoding.PEM))
+        open(kp, "wb").write(lk.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                              serialization.NoEncryption()))
+        c2 = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        c2.load_cert_chain(lp, kp)
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        p2 = s.getsockname()[1]
+        s.close()
+        srv2 = A.AgentTLSServer(("127.0.0.1", p2), H)
+        srv2.ctx = c2
+        threading.Thread(target=srv2.serve_forever, daemon=True).start()
+        keep_pem = open(A.LINK_CERT).read()
+        open(A.LINK_CERT, "w").write(open(lp).read())          # 只有那張憑證，沒有根憑證
+        cfg2 = {**cfg, "port": p2, "fp": hashlib.sha256(leaf.public_bytes(serialization.Encoding.DER)).hexdigest()}
+        saved = A.PARTIAL_CHAIN
+        for name, flag in (("Python 3.10 以上（PARTIAL_CHAIN）", saved), ("Python 3.9（沒有 PARTIAL_CHAIN）", 0)):
+            if name.startswith("Python 3.10") and not saved:
+                continue
+            A.PARTIAL_CHAIN = flag
+            try:
+                A.AgentLink.connect(cfg2, 5).close()
+                case(f"CA 簽的主控台憑證、根憑證不在這台：連得上（{name}）", True)
+            except Exception as exc:  # noqa: BLE001
+                case(f"CA 簽的主控台憑證、根憑證不在這台：連得上（{name}）", False, exc)
+            try:
+                A.AgentLink.connect({**cfg2, "fp": "0" * 64}, 5)
+                case(f"  指紋不同照樣拒絕（{name}）", False)
+            except ssl.SSLError:
+                case(f"  指紋不同照樣拒絕（{name}）", True)
+        A.PARTIAL_CHAIN = saved
+        open(A.LINK_CERT, "w").write(keep_pem)
+        srv2.shutdown()
 
     # ---- 3. 執行指令：送回的片段
     link = A.AgentLink()

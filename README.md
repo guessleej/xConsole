@@ -437,8 +437,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_preview.py` | 任何機器 | 21 | 執行預覽：sandbox 標頭、別人的登入拿不到、過期、2 MB、50 筆、其他頁仍是 DENY |
 | `console/test_agent_tasks.py` | 任何機器 | 31 | Agent 對話迴圈（假的 OpenAI 相容服務）：等待核准、拒絕、always、步數上限、不支援 tools、單一任務、停止、本機欄位當模型、稽核 |
 | `console/test_e2e_features.py` | 任何機器（要 cryptography） | 18 | 另起隔離的代理與主控台走 HTTPS：HF 等級（假 Hugging Face）、已安裝等級、進度、預覽、第三方 API、打開 Agent 模式、任務核准到完成 |
-| `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 31 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；另起隔離主控台與代理端對端；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
-| `agent/test_link.py` | Linux／macOS／Windows | 22 | 代理主動連回代理這一側：連回設定、釘住主控台憑證、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
+| `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 36 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；另起隔離主控台與代理端對端；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
+| `agent/test_link.py` | Linux／macOS／Windows | 26 | 代理主動連回代理這一側：連回設定、釘住主控台憑證（含 CA 簽的憑證在 Python 3.9）、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
 | `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
 | `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |
 | `test/test_llama_engine.py` | 有 systemd --user | 36 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |

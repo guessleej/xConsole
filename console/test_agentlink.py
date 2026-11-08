@@ -199,6 +199,38 @@ def unit():
     check("機器被移除：還在等的呼叫立刻失敗", isinstance(res.get("e"), agentlink.Offline) and time.time() - t0 < 1, res.get("e"))
 
 
+def agent_fail_max():
+    import ast
+    tree = ast.parse(open(os.path.join(HERE, "xconsole_server.py"), encoding="utf-8").read())
+    return next(n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                and getattr(n.targets[0], "id", "") == "AGENT_FAIL_MAX") + 1
+
+
+def join_save():
+    """安裝腳本讀加入回應的那段（bash 與 PowerShell 共用）：推送模式寫連回設定、改回主控台連這台時清掉。"""
+    import ast
+    tree = ast.parse(open(os.path.join(HERE, "xconsole_server.py"), encoding="utf-8").read())
+    code = next(n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                and getattr(n.targets[0], "id", "") == "JOIN_SAVE_PY")
+    home = tempfile.mkdtemp(prefix="xc-joinsave-")
+    sd = os.path.join(home, ".xconsole")
+    os.makedirs(sd)
+
+    def run(resp):
+        return subprocess.run([sys.executable, "-c", code], input=json.dumps(resp), text=True, capture_output=True,
+                              env={**os.environ, "XCONSOLE_HOME": home})
+    pem = "-----BEGIN CERTIFICATE-----\nAA\n-----END CERTIFICATE-----\n"
+    r = run({"ok": True, "link": "push", "message": "m", "console": {"url": "https://a:1", "node": "w", "cert": pem}})
+    files = sorted(os.listdir(sd))
+    check("加入成主動連回：寫下連回設定與主控台憑證（權限 600）", r.returncode == 0 and files == ["agent-link.json", "agent-link.pem"]
+          and all(os.stat(os.path.join(sd, f)).st_mode & 0o077 == 0 for f in files) or os.name == "nt", (r.stderr, files))
+    run({"ok": False, "error": "加入碼不對"})
+    check("  加入失敗：不動既有的連回設定", sorted(os.listdir(sd)) == files)
+    r = run({"ok": True, "id": "w", "message": "已加入"})
+    check("  重裝後改由主控台連這台：舊的連回設定清掉，代理不會再連回舊主控台", r.returncode == 0 and os.listdir(sd) == [], os.listdir(sd))
+    shutil.rmtree(home, ignore_errors=True)
+
+
 def free_port():
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
@@ -299,6 +331,10 @@ def e2e():
             return st
         check("權杖不對的輪詢：401", raw_poll("ws-01", "x" * 40) == 401)
         check("不是主動連回的機器（不存在）：401", raw_poll("nope", token) == 401)
+        sts = [raw_poll("ws-01", "y" * 40) for _ in range(agent_fail_max())]
+        check("同一來源權杖錯太多次：之後錯的回 429", sts[-1] == 429 and 401 in sts, sts[-3:])
+        check("  同一個位址後面權杖正確的工作站不受影響（NAT 後面有人亂送也擋不掉整群）",
+              raw_poll("fake-000", fakes[0]["token"], {"seen": []}) == 200)
 
         # ---- 三、連線上限
         held, results, lock = [], [], threading.Lock()
@@ -371,6 +407,7 @@ def e2e():
 
 if __name__ == "__main__":
     unit()
+    join_save()
     e2e()
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)

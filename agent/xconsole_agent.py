@@ -8755,6 +8755,7 @@ LINK_FRAME = 4 * 1024 * 1024        # 結果超過這麼大就分片送
 LINK_REPLY_MAX = 32 * 1024 * 1024   # 跟主控台收代理回應的上限一樣
 LINK_KEEP = 1024 * 1024             # 做完的結果小於這個才留著，同一筆指令再送來時直接重送結果
 LINK_RECENT_TTL, LINK_RECENT_MAX = 3600, 256
+PARTIAL_CHAIN = getattr(ssl, "VERIFY_X509_PARTIAL_CHAIN", 0)    # Python 3.10 起才有
 
 
 class AgentLink:
@@ -8785,13 +8786,29 @@ class AgentLink:
 
     @staticmethod
     def connect(cfg, timeout):
-        """只信加入時拿到的那張主控台憑證：用它當信任依據驗證，再比對整張憑證的 SHA-256。不准退回不驗證。"""
+        """只信加入時拿到的那張主控台憑證：先照一般方式驗證憑證，再比對整張憑證的 SHA-256。"""
+        try:
+            return AgentLink._connect(cfg, timeout, True)
+        except ssl.SSLCertVerificationError:
+            if PARTIAL_CHAIN:
+                raise
+            # Python 3.9 沒有 PARTIAL_CHAIN：主控台用企業自建 CA 簽的憑證、而那個根憑證不在這台時驗不過。
+            # 這時只靠釘住整張憑證：TLS 握手本身已證明對方持有這張憑證的私鑰，指紋對上就是加入時那台主控台
+            # （跟安裝腳本 curl --pinnedpubkey 同一個做法）。指紋不對一樣拒絕
+            return AgentLink._connect(cfg, timeout, False)
+
+    @staticmethod
+    def _connect(cfg, timeout, verify):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.check_hostname = False       # 主控台網址常是 IP、不一定在憑證的名稱裡：改由釘住整張憑證確認是它
-        ctx.load_verify_locations(LINK_CERT)
-        if hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
-            ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN   # 正式憑證：信那張本身就好，不必帶根憑證
+        if verify:
+            ctx.load_default_certs()     # 公開 CA 簽的正式憑證
+            ctx.load_verify_locations(LINK_CERT)
+            if PARTIAL_CHAIN:
+                ctx.verify_flags |= PARTIAL_CHAIN   # 企業 CA 簽的：信加入時拿到的那張本身就好，不必帶根憑證
+        else:
+            ctx.verify_mode = ssl.CERT_NONE      # 只在上面那種情況：下面一定比對指紋
         conn = http.client.HTTPSConnection(cfg["host"], cfg["port"], context=ctx, timeout=timeout)
         conn.connect()
         der = conn.sock.getpeercert(binary_form=True) or b""

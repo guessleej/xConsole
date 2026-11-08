@@ -857,14 +857,19 @@ print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(
 """
 
 # 讀主控台對加入的回應：印出訊息；主控台連不進這台時，把連回的位址與主控台憑證寫給代理（代理每 5 秒看一次）。
+# 改由主控台連這台時，清掉以前留下的連回設定：不然重裝後的代理會繼續連回舊的主控台、聽它的指令。
 # 給 bash 的 -c '...' 用，所以整段不能有單引號
 JOIN_SAVE_PY = """import json, os, sys
 src = open(sys.argv[1], encoding="utf-8-sig") if len(sys.argv) > 1 else sys.stdin
 d = json.load(src)
 print(d.get("message") or d.get("error") or d)
 c = d.get("console") or {}
+sd = os.path.join(os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~"), ".xconsole")
+if d.get("ok") and d.get("link") != "push":
+    for name in ("agent-link.json", "agent-link.pem"):
+        if os.path.exists(os.path.join(sd, name)):
+            os.remove(os.path.join(sd, name))
 if d.get("link") == "push" and c.get("url") and c.get("cert"):
-    sd = os.path.join(os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~"), ".xconsole")
     for name, data in (("agent-link.pem", c["cert"]), ("agent-link.json", json.dumps({"url": c["url"], "node": c["node"]}))):
         tmp = os.path.join(sd, name + ".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -2436,8 +2441,9 @@ class Handler(BaseHTTPRequestHandler):
             fails = [t for t in _AGENT_FAILS.get(self.ip, []) if t > time.time() - 900]
             _AGENT_FAILS[self.ip] = fails
         node = next((n for n in fleet()["nodes"] if n["id"] == nid and n.get("link") == "push"), None)
-        ok = len(fails) < AGENT_FAIL_MAX and bool(node) and got.startswith("Bearer ") \
-            and hmac.compare_digest(got[7:].encode(), node_token(node).encode())
+        # 先驗權杖，限速只管驗不過的：幾百台工作站共用一個 NAT 位址時，其中一台亂送錯的權杖
+        # 不能把同一個位址後面的所有工作站一起擋在外面
+        ok = bool(node) and got.startswith("Bearer ") and hmac.compare_digest(got[7:].encode(), node_token(node).encode())
         if not ok:
             if self._body(MAX_ANON_BODY) is None:
                 return None
