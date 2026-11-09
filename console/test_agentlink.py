@@ -253,6 +253,7 @@ def ring():
 
     def got(name):
         cx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        cx.minimum_version = ssl.TLSVersion.TLSv1_2
         cx.check_hostname, cx.verify_mode = False, ssl.CERT_NONE   # 測試只看主控台送哪一張
         with socket.create_connection(ls.getsockname()) as raw_s:
             with cx.wrap_socket(raw_s, server_hostname=name) as t:
@@ -557,10 +558,14 @@ def e2e():
         check(f"同一來源沒登入的連線：仍在第 65 條起被擋（70 條被關 {refused} 條）", refused == 6, refused)
         code, out = call("/api/link/rotate", {})
         code2, out2 = call("/api/link/rotate", {})
-        w = call("/api/link")[1]["ring"]
+        for _ in range(40):                    # 真的代理按下去之後一兩秒內回報；假的那 200 台不會回報
+            w = call("/api/link")[1]["ring"]
+            if "ws-01" not in w["waiting"]:
+                break
+            time.sleep(0.25)
         check("在線的機器還沒收到新的通道憑證：不換上，設定頁列出還在等哪幾台；不能再按一次",
               code == 200 and w["rotating"] and len(w["waiting"]) >= 190 and "ws-01" not in w["waiting"]
-              and code2 == 409, (out, out2, len(w["waiting"])))
+              and code2 == 409, (out.get("message"), out2.get("message"), len(w["waiting"]), w["waiting"][:3]))
         for c in held:
             c.close()
     finally:

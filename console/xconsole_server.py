@@ -536,10 +536,16 @@ def link_tick(force=False):
 
 def valid_link_addr(a):
     """對外網址：主機:埠，或 [IPv6]:埠。"""
-    m = re.fullmatch(r"\[([0-9A-Fa-f:.]+)\]:(\d{1,5})|([^:\[\]]+):(\d{1,5})", a)
-    if not m:
+    # 不用正規表示式：使用者輸入配上有回溯的樣式，長字串會跑很久（CodeQL）
+    host, sep, port = a[:260].rpartition(":")
+    if not sep or len(a) > 255 or not port.isdigit() or len(port) > 5:
         return False
-    host, port = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+        if ":" not in host:
+            return False                            # 方括號只給 IPv6
+    elif ":" in host:
+        return False
     return valid_host(host) and 0 < int(port) < 65536
 
 
