@@ -31,6 +31,10 @@ jobs:
         run: cd agent && python test_admit.py
       - name: 憑證匯入與檢查
         run: cd console && python test_tls.py
+      - name: 代理主動連回（指令佇列、端對端、同一來源 200 台的連線上限）
+        run: cd console && python test_agentlink.py
+      - name: 代理主動連回（代理這一側）
+        run: cd agent && python test_link.py
       - name: 服務使用報告
         run: cd console && python test_usage_report.py
       - name: 網頁換憑證端對端

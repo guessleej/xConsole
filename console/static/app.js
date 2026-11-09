@@ -3895,11 +3895,12 @@ async function settingsMachines(wrap) {
     const tr = el("tr");
     tr.appendChild(el("td", "nowrap", n.name));
     tr.appendChild(el("td", "nowrap", n.group));
-    tr.appendChild(Object.assign(el("td", "mono"), { textContent: `${n.host}:${n.agent_port || 9401}` }));
+    const push = n.link === "push";   // 工作站：防火牆擋連入，由那台主動連回主控台
+    tr.appendChild(Object.assign(el("td", "mono"), { textContent: push ? `${n.host}（由這台連回）` : `${n.host}:${n.agent_port || 9401}` }));
     tr.appendChild(el("td", "nowrap", live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
-    tr.appendChild(el("td", "nowrap " + (live?.online ? "" : "bad-t"), live?.online ? "在線" : "連不上"));
+    tr.appendChild(el("td", "nowrap " + (live?.online ? "" : "bad-t"), live?.online ? "在線" : (push ? "沒有連回" : "連不上")));
     tr.appendChild(Object.assign(el("td", "mono small"),
-      { textContent: n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
+      { textContent: push ? "不需要（連回時驗權杖）" : n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
     const td = el("td", "row-acts");
     const e = el("button", "btn sm", "修改");
     e.onclick = () => openMachineSettings(n.id);

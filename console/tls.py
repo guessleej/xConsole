@@ -813,15 +813,19 @@ class TLSServer(ThreadingHTTPServer):
     """
     daemon_threads = True
     certs = None   # CertManager
+    request_queue_size = 128     # 預設 5：一間教室的工作站同時開機連回時，多出來的連線會被系統直接重置
 
     def server_bind(self):
         # 不做 HTTPServer 的 getfqdn 反解：沒有反解的機器（實際遇到：macOS 主機）會卡在這裡幾十秒才開始聽
         import socketserver
         socketserver.TCPServer.server_bind(self)
         self.server_name, self.server_port = socket.gethostname(), self.server_address[1]
-    # 連線數上限：沒登入的人開一堆連線慢慢送，每條都會佔住一個執行緒；總數與同一來源各設上限，超過的直接關
-    MAX_CONNS, MAX_PER_IP = 512, 64
-    _conns, _per_ip, _conn_lock = 0, {}, threading.Lock()
+    # 連線數上限：沒登入的人開一堆連線慢慢送，每條都會佔住一個執行緒；總數與同一來源各設上限，超過的直接關。
+    # 代理主動連回的連線驗過節點權杖後改依節點計（promote）：幾百台工作站在 NAT／VPN 後面共用一個 IP，
+    # 依來源計的話第 65 台就連不上。
+    # ponytail: 每條連線一個執行緒，總數 512 是上限；500 台以上要改非同步伺服器
+    MAX_CONNS, MAX_PER_IP, MAX_PER_NODE = 512, 64, 8
+    _conns, _per_ip, _per_node, _conn_lock = 0, {}, {}, threading.Lock()
 
     def process_request(self, request, client_address):
         ip = client_address[0] if client_address else ""
@@ -831,17 +835,39 @@ class TLSServer(ThreadingHTTPServer):
                 return
             TLSServer._conns += 1
             self._per_ip[ip] = self._per_ip.get(ip, 0) + 1
+        slot = {"ip": ip, "node": None}
 
         def run():
+            threading.current_thread().xc_slot = slot
             try:
                 self.process_request_thread(request, client_address)
             finally:
                 with self._conn_lock:
                     TLSServer._conns -= 1
-                    self._per_ip[ip] -= 1
-                    if not self._per_ip[ip]:
-                        del self._per_ip[ip]
+                    k, d = (slot["node"], self._per_node) if slot["node"] else (ip, self._per_ip)
+                    d[k] -= 1
+                    if not d[k]:
+                        del d[k]
         threading.Thread(target=run, daemon=True).start()
+
+    def promote(self, node):
+        """這條連線已驗過是某台代理：不再算進來源的 64 條，改算進那台的 MAX_PER_NODE 條。
+        回 False 表示那台開太多條，或這條連線先前已驗成別台。"""
+        slot = getattr(threading.current_thread(), "xc_slot", None)
+        if slot is None:
+            return True
+        with self._conn_lock:
+            if slot["node"]:
+                return slot["node"] == node
+            if self._per_node.get(node, 0) >= self.MAX_PER_NODE:
+                return False
+            ip = slot["ip"]
+            self._per_ip[ip] -= 1
+            if not self._per_ip[ip]:
+                del self._per_ip[ip]
+            self._per_node[node] = self._per_node.get(node, 0) + 1
+            slot["node"] = node
+            return True
 
     def finish_request(self, request, client_address):
         try:
