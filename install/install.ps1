@@ -6,7 +6,7 @@
 #   ... install.ps1 -PasswordFile <檔>   自動化安裝：檔案第一行帳號、第二行密碼（用完請刪）
 #
 # 系統管理員身分：裝成開機自動啟動（SYSTEM 帳號，不必有人登入），資料放 C:\ProgramData\xConsole，
-#                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、8090～8289（模型 API）。
+#                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、9402（工作站連回）、8090～8289（模型 API）。
 # 一般身分：裝在自己的家目錄，登入後才啟動，防火牆要另外請管理員開。
 param([switch]$Uninstall, [string]$PasswordFile)
 # 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷。
@@ -54,7 +54,7 @@ if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
   icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 }
-foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
+foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'linkcert.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
 }
 Copy-Item -Force (Join-Path $SRC 'console\static\*') (Join-Path $dir 'static')
@@ -96,7 +96,7 @@ $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnB
 if ($admin) {
   $trg = New-ScheduledTaskTrigger -AtStartup
   $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-  foreach ($r in @(@('xConsole 網頁', '9400'), @('xConsole 節點代理', '9401'), @('xConsole 模型 API', '8090-8289'))) {
+  foreach ($r in @(@('xConsole 網頁', '9400'), @('xConsole 節點代理', '9401'), @('xConsole 工作站連回', '9402'), @('xConsole 模型 API', '8090-8289'))) {
     Get-NetFirewallRule -DisplayName $r[0] -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     New-NetFirewallRule -DisplayName $r[0] -Direction Inbound -Protocol TCP -LocalPort $r[1] -Action Allow -Profile Domain,Private | Out-Null
   }

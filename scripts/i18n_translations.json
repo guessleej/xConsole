@@ -18418,5 +18418,655 @@
 "en": "This model needs an image uploaded first (image-to-video / editing model)",
 "ja": "このモデルは先に画像をアップロードする必要があります（画像から動画／編集モデル）",
 "ko": "이 모델은 먼저 이미지를 올려야 합니다(이미지→동영상/편집 모델)"
+},
+"可能壞了": {
+"en": "May be broken",
+"ja": "壊れている可能性",
+"ko": "손상되었을 수 있음"
+},
+"產出看起來是壞的": {
+"en": "The output looks broken",
+"ja": "出力が壊れているようです",
+"ko": "출력이 손상된 것 같습니다"
+},
+"這多半是推理引擎在這台算錯，不是提示詞的問題，換描述也不會好；請回報管理者。": {
+"en": "This is most likely the inference engine computing incorrectly on this machine, not a prompt issue; changing the description will not help. Please report it to the administrator.",
+"ja": "これはこのマシンで推論エンジンが誤って計算している可能性が高く、プロンプトの問題ではありません。説明を変えても改善しません。管理者に報告してください。",
+"ko": "이 기기에서 추론 엔진이 잘못 계산하고 있을 가능성이 높으며 프롬프트 문제가 아닙니다. 설명을 바꿔도 나아지지 않습니다. 관리자에게 알려 주세요."
+},
+"{0}（由這台連回）": {
+"en": "{0} (connects back from this machine)",
+"ja": "{0}（このマシンから接続）",
+"ko": "{0} (이 기기에서 다시 연결)"
+},
+"由這台連回": {
+"en": "Connects back from this machine",
+"ja": "このマシンから接続",
+"ko": "이 기기에서 다시 연결"
+},
+"沒有連回": {
+"en": "Not connected back",
+"ja": "接続されていません",
+"ko": "다시 연결되지 않음"
+},
+"不需要（連回時驗權杖）": {
+"en": "Not needed (token checked when it connects back)",
+"ja": "不要（接続時にトークンを検証）",
+"ko": "필요 없음 (다시 연결할 때 토큰 확인)"
+},
+"工作站連回通道": {
+"en": "Workstation link channel",
+"ja": "ワークステーション接続チャネル",
+"ko": "워크스테이션 연결 채널"
+},
+"主動連回的機器 {0} 台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線": {
+"en": "{0} machines connect back; this certificate is separate from the management web certificate above, so changing that one will not disconnect workstations",
+"ja": "接続してくるマシン {0} 台。この証明書は上の管理画面の証明書とは別なので、そちらを変えてもワークステーションは切断されません",
+"ko": "다시 연결하는 기기 {0}대. 이 인증서는 위의 관리 웹 인증서와 별개이므로 그것을 바꿔도 워크스테이션 연결이 끊기지 않습니다"
+},
+"主動連回的機器": {
+"en": "Machines that connect back",
+"ja": "接続してくるマシン",
+"ko": "다시 연결하는 기기"
+},
+"台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線": {
+"en": "machines; this certificate is separate from the management web certificate above, so changing that one will not disconnect workstations",
+"ja": "台。この証明書は上の管理画面の証明書とは別なので、そちらを変えてもワークステーションは切断されません",
+"ko": "대. 이 인증서는 위의 관리 웹 인증서와 별개이므로 그것을 바꿔도 워크스테이션 연결이 끊기지 않습니다"
+},
+"通道埠": {
+"en": "Channel port",
+"ja": "チャネルのポート",
+"ko": "채널 포트"
+},
+"{0}（有在聽）": {
+"en": "{0} (listening)",
+"ja": "{0}（待ち受け中）",
+"ko": "{0} (수신 중)"
+},
+"有在聽": {
+"en": "Listening",
+"ja": "待ち受け中",
+"ko": "수신 중"
+},
+"{0}（沒有在聽）": {
+"en": "{0} (not listening)",
+"ja": "{0}（待ち受けていません）",
+"ko": "{0} (수신 안 함)"
+},
+"沒有在聽": {
+"en": "Not listening",
+"ja": "待ち受けていません",
+"ko": "수신 안 함"
+},
+"輪替中（發給各台）": {
+"en": "Rotating (being sent to each machine)",
+"ja": "ローテーション中（各マシンに配布中）",
+"ko": "교체 중 (각 기기로 전송 중)"
+},
+"退役（保留到期就刪）": {
+"en": "Retired (deleted when the retention period ends)",
+"ja": "退役（保持期間が過ぎたら削除）",
+"ko": "폐기됨 (보관 기간이 끝나면 삭제)"
+},
+"通道憑證・{0}": {
+"en": "Channel certificate: {0}",
+"ja": "チャネル証明書・{0}",
+"ko": "채널 인증서: {0}"
+},
+"通道憑證": {
+"en": "Channel certificate",
+"ja": "チャネル証明書",
+"ko": "채널 인증서"
+},
+"{0}…，{1} 產生": {
+"en": "{0}…, created {1}",
+"ja": "{0}…、{1} 作成",
+"ko": "{0}…, {1} 생성"
+},
+"，{0} 刪除（台北時間）": {
+"en": ", deleted {0} (Taipei time)",
+"ja": "、{0} 削除（台北時間）",
+"ko": ", {0} 삭제 (타이베이 시간)"
+},
+"刪除（台北時間": {
+"en": "deleted (Taipei time",
+"ja": "削除（台北時間",
+"ko": "삭제 (타이베이 시간"
+},
+"通道埠沒有在聽：主動連回的工作站都連不上。請確認這個埠沒被別的程式占用，再重開主控台。": {
+"en": "The channel port is not listening, so workstations that connect back cannot reach the console. Make sure no other program is using this port, then restart the console.",
+"ja": "チャネルのポートが待ち受けていないため、接続してくるワークステーションはすべて接続できません。このポートが他のプログラムに使われていないか確認し、コンソールを再起動してください。",
+"ko": "채널 포트가 수신하지 않아 다시 연결하는 워크스테이션이 모두 연결할 수 없습니다. 다른 프로그램이 이 포트를 쓰고 있지 않은지 확인한 뒤 콘솔을 다시 시작하세요."
+},
+"新的通道憑證正在發給各台，在線的都收到後自動換上。還在等：{0}{1}": {
+"en": "The new channel certificate is being sent to each machine and will be switched in once every online machine has it. Still waiting for: {0}{1}",
+"ja": "新しいチャネル証明書を各マシンに配布中です。オンラインのマシンがすべて受け取ると自動で切り替わります。待機中：{0}{1}",
+"ko": "새 채널 인증서를 각 기기로 보내는 중이며, 온라인 기기가 모두 받으면 자동으로 교체됩니다. 대기 중: {0}{1}"
+},
+"新的通道憑證正在發給各台，在線的都收到後自動換上。還在等": {
+"en": "The new channel certificate is being sent to each machine and will be switched in once every online machine has it. Still waiting for",
+"ja": "新しいチャネル証明書を各マシンに配布中です。オンラインのマシンがすべて受け取ると自動で切り替わります。待機中",
+"ko": "새 채널 인증서를 각 기기로 보내는 중이며, 온라인 기기가 모두 받으면 자동으로 교체됩니다. 대기 중"
+},
+"新的通道憑證已發出，正在換上。": {
+"en": "The new channel certificate has been sent and is being switched in.",
+"ja": "新しいチャネル証明書を配布しました。切り替え中です。",
+"ko": "새 채널 인증서를 보냈으며 교체하는 중입니다."
+},
+"換通道憑證時，舊的會再保留 {0} 天：這段時間關機或沒帶回來的機器，一連上就自動拿到新的；超過 {1} 天都沒上線的要重新加入。": {
+"en": "When the channel certificate changes, the old one is kept for {0} more days: machines that were off or away during that time get the new one as soon as they connect. Machines that stay offline for more than {1} days must join again.",
+"ja": "チャネル証明書を変えると、古い証明書はさらに {0} 日間保持されます。その間に電源が切れていた、または持ち出されていたマシンは、接続するとすぐ新しい証明書を受け取ります。{1} 日を超えてオンラインにならなかったマシンは再参加が必要です。",
+"ko": "채널 인증서를 바꾸면 이전 인증서는 {0}일 동안 더 보관됩니다. 그동안 꺼져 있었거나 밖에 있던 기기는 연결하자마자 새 인증서를 받습니다. {1}일 넘게 온라인이 아니었던 기기는 다시 가입해야 합니다."
+},
+"換通道憑證時，舊的會再保留": {
+"en": "When the channel certificate changes, the old one is kept for",
+"ja": "チャネル証明書を変えると、古い証明書はさらに",
+"ko": "채널 인증서를 바꾸면 이전 인증서는"
+},
+"天：這段時間關機或沒帶回來的機器，一連上就自動拿到新的；超過": {
+"en": "more days: machines that were off or away during that time get the new one as soon as they connect. Machines offline for more than",
+"ja": "日間保持されます。その間に電源が切れていた、または持ち出されていたマシンは、接続するとすぐ新しい証明書を受け取ります。",
+"ko": "일 동안 더 보관됩니다. 그동안 꺼져 있었거나 밖에 있던 기기는 연결하자마자 새 인증서를 받습니다."
+},
+"天都沒上線的要重新加入": {
+"en": "days must join again",
+"ja": "日を超えてオンラインにならなかったマシンは再参加が必要です",
+"ko": "일 넘게 온라인이 아니었던 기기는 다시 가입해야 합니다"
+},
+"換通道憑證": {
+"en": "Change channel certificate",
+"ja": "チャネル証明書を変更",
+"ko": "채널 인증서 교체"
+},
+"上一次還沒完成": {
+"en": "The previous one is not finished yet",
+"ja": "前回がまだ完了していません",
+"ko": "이전 작업이 아직 끝나지 않았습니다"
+},
+"會產生一張新的通道憑證，經現有的通道發給每台主動連回的機器。在線的都收到後才換上，工作站不會斷線。": {
+"en": "A new channel certificate will be created and sent over the existing channel to every machine that connects back. It is switched in only after every online machine has it, so workstations stay connected.",
+"ja": "新しいチャネル証明書を作成し、既存のチャネル経由で接続してくる各マシンに配布します。オンラインのマシンがすべて受け取ってから切り替えるので、ワークステーションは切断されません。",
+"ko": "새 채널 인증서를 만들어 기존 채널을 통해 다시 연결하는 모든 기기로 보냅니다. 온라인 기기가 모두 받은 뒤에 교체되므로 워크스테이션 연결은 끊기지 않습니다."
+},
+"筆電帶回家或在外面時，從這些位址連回來（一行一個，寫成「主機:埠」，例如 vpn.example.com:9402）。對外只要開通道埠，不必開管理網頁的埠。各台在辦公室裡照樣走內部位址，連不到才改走這些。": {
+"en": "When laptops are taken home or used outside, they connect back through these addresses (one per line, written as host:port, for example vpn.example.com:9402). Only the channel port needs to be open to the outside, not the management web port. In the office, machines still use the internal address and only fall back to these when it cannot be reached.",
+"ja": "ノート PC を持ち帰ったり外で使ったりするときは、これらのアドレスから接続します（1 行に 1 つ、「ホスト:ポート」の形式。例：vpn.example.com:9402）。外部に開けるのはチャネルのポートだけで、管理画面のポートは不要です。オフィス内では引き続き内部アドレスを使い、つながらないときだけこれらを使います。",
+"ko": "노트북을 집에 가져가거나 밖에서 쓸 때는 이 주소들로 다시 연결합니다(한 줄에 하나, '호스트:포트' 형식, 예: vpn.example.com:9402). 외부에는 채널 포트만 열면 되고 관리 웹 포트는 열 필요가 없습니다. 사무실에서는 계속 내부 주소를 쓰고, 연결되지 않을 때만 이 주소들을 씁니다."
+},
+"代理伺服器": {
+"en": "Proxy server",
+"ja": "プロキシサーバー",
+"ko": "프록시 서버"
+},
+"公司網路要經代理伺服器才能連到主控台時填，寫成 http://主機:埠。留空就用各台自己的系統設定；都不通時各台會改直連試試。需要帳密的代理伺服器請設在各台的系統設定，主控台不保存代理伺服器的密碼。": {
+"en": "Fill this in when the company network can reach the console only through a proxy server, written as http://host:port. Leave it empty to use each machine's own system settings; if nothing works, machines try a direct connection. Proxy servers that need a username and password should be set in each machine's system settings; the console does not store proxy passwords.",
+"ja": "社内ネットワークからプロキシサーバー経由でしかコンソールに届かない場合に入力します（http://ホスト:ポート）。空欄なら各マシンのシステム設定を使い、どれもつながらないときは直接接続を試します。認証が必要なプロキシは各マシンのシステム設定で指定してください。コンソールはプロキシのパスワードを保存しません。",
+"ko": "회사 네트워크에서 프록시 서버를 거쳐야만 콘솔에 닿을 때 입력하세요(http://호스트:포트). 비워 두면 각 기기의 시스템 설정을 쓰고, 모두 안 되면 직접 연결을 시도합니다. 계정과 비밀번호가 필요한 프록시는 각 기기의 시스템 설정에 지정하세요. 콘솔은 프록시 비밀번호를 저장하지 않습니다."
+},
+"儲存並發給各台": {
+"en": "Save and send to each machine",
+"ja": "保存して各マシンに配布",
+"ko": "저장하고 각 기기로 보내기"
+},
+"已儲存，在線的工作站幾秒內就會收到": {
+"en": "Saved; online workstations will receive it within seconds",
+"ja": "保存しました。オンラインのワークステーションは数秒で受け取ります",
+"ko": "저장했습니다. 온라인 워크스테이션은 몇 초 안에 받습니다"
+},
+"還沒啟動": {
+"en": "Not started yet",
+"ja": "まだ起動していません",
+"ko": "아직 시작되지 않음"
+},
+"已加入主控台：{0}。主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它。": {
+"en": "Joined the console: {0}. The console cannot connect in to this machine (the firewall blocks incoming connections), so this machine connects back instead; it will appear on the web page within seconds.",
+"ja": "コンソールに参加しました：{0}。コンソールからこのマシンに接続できない（ファイアウォールが着信を遮断）ため、このマシンから接続します。数秒で画面に表示されます。",
+"ko": "콘솔에 가입했습니다: {0}. 콘솔이 이 기기로 연결할 수 없어(방화벽이 들어오는 연결을 차단) 이 기기가 대신 다시 연결합니다. 몇 초 안에 웹 페이지에 나타납니다."
+},
+"主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它": {
+"en": "The console cannot connect in to this machine (the firewall blocks incoming connections), so this machine connects back instead; it will appear on the web page within seconds",
+"ja": "コンソールからこのマシンに接続できない（ファイアウォールが着信を遮断）ため、このマシンから接続します。数秒で画面に表示されます",
+"ko": "콘솔이 이 기기로 연결할 수 없어(방화벽이 들어오는 연결을 차단) 이 기기가 대신 다시 연결합니다. 몇 초 안에 웹 페이지에 나타납니다"
+},
+"。主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它。": {
+"en": ". The console cannot connect in to this machine (the firewall blocks incoming connections), so this machine connects back instead; it will appear on the web page within seconds.",
+"ja": "。コンソールからこのマシンに接続できない（ファイアウォールが着信を遮断）ため、このマシンから接続します。数秒で画面に表示されます。",
+"ko": ". 콘솔이 이 기기로 연결할 수 없어(방화벽이 들어오는 연결을 차단) 이 기기가 대신 다시 연결합니다. 몇 초 안에 웹 페이지에 나타납니다."
+},
+"這個埠只給代理連回；管理網頁在另一個埠": {
+"en": "This port is only for agents connecting back; the management web page is on another port",
+"ja": "このポートはエージェントの接続専用です。管理画面は別のポートです",
+"ko": "이 포트는 에이전트가 다시 연결하는 용도입니다. 관리 웹은 다른 포트에 있습니다"
+},
+"；代理通道 {0}": {
+"en": "; agent channel {0}",
+"ja": "；エージェントチャネル {0}",
+"ko": "; 에이전트 채널 {0}"
+},
+"代理通道": {
+"en": "Agent channel",
+"ja": "エージェントチャネル",
+"ko": "에이전트 채널"
+},
+"{0} 超過期限沒有回：{1}": {
+"en": "{0} did not reply before the deadline: {1}",
+"ja": "{0} が期限内に応答しませんでした：{1}",
+"ko": "{0}이(가) 기한 안에 응답하지 않았습니다: {1}"
+},
+"超過期限沒有回": {
+"en": "Did not reply before the deadline",
+"ja": "期限内に応答しませんでした",
+"ko": "기한 안에 응답하지 않음"
+},
+"{0} 連不上：{1}": {
+"en": "Cannot reach {0}: {1}",
+"ja": "{0} に接続できません：{1}",
+"ko": "{0}에 연결할 수 없습니다: {1}"
+},
+"節點權杖不對，或這台不是主動連回的機器": {
+"en": "The node token is wrong, or this machine is not one that connects back",
+"ja": "ノードトークンが正しくないか、このマシンは接続してくるマシンではありません",
+"ko": "노드 토큰이 틀렸거나 이 기기는 다시 연결하는 기기가 아닙니다"
+},
+"這台同時開的連線太多": {
+"en": "This machine has too many connections open at once",
+"ja": "このマシンの同時接続数が多すぎます",
+"ko": "이 기기의 동시 연결이 너무 많습니다"
+},
+"；代理通道 ": {
+"en": "; agent channel ",
+"ja": "；エージェントチャネル ",
+"ko": "; 에이전트 채널 "
+},
+" 超過期限沒有回：": {
+"en": " did not reply before the deadline: ",
+"ja": " が期限内に応答しませんでした：",
+"ko": "이(가) 기한 안에 응답하지 않았습니다: "
+},
+" 連不上：": {
+"en": " cannot be reached: ",
+"ja": " に接続できません：",
+"ko": "에 연결할 수 없습니다: "
+},
+"權杖錯太多次，請 15 分鐘後再試": {
+"en": "Too many wrong tokens; please try again in 15 minutes",
+"ja": "トークンの誤りが多すぎます。15 分後にもう一度お試しください",
+"ko": "토큰이 너무 많이 틀렸습니다. 15분 뒤에 다시 시도하세요"
+},
+"對外網址要寫成「主機:埠」，最多 8 個：{0}": {
+"en": "External addresses must be written as host:port, up to 8: {0}",
+"ja": "外部アドレスは「ホスト:ポート」の形式で最大 8 個です：{0}",
+"ko": "외부 주소는 '호스트:포트' 형식으로 최대 8개입니다: {0}"
+},
+"對外網址要寫成「主機:埠」，最多 8 個": {
+"en": "External addresses must be written as host:port, up to 8",
+"ja": "外部アドレスは「ホスト:ポート」の形式で最大 8 個です",
+"ko": "외부 주소는 '호스트:포트' 형식으로 최대 8개입니다"
+},
+"代理伺服器要寫成 http://主機:埠，不收帳密（要帳密請用那台的系統設定）": {
+"en": "The proxy server must be written as http://host:port without a username or password (set credentials in that machine's system settings)",
+"ja": "プロキシサーバーは http://ホスト:ポート の形式で、認証情報は含めません（認証が必要ならそのマシンのシステム設定で指定）",
+"ko": "프록시 서버는 http://호스트:포트 형식이며 계정과 비밀번호는 넣지 않습니다(필요하면 그 기기의 시스템 설정에 지정)"
+},
+"通道埠 {0} 聽不起來：{1}": {
+"en": "Channel port {0} could not start listening: {1}",
+"ja": "チャネルのポート {0} で待ち受けできません：{1}",
+"ko": "채널 포트 {0}에서 수신할 수 없습니다: {1}"
+},
+"聽不起來": {
+"en": "Could not start listening",
+"ja": "待ち受けできません",
+"ko": "수신할 수 없음"
+},
+"對外網址要寫成「主機:埠」，最多 8 個：": {
+"en": "External addresses must be written as host:port, up to 8: ",
+"ja": "外部アドレスは「ホスト:ポート」の形式で最大 8 個です：",
+"ko": "외부 주소는 '호스트:포트' 형식으로 최대 8개입니다: "
+},
+"通道埠 ": {
+"en": "Channel port ",
+"ja": "チャネルのポート ",
+"ko": "채널 포트 "
+},
+" 聽不起來：": {
+"en": " could not start listening: ",
+"ja": " で待ち受けできません：",
+"ko": "에서 수신할 수 없습니다: "
+},
+"檢查產出中": {
+"en": "Checking the output",
+"ja": "出力を確認中",
+"ko": "출력 확인 중"
+},
+"EBML 長度錯誤": {
+"en": "Invalid EBML length",
+"ja": "EBML の長さが不正です",
+"ko": "EBML 길이 오류"
+},
+"EBML 被截斷": {
+"en": "EBML is truncated",
+"ja": "EBML が途中で切れています",
+"ko": "EBML이 잘렸습니다"
+},
+"產出檢查略過 {0}：{1}": {
+"en": "Output check skipped for {0}: {1}",
+"ja": "出力チェックをスキップ {0}：{1}",
+"ko": "출력 확인 건너뜀 {0}: {1}"
+},
+"產出檢查略過": {
+"en": "Output check skipped",
+"ja": "出力チェックをスキップ",
+"ko": "출력 확인 건너뜀"
+},
+"沒有可以試的位址": {
+"en": "No addresses to try",
+"ja": "試せるアドレスがありません",
+"ko": "시도할 주소가 없습니다"
+},
+"主控台送出的憑證不是發給這台的通道憑證，拒絕連線": {
+"en": "The certificate the console sent is not a channel certificate issued to this machine; connection refused",
+"ja": "コンソールが送った証明書はこのマシンに配布されたチャネル証明書ではないため、接続を拒否しました",
+"ko": "콘솔이 보낸 인증서가 이 기기에 발급된 채널 인증서가 아니어서 연결을 거부했습니다"
+},
+"收到主控台的通道憑證（{0} 張，目前用 {1}…）": {
+"en": "Received channel certificates from the console ({0}, now using {1}…)",
+"ja": "コンソールからチャネル証明書を受け取りました（{0} 枚、現在 {1}… を使用）",
+"ko": "콘솔에서 채널 인증서를 받았습니다({0}장, 현재 {1}… 사용)"
+},
+"收到主控台的通道憑證": {
+"en": "Received channel certificates from the console",
+"ja": "コンソールからチャネル証明書を受け取りました",
+"ko": "콘솔에서 채널 인증서를 받았습니다"
+},
+"張，目前用": {
+"en": "certificates, now using",
+"ja": "枚、現在使用",
+"ko": "장, 현재 사용"
+},
+"CUDA 編譯器搭配 GCC {0}，這台預設的 C++ 編譯器是 {1}：整個專案改用 GCC {2} 編，連結時才不會混到兩版的 C++ 函式庫": {
+"en": "The CUDA compiler pairs with GCC {0}, but this machine's default C++ compiler is {1}: the whole project is built with GCC {2} so linking does not mix two versions of the C++ library",
+"ja": "CUDA コンパイラは GCC {0} と組み合わせますが、このマシンの既定の C++ コンパイラは {1} です。リンク時に 2 つの版の C++ ライブラリが混ざらないよう、プロジェクト全体を GCC {2} でビルドします",
+"ko": "CUDA 컴파일러는 GCC {0}과 함께 쓰는데 이 기기의 기본 C++ 컴파일러는 {1}입니다. 링크할 때 두 버전의 C++ 라이브러리가 섞이지 않도록 프로젝트 전체를 GCC {2}로 빌드합니다"
+},
+"CUDA 編譯器搭配 GCC": {
+"en": "The CUDA compiler pairs with GCC",
+"ja": "CUDA コンパイラの組み合わせは GCC",
+"ko": "CUDA 컴파일러와 함께 쓰는 GCC"
+},
+"這台預設的 C++ 編譯器是": {
+"en": "this machine's default C++ compiler is",
+"ja": "このマシンの既定の C++ コンパイラは",
+"ko": "이 기기의 기본 C++ 컴파일러는"
+},
+"整個專案改用 GCC": {
+"en": "the whole project is built with GCC",
+"ja": "プロジェクト全体をビルドする GCC",
+"ko": "프로젝트 전체를 빌드하는 GCC"
+},
+"編，連結時才不會混到兩版的 C++ 函式庫": {
+"en": "so linking does not mix two versions of the C++ library",
+"ja": "（リンク時に 2 つの版の C++ ライブラリが混ざらないように）",
+"ko": "(링크할 때 두 버전의 C++ 라이브러리가 섞이지 않도록)"
+},
+"產出 {0}（{1}）看起來是壞的：{2}": {
+"en": "Output {0} ({1}) looks broken: {2}",
+"ja": "出力 {0}（{1}）が壊れているようです：{2}",
+"ko": "출력 {0}({1})이(가) 손상된 것 같습니다: {2}"
+},
+"產出": {
+"en": "Output",
+"ja": "出力",
+"ko": "출력"
+},
+"看起來是壞的": {
+"en": "looks broken",
+"ja": "壊れているようです",
+"ko": "손상된 것 같습니다"
+},
+"產出檢查略過 ": {
+"en": "Output check skipped ",
+"ja": "出力チェックをスキップ ",
+"ko": "출력 확인 건너뜀 "
+},
+"收到主控台的通道憑證（": {
+"en": "Received channel certificates from the console (",
+"ja": "コンソールからチャネル証明書を受け取りました（",
+"ko": "콘솔에서 채널 인증서를 받았습니다("
+},
+" 張，目前用 ": {
+"en": " certificates, now using ",
+"ja": " 枚、現在使用 ",
+"ko": "장, 현재 사용 "
+},
+"主控台拒絕連回（{0}）：{1}": {
+"en": "The console refused the connection ({0}): {1}",
+"ja": "コンソールが接続を拒否しました（{0}）：{1}",
+"ko": "콘솔이 연결을 거부했습니다({0}): {1}"
+},
+"主控台拒絕連回": {
+"en": "The console refused the connection",
+"ja": "コンソールが接続を拒否しました",
+"ko": "콘솔이 연결을 거부했습니다"
+},
+"結果送不回主控台": {
+"en": "The result could not be sent back to the console",
+"ja": "結果をコンソールに送り返せません",
+"ko": "결과를 콘솔로 보낼 수 없습니다"
+},
+"CUDA 編譯器搭配 GCC ": {
+"en": "The CUDA compiler pairs with GCC ",
+"ja": "CUDA コンパイラの組み合わせは GCC ",
+"ko": "CUDA 컴파일러와 함께 쓰는 GCC "
+},
+"，這台預設的 C++ 編譯器是 ": {
+"en": ", but this machine's default C++ compiler is ",
+"ja": "、このマシンの既定の C++ コンパイラは ",
+"ko": ", 이 기기의 기본 C++ 컴파일러는 "
+},
+"：整個專案改用 GCC ": {
+"en": ": the whole project is built with GCC ",
+"ja": "：プロジェクト全体を GCC ",
+"ko": ": 프로젝트 전체를 GCC "
+},
+" 編，連結時才不會混到兩版的 C++ 函式庫": {
+"en": " so linking does not mix two versions of the C++ library",
+"ja": " でビルドします（リンク時に C++ ライブラリが混ざらないように）",
+"ko": "(으)로 빌드합니다(링크할 때 C++ 라이브러리가 섞이지 않도록)"
+},
+"CUDA 編譯器搭配 GCC {0}，這台預設的 C++ 編譯器是 {1}，但找不到 gcc-{2}／g++-{3}，連結可能失敗。請 IT 安裝：sudo apt install gcc-{4} g++-{5}": {
+"en": "The CUDA compiler pairs with GCC {0} and this machine's default C++ compiler is {1}, but gcc-{2}/g++-{3} cannot be found, so linking may fail. Ask IT to install: sudo apt install gcc-{4} g++-{5}",
+"ja": "CUDA コンパイラは GCC {0} と組み合わせ、このマシンの既定の C++ コンパイラは {1} ですが、gcc-{2}／g++-{3} が見つからないためリンクに失敗する可能性があります。IT にインストールを依頼してください：sudo apt install gcc-{4} g++-{5}",
+"ko": "CUDA 컴파일러는 GCC {0}과 함께 쓰고 이 기기의 기본 C++ 컴파일러는 {1}인데 gcc-{2}/g++-{3}을 찾을 수 없어 링크가 실패할 수 있습니다. IT에 설치를 요청하세요: sudo apt install gcc-{4} g++-{5}"
+},
+"但找不到 gcc-": {
+"en": "but cannot find gcc-",
+"ja": "が gcc-",
+"ko": "그런데 찾을 수 없음: gcc-"
+},
+"連結可能失敗。請 IT 安裝：sudo apt install gcc-": {
+"en": "linking may fail. Ask IT to install: sudo apt install gcc-",
+"ja": "リンクに失敗する可能性があります。IT にインストールを依頼してください：sudo apt install gcc-",
+"ko": "링크가 실패할 수 있습니다. IT에 설치를 요청하세요: sudo apt install gcc-"
+},
+"產出 ": {
+"en": "Output ",
+"ja": "出力 ",
+"ko": "출력 "
+},
+"）看起來是壞的：": {
+"en": ") looks broken: ",
+"ja": "）が壊れているようです：",
+"ko": ")이(가) 손상된 것 같습니다: "
+},
+"整張": {
+"en": "The whole image",
+"ja": "画像全体",
+"ko": "이미지 전체"
+},
+"{0}幾乎是同一個顏色（亮度 {1}）": {
+"en": "{0} is almost a single color (brightness {1})",
+"ja": "{0}ほぼ単一の色です（明るさ {1}）",
+"ko": "{0} 거의 한 가지 색입니다(밝기 {1})"
+},
+"幾乎是同一個顏色（亮度": {
+"en": "is almost a single color (brightness",
+"ja": "ほぼ単一の色です（明るさ",
+"ko": "거의 한 가지 색입니다(밝기"
+},
+"連回主控台走 {0}:{1}": {
+"en": "Connecting back to the console via {0}:{1}",
+"ja": "コンソールへの接続経路 {0}:{1}",
+"ko": "콘솔 연결 경로 {0}:{1}"
+},
+"連回主控台走": {
+"en": "Connecting back to the console via",
+"ja": "コンソールへの接続経路",
+"ko": "콘솔 연결 경로"
+},
+"主控台拒絕連回（": {
+"en": "The console refused the connection (",
+"ja": "コンソールが接続を拒否しました（",
+"ko": "콘솔이 연결을 거부했습니다("
+},
+"連不回主控台 {0}（試過所有位址與代理伺服器）：{1}": {
+"en": "Cannot connect back to the console at {0} (tried every address and proxy server): {1}",
+"ja": "コンソール {0} に接続できません（すべてのアドレスとプロキシサーバーを試行）：{1}",
+"ko": "콘솔 {0}에 다시 연결할 수 없습니다(모든 주소와 프록시 서버 시도): {1}"
+},
+"連不回主控台": {
+"en": "Cannot connect back to the console",
+"ja": "コンソールに接続できません",
+"ko": "콘솔에 다시 연결할 수 없습니다"
+},
+"試過所有位址與代理伺服器": {
+"en": "tried every address and proxy server",
+"ja": "すべてのアドレスとプロキシサーバーを試行",
+"ko": "모든 주소와 프록시 서버 시도"
+},
+"，但找不到 gcc-": {
+"en": ", but cannot find gcc-",
+"ja": "、ただし gcc-",
+"ko": ", 그런데 찾을 수 없음: gcc-"
+},
+"，連結可能失敗。請 IT 安裝：sudo apt install gcc-": {
+"en": ", so linking may fail. Ask IT to install: sudo apt install gcc-",
+"ja": "、リンクに失敗する可能性があります。IT にインストールを依頼してください：sudo apt install gcc-",
+"ko": ", 링크가 실패할 수 있습니다. IT에 설치를 요청하세요: sudo apt install gcc-"
+},
+"第 ": {
+"en": "No. ",
+"ja": "第 ",
+"ko": "제 "
+},
+" 張": {
+"en": "",
+"ja": " 枚目",
+"ko": "장"
+},
+"幾乎是同一個顏色（亮度 ": {
+"en": "is almost a single color (brightness ",
+"ja": "ほぼ単一の色です（明るさ ",
+"ko": "거의 한 가지 색입니다(밝기 "
+},
+"畫面整段幾乎是同一個顏色": {
+"en": "The whole video is almost a single color",
+"ja": "映像全体がほぼ単一の色です",
+"ko": "영상 전체가 거의 한 가지 색입니다"
+},
+"聲音整段推到滿格（平均 {0} dB）": {
+"en": "The audio is pushed to full scale throughout (average {0} dB)",
+"ja": "音声全体が最大レベルに張り付いています（平均 {0} dB）",
+"ko": "소리 전체가 최대치로 올라가 있습니다(평균 {0} dB)"
+},
+"聲音整段推到滿格（平均": {
+"en": "The audio is pushed to full scale throughout (average",
+"ja": "音声全体が最大レベルに張り付いています（平均",
+"ko": "소리 전체가 최대치로 올라가 있습니다(평균"
+},
+"連回主控台走 ": {
+"en": "Connecting back to the console via ",
+"ja": "コンソールへの接続経路 ",
+"ko": "콘솔 연결 경로 "
+},
+"，經代理伺服器 {0}": {
+"en": ", through proxy server {0}",
+"ja": "、プロキシサーバー {0} 経由",
+"ko": ", 프록시 서버 {0} 경유"
+},
+"經代理伺服器": {
+"en": "through proxy server",
+"ja": "プロキシサーバー経由",
+"ko": "프록시 서버 경유"
+},
+"已連回主控台": {
+"en": "Connected back to the console",
+"ja": "コンソールに接続しました",
+"ko": "콘솔에 다시 연결했습니다"
+},
+"連不回主控台 ": {
+"en": "Cannot connect back to the console ",
+"ja": "コンソールに接続できません ",
+"ko": "콘솔에 다시 연결할 수 없습니다 "
+},
+"（試過所有位址與代理伺服器）：": {
+"en": " (tried every address and proxy server): ",
+"ja": "（すべてのアドレスとプロキシサーバーを試行）：",
+"ko": "(모든 주소와 프록시 서버 시도): "
+},
+"聲音整段推到滿格（平均 ": {
+"en": "The audio is pushed to full scale throughout (average ",
+"ja": "音声全体が最大レベルに張り付いています（平均 ",
+"ko": "소리 전체가 최대치로 올라가 있습니다(평균 "
+},
+"，經代理伺服器 ": {
+"en": ", through proxy server ",
+"ja": "、プロキシサーバー経由 ",
+"ko": ", 프록시 서버 경유 "
+},
+"主控台送來的通道設定存不下來：{0}": {
+"en": "The channel settings sent by the console could not be saved: {0}",
+"ja": "コンソールから届いたチャネル設定を保存できません：{0}",
+"ko": "콘솔이 보낸 채널 설정을 저장할 수 없습니다: {0}"
+},
+"主控台送來的通道設定存不下來": {
+"en": "The channel settings sent by the console could not be saved",
+"ja": "コンソールから届いたチャネル設定を保存できません",
+"ko": "콘솔이 보낸 채널 설정을 저장할 수 없습니다"
+},
+"指令的路徑不對": {
+"en": "The command path is invalid",
+"ja": "コマンドのパスが正しくありません",
+"ko": "명령 경로가 올바르지 않습니다"
+},
+"內容不合法": {
+"en": "Invalid content",
+"ja": "内容が不正です",
+"ko": "내용이 올바르지 않습니다"
+},
+"主控台送來的通道設定存不下來：": {
+"en": "The channel settings sent by the console could not be saved: ",
+"ja": "コンソールから届いたチャネル設定を保存できません：",
+"ko": "콘솔이 보낸 채널 설정을 저장할 수 없습니다: "
+},
+"這台執行指令失敗：{0}": {
+"en": "This machine failed to run the command: {0}",
+"ja": "このマシンでコマンドの実行に失敗しました：{0}",
+"ko": "이 기기에서 명령 실행에 실패했습니다: {0}"
+},
+"這台執行指令失敗": {
+"en": "This machine failed to run the command",
+"ja": "このマシンでコマンドの実行に失敗しました",
+"ko": "이 기기에서 명령 실행에 실패했습니다"
+},
+"PCM 被截斷": {
+"en": "PCM is truncated",
+"ja": "PCM が途中で切れています",
+"ko": "PCM이 잘렸습니다"
+},
+"這台執行指令失敗：": {
+"en": "This machine failed to run the command: ",
+"ja": "このマシンでコマンドの実行に失敗しました：",
+"ko": "이 기기에서 명령 실행에 실패했습니다: "
 }
 }

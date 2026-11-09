@@ -2476,6 +2476,10 @@
 "pattern": false
 },
 {
+"zh": "可能壞了",
+"pattern": false
+},
+{
 "zh": "產生中",
 "pattern": false
 },
@@ -2513,6 +2517,14 @@
 },
 {
 "zh": "　權重放系統記憶體（較慢）",
+"pattern": false
+},
+{
+"zh": "產出看起來是壞的",
+"pattern": false
+},
+{
+"zh": "這多半是推理引擎在這台算錯，不是提示詞的問題，換描述也不會好；請回報管理者。",
 "pattern": false
 },
 {
@@ -4100,7 +4112,23 @@
 "pattern": false
 },
 {
+"zh": "{0}（由這台連回）",
+"pattern": true
+},
+{
+"zh": "由這台連回",
+"pattern": false
+},
+{
 "zh": "在線",
+"pattern": false
+},
+{
+"zh": "沒有連回",
+"pattern": false
+},
+{
+"zh": "不需要（連回時驗權杖）",
 "pattern": false
 },
 {
@@ -4553,6 +4581,134 @@
 },
 {
 "zh": "HSTS 已關閉",
+"pattern": false
+},
+{
+"zh": "工作站連回通道",
+"pattern": false
+},
+{
+"zh": "主動連回的機器 {0} 台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線",
+"pattern": true
+},
+{
+"zh": "主動連回的機器",
+"pattern": false
+},
+{
+"zh": "台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線",
+"pattern": false
+},
+{
+"zh": "通道埠",
+"pattern": false
+},
+{
+"zh": "{0}（有在聽）",
+"pattern": true
+},
+{
+"zh": "有在聽",
+"pattern": false
+},
+{
+"zh": "{0}（沒有在聽）",
+"pattern": true
+},
+{
+"zh": "沒有在聽",
+"pattern": false
+},
+{
+"zh": "輪替中（發給各台）",
+"pattern": false
+},
+{
+"zh": "退役（保留到期就刪）",
+"pattern": false
+},
+{
+"zh": "通道憑證・{0}",
+"pattern": true
+},
+{
+"zh": "通道憑證",
+"pattern": false
+},
+{
+"zh": "{0}…，{1} 產生",
+"pattern": true
+},
+{
+"zh": "，{0} 刪除（台北時間）",
+"pattern": true
+},
+{
+"zh": "刪除（台北時間",
+"pattern": false
+},
+{
+"zh": "通道埠沒有在聽：主動連回的工作站都連不上。請確認這個埠沒被別的程式占用，再重開主控台。",
+"pattern": false
+},
+{
+"zh": "新的通道憑證正在發給各台，在線的都收到後自動換上。還在等：{0}{1}",
+"pattern": true
+},
+{
+"zh": "新的通道憑證正在發給各台，在線的都收到後自動換上。還在等",
+"pattern": false
+},
+{
+"zh": "新的通道憑證已發出，正在換上。",
+"pattern": false
+},
+{
+"zh": "換通道憑證時，舊的會再保留 {0} 天：這段時間關機或沒帶回來的機器，一連上就自動拿到新的；超過 {1} 天都沒上線的要重新加入。",
+"pattern": true
+},
+{
+"zh": "換通道憑證時，舊的會再保留",
+"pattern": false
+},
+{
+"zh": "天：這段時間關機或沒帶回來的機器，一連上就自動拿到新的；超過",
+"pattern": false
+},
+{
+"zh": "天都沒上線的要重新加入",
+"pattern": false
+},
+{
+"zh": "換通道憑證",
+"pattern": false
+},
+{
+"zh": "上一次還沒完成",
+"pattern": false
+},
+{
+"zh": "會產生一張新的通道憑證，經現有的通道發給每台主動連回的機器。在線的都收到後才換上，工作站不會斷線。",
+"pattern": false
+},
+{
+"zh": "筆電帶回家或在外面時，從這些位址連回來（一行一個，寫成「主機:埠」，例如 vpn.example.com:9402）。對外只要開通道埠，不必開管理網頁的埠。各台在辦公室裡照樣走內部位址，連不到才改走這些。",
+"pattern": false
+},
+{
+"zh": "代理伺服器",
+"pattern": false
+},
+{
+"zh": "公司網路要經代理伺服器才能連到主控台時填，寫成 http://主機:埠。留空就用各台自己的系統設定；都不通時各台會改直連試試。需要帳密的代理伺服器請設在各台的系統設定，主控台不保存代理伺服器的密碼。",
+"pattern": false
+},
+{
+"zh": "儲存並發給各台",
+"pattern": false
+},
+{
+"zh": "已儲存，在線的工作站幾秒內就會收到",
 "pattern": false
 },
 {
@@ -8092,6 +8248,10 @@
 "pattern": false
 },
 {
+"zh": "還沒啟動",
+"pattern": false
+},
+{
 "zh": "產生。加入碼 30 分鐘內有效、只能用一次。\n# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。\nset -euo pipefail\nC='",
 "pattern": false
 },
@@ -8104,7 +8264,11 @@
 "pattern": false
 },
 {
-"zh": "PY\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | \"$PY\" -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"message\") or d.get(\"error\") or d)'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台\"\nexit 0\n",
+"zh": "PY\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"pattern": false
+},
+{
+"zh": "'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台\"\nexit 0\n",
 "pattern": false
 },
 {
@@ -8117,6 +8281,10 @@
 },
 {
 "zh": "產生。加入碼 30 分鐘內有效、只能用一次。\n# 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷\n$ErrorActionPreference = 'Continue'\n$C = '",
+"pattern": false
+},
+{
+"zh": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }\n",
 "pattern": false
 },
 {
@@ -8256,6 +8424,10 @@
 "pattern": false
 },
 {
+"zh": "系統",
+"pattern": false
+},
+{
 "zh": "沒有這台機器",
 "pattern": false
 },
@@ -8308,7 +8480,7 @@
 "pattern": false
 },
 {
-"zh": "已加入主控台：{0}（{1}）。回到網頁就看得到這台。",
+"zh": "已加入主控台：{0}。主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它。",
 "pattern": true
 },
 {
@@ -8316,7 +8488,7 @@
 "pattern": false
 },
 {
-"zh": "回到網頁就看得到這台",
+"zh": "主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它",
 "pattern": false
 },
 {
@@ -8432,10 +8604,6 @@
 "pattern": false
 },
 {
-"zh": "；涵蓋 {0}",
-"pattern": true
-},
-{
 "zh": "已設定帳號 {0}",
 "pattern": true
 },
@@ -8536,19 +8704,11 @@
 "pattern": false
 },
 {
-"zh": "主控台連不到這台的代理（試過 {0}）。請確認防火牆讓主控台連得到這台的 {1} 埠，而且送來的權杖與憑證是這台代理的。",
+"zh": "已加入主控台：{0}（{1}）。回到網頁就看得到這台。",
 "pattern": true
 },
 {
-"zh": "主控台連不到這台的代理（試過",
-"pattern": false
-},
-{
-"zh": "請確認防火牆讓主控台連得到這台的",
-"pattern": false
-},
-{
-"zh": "埠，而且送來的權杖與憑證是這台代理的",
+"zh": "回到網頁就看得到這台",
 "pattern": false
 },
 {
@@ -8556,7 +8716,7 @@
 "pattern": false
 },
 {
-"zh": "）。回到網頁就看得到這台。",
+"zh": "。主控台連不進這台（防火牆擋連入），改由這台主動連回，幾秒內網頁就看得到它。",
 "pattern": false
 },
 {
@@ -8740,6 +8900,10 @@
 "pattern": false
 },
 {
+"zh": "這個埠只給代理連回；管理網頁在另一個埠",
+"pattern": false
+},
+{
 "zh": "桌面版要由 xConsole 應用程式帶起來（缺鑰匙或本機通道的埠）",
 "pattern": false
 },
@@ -8760,19 +8924,15 @@
 "pattern": false
 },
 {
-"zh": "xConsole 聽在 https://{0}:{1}；憑證：{2}",
+"zh": "；涵蓋 {0}",
 "pattern": true
 },
 {
-"zh": "xConsole 聽在 https://",
-"pattern": false
+"zh": "；代理通道 {0}",
+"pattern": true
 },
 {
-"zh": "憑證",
-"pattern": false
-},
-{
-"zh": "；涵蓋 ",
+"zh": "代理通道",
 "pattern": false
 },
 {
@@ -8816,15 +8976,23 @@
 "pattern": false
 },
 {
+"zh": "{0} 超過期限沒有回：{1}",
+"pattern": true
+},
+{
+"zh": "超過期限沒有回",
+"pattern": false
+},
+{
+"zh": "{0} 連不上：{1}",
+"pattern": true
+},
+{
 "zh": "連不上 {0} 的代理：{1}",
 "pattern": true
 },
 {
 "zh": "的代理",
-"pattern": false
-},
-{
-"zh": "系統",
 "pattern": false
 },
 {
@@ -8836,15 +9004,23 @@
 "pattern": false
 },
 {
-"zh": "主控台連不到這台的代理（試過 ",
+"zh": "主控台連不到這台的代理（試過 {0}）。請確認防火牆讓主控台連得到這台的 {1} 埠，而且送來的權杖與憑證是這台代理的。",
+"pattern": true
+},
+{
+"zh": "主控台連不到這台的代理（試過",
 "pattern": false
 },
 {
-"zh": "）。請確認防火牆讓主控台連得到這台的 ",
+"zh": "請確認防火牆讓主控台連得到這台的",
 "pattern": false
 },
 {
-"zh": " 埠，而且送來的權杖與憑證是這台代理的。",
+"zh": "埠，而且送來的權杖與憑證是這台代理的",
+"pattern": false
+},
+{
+"zh": "）。回到網頁就看得到這台。",
 "pattern": false
 },
 {
@@ -8968,11 +9144,19 @@
 "pattern": false
 },
 {
-"zh": "只接受 application/json",
+"zh": "節點權杖不對，或這台不是主動連回的機器",
+"pattern": false
+},
+{
+"zh": "這台同時開的連線太多",
 "pattern": false
 },
 {
 "zh": "請求內容太大",
+"pattern": false
+},
+{
+"zh": "只接受 application/json",
 "pattern": false
 },
 {
@@ -8984,11 +9168,23 @@
 "pattern": false
 },
 {
-"zh": "；憑證：",
+"zh": "xConsole 聽在 https://{0}:{1}；憑證：{2}",
+"pattern": true
+},
+{
+"zh": "xConsole 聽在 https://",
 "pattern": false
 },
 {
-"zh": "（剛產生）",
+"zh": "憑證",
+"pattern": false
+},
+{
+"zh": "；涵蓋 ",
+"pattern": false
+},
+{
+"zh": "；代理通道 ",
 "pattern": false
 },
 {
@@ -8997,6 +9193,14 @@
 },
 {
 "zh": "，沒有被擋",
+"pattern": false
+},
+{
+"zh": " 超過期限沒有回：",
+"pattern": false
+},
+{
+"zh": " 連不上：",
 "pattern": false
 },
 {
@@ -9025,6 +9229,18 @@
 },
 {
 "zh": "取樣失敗：",
+"pattern": false
+},
+{
+"zh": "主控台連不到這台的代理（試過 ",
+"pattern": false
+},
+{
+"zh": "）。請確認防火牆讓主控台連得到這台的 ",
+"pattern": false
+},
+{
+"zh": " 埠，而且送來的權杖與憑證是這台代理的。",
 "pattern": false
 },
 {
@@ -9120,6 +9336,10 @@
 "pattern": false
 },
 {
+"zh": "權杖錯太多次，請 15 分鐘後再試",
+"pattern": false
+},
+{
 "zh": "沒有這個加入碼",
 "pattern": false
 },
@@ -9200,6 +9420,18 @@
 "pattern": false
 },
 {
+"zh": "對外網址要寫成「主機:埠」，最多 8 個：{0}",
+"pattern": true
+},
+{
+"zh": "對外網址要寫成「主機:埠」，最多 8 個",
+"pattern": false
+},
+{
+"zh": "代理伺服器要寫成 http://主機:埠，不收帳密（要帳密請用那台的系統設定）",
+"pattern": false
+},
+{
 "zh": "沒有收到檔案",
 "pattern": false
 },
@@ -9248,7 +9480,23 @@
 "pattern": false
 },
 {
+"zh": "通道埠 {0} 聽不起來：{1}",
+"pattern": true
+},
+{
+"zh": "聽不起來",
+"pattern": false
+},
+{
 "zh": "開",
+"pattern": false
+},
+{
+"zh": "；憑證：",
+"pattern": false
+},
+{
+"zh": "（剛產生）",
 "pattern": false
 },
 {
@@ -9332,6 +9580,10 @@
 "pattern": false
 },
 {
+"zh": "對外網址要寫成「主機:埠」，最多 8 個：",
+"pattern": false
+},
+{
 "zh": "至少要有一個網址",
 "pattern": false
 },
@@ -9361,6 +9613,14 @@
 },
 {
 "zh": "」不是數字",
+"pattern": false
+},
+{
+"zh": "通道埠 ",
+"pattern": false
+},
+{
+"zh": " 聽不起來：",
 "pattern": false
 },
 {
@@ -11728,11 +11988,23 @@
 "pattern": false
 },
 {
+"zh": "檢查產出中",
+"pattern": false
+},
+{
 "zh": "參考圖格式不對",
 "pattern": false
 },
 {
 "zh": "參考圖只收 PNG、JPEG、WebP，最大 4 MB",
+"pattern": false
+},
+{
+"zh": "EBML 長度錯誤",
+"pattern": false
+},
+{
+"zh": "EBML 被截斷",
 "pattern": false
 },
 {
@@ -12672,6 +12944,14 @@
 "pattern": false
 },
 {
+"zh": "產出檢查略過 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "產出檢查略過",
+"pattern": false
+},
+{
 "zh": "沒有這顆畫圖／影片模型",
 "pattern": false
 },
@@ -12797,6 +13077,26 @@
 },
 {
 "zh": "桌面版第一次啟動：記憶體架構自動套用偵測結果 ",
+"pattern": false
+},
+{
+"zh": "沒有可以試的位址",
+"pattern": false
+},
+{
+"zh": "主控台送出的憑證不是發給這台的通道憑證，拒絕連線",
+"pattern": false
+},
+{
+"zh": "收到主控台的通道憑證（{0} 張，目前用 {1}…）",
+"pattern": true
+},
+{
+"zh": "收到主控台的通道憑證",
+"pattern": false
+},
+{
+"zh": "張，目前用",
 "pattern": false
 },
 {
@@ -13125,6 +13425,26 @@
 },
 {
 "zh": "。下載後核對官方公布的 sha256，對不上就不裝",
+"pattern": false
+},
+{
+"zh": "CUDA 編譯器搭配 GCC {0}，這台預設的 C++ 編譯器是 {1}：整個專案改用 GCC {2} 編，連結時才不會混到兩版的 C++ 函式庫",
+"pattern": true
+},
+{
+"zh": "CUDA 編譯器搭配 GCC",
+"pattern": false
+},
+{
+"zh": "這台預設的 C++ 編譯器是",
+"pattern": false
+},
+{
+"zh": "整個專案改用 GCC",
+"pattern": false
+},
+{
+"zh": "編，連結時才不會混到兩版的 C++ 函式庫",
 "pattern": false
 },
 {
@@ -13568,6 +13888,22 @@
 "pattern": false
 },
 {
+"zh": "產出 {0}（{1}）看起來是壞的：{2}",
+"pattern": true
+},
+{
+"zh": "產出",
+"pattern": false
+},
+{
+"zh": "看起來是壞的",
+"pattern": false
+},
+{
+"zh": "產出檢查略過 ",
+"pattern": false
+},
+{
 "zh": "一次可以產 1～4 張",
 "pattern": false
 },
@@ -13621,6 +13957,26 @@
 },
 {
 "zh": "新版編譯不過，不更新",
+"pattern": false
+},
+{
+"zh": "收到主控台的通道憑證（",
+"pattern": false
+},
+{
+"zh": " 張，目前用 ",
+"pattern": false
+},
+{
+"zh": "主控台拒絕連回（{0}）：{1}",
+"pattern": true
+},
+{
+"zh": "主控台拒絕連回",
+"pattern": false
+},
+{
+"zh": "結果送不回主控台",
 "pattern": false
 },
 {
@@ -13814,6 +14170,34 @@
 {
 "zh": "{0}要在 {1}～{2}",
 "pattern": true
+},
+{
+"zh": "CUDA 編譯器搭配 GCC ",
+"pattern": false
+},
+{
+"zh": "，這台預設的 C++ 編譯器是 ",
+"pattern": false
+},
+{
+"zh": "：整個專案改用 GCC ",
+"pattern": false
+},
+{
+"zh": " 編，連結時才不會混到兩版的 C++ 函式庫",
+"pattern": false
+},
+{
+"zh": "CUDA 編譯器搭配 GCC {0}，這台預設的 C++ 編譯器是 {1}，但找不到 gcc-{2}／g++-{3}，連結可能失敗。請 IT 安裝：sudo apt install gcc-{4} g++-{5}",
+"pattern": true
+},
+{
+"zh": "但找不到 gcc-",
+"pattern": false
+},
+{
+"zh": "連結可能失敗。請 IT 安裝：sudo apt install gcc-",
+"pattern": false
 },
 {
 "zh": "用 ROCm 編，目標 ",
@@ -14044,6 +14428,26 @@
 "pattern": false
 },
 {
+"zh": "產出 ",
+"pattern": false
+},
+{
+"zh": "）看起來是壞的：",
+"pattern": false
+},
+{
+"zh": "整張",
+"pattern": false
+},
+{
+"zh": "{0}幾乎是同一個顏色（亮度 {1}）",
+"pattern": true
+},
+{
+"zh": "幾乎是同一個顏色（亮度",
+"pattern": false
+},
+{
 "zh": "種子、張數、重繪強度要是數字",
 "pattern": false
 },
@@ -14097,6 +14501,30 @@
 },
 {
 "zh": "需要權杖",
+"pattern": false
+},
+{
+"zh": "連回主控台走 {0}:{1}",
+"pattern": true
+},
+{
+"zh": "連回主控台走",
+"pattern": false
+},
+{
+"zh": "主控台拒絕連回（",
+"pattern": false
+},
+{
+"zh": "連不回主控台 {0}（試過所有位址與代理伺服器）：{1}",
+"pattern": true
+},
+{
+"zh": "連不回主控台",
+"pattern": false
+},
+{
+"zh": "試過所有位址與代理伺服器",
 "pattern": false
 },
 {
@@ -14157,6 +14585,14 @@
 },
 {
 "zh": "要在 ",
+"pattern": false
+},
+{
+"zh": "，但找不到 gcc-",
+"pattern": false
+},
+{
+"zh": "，連結可能失敗。請 IT 安裝：sudo apt install gcc-",
 "pattern": false
 },
 {
@@ -14244,6 +14680,30 @@
 "pattern": false
 },
 {
+"zh": "第 ",
+"pattern": false
+},
+{
+"zh": " 張",
+"pattern": false
+},
+{
+"zh": "幾乎是同一個顏色（亮度 ",
+"pattern": false
+},
+{
+"zh": "畫面整段幾乎是同一個顏色",
+"pattern": false
+},
+{
+"zh": "聲音整段推到滿格（平均 {0} dB）",
+"pattern": true
+},
+{
+"zh": "聲音整段推到滿格（平均",
+"pattern": false
+},
+{
 "zh": "連不到模型服務：",
 "pattern": false
 },
@@ -14253,6 +14713,30 @@
 },
 {
 "zh": "）：請確認有人登入這台的桌面",
+"pattern": false
+},
+{
+"zh": "連回主控台走 ",
+"pattern": false
+},
+{
+"zh": "，經代理伺服器 {0}",
+"pattern": true
+},
+{
+"zh": "經代理伺服器",
+"pattern": false
+},
+{
+"zh": "已連回主控台",
+"pattern": false
+},
+{
+"zh": "連不回主控台 ",
+"pattern": false
+},
+{
+"zh": "（試過所有位址與代理伺服器）：",
 "pattern": false
 },
 {
@@ -14324,6 +14808,10 @@
 "pattern": false
 },
 {
+"zh": "聲音整段推到滿格（平均 ",
+"pattern": false
+},
+{
 "zh": "模型服務回 {0}",
 "pattern": true
 },
@@ -14337,6 +14825,10 @@
 },
 {
 "zh": "桌面小幫手回",
+"pattern": false
+},
+{
+"zh": "，經代理伺服器 ",
 "pattern": false
 },
 {
@@ -14364,6 +14856,18 @@
 "pattern": false
 },
 {
+"zh": "主控台送來的通道設定存不下來：{0}",
+"pattern": true
+},
+{
+"zh": "主控台送來的通道設定存不下來",
+"pattern": false
+},
+{
+"zh": "指令的路徑不對",
+"pattern": false
+},
+{
 "zh": "不認得的按鍵：{0}",
 "pattern": true
 },
@@ -14372,7 +14876,31 @@
 "pattern": false
 },
 {
+"zh": "內容不合法",
+"pattern": false
+},
+{
+"zh": "主控台送來的通道設定存不下來：",
+"pattern": false
+},
+{
 "zh": "不認得的按鍵：",
+"pattern": false
+},
+{
+"zh": "這台執行指令失敗：{0}",
+"pattern": true
+},
+{
+"zh": "這台執行指令失敗",
+"pattern": false
+},
+{
+"zh": "PCM 被截斷",
+"pattern": false
+},
+{
+"zh": "這台執行指令失敗：",
 "pattern": false
 }
 ]
