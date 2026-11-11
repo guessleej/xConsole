@@ -3748,6 +3748,10 @@
 "pattern": false
 },
 {
+"zh": "群組",
+"pattern": false
+},
+{
 "zh": "推理引擎",
 "pattern": false
 },
@@ -4056,6 +4060,242 @@
 "pattern": false
 },
 {
+"zh": "要哪些模型",
+"pattern": false
+},
+{
+"zh": "執行參數",
+"pattern": false
+},
+{
+"zh": "保留記憶體",
+"pattern": false
+},
+{
+"zh": "只准用的模型",
+"pattern": false
+},
+{
+"zh": "顯卡功耗上限",
+"pattern": false
+},
+{
+"zh": "同群組互傳",
+"pattern": false
+},
+{
+"zh": "內部鏡像",
+"pattern": false
+},
+{
+"zh": "立即",
+"pattern": false
+},
+{
+"zh": "下次開機",
+"pattern": false
+},
+{
+"zh": "指定時間",
+"pattern": false
+},
+{
+"zh": "同一群組的機器用同一份設定；設定一改，版本號就加一",
+"pattern": false
+},
+{
+"zh": "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。機器依群組設定自動準備與套用的功能，會在下一版接上；目前先保存設定與版本號。",
+"pattern": false
+},
+{
+"zh": "新群組名稱，例：電腦教室 A",
+"pattern": false
+},
+{
+"zh": "新增群組",
+"pattern": false
+},
+{
+"zh": "已新增群組",
+"pattern": false
+},
+{
+"zh": "全部群組",
+"pattern": false
+},
+{
+"zh": "{0} 個",
+"pattern": true
+},
+{
+"zh": "設定版本",
+"pattern": false
+},
+{
+"zh": "更新時間（台北時間）",
+"pattern": false
+},
+{
+"zh": "編輯設定",
+"pattern": false
+},
+{
+"zh": "未分類",
+"pattern": false
+},
+{
+"zh": "刪除群組「{0}」",
+"pattern": true
+},
+{
+"zh": "刪除群組「",
+"pattern": false
+},
+{
+"zh": "這個群組有 {0} 台機器。刪除後它們移到「未分類」，機器本身不受影響。",
+"pattern": true
+},
+{
+"zh": "這個群組有",
+"pattern": false
+},
+{
+"zh": "台機器。刪除後它們移到「未分類」，機器本身不受影響",
+"pattern": false
+},
+{
+"zh": "這個群組沒有機器。",
+"pattern": false
+},
+{
+"zh": "已刪除，{0} 台移到「未分類」",
+"pattern": true
+},
+{
+"zh": "已刪除",
+"pattern": false
+},
+{
+"zh": "台移到「未分類」",
+"pattern": false
+},
+{
+"zh": "「{0}」的設定",
+"pattern": true
+},
+{
+"zh": "」的設定",
+"pattern": false
+},
+{
+"zh": "目前版本 v{0}；內容有變才會加一",
+"pattern": true
+},
+{
+"zh": "目前版本 v",
+"pattern": false
+},
+{
+"zh": "內容有變才會加一",
+"pattern": false
+},
+{
+"zh": "群組名稱",
+"pattern": false
+},
+{
+"zh": "種類（只是標籤）",
+"pattern": false
+},
+{
+"zh": "要哪些模型（一行一個；寫 auto 由主控台依每台硬體挑版本）",
+"pattern": false
+},
+{
+"zh": "只准用的模型（一行一個；空的就是不限）",
+"pattern": false
+},
+{
+"zh": "上下文長度（token，空的就是不指定）",
+"pattern": false
+},
+{
+"zh": "並行數",
+"pattern": false
+},
+{
+"zh": "不指定",
+"pattern": false
+},
+{
+"zh": "開",
+"pattern": false
+},
+{
+"zh": "關",
+"pattern": false
+},
+{
+"zh": "思考",
+"pattern": false
+},
+{
+"zh": "溫度（0～2）",
+"pattern": false
+},
+{
+"zh": "保留給使用者其他程式的記憶體（GiB）",
+"pattern": false
+},
+{
+"zh": "顯卡功耗上限（瓦，空的就是不限）",
+"pattern": false
+},
+{
+"zh": "模型存放位置（完整路徑；還原卡要指到不還原的磁碟；空的用預設）",
+"pattern": false
+},
+{
+"zh": "/data/xconsole 或 D:\\xconsole",
+"pattern": false
+},
+{
+"zh": "模型可以從哪裡取得（至少選一個）",
+"pattern": false
+},
+{
+"zh": "鎖定（使用者在自己那台不能改）",
+"pattern": false
+},
+{
+"zh": "套用時機",
+"pattern": false
+},
+{
+"zh": "指定時間（選「指定時間」才用）",
+"pattern": false
+},
+{
+"zh": "儲存設定",
+"pattern": false
+},
+{
+"zh": "選了「指定時間」就要填時間",
+"pattern": false
+},
+{
+"zh": "已儲存，設定版本升到 v{0}",
+"pattern": true
+},
+{
+"zh": "已儲存，設定版本升到 v",
+"pattern": false
+},
+{
+"zh": "已儲存（設定內容沒變，版本不動）",
+"pattern": false
+},
+{
 "zh": "納管的機器",
 "pattern": false
 },
@@ -4089,10 +4329,6 @@
 },
 {
 "zh": "<thead><tr><th>機器</th><th>群組</th><th>位址</th><th>記憶體架構</th><th>連線</th><th>代理憑證</th><th></th></tr></thead>",
-"pattern": false
-},
-{
-"zh": "群組",
 "pattern": false
 },
 {
@@ -5840,10 +6076,6 @@
 "pattern": false
 },
 {
-"zh": "已刪除",
-"pattern": false
-},
-{
 "zh": "{0} 的情境",
 "pattern": true
 },
@@ -5884,15 +6116,7 @@
 "pattern": false
 },
 {
-"zh": "關",
-"pattern": false
-},
-{
 "zh": "2,048～1,048,576；套用前會做記憶體試算",
-"pattern": false
-},
-{
-"zh": "並行數",
 "pattern": false
 },
 {
@@ -8896,10 +9120,6 @@
 "pattern": false
 },
 {
-"zh": "未分類",
-"pattern": false
-},
-{
 "zh": "這個埠只給代理連回；管理網頁在另一個埠",
 "pattern": false
 },
@@ -9380,10 +9600,6 @@
 "pattern": false
 },
 {
-"zh": "群組最多 30 個字",
-"pattern": false
-},
-{
 "zh": "位址格式不對，填 IP 或主機名稱（不含埠）",
 "pattern": false
 },
@@ -9417,6 +9633,10 @@
 },
 {
 "zh": "目前是正式憑證，換回暫用自簽會讓使用者看到安全警告；確定要換請再確認一次",
+"pattern": false
+},
+{
+"zh": "已經有同名的群組",
 "pattern": false
 },
 {
@@ -9485,10 +9705,6 @@
 },
 {
 "zh": "聽不起來",
-"pattern": false
-},
-{
-"zh": "開",
 "pattern": false
 },
 {
@@ -9580,6 +9796,14 @@
 "pattern": false
 },
 {
+"zh": "一般",
+"pattern": false
+},
+{
+"zh": "沒有這個群組",
+"pattern": false
+},
+{
 "zh": "對外網址要寫成「主機:埠」，最多 8 個：",
 "pattern": false
 },
@@ -9644,6 +9868,10 @@
 "pattern": false
 },
 {
+"zh": "「未分類」是預設群組，不能刪除",
+"pattern": false
+},
+{
 "zh": "要用硬碟",
 "pattern": false
 },
@@ -9653,6 +9881,10 @@
 },
 {
 "zh": "檔案",
+"pattern": false
+},
+{
+"zh": "同名",
 "pattern": false
 },
 {
