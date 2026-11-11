@@ -47,6 +47,7 @@ import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
 import agentlink  # noqa: E402
+import linkcert  # noqa: E402
 from store import Store  # noqa: E402
 
 # Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
@@ -56,6 +57,8 @@ STATE_DIR = os.path.join(HOME, ".xconsole")
 FLEET = os.path.join(STATE_DIR, "fleet.json")
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 PORT = int(os.environ.get("XCONSOLE_PORT", "9400"))
+# 代理主動連回用的通道埠：只回代理的兩條路徑，用專用的通道憑證。遠端的筆電要從外面連回來時，對外只開這個埠
+LINK_PORT = int(os.environ.get("XCONSOLE_LINK_PORT", "9402"))
 
 
 def _arg(name):
@@ -90,6 +93,8 @@ _THROTTLE_LOGGED = {}
 os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
 STORE = Store(os.path.join(STATE_DIR, "xconsole.db"))
 CERTS = tls.CertManager(STATE_DIR, PORT)
+RING = linkcert.Ring(STATE_DIR)       # 通道憑證：換管理網頁的憑證不影響它
+LINK_LISTEN = {"ok": False, "error": "還沒啟動"}
 CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "catalog.json"),
                             os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_default.json"))
 SD_CATALOG = recommend.Catalog(os.path.join(STATE_DIR, "sd_catalog.json"),
@@ -495,6 +500,66 @@ LINK = agentlink.Link(log=lambda m: print(m, flush=True))
 PUSH = "push"            # node_request() 對主動連回的節點回這個當 TLS 設定：agent_open() 認得它
 
 
+def link_cfg():
+    c = fleet().get("link") or {}
+    return {"public": [str(x) for x in c.get("public") or []][:8], "proxy": str(c.get("proxy") or "")}
+
+
+def link_ver():
+    """代理手上那份通道設定的版本：憑證版本＋對外網址與代理伺服器的雜湊。代理回報的不一樣就再發一次。"""
+    c = link_cfg()
+    return f"{RING.version()}-{hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest()[:8]}"
+
+
+def link_payload():
+    pem, cur = RING.trusted()
+    c = link_cfg()
+    return {"v": link_ver(), "cert": pem, "current": cur, "public": c["public"], "proxy": c["proxy"]}
+
+
+def push_ids():
+    return [n["id"] for n in fleet()["nodes"] if n.get("link") == "push"]
+
+
+_LINK_TICK = [0.0]
+
+
+def link_tick(force=False):
+    """所有在線的工作站都收到新通道憑證了就換上；退役超過 30 天的刪掉。輪詢時順手做，每 2 秒最多一次。"""
+    if not force and time.time() - _LINK_TICK[0] < 2:
+        return
+    _LINK_TICK[0] = time.time()
+    if RING.check(push_ids(), LINK.online):
+        LINK.wake()
+        STORE.audit("", "系統", "link.cert", RING.current()["fp"][:16], True, {"version": RING.version()})
+
+
+def valid_link_addr(a):
+    """對外網址：主機:埠，或 [IPv6]:埠。"""
+    # 不用正規表示式：使用者輸入配上有回溯的樣式，長字串會跑很久（CodeQL）
+    host, sep, port = a[:260].rpartition(":")
+    if not sep or len(a) > 255 or not port.isdigit() or len(port) > 5:
+        return False
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+        if ":" not in host:
+            return False                            # 方括號只給 IPv6
+    elif ":" in host:
+        return False
+    return valid_host(host) and 0 < int(port) < 65536
+
+
+def valid_proxy(u):
+    """企業的代理伺服器：http://主機:埠。帳密不收：主控台不保存代理伺服器的密碼，要帳密就用那台的系統設定。"""
+    try:
+        x = urlparse(u)
+        port = x.port
+    except ValueError:
+        return False
+    return x.scheme == "http" and bool(x.hostname) and valid_host(x.hostname) and not x.username \
+        and not x.password and x.path in ("", "/") and not x.query and bool(port)
+
+
 def node_url(node, path):
     """主控台連代理（link=pull，伺服器）用 https；代理主動連回（link=push，工作站）的排進那台的佇列。"""
     if node.get("link") == "push":
@@ -856,7 +921,7 @@ print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(
                   "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
 """
 
-# 讀主控台對加入的回應：印出訊息；主控台連不進這台時，把連回的位址與主控台憑證寫給代理（代理每 5 秒看一次）。
+# 讀主控台對加入的回應：印出訊息；主控台連不進這台時，把通道的位址與通道憑證寫給代理（代理每 5 秒看一次）。
 # 改由主控台連這台時，清掉以前留下的連回設定：不然重裝後的代理會繼續連回舊的主控台、聽它的指令。
 # 給 bash 的 -c '...' 用，所以整段不能有單引號
 JOIN_SAVE_PY = """import json, os, sys
@@ -870,7 +935,8 @@ if d.get("ok") and d.get("link") != "push":
         if os.path.exists(os.path.join(sd, name)):
             os.remove(os.path.join(sd, name))
 if d.get("link") == "push" and c.get("url") and c.get("cert"):
-    for name, data in (("agent-link.pem", c["cert"]), ("agent-link.json", json.dumps({"url": c["url"], "node": c["node"]}))):
+    meta = {k: c.get(k) for k in ("url", "node", "current", "public", "proxy", "v")}
+    for name, data in (("agent-link.pem", c["cert"]), ("agent-link.json", json.dumps(meta))):
         tmp = os.path.join(sd, name + ".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -1132,11 +1198,11 @@ def _join_node(handler, body):
     name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
     if link == "pull":
         return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
-    with open(CERTS.p.live_cert) as fh:
-        console_pem = fh.read()
-    # 安裝腳本把這些寫進 ~/.xconsole/agent-link.json：代理看到就開始連回，只認這張主控台憑證
+    host = urlparse(f"https://{j['console']}").hostname or ""
+    # 安裝腳本把這些寫進 ~/.xconsole/agent-link.json：代理看到就開始連回通道埠，只認發給它的通道憑證
     return 200, {"ok": True, "id": nid, "link": "push",
-                 "console": {"url": f"https://{j['console']}", "node": nid, "cert": console_pem},
+                 "console": dict(link_payload(), node=nid,
+                                 url=f"https://{'[' + host + ']' if ':' in host else host}:{LINK_PORT}"),
                  "message": f"已加入主控台：{name}。主控台連不進這台（防火牆擋連入），改由這台主動連回，"
                             f"幾秒內網頁就看得到它。"}
 
@@ -2467,7 +2533,12 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
         if path == "/api/agent/poll":
-            return self._json(200, {"cmds": LINK.poll(nid, body.get("seen"))})
+            lv = str(body.get("link") or "")
+            link_tick(force=RING.ack(nid, int(lv.split("-")[0]) if re.fullmatch(r"\d{1,9}-[0-9a-f]{8}", lv) else 0))
+            out = {"cmds": LINK.poll(nid, body.get("seen"), stop=lambda: lv != link_ver())}
+            if lv != link_ver():
+                out["link"] = link_payload()        # 換了通道憑證、對外網址或代理伺服器：這台下一輪就換上
+            return self._json(200, out)
         return self._json(200, {"ok": LINK.result(nid, body)})
 
     def _headers_done(self):
@@ -2658,6 +2729,10 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/{m.group(3)}"))
 
+        if path == "/api/link":
+            c = link_cfg()
+            return self._json(200, dict(c, port=LINK_PORT, listen=LINK_LISTEN, nodes=len(push_ids()),
+                                        ring=RING.summary(push_ids(), LINK.online)))
         if path == "/api/tls/status":
             rec, _ = tls.pending_csr(CERTS.p)
             return self._json(200, {
@@ -2711,8 +2786,6 @@ class Handler(BaseHTTPRequestHandler):
                 self._headers_done()
                 return self._json(400, {"error": "桌面版用安裝檔更新；請到「版本與更新」按更新，或到 GitHub 的版本頁下載安裝檔"})
             return self._update_upload(ctype)
-        if path in ("/api/agent/poll", "/api/agent/result"):
-            return self._agent_link(path)
         if path.startswith("/api/") and ctype != "application/json":
             # 跨站的 <form> 只能送 form-urlencoded／multipart／text/plain，送不出 application/json
             return self._json(415, {"error": "只接受 application/json"})
@@ -2811,6 +2884,7 @@ class Handler(BaseHTTPRequestHandler):
                 if os.path.exists(trust_file(nid)):
                     os.remove(trust_file(nid))
                 LINK.forget(nid)
+                RING.forget(nid)
                 self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"]})
                 return self._json(200, {"ok": True})
             name = str(body.get("name", node["name"]) or "").strip()
@@ -3256,6 +3330,25 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = CERTS.bootstrap(hostnames())
             self._audit("tls.bootstrap", "", ok, {"message": msg})
             return self._json(200 if ok else 409, {"ok": ok, "message": msg, "current": CERTS.current()})
+        if path == "/api/link/settings":
+            pub = [str(a).strip() for a in body.get("public") or [] if str(a).strip()]
+            proxy = str(body.get("proxy") or "").strip()
+            bad = [a for a in pub if not valid_link_addr(a)]
+            if bad or len(pub) > 8:
+                return self._json(400, {"error": f"對外網址要寫成「主機:埠」，最多 8 個：{', '.join(bad)[:120]}"})
+            if proxy and not valid_proxy(proxy):
+                return self._json(400, {"error": "代理伺服器要寫成 http://主機:埠，不收帳密（要帳密請用那台的系統設定）"})
+            update_fleet(lambda c: c.__setitem__("link", {"public": pub, "proxy": proxy}))
+            self._audit("link.settings", "", True, {"public": pub, "proxy": proxy})
+            LINK.wake()                             # 掛著的輪詢馬上回，各台立刻拿到新設定
+            return self._json(200, dict(link_cfg(), ok=True))
+        if path == "/api/link/rotate":
+            ok, msg = RING.rotate()
+            self._audit("link.rotate", "", ok, {"message": msg})
+            if ok:
+                LINK.wake()
+                link_tick(force=True)               # 沒有在線的機器就直接換上
+            return self._json(200 if ok else 409, {"ok": ok, "message": msg, "ring": RING.summary(push_ids(), LINK.online)})
         if path == "/api/tls/settings":
             if "hostnames" in body:
                 names = [h.strip() for h in body.get("hostnames") or [] if str(h).strip()]
@@ -3380,6 +3473,24 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"error": "找不到"})
 
 
+class LinkHandler(Handler):
+    """通道埠（LINK_PORT）：只回代理連回的兩條路徑。對外只開這個埠時，管理網頁不會跟著露出去。"""
+
+    def do_GET(self):  # noqa: N802
+        self._headers_done()
+        if urlparse(self.path).path == "/healthz":
+            return self._json(200, {"ok": True, "service": "xconsole-link"})
+        return self._json(404, {"error": "這個埠只給代理連回；管理網頁在另一個埠"})
+
+    def do_POST(self):  # noqa: N802
+        path = urlparse(self.path).path
+        if path in ("/api/agent/poll", "/api/agent/result"):
+            return self._agent_link(path)
+        self._body(MAX_ANON_BODY)
+        self._headers_done()
+        return self._json(404, {"error": "這個埠只給代理連回；管理網頁在另一個埠"})
+
+
 class LoopHandler(Handler):
     """桌面版視窗專用：只聽 127.0.0.1。流量不出這台，所以不包 TLS；但要擋別的網頁借瀏覽器連進來：
     Host 與 Origin 一定要是 127.0.0.1:這個埠（DNS rebinding 也過不了），登入只收應用程式給的鑰匙。"""
@@ -3485,6 +3596,16 @@ def main():
     bind = "0.0.0.0" if not DESKTOP or cfg.get("lan_access") else "127.0.0.1"
     srv = tls.TLSServer((bind, PORT), Handler)
     srv.certs = CERTS
+    if bind == "0.0.0.0":
+        try:
+            lsrv = tls.TLSServer((bind, LINK_PORT), LinkHandler)
+            lsrv.certs = RING
+            threading.Thread(target=lsrv.serve_forever, daemon=True).start()
+            LINK_LISTEN.update(ok=True, error=None)
+        except OSError as exc:
+            # 不擋主控台啟動：只有主動連回的工作站連不上；設定頁會顯示原因
+            LINK_LISTEN.update(ok=False, error=f"通道埠 {LINK_PORT} 聽不起來：{exc}")
+            print(LINK_LISTEN["error"], flush=True)
     if DESKTOP:
         loop = ThreadingHTTPServer(("127.0.0.1", APP_PORT), LoopHandler)
         loop.daemon_threads = True
@@ -3494,7 +3615,8 @@ def main():
     cur = CERTS.current()
     kind = "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）" if cur["selfSigned"] else cur["issuer"]
     print(f"xConsole 聽在 https://{bind}:{PORT}；憑證：{kind}"
-          + ("（剛產生）" if fresh else "") + f"；涵蓋 {', '.join(cur['dns'] + cur['ips'])}", flush=True)
+          + ("（剛產生）" if fresh else "") + f"；涵蓋 {', '.join(cur['dns'] + cur['ips'])}"
+          + (f"；代理通道 {LINK_PORT}" if LINK_LISTEN["ok"] else ""), flush=True)
     srv.serve_forever()
 
 

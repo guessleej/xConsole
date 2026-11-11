@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""代理主動連回（工作站模式）代理這一側的自我檢查：讀連回設定、釘住主控台憑證、
+"""代理主動連回（工作站模式）代理這一側的自我檢查：讀連回設定、釘住通道憑證、位址與代理伺服器輪流試、
+SNI 選通道憑證與收到新清單、
 指令轉給本機代理後分片送回（一般、大檔、串流）、同一個編號不重做、取消會把本機連線關掉。
 跑法：python3 test_link.py（只用標準函式庫＋代理本身，Linux／macOS／Windows 都能跑）
 """
@@ -88,92 +89,178 @@ def main():
         pem = fh.read()
     with open(A.LINK_CERT, "w") as fh:
         fh.write(pem)
-    for bad in ({"url": "http://1.2.3.4:9400", "node": "a"}, {"url": "https://1.2.3.4:9400", "node": "../x"},
-                {"url": "https://1.2.3.4:9400"}):
+    for bad in ({"url": "http://1.2.3.4:9402", "node": "a"}, {"url": "https://1.2.3.4:9402", "node": "../x"},
+                {"url": "https://1.2.3.4:9402"}, {"url": "https://1.2.3.4:9402/x", "node": "a"}):
         with open(A.LINK_FILE, "w") as fh:
             json.dump(bad, fh)
         case(f"設定不合法不連：{bad}", A.AgentLink.config() is None)
+    fp0 = A.AgentLink._fps(pem)[0]
+    dead = socket.socket()
+    dead.bind(("127.0.0.1", 0))
+    dead_port = dead.getsockname()[1]
+    dead.close()                                          # 沒人聽的埠：模擬在家連不到內部位址
     with open(A.LINK_FILE, "w") as fh:
-        json.dump({"url": f"https://127.0.0.1:{A.PORT}", "node": "ws-01"}, fh)
+        json.dump({"url": f"https://127.0.0.1:{A.PORT}", "node": "ws-01", "public": ["bad addr", f"127.0.0.1:{dead_port}"]}, fh)
     cfg = A.AgentLink.config()
-    case("讀到連回設定", cfg and cfg["node"] == "ws-01" and cfg["port"] == A.PORT and len(cfg["fp"]) == 64, cfg)
+    case("讀到連回設定（內部位址＋對外網址，不合法的對外網址略過）",
+         cfg and cfg["node"] == "ws-01" and cfg["addrs"] == [("127.0.0.1", A.PORT), ("127.0.0.1", dead_port)]
+         and cfg["fps"] == [fp0] and cfg["current"] == fp0, cfg)
 
-    # ---- 2. 釘住主控台憑證：同一張連得上，指紋不同就拒絕（不是關掉驗證）
+    # ---- 2. 釘住通道憑證：發給這台的那張連得上，不是的就拒絕（不是關掉驗證）
     try:
-        A.AgentLink.connect(cfg, 5).close()
+        A.AgentLink().connect(cfg).close()
         case("釘住的憑證：連得上", True)
     except Exception as exc:  # noqa: BLE001
         case("釘住的憑證：連得上", False, exc)
     try:
-        A.AgentLink.connect({**cfg, "fp": "0" * 64}, 5)
+        A.AgentLink().connect({**cfg, "fps": ["0" * 64]})
         case("指紋不同：拒絕連線", False)
     except ssl.SSLError as exc:
-        case("指紋不同：拒絕連線", "釘住" in str(exc), exc)
+        case("指紋不同：拒絕連線", "不是發給這台" in str(exc), exc)
 
-    # ---- 2b. 主控台用 CA 簽的憑證（根憑證不在這台）：新版 Python 驗證通過；Python 3.9 沒有 PARTIAL_CHAIN 時靠指紋
+    # ---- 2b. 位址輪流試：內部位址連不到就走對外網址，下次先試上次通的那條
+    lk = A.AgentLink()
+    cfg_out = {**cfg, "addrs": [("127.0.0.1", dead_port), ("127.0.0.1", A.PORT)]}
+    try:
+        lk.connect(cfg_out).close()
+        case("第一個位址連不到：改走下一個", lk.route == 1, lk.route)
+    except Exception as exc:  # noqa: BLE001
+        case("第一個位址連不到：改走下一個", False, exc)
+
+    # ---- 2c. 經 HTTP 代理伺服器（CONNECT）；指定的代理伺服器壞了就改直連
+    seen = []
+
+    def proxy_srv():
+        ls = socket.socket()
+        ls.bind(("127.0.0.1", 0))
+        ls.listen(8)
+
+        def pipe(x, y):
+            try:
+                while True:
+                    d = x.recv(65536)
+                    if not d:
+                        break
+                    y.sendall(d)
+            except OSError:
+                pass
+            for z in (x, y):
+                try:
+                    z.close()
+                except OSError:
+                    pass
+
+        def one(c):
+            buf = b""
+            while b"\r\n\r\n" not in buf:
+                buf += c.recv(4096)
+            head = buf.split(b"\r\n\r\n")[0].decode()
+            seen.append(head)
+            host, port = head.split()[1].rsplit(":", 1)
+            up = socket.create_connection((host, int(port)))
+            c.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+            threading.Thread(target=pipe, args=(c, up), daemon=True).start()
+            threading.Thread(target=pipe, args=(up, c), daemon=True).start()
+
+        def loop():
+            while True:
+                c, _ = ls.accept()
+                threading.Thread(target=one, args=(c,), daemon=True).start()
+        threading.Thread(target=loop, daemon=True).start()
+        return ls.getsockname()[1]
+
+    pp = proxy_srv()
+    lk = A.AgentLink()
+    try:
+        c = lk.connect({**cfg, "addrs": [("127.0.0.1", A.PORT)], "proxy": f"http://127.0.0.1:{pp}"})
+        c.close()
+        case("經代理伺服器 CONNECT 連得上，憑證照樣釘住", seen and seen[0].startswith(f"CONNECT 127.0.0.1:{A.PORT} "), seen)
+    except Exception as exc:  # noqa: BLE001
+        case("經代理伺服器 CONNECT 連得上，憑證照樣釘住", False, exc)
+    seen.clear()
+    c = A._LinkConn("127.0.0.1", A.PORT, f"http://u%40x:p%3Aw@127.0.0.1:{pp}", ssl.create_default_context(), 5, "x")
+    c.check_hostname = False
+    try:
+        c.connect()
+    except OSError:
+        pass                                              # 這裡只看送出的標頭，憑證驗不過沒關係
+    c.close()
+    want = "Proxy-Authorization: Basic " + base64.b64encode(b"u@x:p:w").decode()
+    case("系統設定帶帳密的代理伺服器：帳密放在 Proxy-Authorization", seen and want in seen[0], seen)
+    lk = A.AgentLink()
+    try:
+        lk.connect({**cfg, "addrs": [("127.0.0.1", A.PORT)], "proxy": f"http://127.0.0.1:{dead_port}"}).close()
+        case("指定的代理伺服器連不到：改直連", lk.route == len(A.AgentLink.routes({**cfg, "addrs": [("127.0.0.1", A.PORT)],
+                                                                            "proxy": f"http://127.0.0.1:{dead_port}"})) - 1, lk.route)
+    except Exception as exc:  # noqa: BLE001
+        case("指定的代理伺服器連不到：改直連", False, exc)
+
+    # ---- 2d. 主控台用 SNI 選通道憑證：代理說它認哪一張就拿到哪一張（輪替期間新舊兩張同時服務）
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.x509.oid import NameOID
         import datetime as dt
-        import ipaddress
     except ImportError:
         x509 = None
-        print("（沒有 cryptography，略過 CA 簽的主控台憑證）")
+        print("（沒有 cryptography，略過通道憑證輪替）")
     if x509 is not None:
         now = dt.datetime.now(dt.timezone.utc)
-        ck = ec.generate_private_key(ec.SECP256R1())
-        cn = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test Root")])
-        ca = (x509.CertificateBuilder().subject_name(cn).issuer_name(cn).public_key(ck.public_key())
-              .serial_number(1).not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=30))
-              .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-              .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False), critical=True)
-              .add_extension(x509.SubjectKeyIdentifier.from_public_key(ck.public_key()), critical=False)
-              .sign(ck, hashes.SHA256()))
-        lk = ec.generate_private_key(ec.SECP256R1())
-        leaf = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "console")]))
-                .issuer_name(cn).public_key(lk.public_key()).serial_number(2)
-                .not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=30))
-                .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
-                .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), critical=False)
-                .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ck.public_key()), critical=False)
-                .add_extension(x509.SubjectKeyIdentifier.from_public_key(lk.public_key()), critical=False)
-                .sign(ck, hashes.SHA256()))
-        d = tempfile.mkdtemp(prefix="xc-ca-")
-        lp, kp = os.path.join(d, "leaf.pem"), os.path.join(d, "leaf.key")
-        open(lp, "wb").write(leaf.public_bytes(serialization.Encoding.PEM))
-        open(kp, "wb").write(lk.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                              serialization.NoEncryption()))
-        c2 = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        c2.load_cert_chain(lp, kp)
+        d = tempfile.mkdtemp(prefix="xc-ring-")
+        ctxs, pems = {}, []
+        for i in range(2):
+            k = ec.generate_private_key(ec.SECP256R1())
+            nm = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"xconsole-link-{i}")])
+            c = (x509.CertificateBuilder().subject_name(nm).issuer_name(nm).public_key(k.public_key())
+                 .serial_number(x509.random_serial_number()).not_valid_before(now - dt.timedelta(days=1))
+                 .not_valid_after(now + dt.timedelta(days=30)).sign(k, hashes.SHA256()))
+            cp, kp = os.path.join(d, f"c{i}.pem"), os.path.join(d, f"k{i}.pem")
+            open(cp, "wb").write(c.public_bytes(serialization.Encoding.PEM))
+            open(kp, "wb").write(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                                 serialization.NoEncryption()))
+            x = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            x.load_cert_chain(cp, kp)
+            fp = hashlib.sha256(c.public_bytes(serialization.Encoding.DER)).hexdigest()
+            ctxs["k-" + fp[:32] + A.LINK_SNI] = x
+            pems.append((fp, open(cp).read()))
+        default = list(ctxs.values())[0]
+
+        def sni(sobj, name, _c):
+            if name in ctxs:
+                sobj.context = ctxs[name]
+        default.sni_callback = sni
         s = socket.socket()
         s.bind(("127.0.0.1", 0))
         p2 = s.getsockname()[1]
         s.close()
         srv2 = A.AgentTLSServer(("127.0.0.1", p2), H)
-        srv2.ctx = c2
+        srv2.ctx = default
         threading.Thread(target=srv2.serve_forever, daemon=True).start()
-        keep_pem = open(A.LINK_CERT).read()
-        open(A.LINK_CERT, "w").write(open(lp).read())          # 只有那張憑證，沒有根憑證
-        cfg2 = {**cfg, "port": p2, "fp": hashlib.sha256(leaf.public_bytes(serialization.Encoding.DER)).hexdigest()}
-        saved = A.PARTIAL_CHAIN
-        for name, flag in (("Python 3.10 以上（PARTIAL_CHAIN）", saved), ("Python 3.9（沒有 PARTIAL_CHAIN）", 0)):
-            if name.startswith("Python 3.10") and not saved:
-                continue
-            A.PARTIAL_CHAIN = flag
+        keep_pem, keep_json = open(A.LINK_CERT).read(), open(A.LINK_FILE).read()
+        (f0, c0), (f1, c1) = pems
+        open(A.LINK_CERT, "w").write(c0 + c1)
+        cf = {**A.AgentLink.config(), "addrs": [("127.0.0.1", p2)]}
+        for want in (f0, f1):
             try:
-                A.AgentLink.connect(cfg2, 5).close()
-                case(f"CA 簽的主控台憑證、根憑證不在這台：連得上（{name}）", True)
+                cn = A.AgentLink().connect({**cf, "current": want})
+                got = hashlib.sha256(cn.sock.getpeercert(binary_form=True)).hexdigest()
+                cn.close()
+                case(f"SNI 要第 {[f0, f1].index(want) + 1} 張：主控台送那一張", got == want)
             except Exception as exc:  # noqa: BLE001
-                case(f"CA 簽的主控台憑證、根憑證不在這台：連得上（{name}）", False, exc)
-            try:
-                A.AgentLink.connect({**cfg2, "fp": "0" * 64}, 5)
-                case(f"  指紋不同照樣拒絕（{name}）", False)
-            except ssl.SSLError:
-                case(f"  指紋不同照樣拒絕（{name}）", True)
-        A.PARTIAL_CHAIN = saved
+                case(f"SNI 要第 {[f0, f1].index(want) + 1} 張：主控台送那一張", False, exc)
+        # 收到主控台送來的新清單：存檔、版本更新；認的那張換了要重連
+        ch = A.AgentLink.save_link(cf, {"cert": c1, "current": f1, "public": ["10.0.0.9:9402", "x y"], "proxy": "", "v": "7-abcdef01"})
+        cf2 = A.AgentLink.config()
+        case("收到新的通道憑證清單：存檔，認的那張換了就重連",
+             ch is True and cf2["fps"] == [f1] and cf2["current"] == f1 and cf2["v"] == "7-abcdef01"
+             and ("10.0.0.9", 9402) in cf2["addrs"] and cf2["node"] == "ws-01", cf2)
+        case("  檔案權限只給自己（0600）", os.name == "nt" or (os.stat(A.LINK_CERT).st_mode & 0o777) == 0o600)
+        for why, bad in (("目前那張不在清單裡", {"cert": c1, "current": f0}), ("沒有憑證", {"cert": "", "current": f1}),
+                         ("代理伺服器不是 http://", {"cert": c1, "current": f1, "proxy": "socks5://x:1"})):
+            case(f"  不合法的清單不存：{why}", A.AgentLink.save_link(cf2, bad) is False and A.AgentLink.config()["v"] == "7-abcdef01")
         open(A.LINK_CERT, "w").write(keep_pem)
+        open(A.LINK_FILE, "w").write(keep_json)
         srv2.shutdown()
 
     # ---- 3. 執行指令：送回的片段
