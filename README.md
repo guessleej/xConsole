@@ -150,7 +150,7 @@
 |---|---|---|
 | Ubuntu（含 DGX Spark、Jetson） | `bash install/install.sh` | systemd 使用者服務，開 linger（沒人登入也會跑） |
 | macOS（Apple Silicon） | `bash install/install.sh` | launchd 的 LaunchAgent（登入後自動啟動） |
-| Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／8090～8289 |
+| Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／9402（工作站連回）／8090～8289 |
 
 需要 Python 3.9 以上（macOS 沒有的話先 `xcode-select --install`；Windows 沒有會問要不要用 winget 裝）。
 安裝時會問管理者帳號與密碼；自動化安裝用 `--password-file <檔>`（Windows `-PasswordFile`），檔案第一行帳號、第二行密碼。
@@ -189,7 +189,7 @@ bash deploy_standalone.sh 20      # 代理＋主控台都裝在 .20，它只管�
 |---|---|---|
 | 1. 產生安裝指令 | 設定 → 機器 →「加一台機器」 | 填名稱、群組、主控台位址（那台連得到的 IP:埠），按「產生安裝指令」。加入碼 30 分鐘、只能用一次 |
 | 2. 在那台貼上執行 | 那台機器的終端機（一般帳號，不要 root） | `curl --pinnedpubkey … \| bash`：釘住主控台憑證的公鑰下載代理、建使用者服務並開機自啟、開 linger、把代理的權杖與憑證送回主控台 |
-| 3. 自動出現 | 同一個視窗 | 主控台用那張憑證與權杖實際連一次，成功就由主控台連這台（伺服器）。連不進去（工作站常見：防火牆擋連入、IP 會換）就改由那台主動連回主控台：安裝腳本寫下主控台網址與憑證，代理每 25 秒以長輪詢拿指令，機器清單的位址欄顯示「由這台連回」。這種機器不必開 9401 埠 |
+| 3. 自動出現 | 同一個視窗 | 主控台用那張憑證與權杖實際連一次，成功就由主控台連這台（伺服器）。連不進去（工作站常見：防火牆擋連入、IP 會換）就改由那台主動連回主控台的通道埠 9402：安裝腳本寫下通道位址與通道憑證，代理每 25 秒以長輪詢拿指令，機器清單的位址欄顯示「由這台連回」。這種機器不必開 9401 埠。通道用自己的憑證，換管理網頁的憑證不會讓工作站斷線；換通道憑證、對外網址（帶回家的筆電用）與代理伺服器都在「設定 → HTTPS 與憑證 → 工作站連回通道」 |
 | 4. 這台的設定 | 設定 › 機器，或執行 › 角色欄位右上「這台的設定」 | 記憶體架構（附偵測建議）、兩種底線、存放區（列出各顆碟、標出機械硬碟）、llama-server、Agent 開關、備註；名稱、群組、位址也在這裡改 |
 | 5. 新增欄位（選用） | 執行 › 角色欄位右上 | 一台跑好幾個模型時才需要：空欄位，或登記這台已經在跑的 systemd 使用者服務。只跑一顆的話，在執行頁按「啟動模型」會自動建一格 |
 | 6. 放入模型 | 模型 → 執行 | 下載或匯入，再到執行頁選好按「啟動模型」 |
@@ -437,8 +437,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_preview.py` | 任何機器 | 21 | 執行預覽：sandbox 標頭、別人的登入拿不到、過期、2 MB、50 筆、其他頁仍是 DENY |
 | `console/test_agent_tasks.py` | 任何機器 | 31 | Agent 對話迴圈（假的 OpenAI 相容服務）：等待核准、拒絕、always、步數上限、不支援 tools、單一任務、停止、本機欄位當模型、稽核 |
 | `console/test_e2e_features.py` | 任何機器（要 cryptography） | 18 | 另起隔離的代理與主控台走 HTTPS：HF 等級（假 Hugging Face）、已安裝等級、進度、預覽、第三方 API、打開 Agent 模式、任務核准到完成 |
-| `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 36 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；另起隔離主控台與代理端對端；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
-| `agent/test_link.py` | Linux／macOS／Windows | 26 | 代理主動連回代理這一側：連回設定、釘住主控台憑證（含 CA 簽的憑證在 Python 3.9）、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
+| `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 63 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；通道憑證（私鑰不落明文、輪替要在線的都收到才換、SNI 選憑證、退役 30 天後刪）；另起隔離主控台與代理端對端（通道埠與管理網頁埠分開、換管理網頁憑證不斷線、輪替與對外網址幾秒內送達）；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
+| `agent/test_link.py` | Linux／macOS／Windows | 34 | 代理主動連回代理這一側：連回設定、釘住通道憑證、內部位址連不到改走對外網址、經 HTTP 代理伺服器（含帳密）與壞掉時改直連、SNI 選通道憑證與收到新清單、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
 | `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
 | `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |
 | `test/test_llama_engine.py` | 有 systemd --user | 36 | 模型庫與 llama.cpp：讀檔頭算 KV、跨引擎切換與還原、下載（假 Hugging Face）、刪除 |
@@ -520,5 +520,6 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `test_e2e_tls.py` 在 Python 3.13 以上一開始就 `CERTIFICATE_VERIFY_FAILED` | 3.13 起預設 `VERIFY_X509_STRICT`：測試自己簽的憑證要有 AKI／SKI，根 CA 要有 keyUsage。只改測試的憑證產生參數，主控台的驗證不放寬 |
 | 稽核裡「金鑰換新／保留」整欄變成「[已遮罩]」 | `redact()` 看鍵名，含 `key` 的一律遮掉。稽核欄位不要用 `key_change` 這種名字（改叫 `credential`） |
 | 一整間教室同時開機，有幾台連回主控台時被「連線重置」 | `ThreadingHTTPServer` 的接受佇列預設只有 5，同一瞬間進來的連線多出來就被系統重置。`tls.TLSServer` 改成 128 |
+| 換了通道憑證，工作站要等 25 秒以上才收到 | 長輪詢掛著時不會回頭看設定有沒有變。輪詢要帶「提早回」的條件（`Link.poll(stop=…)`），換憑證或改通道設定時叫醒所有掛著的輪詢；代理回報收到的那一輪也要馬上檢查能不能換上，不能被「每 2 秒最多檢查一次」擋掉 |
 | 主動連回的代理按「停止」後，本機那條連線關不掉 | 本機回應帶 `Connection: close` 時 `http.client` 會把 `conn.sock` 清成 `None`，取消時拿不到。要在送出請求前就把 socket 存起來 |
 | 換模型後思考模式、只給本機連的設定不見了 | 以前換 GGUF 都重寫一份新設定（`host` 固定 0.0.0.0、沒有 `reasoning`）。現在沒帶就沿用欄位原本的設定 |

@@ -5,8 +5,10 @@
     沒收到的重送、收到的不重送、長的不擋短的、串流逐行讀、缺片段當失敗、逾時後才到的結果丟掉。
 二、端對端：另起一個主控台與一支真的代理，代理只靠 agent-link.json 連回；經網頁 API 看得到那台、
     查得到狀態、改位址時的連線測試走連回通道；權杖錯的輪詢被擋。
+    通道另外聽一個埠、用專用的通道憑證：換管理網頁的憑證不影響；通道憑證輪替、對外網址在網頁上改，代理幾秒內收到。
 三、連線上限：同一個來源 200 支已驗證的代理同時掛著長輪詢全部連得上；
     同一個來源沒登入的連線仍在第 65 條被擋。
+四、通道憑證（linkcert.Ring）：私鑰不落明文、輪替要在線的都收到才換、SNI 選憑證、退役 30 天後刪掉。
 跑法：python3 test_agentlink.py
 """
 import base64
@@ -14,6 +16,7 @@ import http.client
 import http.cookiejar
 import json
 import os
+import re
 import secrets
 import select
 import shutil
@@ -199,6 +202,73 @@ def unit():
     check("機器被移除：還在等的呼叫立刻失敗", isinstance(res.get("e"), agentlink.Offline) and time.time() - t0 < 1, res.get("e"))
 
 
+def ring():
+    """通道憑證（linkcert.Ring，不開主控台）：私鑰不落明文、重開沿用、輪替要在線的都收到才換、SNI 選憑證、30 天後刪掉。"""
+    import hashlib
+    import linkcert
+    d = tempfile.mkdtemp(prefix="xc-ring-")
+    r = linkcert.Ring(d)
+    cur = r.current()["fp"]
+    raw = open(r.file).read()
+    keyf = open(r._path(cur)).read()
+    check("通道憑證：第一次就產一張；ring.json 沒有私鑰，私鑰檔是加密的",
+          len(r.d["keys"]) == 1 and "PRIVATE KEY" not in raw and "ENCRYPTED PRIVATE KEY" in keyf
+          and (os.name == "nt" or os.stat(r._path(cur)).st_mode & 0o077 == 0))
+    check("  重開沿用同一張", linkcert.Ring(d).current()["fp"] == cur)
+    ok, _ = r.rotate()
+    nx = r.pending()["fp"]
+    ok2, msg2 = r.rotate()
+    check("輪替：產下一張；上一次還沒完成時不能再換", ok and nx != cur and not ok2 and "還沒完成" in msg2)
+    pem, c = r.trusted()
+    check("  發給代理的是目前這張＋下一張", c == cur and pem.count("BEGIN CERTIFICATE") == 2)
+    online = {"a", "b"}.__contains__
+    r.ack("a", r.version())
+    check("  在線的還有一台沒收到：不換", r.check(["a", "b", "off"], online) is False and r.current()["fp"] == cur
+          and r.summary(["a", "b", "off"], online)["waiting"] == ["b"])
+    r.ack("b", r.version())
+    r.ack("x", 10 ** 6)                                   # 比主控台的版本還大：不收
+    check("  在線的都收到了：換上新的；沒上線的不用等", r.check(["a", "b", "off"], online) is True and r.current()["fp"] == nx
+          and "x" not in r.acked)
+    old = next(k for k in r.d["keys"] if k["fp"] == cur)
+    check("  舊的改成退役，保留 30 天；不再發給代理", old["state"] == "retired"
+          and abs(old["retire_at"] - time.time() - 30 * 86400) < 60 and r.trusted()[0].count("BEGIN CERTIFICATE") == 1)
+
+    # SNI：要哪張給哪張，不認得的給目前這張
+    ls = socket.socket()
+    ls.bind(("127.0.0.1", 0))
+    ls.listen(8)
+
+    def serve():
+        while True:
+            try:
+                c, _ = ls.accept()
+            except OSError:
+                return
+            try:
+                t = r.ctx.wrap_socket(c, server_side=True)
+                t.close()
+            except OSError:
+                c.close()
+    threading.Thread(target=serve, daemon=True).start()
+
+    def got(name):
+        cx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        cx.minimum_version = ssl.TLSVersion.TLSv1_2
+        cx.check_hostname, cx.verify_mode = False, ssl.CERT_NONE   # 測試只看主控台送哪一張
+        with socket.create_connection(ls.getsockname()) as raw_s:
+            with cx.wrap_socket(raw_s, server_hostname=name) as t:
+                return hashlib.sha256(t.getpeercert(binary_form=True)).hexdigest()
+    check("  SNI 要退役那張：還拿得到（沒上線的機器 30 天內連得回來）", got(linkcert.tag(cur)) == cur)
+    check("  SNI 要新的、或不認得：給目前這張", got(linkcert.tag(nx)) == nx and got("x.example") == nx)
+    old["retire_at"] = int(time.time()) - 1
+    v0 = r.version()
+    check("  過了 30 天：退役的刪掉，私鑰檔一起刪，版本加一", r.check([], online) is True and len(r.d["keys"]) == 1
+          and not os.path.exists(r._path(cur)) and r.version() == v0 + 1)
+    check("  刪掉之後要舊的那張：拿到的是目前這張（舊機器要重新加入）", got(linkcert.tag(cur)) == nx)
+    ls.close()
+    shutil.rmtree(d, ignore_errors=True)
+
+
 def agent_fail_max():
     import ast
     tree = ast.parse(open(os.path.join(HERE, "xconsole_server.py"), encoding="utf-8").read())
@@ -220,9 +290,13 @@ def join_save():
         return subprocess.run([sys.executable, "-c", code], input=json.dumps(resp), text=True, capture_output=True,
                               env={**os.environ, "XCONSOLE_HOME": home})
     pem = "-----BEGIN CERTIFICATE-----\nAA\n-----END CERTIFICATE-----\n"
-    r = run({"ok": True, "link": "push", "message": "m", "console": {"url": "https://a:1", "node": "w", "cert": pem}})
+    r = run({"ok": True, "link": "push", "message": "m", "console": {"url": "https://a:1", "node": "w", "cert": pem,
+                                                                   "current": "ab", "public": ["b:2"], "proxy": "", "v": "3-x"}})
     files = sorted(os.listdir(sd))
-    check("加入成主動連回：寫下連回設定與主控台憑證（權限 600）", r.returncode == 0 and files == ["agent-link.json", "agent-link.pem"]
+    meta = json.load(open(os.path.join(sd, "agent-link.json"))) if "agent-link.json" in files else {}
+    check("  連回設定帶通道憑證版本與對外網址，不帶憑證內容", meta == {"url": "https://a:1", "node": "w", "current": "ab",
+                                                            "public": ["b:2"], "proxy": "", "v": "3-x"}, meta)
+    check("加入成主動連回：寫下連回設定與通道憑證（權限 600）", r.returncode == 0 and files == ["agent-link.json", "agent-link.pem"]
           and all(os.stat(os.path.join(sd, f)).st_mode & 0o077 == 0 for f in files) or os.name == "nt", (r.stderr, files))
     run({"ok": False, "error": "加入碼不對"})
     check("  加入失敗：不動既有的連回設定", sorted(os.listdir(sd)) == files)
@@ -244,7 +318,7 @@ def e2e():
     chome, ahome = os.path.join(W, "console"), os.path.join(W, "agent")
     for d in (chome, ahome):
         os.makedirs(os.path.join(d, ".xconsole"), mode=0o700)
-    port, aport = free_port(), free_port()
+    port, aport, lport = free_port(), free_port(), free_port()
     token = secrets.token_urlsafe(32)
     with open(os.path.join(ahome, ".xconsole", "token"), "w") as fh:
         fh.write(token)
@@ -255,7 +329,7 @@ def e2e():
     with open(os.path.join(chome, ".xconsole", "fleet.json"), "w") as fh:
         json.dump({"nodes": nodes, "auth": {}}, fh)
     srv = os.path.join(HERE, "xconsole_server.py")
-    cenv = {**os.environ, "HOME": chome, "XCONSOLE_HOME": chome, "XCONSOLE_PORT": str(port)}
+    cenv = {**os.environ, "HOME": chome, "XCONSOLE_HOME": chome, "XCONSOLE_PORT": str(port), "XCONSOLE_LINK_PORT": str(lport)}
     subprocess.run([sys.executable, srv, "--set-credentials"], input=b"admin\nlink-pass-2026\n",
                    env=cenv, check=True, capture_output=True)
     cons = subprocess.Popen([sys.executable, srv], env=cenv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -264,30 +338,45 @@ def e2e():
         for _ in range(100):
             try:
                 ssl.get_server_certificate(("127.0.0.1", port), timeout=1)
+                ssl.get_server_certificate(("127.0.0.1", lport), timeout=1)
                 break
             except Exception:  # noqa: BLE001
                 time.sleep(0.3)
         cert = os.path.join(chome, ".xconsole", "tls", "cert.pem")
+        ringf = os.path.join(chome, ".xconsole", "link", "ring.json")
+
+        def ring_now():
+            return json.load(open(ringf))
+        lcert = os.path.join(W, "link.pem")
+        open(lcert, "w").write(next(k["cert"] for k in ring_now()["keys"] if k["state"] == "current"))
+        check("通道憑證跟管理網頁的不同張", open(lcert).read() != open(cert).read())
         fleet = json.load(open(os.path.join(chome, ".xconsole", "fleet.json")))
         check("主控台啟動時把明文權杖轉成密文", all(n["token"].startswith("enc:v1:") for n in fleet["nodes"]))
 
-        # 代理：只靠 agent-link.json＋主控台憑證連回（安裝腳本寫的就是這兩個檔）
-        shutil.copy(cert, os.path.join(ahome, ".xconsole", "agent-link.pem"))
-        with open(os.path.join(ahome, ".xconsole", "agent-link.json"), "w") as fh:
-            json.dump({"url": f"https://127.0.0.1:{port}", "node": "ws-01"}, fh)
+        # 代理：只靠 agent-link.json＋通道憑證連回通道埠（安裝腳本寫的就是這兩個檔）
+        alink = os.path.join(ahome, ".xconsole", "agent-link.json")
+        apem = os.path.join(ahome, ".xconsole", "agent-link.pem")
+        shutil.copy(lcert, apem)
+        with open(alink, "w") as fh:
+            json.dump({"url": f"https://127.0.0.1:{lport}", "node": "ws-01"}, fh)
         aenv = {**os.environ, "HOME": ahome, "XCONSOLE_HOME": ahome, "XCONSOLE_AGENT_PORT": str(aport)}
         agent = subprocess.Popen([sys.executable, os.path.join(HERE, "..", "agent", "xconsole_agent.py"),
                                   "--home", ahome, "--bind", "127.0.0.1"],
                                  env=aenv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-        ctx = ssl.create_default_context(cafile=cert)
+        jar = http.cookiejar.CookieJar()
+
+        def opener():
+            c = ssl.create_default_context(cafile=cert)
+            c.check_hostname = False
+            return urllib.request.build_opener(urllib.request.HTTPSHandler(context=c), urllib.request.HTTPCookieProcessor(jar))
+        op = opener()
+        ctx = ssl.create_default_context(cafile=lcert)      # 通道埠用通道憑證
         ctx.check_hostname = False
-        op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx),
-                                         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         base = f"https://127.0.0.1:{port}"
 
-        def call(path, body=None, timeout=60):
-            req = urllib.request.Request(base + path, method="POST" if body is not None else "GET",
+        def call(path, body=None, timeout=60, at=None):
+            req = urllib.request.Request((at or base) + path, method="POST" if body is not None else "GET",
                                          data=json.dumps(body).encode() if body is not None else None,
                                          headers={"Content-Type": "application/json"})
             try:
@@ -317,10 +406,87 @@ def e2e():
         check("改位址時的連線測試走連回通道（不是去連 127.0.0.2:9401）", code == 200, out)
         code, lib = call("/api/node/ws-01/library")
         check("模型庫這種一般頁面不用改就能用", code == 200, (code, lib))
+        al = json.load(open(alink))
+        check("代理第一次輪詢就拿到通道設定版本，存進 agent-link.json", re.fullmatch(r"\d+-[0-9a-f]{8}", al.get("v") or ""), al)
+
+        # 分埠：通道埠只回代理的路徑，管理網頁埠不收代理連回
+        lop = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx))
+        for pth, body in (("/api/fleet", None), ("/api/login", {"username": "admin", "password": "link-pass-2026"})):
+            req = urllib.request.Request(f"https://127.0.0.1:{lport}{pth}", data=json.dumps(body).encode() if body else None,
+                                         headers={"Content-Type": "application/json"})
+            try:
+                st = lop.open(req, timeout=10).status
+            except urllib.error.HTTPError as e:
+                st = e.code
+            check(f"通道埠不回管理網頁的路徑：{pth} → 404", st == 404, st)
+
+        def mgmt_poll():
+            c = http.client.HTTPSConnection("127.0.0.1", port, context=opener_ctx(), timeout=10)
+            c.request("POST", "/api/agent/poll", body=b'{"seen":[]}', headers={
+                "Authorization": f"Bearer {token}", "X-XConsole-Node": "ws-01", "Content-Type": "application/json"})
+            r = c.getresponse()
+            out = r.status, r.read()
+            c.close()
+            return out
+
+        def opener_ctx():
+            c = ssl.create_default_context(cafile=cert)
+            c.check_hostname = False
+            return c
+        st, b = mgmt_poll()
+        check("管理網頁埠不收代理連回（對外只開通道埠時兩邊分得開）", st != 200 and b"cmds" not in b, (st, b[:80]))
+        code, li = call("/api/link")
+        check("設定頁看得到通道：埠、有在聽、一張目前的通道憑證", code == 200 and li["port"] == lport and li["listen"]["ok"]
+              and [k["state"] for k in li["ring"]["keys"]] == ["current"] and li["nodes"] == 201, li)
+
+        # 換管理網頁的憑證：通道憑證不動，代理不斷線
+        code, out = call("/api/tls/bootstrap", {})
+        op = opener()
+        code2, st = call("/api/node/ws-01/state")
+        check("換管理網頁的憑證：通道憑證不變，工作站照樣查得到", code == 200 and code2 == 200 and "pools" in st
+              and next(k["cert"] for k in ring_now()["keys"] if k["state"] == "current") == open(lcert).read(), (code, out, code2))
+
+        # 通道憑證輪替：產下一張 → 代理收到並回報 → 在線的都收到就換上；舊的退役保留 30 天
+        old_fp = next(k["fp"] for k in ring_now()["keys"] if k["state"] == "current")
+        t0 = time.time()
+        code, out = call("/api/link/rotate", {})
+        rot = None
+        for _ in range(40):
+            rot = call("/api/link")[1]["ring"]
+            if not rot["rotating"] and len(rot["keys"]) == 2:
+                break
+            time.sleep(0.25)
+        states = {k["fingerprint256"]: k["state"] for k in rot["keys"]}
+        new_fp = next((f for f, st_ in states.items() if st_ == "current"), "")
+        check(f"輪替：在線的工作站幾秒內收到並回報，換上新的（{time.time() - t0:.1f} 秒）",
+              code == 200 and states.get(old_fp) == "retired" and new_fp and new_fp != old_fp and time.time() - t0 < 10, (out, rot))
+        al = json.load(open(alink))
+        for _ in range(20):
+            al = json.load(open(alink))
+            if al.get("current") == new_fp:
+                break
+            time.sleep(0.25)
+        check("  代理只認新的那張（退役的不留）", al.get("current") == new_fp and open(apem).read().count("BEGIN CERTIFICATE") == 1, al)
+        code, st = call("/api/node/ws-01/state")
+        check("  換完照樣下得了指令", code == 200 and "pools" in st, code)
+        ctx = ssl.create_default_context(cafile=apem)    # 之後測試直接打通道埠的請求改信新的那張
+        ctx.check_hostname = False
+
+        # 對外網址與代理伺服器：在網頁上改，代理馬上收到；不合法的擋下
+        for bad in ({"public": ["no-port"]}, {"proxy": "http://u:p@10.0.0.1:3128"}, {"proxy": "socks5://10.0.0.1:1080"}):
+            code, _ = call("/api/link/settings", bad)
+            check(f"通道設定不合法：400（{bad}）", code == 400, code)
+        code, _ = call("/api/link/settings", {"public": ["vpn.example.com:9402"], "proxy": ""})
+        for _ in range(20):
+            al = json.load(open(alink))
+            if al.get("public") == ["vpn.example.com:9402"]:
+                break
+            time.sleep(0.25)
+        check("改對外網址：工作站幾秒內就收到", code == 200 and al.get("public") == ["vpn.example.com:9402"], al)
 
         # 權杖不對：擋下；同一來源錯太多次被限速
         def raw_poll(node, tok, hold_body=None):
-            c = http.client.HTTPSConnection("127.0.0.1", port, context=ctx, timeout=40)
+            c = http.client.HTTPSConnection("127.0.0.1", lport, context=ctx, timeout=40)
             c.request("POST", "/api/agent/poll", body=json.dumps(hold_body or {"seen": []}).encode(),
                       headers={"Authorization": f"Bearer {tok}", "X-XConsole-Node": node,
                                "Content-Type": "application/json"})
@@ -338,14 +504,15 @@ def e2e():
 
         # ---- 三、連線上限
         held, results, lock = [], [], threading.Lock()
+        lv = json.load(open(alink))["v"]      # 跟真的代理一樣回報手上的通道設定版本：版本對了才會掛著等
 
         def hold(n):
             try:
-                c = http.client.HTTPSConnection("127.0.0.1", port, context=ctx, timeout=60)
+                c = http.client.HTTPSConnection("127.0.0.1", lport, context=ctx, timeout=60)
                 c.connect()
                 with lock:
                     held.append(c)
-                c.request("POST", "/api/agent/poll", body=b'{"seen":[]}',
+                c.request("POST", "/api/agent/poll", body=json.dumps({"seen": [], "link": lv}).encode(),
                           headers={"Authorization": f"Bearer {n['token']}", "X-XConsole-Node": n["id"],
                                    "Content-Type": "application/json"})
                 r = c.getresponse()
@@ -366,7 +533,7 @@ def e2e():
         anon = []
         refused = 0
         for _ in range(70):
-            anon.append(socket.create_connection(("127.0.0.1", port), timeout=5))
+            anon.append(socket.create_connection(("127.0.0.1", lport), timeout=5))
         time.sleep(1)
         # 被擋的那幾條主控台一接受就關掉：一起看哪些已經被關（逐條等會等到握手逾時 15 秒，沒被擋的也會被關）
         for s in anon:
@@ -389,6 +556,16 @@ def e2e():
         check(f"同一來源 200 支已驗證的代理同時掛著長輪詢：全部連得上（{ok200}/200）",
               ok200 == 200 and early == 0 and time.time() - t0 >= 20, (ok200, early, [r for r in results if r[0] != 200][:3]))
         check(f"同一來源沒登入的連線：仍在第 65 條起被擋（70 條被關 {refused} 條）", refused == 6, refused)
+        code, out = call("/api/link/rotate", {})
+        code2, out2 = call("/api/link/rotate", {})
+        for _ in range(40):                    # 真的代理按下去之後一兩秒內回報；假的那 200 台不會回報
+            w = call("/api/link")[1]["ring"]
+            if "ws-01" not in w["waiting"]:
+                break
+            time.sleep(0.25)
+        check("在線的機器還沒收到新的通道憑證：不換上，設定頁列出還在等哪幾台；不能再按一次",
+              code == 200 and w["rotating"] and len(w["waiting"]) >= 190 and "ws-01" not in w["waiting"]
+              and code2 == 409, (out.get("message"), out2.get("message"), len(w["waiting"]), w["waiting"][:3]))
         for c in held:
             c.close()
     finally:
@@ -407,6 +584,7 @@ def e2e():
 
 if __name__ == "__main__":
     unit()
+    ring()
     join_save()
     e2e()
     print("全部通過" if OK else "有項目失敗")

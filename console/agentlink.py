@@ -179,8 +179,14 @@ class Link:
             p.frames.put(None)
 
     # ---- 代理端（/api/agent/poll、/api/agent/result）
-    def poll(self, nid, seen, hold=POLL_HOLD):
-        """回一批要給這台的指令。seen：代理說它最近收過的編號。"""
+    def wake(self):
+        """叫醒所有掛著的輪詢，讓它們重新看 stop()（換了通道憑證或通道設定時用）。"""
+        with self._lock:
+            for n in self._nodes.values():
+                n["cond"].notify_all()
+
+    def poll(self, nid, seen, hold=POLL_HOLD, stop=None):
+        """回一批要給這台的指令。seen：代理說它最近收過的編號。stop()：成立就提早回（不必等滿 hold 秒）。"""
         seen = set(list(seen)[:SEEN_MAX]) if isinstance(seen, (list, tuple)) else set()
         end = time.time() + hold
         with self._lock:
@@ -202,7 +208,7 @@ class Link:
                         out.append(p)
                         size += p.size
                     left = end - time.time()
-                    if out or left <= 0 or nid not in self._nodes:
+                    if out or left <= 0 or nid not in self._nodes or (stop is not None and stop()):
                         break
                     n["cond"].wait(left)
                 for p in out:

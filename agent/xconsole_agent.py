@@ -8755,7 +8755,29 @@ LINK_FRAME = 4 * 1024 * 1024        # 結果超過這麼大就分片送
 LINK_REPLY_MAX = 32 * 1024 * 1024   # 跟主控台收代理回應的上限一樣
 LINK_KEEP = 1024 * 1024             # 做完的結果小於這個才留著，同一筆指令再送來時直接重送結果
 LINK_RECENT_TTL, LINK_RECENT_MAX = 3600, 256
-PARTIAL_CHAIN = getattr(ssl, "VERIFY_X509_PARTIAL_CHAIN", 0)    # Python 3.10 起才有
+LINK_SNI = ".link.xconsole"         # 握手時用 SNI 說認的是哪一張通道憑證（主控台 console/linkcert.py 的 tag()）
+LINK_DIAL = 10                      # 建立連線（含經代理伺服器）最多等這麼久；連上之後每個請求另外算
+
+
+class _LinkConn(http.client.HTTPSConnection):
+    """連主控台通道：可經 HTTP 代理伺服器（CONNECT），TLS 一路到主控台；SNI 放要認的那張通道憑證。"""
+
+    def __init__(self, host, port, proxy, ctx, timeout, sni):
+        if proxy:
+            u = urllib.parse.urlsplit(proxy)
+            super().__init__(u.hostname, u.port or 8080, context=ctx, timeout=timeout)
+            hdr = {}
+            if u.username:               # 系統設定帶帳密的代理伺服器（環境變數）：只在記憶體裡用，不寫檔
+                cred = f"{urllib.parse.unquote(u.username)}:{urllib.parse.unquote(u.password or '')}"
+                hdr["Proxy-Authorization"] = "Basic " + base64.b64encode(cred.encode()).decode()
+            self.set_tunnel(host, port, hdr)
+        else:
+            super().__init__(host, port, context=ctx, timeout=timeout)
+        self.sni = sni
+
+    def connect(self):
+        http.client.HTTPConnection.connect(self)          # TCP，有代理伺服器就先 CONNECT
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.sni)
 
 
 class AgentLink:
@@ -8766,6 +8788,24 @@ class AgentLink:
         self.res = None                  # 送結果用的連線（keep-alive，送一片鎖一次）
         self.res_lock = threading.Lock()
         self.last_err = None
+        self.route = 0                   # 上次連得上的那條路（位址 × 代理伺服器），下次先試它
+
+    @staticmethod
+    def _addr(u):
+        u = str(u or "")
+        x = urllib.parse.urlsplit(u if "://" in u else "https://" + u)
+        try:
+            port = x.port or 443
+        except ValueError:
+            return None
+        if x.scheme != "https" or not re.fullmatch(r"[A-Za-z0-9._:-]{1,253}", x.hostname or "") or x.path not in ("", "/"):
+            return None
+        return x.hostname, port
+
+    @staticmethod
+    def _fps(pem):
+        return [hashlib.sha256(ssl.PEM_cert_to_DER_cert(b.strip() + "\n-----END CERTIFICATE-----\n")).hexdigest()
+                for b in pem.split("-----END CERTIFICATE-----") if "BEGIN CERTIFICATE" in b]
 
     @staticmethod
     def config():
@@ -8773,49 +8813,96 @@ class AgentLink:
             with open(LINK_FILE, encoding="utf-8") as fh:
                 c = json.load(fh)
             with open(LINK_CERT, encoding="utf-8") as fh:
-                pem = fh.read()
-            u = urllib.parse.urlsplit(str(c.get("url") or ""))
-            first = pem.split("-----END CERTIFICATE-----")[0] + "-----END CERTIFICATE-----\n"
-            fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(first)).hexdigest()
-            port = u.port or 443
-        except (OSError, ValueError, AttributeError):
+                fps = AgentLink._fps(fh.read())
+            addrs = [a for a in (AgentLink._addr(u) for u in [c.get("url")] + list(c.get("public") or [])[:8]) if a]
+        except (OSError, ValueError, AttributeError, TypeError):
             return None
-        if u.scheme != "https" or not u.hostname or not re.fullmatch(r"[A-Za-z0-9][\w.-]{0,39}", str(c.get("node") or "")):
+        if not fps or not addrs or not re.fullmatch(r"[A-Za-z0-9][\w.-]{0,39}", str(c.get("node") or "")):
             return None
-        return {"host": u.hostname, "port": port, "node": c["node"], "fp": fp}
+        cur = str(c.get("current") or "")
+        return {"addrs": list(dict.fromkeys(addrs)), "node": c["node"], "fps": fps,
+                "current": cur if cur in fps else fps[0], "proxy": str(c.get("proxy") or ""), "v": str(c.get("v") or "")}
 
     @staticmethod
-    def connect(cfg, timeout):
-        """只信加入時拿到的那張主控台憑證：先照一般方式驗證憑證，再比對整張憑證的 SHA-256。"""
+    def proxies(conf, host):
+        """要試的代理伺服器：主控台指定的、這台系統設定的，最後直連。每一條都不通才算連不上。"""
+        out = [conf] if conf else []
         try:
-            return AgentLink._connect(cfg, timeout, True)
-        except ssl.SSLCertVerificationError:
-            if PARTIAL_CHAIN:
-                raise
-            # Python 3.9 沒有 PARTIAL_CHAIN：主控台用企業自建 CA 簽的憑證、而那個根憑證不在這台時驗不過。
-            # 這時只靠釘住整張憑證：TLS 握手本身已證明對方持有這張憑證的私鑰，指紋對上就是加入時那台主控台
-            # （跟安裝腳本 curl --pinnedpubkey 同一個做法）。指紋不對一樣拒絕
-            return AgentLink._connect(cfg, timeout, False)
+            sysp = urllib.request.getproxies().get("https") or ""
+            if sysp and not urllib.request.proxy_bypass(host):
+                out.append(sysp if "://" in sysp else "http://" + sysp)
+        except Exception:  # noqa: BLE001
+            pass
+        return list(dict.fromkeys(out + [""]))
 
     @staticmethod
-    def _connect(cfg, timeout, verify):
+    def routes(cfg):
+        return [(h, p, px) for h, p in cfg["addrs"] for px in AgentLink.proxies(cfg["proxy"], h)]
+
+    def connect(self, cfg, timeout=None):
+        """從上次連得上的那條路開始試。辦公室裡走內部位址，帶回家的筆電走對外網址；企業網路走代理伺服器。"""
+        rs, err = self.routes(cfg), None
+        for i in range(len(rs)):
+            k = (self.route + i) % len(rs)
+            try:
+                conn = self._connect(cfg, *rs[k])
+            except OSError as exc:       # 含 ssl.SSLError、逾時、代理伺服器拒絕
+                if not isinstance(err, ssl.SSLError):
+                    err = exc                # 憑證不對比「連不到」重要：記錄裡留憑證那一筆
+                continue
+            if k != self.route or self.last_err:
+                h, p, px = rs[k]
+                print(f"連回主控台走 {h}:{p}" + (f"，經代理伺服器 {urllib.parse.urlsplit(px).netloc.split('@')[-1]}" if px else ""),
+                      flush=True)
+            self.route = k
+            return conn
+        raise err or OSError("沒有可以試的位址")
+
+    @staticmethod
+    def _connect(cfg, host, port, proxy):
+        """只信主控台發的通道憑證：那幾張本身就是信任錨（自簽），再比對整張憑證的 SHA-256。"""
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.check_hostname = False       # 主控台網址常是 IP、不一定在憑證的名稱裡：改由釘住整張憑證確認是它
-        if verify:
-            ctx.load_default_certs()     # 公開 CA 簽的正式憑證
-            ctx.load_verify_locations(LINK_CERT)
-            if PARTIAL_CHAIN:
-                ctx.verify_flags |= PARTIAL_CHAIN   # 企業 CA 簽的：信加入時拿到的那張本身就好，不必帶根憑證
-        else:
-            ctx.verify_mode = ssl.CERT_NONE      # 只在上面那種情況：下面一定比對指紋
-        conn = http.client.HTTPSConnection(cfg["host"], cfg["port"], context=ctx, timeout=timeout)
-        conn.connect()
-        der = conn.sock.getpeercert(binary_form=True) or b""
-        if not secrets.compare_digest(hashlib.sha256(der).hexdigest(), cfg["fp"]):
+        ctx.check_hostname = False       # 通道憑證不帶網址：主控台網址常是 IP、還可能有對外網址，改由釘住整張憑證確認是它
+        ctx.load_verify_locations(LINK_CERT)
+        conn = _LinkConn(host, port, proxy, ctx, LINK_DIAL, "k-" + cfg["current"][:32] + LINK_SNI)
+        try:
+            conn.connect()
+            got = hashlib.sha256(conn.sock.getpeercert(binary_form=True) or b"").hexdigest()
+        except BaseException:
             conn.close()
-            raise ssl.SSLError("主控台送出的憑證跟加入時釘住的不同，拒絕連線")
+            raise
+        if not any(secrets.compare_digest(got, f) for f in cfg["fps"]):
+            conn.close()
+            raise ssl.SSLError("主控台送出的憑證不是發給這台的通道憑證，拒絕連線")
         return conn
+
+    @staticmethod
+    def save_link(cfg, lk):
+        """主控台經已驗證的通道送來新的通道憑證、對外網址或代理伺服器。存好以後下一輪輪詢回報新版本。
+        回 True 表示認的那張換了（要重連，好讓 SNI 換成新的）。"""
+        pem = str(lk.get("cert") or "")
+        try:
+            fps = AgentLink._fps(pem)
+        except ValueError:
+            return False
+        cur = str(lk.get("current") or "")
+        pub = [str(a) for a in lk.get("public") or [] if AgentLink._addr(a)][:8] if isinstance(lk.get("public"), list) else []
+        proxy = str(lk.get("proxy") or "")
+        if not fps or cur not in fps or (proxy and not proxy.startswith("http://")):
+            return False
+        with open(LINK_FILE, encoding="utf-8") as fh:
+            c = json.load(fh)
+        c.update(current=cur, public=pub, proxy=proxy, v=str(lk.get("v") or "")[:40])
+        for path, data in ((LINK_CERT, pem), (LINK_FILE, json.dumps(c))):
+            tmp = path + ".tmp"
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(data)
+            os.replace(tmp, path)
+        if set(fps) != set(cfg["fps"]):
+            print(f"收到主控台的通道憑證（{len(fps)} 張，目前用 {cur[:16]}…）", flush=True)
+        return cur != cfg["current"]
 
     @staticmethod
     def post(conn, cfg, path, obj, timeout):
@@ -8853,13 +8940,24 @@ class AgentLink:
                 continue
             try:
                 if conn is None:
-                    conn = self.connect(cfg, 40)
-                st, out = self.post(conn, cfg, "/api/agent/poll", {"seen": self.seen()}, 40)
+                    conn = self.connect(cfg)
+                st, out = self.post(conn, cfg, "/api/agent/poll", {"seen": self.seen(), "link": cfg["v"]}, 40)
                 if st == 200:
                     if self.last_err:
                         self._log(None)
                         print("已連回主控台", flush=True)
                     back = 2
+                    if isinstance(out.get("link"), dict):
+                        try:
+                            if self.save_link(cfg, out["link"]):
+                                conn.close()     # 主控台換上新的通道憑證了：下一輪用新的 SNI 重連
+                                conn = None
+                            elif self.config()["v"] != str(out["link"].get("v") or ""):
+                                raise ValueError("內容不合法")
+                        except (OSError, ValueError, TypeError) as exc:
+                            # 存不下來的話版本不會變，主控台每輪都會馬上再送：等一下再輪詢，不要空轉
+                            self._log(f"主控台送來的通道設定存不下來：{exc}")
+                            time.sleep(30)
                     for c in out.get("cmds") or []:
                         if isinstance(c, dict):
                             self.dispatch(cfg, c)
@@ -8869,7 +8967,8 @@ class AgentLink:
                 conn = None
                 time.sleep(60 if st in (401, 403, 429) else back)
             except Exception as exc:  # noqa: BLE001
-                self._log(f"連不回主控台 {cfg['host']}:{cfg['port']}：{str(exc)[:160]}")
+                where = "、".join(f"{h}:{p}" for h, p in cfg["addrs"])
+                self._log(f"連不回主控台 {where}（試過所有位址與代理伺服器）：{str(exc)[:160]}")
                 if conn is not None:
                     conn.close()
                     conn = None
@@ -8912,7 +9011,7 @@ class AgentLink:
             with self.res_lock:
                 try:
                     if self.res is None:
-                        self.res = self.connect(cfg, 60)
+                        self.res = self.connect(cfg)
                     st, _ = self.post(self.res, cfg, "/api/agent/result", fr, 60)
                     if st == 200:
                         return True

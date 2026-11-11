@@ -4247,6 +4247,71 @@ async function settingsTls(wrap) {
     render();
   };
   wrap.appendChild(hs);
+  await settingsLinkCard(wrap);
+}
+
+// 工作站主動連回用的通道：另一個埠、另一張憑證。換上面那張管理網頁的憑證不會影響它
+async function settingsLinkCard(wrap) {
+  let li;
+  try { li = await api("/api/link"); } catch (ex) { return; }
+  const day = (t) => t ? new Date(t * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" }).slice(0, 10) : "—";
+  const ring = li.ring || {};
+  const c = card("工作站連回通道", `主動連回的機器 ${li.nodes} 台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線`);
+  const kv = el("div");
+  kv.style.maxWidth = "640px";
+  kv.appendChild(kvRow("通道埠", li.listen && li.listen.ok ? `${li.port}（有在聽）` : (li.listen && li.listen.error) || `${li.port}（沒有在聽）`));
+  const name = { current: "使用中", next: "輪替中（發給各台）", retired: "退役（保留到期就刪）" };
+  (ring.keys || []).forEach((k) => kv.appendChild(kvRow(`通道憑證・${name[k.state] || k.state}`,
+    `${k.fingerprint256.slice(0, 16)}…，${day(k.created)} 產生` + (k.retire_at ? `，${day(k.retire_at)} 刪除（台北時間）` : ""))));
+  c.appendChild(kv);
+  if (li.listen && !li.listen.ok) c.appendChild(el("p", "note warn", "通道埠沒有在聽：主動連回的工作站都連不上。請確認這個埠沒被別的程式占用，再重開主控台。"));
+  if (ring.rotating) c.appendChild(el("p", "note", ring.waiting.length
+    ? `新的通道憑證正在發給各台，在線的都收到後自動換上。還在等：${ring.waiting.slice(0, 20).join("、")}${ring.waiting.length > 20 ? ` 等 ${ring.waiting.length} 台` : ""}`
+    : "新的通道憑證已發出，正在換上。"));
+  c.appendChild(el("p", "small muted",
+    `換通道憑證時，舊的會再保留 ${ring.retain_days || 30} 天：這段時間關機或沒帶回來的機器，一連上就自動拿到新的；超過 ${ring.retain_days || 30} 天都沒上線的要重新加入。`));
+  const act = el("div", "slot-actions");
+  const rb = el("button", "btn sm", "換通道憑證");
+  rb.disabled = !!ring.rotating;
+  rb.title = ring.rotating ? "上一次還沒完成" : "";
+  rb.onclick = () => modal({
+    title: "換通道憑證", hasInput: false, confirmText: "換",
+    bodyNode: el("p", "small muted", "會產生一張新的通道憑證，經現有的通道發給每台主動連回的機器。在線的都收到後才換上，工作站不會斷線。"),
+    onConfirm: async () => {
+      try { const r = await api("/api/link/rotate", { method: "POST" }); toast(r.message, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+      render();
+    },
+  });
+  act.appendChild(rb);
+  c.appendChild(act);
+
+  c.appendChild(el("h3", null, "對外網址"));
+  c.appendChild(el("p", "small muted",
+    "筆電帶回家或在外面時，從這些位址連回來（一行一個，寫成「主機:埠」，例如 vpn.example.com:9402）。對外只要開通道埠，不必開管理網頁的埠。各台在辦公室裡照樣走內部位址，連不到才改走這些。"));
+  const ta = el("textarea");
+  ta.value = (li.public || []).join("\n");
+  c.appendChild(ta);
+  c.appendChild(el("h3", null, "代理伺服器"));
+  c.appendChild(el("p", "small muted",
+    "公司網路要經代理伺服器才能連到主控台時填，寫成 http://主機:埠。留空就用各台自己的系統設定；都不通時各台會改直連試試。需要帳密的代理伺服器請設在各台的系統設定，主控台不保存代理伺服器的密碼。"));
+  const px = el("input");
+  px.type = "text";
+  px.value = li.proxy || "";
+  px.placeholder = "http://proxy.example.com:3128";
+  c.appendChild(px);
+  const sb = el("button", "btn sm", "儲存並發給各台");
+  sb.onclick = async () => {
+    const pub = ta.value.split(/\s+/).map((x) => x.trim()).filter(Boolean);
+    try {
+      await api("/api/link/settings", { method: "POST", body: { public: pub, proxy: px.value.trim() } });
+      toast("已儲存，在線的工作站幾秒內就會收到", "ok");
+      render();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  const sr = el("div", "slot-actions");
+  sr.appendChild(sb);
+  c.appendChild(sr);
+  wrap.appendChild(c);
 }
 
 /* ---------------------------------------------------------------- 3 使用報告 */
