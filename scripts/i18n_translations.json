@@ -6804,11 +6804,6 @@
 "ja": "外部 URL の形式が正しくないため、コンソールは代理でテストしません",
 "ko": "외부 URL 형식이 올바르지 않아 콘솔이 대신 테스트하지 않습니다"
 },
-"對外網址格式不對，例：http://192.168.11.26:8081/v1": {
-"en": "Invalid external URL, e.g. http://192.168.11.26:8081/v1",
-"ja": "外部 URL の形式が正しくありません。例：http://192.168.11.26:8081/v1",
-"ko": "외부 URL 형식이 올바르지 않습니다. 예: http://192.168.11.26:8081/v1"
-},
 "對外網址的主機不是這台機器": {
 "en": "The public URL's host isn't this machine",
 "ja": "外部 URL のホストがこのマシンではありません",
@@ -19523,5 +19518,10 @@
 "en": "Transfer within the group and the internal mirror are not available yet; getting models from Hugging Face this time",
 "ja": "グループ内転送と内部ミラーはまだ使えないため、今回は Hugging Face から取得します",
 "ko": "그룹 내 전송과 내부 미러가 아직 없어 이번에는 Hugging Face에서 가져옵니다"
+},
+"對外網址格式不對，例：http://ai.example.com:8081/v1": {
+"en": "Invalid external URL, e.g. http://ai.example.com:8081/v1",
+"ja": "外部 URL の形式が正しくありません。例：http://ai.example.com:8081/v1",
+"ko": "외부 URL 형식이 올바르지 않습니다. 예: http://ai.example.com:8081/v1"
 }
 }

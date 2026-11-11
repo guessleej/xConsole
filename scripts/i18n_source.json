@@ -12532,7 +12532,7 @@
 "pattern": false
 },
 {
-"zh": "對外網址格式不對，例：http://192.168.11.26:8081/v1",
+"zh": "對外網址格式不對，例：http://ai.example.com:8081/v1",
 "pattern": false
 },
 {

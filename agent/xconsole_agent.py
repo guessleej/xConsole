@@ -2289,7 +2289,7 @@ def api_settings(slot_id, body, force=False):
     if url is not None:
         url = str(url).strip().rstrip("/")
         if url and (len(url) > 200 or not API_URL_RX.fullmatch(url)):
-            errors.append("對外網址格式不對，例：http://192.168.11.26:8081/v1")
+            errors.append("對外網址格式不對，例：http://ai.example.com:8081/v1")
 
     want = {}
     if raw is not None:
