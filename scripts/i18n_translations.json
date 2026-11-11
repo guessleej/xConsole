@@ -19068,5 +19068,300 @@
 "en": "This machine failed to run the command: ",
 "ja": "このマシンでコマンドの実行に失敗しました：",
 "ko": "이 기기에서 명령 실행에 실패했습니다: "
+},
+"要哪些模型": {
+"en": "Models to use",
+"ja": "使用するモデル",
+"ko": "사용할 모델"
+},
+"執行參數": {
+"en": "Runtime parameters",
+"ja": "実行パラメーター",
+"ko": "실행 매개변수"
+},
+"保留記憶體": {
+"en": "Reserved memory",
+"ja": "予約メモリ",
+"ko": "예약 메모리"
+},
+"只准用的模型": {
+"en": "Allowed models only",
+"ja": "許可するモデル",
+"ko": "허용 모델"
+},
+"顯卡功耗上限": {
+"en": "GPU power limit",
+"ja": "GPU 電力上限",
+"ko": "GPU 전력 상한"
+},
+"同群組互傳": {
+"en": "Transfer within the group",
+"ja": "グループ内転送",
+"ko": "그룹 내 전송"
+},
+"內部鏡像": {
+"en": "Internal mirror",
+"ja": "内部ミラー",
+"ko": "내부 미러"
+},
+"立即": {
+"en": "Immediately",
+"ja": "すぐに",
+"ko": "즉시"
+},
+"下次開機": {
+"en": "Next boot",
+"ja": "次回起動時",
+"ko": "다음 부팅 시"
+},
+"指定時間": {
+"en": "At a set time",
+"ja": "指定時刻",
+"ko": "지정 시각"
+},
+"同一群組的機器用同一份設定；設定一改，版本號就加一": {
+"en": "Machines in the same group share one set of settings; each change to the settings increases the version number by one",
+"ja": "同じグループのマシンは同じ設定を使います。設定を変えるとバージョン番号が 1 つ上がります",
+"ko": "같은 그룹의 기기는 같은 설정을 씁니다. 설정을 바꾸면 버전 번호가 1 올라갑니다"
+},
+"先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。機器依群組設定自動準備與套用的功能，會在下一版接上；目前先保存設定與版本號。": {
+"en": "First create a group (for example a classroom or a department), then add machines to it under Machines, and finally fill in the group settings here. Having machines prepare and apply group settings automatically comes in the next version; for now the settings and version number are saved.",
+"ja": "まずグループ（教室や部署など）を作り、「マシン」でマシンを追加し、最後にここでグループ設定を入力します。マシンがグループ設定を自動で準備・適用する機能は次の版で対応します。現時点では設定とバージョン番号を保存します。",
+"ko": "먼저 그룹(교실, 부서 등)을 만들고 '기기'에서 기기를 넣은 다음, 여기서 그룹 설정을 입력하세요. 기기가 그룹 설정을 자동으로 준비·적용하는 기능은 다음 버전에서 연결됩니다. 지금은 설정과 버전 번호를 저장합니다."
+},
+"新群組名稱，例：電腦教室 A": {
+"en": "New group name, e.g. Computer Lab A",
+"ja": "新しいグループ名（例：PC 教室 A）",
+"ko": "새 그룹 이름, 예: 컴퓨터실 A"
+},
+"新增群組": {
+"en": "Add group",
+"ja": "グループを追加",
+"ko": "그룹 추가"
+},
+"已新增群組": {
+"en": "Group added",
+"ja": "グループを追加しました",
+"ko": "그룹을 추가했습니다"
+},
+"全部群組": {
+"en": "All groups",
+"ja": "すべてのグループ",
+"ko": "전체 그룹"
+},
+"{0} 個": {
+"en": "{0}",
+"ja": "{0} 個",
+"ko": "{0}개"
+},
+"設定版本": {
+"en": "Settings version",
+"ja": "設定バージョン",
+"ko": "설정 버전"
+},
+"更新時間（台北時間）": {
+"en": "Updated (Taipei time)",
+"ja": "更新日時（台北時間）",
+"ko": "업데이트 시각 (타이베이 시간)"
+},
+"編輯設定": {
+"en": "Edit settings",
+"ja": "設定を編集",
+"ko": "설정 편집"
+},
+"刪除群組「{0}」": {
+"en": "Delete group \"{0}\"",
+"ja": "グループ「{0}」を削除",
+"ko": "그룹 '{0}' 삭제"
+},
+"刪除群組「": {
+"en": "Delete group \"",
+"ja": "グループ「",
+"ko": "그룹 '"
+},
+"這個群組有 {0} 台機器。刪除後它們移到「未分類」，機器本身不受影響。": {
+"en": "This group has {0} machines. After deletion they move to Uncategorized; the machines themselves are not affected.",
+"ja": "このグループには {0} 台のマシンがあります。削除すると「未分類」に移動し、マシン自体には影響しません。",
+"ko": "이 그룹에는 기기 {0}대가 있습니다. 삭제하면 '미분류'로 옮겨지며 기기 자체에는 영향이 없습니다."
+},
+"這個群組有": {
+"en": "This group has",
+"ja": "このグループには",
+"ko": "이 그룹에는"
+},
+"台機器。刪除後它們移到「未分類」，機器本身不受影響": {
+"en": "machines. After deletion they move to Uncategorized; the machines themselves are not affected",
+"ja": "台のマシンがあります。削除すると「未分類」に移動し、マシン自体には影響しません",
+"ko": "대의 기기가 있습니다. 삭제하면 '미분류'로 옮겨지며 기기 자체에는 영향이 없습니다"
+},
+"這個群組沒有機器。": {
+"en": "This group has no machines.",
+"ja": "このグループにはマシンがありません。",
+"ko": "이 그룹에는 기기가 없습니다."
+},
+"已刪除，{0} 台移到「未分類」": {
+"en": "Deleted; {0} machines moved to Uncategorized",
+"ja": "削除しました。{0} 台を「未分類」に移動しました",
+"ko": "삭제했습니다. {0}대를 '미분류'로 옮겼습니다"
+},
+"台移到「未分類」": {
+"en": "machines moved to Uncategorized",
+"ja": "台を「未分類」に移動しました",
+"ko": "대를 '미분류'로 옮겼습니다"
+},
+"「{0}」的設定": {
+"en": "Settings for \"{0}\"",
+"ja": "「{0}」の設定",
+"ko": "'{0}' 설정"
+},
+"」的設定": {
+"en": "\" settings",
+"ja": "」の設定",
+"ko": "' 설정"
+},
+"目前版本 v{0}；內容有變才會加一": {
+"en": "Current version v{0}; it increases only when the content changes",
+"ja": "現在のバージョン v{0}。内容が変わったときだけ上がります",
+"ko": "현재 버전 v{0}. 내용이 바뀔 때만 올라갑니다"
+},
+"目前版本 v": {
+"en": "Current version v",
+"ja": "現在のバージョン v",
+"ko": "현재 버전 v"
+},
+"內容有變才會加一": {
+"en": "increases only when the content changes",
+"ja": "内容が変わったときだけ上がります",
+"ko": "내용이 바뀔 때만 올라갑니다"
+},
+"群組名稱": {
+"en": "Group name",
+"ja": "グループ名",
+"ko": "그룹 이름"
+},
+"種類（只是標籤）": {
+"en": "Type (label only)",
+"ja": "種類（ラベルのみ）",
+"ko": "종류 (표시용)"
+},
+"要哪些模型（一行一個；寫 auto 由主控台依每台硬體挑版本）": {
+"en": "Models to use (one per line; write auto to let the console pick a version for each machine's hardware)",
+"ja": "使用するモデル（1 行に 1 つ。auto と書くとコンソールが各マシンのハードウェアに合わせて版を選びます）",
+"ko": "사용할 모델 (한 줄에 하나, auto라고 쓰면 콘솔이 기기 하드웨어에 맞춰 버전을 고릅니다)"
+},
+"只准用的模型（一行一個；空的就是不限）": {
+"en": "Allowed models only (one per line; empty means no restriction)",
+"ja": "許可するモデル（1 行に 1 つ。空欄なら制限なし）",
+"ko": "허용 모델 (한 줄에 하나, 비우면 제한 없음)"
+},
+"上下文長度（token，空的就是不指定）": {
+"en": "Context length (tokens; empty means not set)",
+"ja": "コンテキスト長（トークン。空欄なら指定なし）",
+"ko": "컨텍스트 길이 (토큰, 비우면 지정 안 함)"
+},
+"不指定": {
+"en": "Not set",
+"ja": "指定なし",
+"ko": "지정 안 함"
+},
+"思考": {
+"en": "Thinking",
+"ja": "思考",
+"ko": "사고"
+},
+"溫度（0～2）": {
+"en": "Temperature (0-2)",
+"ja": "温度（0～2）",
+"ko": "온도 (0~2)"
+},
+"保留給使用者其他程式的記憶體（GiB）": {
+"en": "Memory reserved for the user's other programs (GiB)",
+"ja": "ユーザーの他のプログラム用に予約するメモリ（GiB）",
+"ko": "사용자의 다른 프로그램용 예약 메모리 (GiB)"
+},
+"顯卡功耗上限（瓦，空的就是不限）": {
+"en": "GPU power limit (watts; empty means no limit)",
+"ja": "GPU 電力上限（ワット。空欄なら制限なし）",
+"ko": "GPU 전력 상한 (와트, 비우면 제한 없음)"
+},
+"模型存放位置（完整路徑；還原卡要指到不還原的磁碟；空的用預設）": {
+"en": "Model storage location (full path; with a restore card, point it at a disk that is not restored; empty uses the default)",
+"ja": "モデルの保存場所（フルパス。復元カード使用時は復元されないディスクを指定。空欄なら既定）",
+"ko": "모델 저장 위치 (전체 경로, 복원 카드를 쓰면 복원되지 않는 디스크로 지정, 비우면 기본값)"
+},
+"/data/xconsole 或 D:\\xconsole": {
+"en": "/data/xconsole or D:\\xconsole",
+"ja": "/data/xconsole または D:\\xconsole",
+"ko": "/data/xconsole 또는 D:\\xconsole"
+},
+"模型可以從哪裡取得（至少選一個）": {
+"en": "Where models can come from (choose at least one)",
+"ja": "モデルの取得元（1 つ以上選択）",
+"ko": "모델을 가져올 곳 (하나 이상 선택)"
+},
+"鎖定（使用者在自己那台不能改）": {
+"en": "Locked (users cannot change these on their own machine)",
+"ja": "ロック（ユーザーが自分のマシンで変更できない項目）",
+"ko": "잠금 (사용자가 자기 기기에서 바꿀 수 없음)"
+},
+"套用時機": {
+"en": "When to apply",
+"ja": "適用タイミング",
+"ko": "적용 시점"
+},
+"指定時間（選「指定時間」才用）": {
+"en": "Set time (used only when At a set time is chosen)",
+"ja": "指定時刻（「指定時刻」を選んだときのみ使用）",
+"ko": "지정 시각 ('지정 시각'을 고를 때만 사용)"
+},
+"儲存設定": {
+"en": "Save settings",
+"ja": "設定を保存",
+"ko": "설정 저장"
+},
+"選了「指定時間」就要填時間": {
+"en": "Fill in a time when At a set time is chosen",
+"ja": "「指定時刻」を選んだ場合は時刻を入力してください",
+"ko": "'지정 시각'을 골랐으면 시각을 입력하세요"
+},
+"已儲存，設定版本升到 v{0}": {
+"en": "Saved; settings version is now v{0}",
+"ja": "保存しました。設定バージョンは v{0} になりました",
+"ko": "저장했습니다. 설정 버전이 v{0}이(가) 되었습니다"
+},
+"已儲存，設定版本升到 v": {
+"en": "Saved; settings version is now v",
+"ja": "保存しました。設定バージョンは v",
+"ko": "저장했습니다. 설정 버전 v"
+},
+"已儲存（設定內容沒變，版本不動）": {
+"en": "Saved (settings unchanged, version kept)",
+"ja": "保存しました（設定内容に変更がないため、バージョンはそのまま）",
+"ko": "저장했습니다 (설정 내용이 같아 버전은 그대로)"
+},
+"已經有同名的群組": {
+"en": "A group with this name already exists",
+"ja": "同じ名前のグループがすでにあります",
+"ko": "같은 이름의 그룹이 이미 있습니다"
+},
+"一般": {
+"en": "General",
+"ja": "一般",
+"ko": "일반"
+},
+"沒有這個群組": {
+"en": "No such group",
+"ja": "このグループはありません",
+"ko": "이 그룹이 없습니다"
+},
+"「未分類」是預設群組，不能刪除": {
+"en": "Uncategorized is the default group and cannot be deleted",
+"ja": "「未分類」は既定のグループのため削除できません",
+"ko": "'미분류'는 기본 그룹이라 삭제할 수 없습니다"
+},
+"同名": {
+"en": "Same name",
+"ja": "同名",
+"ko": "같은 이름"
 }
 }

@@ -48,6 +48,7 @@ import report  # noqa: E402
 import tls  # noqa: E402
 import agentlink  # noqa: E402
 import linkcert  # noqa: E402
+import groups  # noqa: E402
 from store import Store  # noqa: E402
 
 # Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
@@ -1181,6 +1182,7 @@ def _join_node(handler, body):
             cfg["nodes"].append({"id": nid, "name": j.get("name") or hostname, "host": good,
                                  "group": j.get("group") or "未分類", "agent_port": port, "link": link,
                                  "token": tls.seal(CERTS.p, token.encode())})
+            groups.ensure(cfg)
         update_fleet(put)
         if link == "pull":
             os.replace(tmp, trust_file(nid))
@@ -2729,6 +2731,14 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/{m.group(3)}"))
 
+        if path == "/api/groups":
+            cfg = fleet()
+            count = {}
+            for n in cfg["nodes"]:
+                count[n.get("group") or groups.DEFAULT] = count.get(n.get("group") or groups.DEFAULT, 0) + 1
+            return self._json(200, {"groups": [dict(g, members=count.get(g["name"], 0)) for g in cfg.get("groups", [])],
+                                    "kinds": groups.KINDS, "lockable": groups.LOCKABLE, "sources": groups.SOURCES,
+                                    "defaults": groups.defaults()})
         if path == "/api/link":
             c = link_cfg()
             return self._json(200, dict(c, port=LINK_PORT, listen=LINK_LISTEN, nodes=len(push_ids()),
@@ -2896,8 +2906,10 @@ class Handler(BaseHTTPRequestHandler):
                 port = 0
             if not 1 <= len(name) <= 40 or re.search(r"[\x00-\x1f<>]", name):
                 return self._json(400, {"error": "名稱要 1～40 個字"})
-            if len(group) > 30 or re.search(r"[\x00-\x1f<>]", group):
-                return self._json(400, {"error": "群組最多 30 個字"})
+            try:
+                group = groups.check_name(group)
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
             if not valid_host(host):
                 return self._json(400, {"error": "位址格式不對，填 IP 或主機名稱（不含埠）"})
             if not 1 <= port <= 65535:
@@ -2909,6 +2921,7 @@ class Handler(BaseHTTPRequestHandler):
                 for n in cfg["nodes"]:
                     if n["id"] == nid:
                         n.update(name=name, group=group, host=host, agent_port=port)
+                groups.ensure(cfg)                  # 打了新的群組名稱：同時建出群組物件
             update_fleet(put)
             if moved:
                 # 換位址先實際連一次，連不上就換回來，免得改一個字就整台失聯
@@ -3330,6 +3343,68 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = CERTS.bootstrap(hostnames())
             self._audit("tls.bootstrap", "", ok, {"message": msg})
             return self._json(200 if ok else 409, {"ok": ok, "message": msg, "current": CERTS.current()})
+        if path == "/api/groups":
+            try:
+                g = groups.new(body.get("name"), str(body.get("kind") or "一般"))
+                if body.get("settings") is not None:
+                    groups.update(g, settings=body["settings"])
+                    g["version"] = 1                 # 新建的群組從 1 起算
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            err = []
+
+            def add(cfg):
+                if any(x["name"] == g["name"] for x in cfg.setdefault("groups", [])):
+                    err.append("已經有同名的群組")
+                    return
+                cfg["groups"].append(g)
+            update_fleet(add)
+            if err:
+                return self._json(409, {"error": err[0]})
+            self._audit("group.create", g["name"], True, {"kind": g["kind"]})
+            return self._json(200, {"ok": True, "group": g})
+        m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/(update|delete)", path)
+        if m:
+            gid, act = m.groups()
+            out = {}
+
+            def edit(cfg):
+                g = next((x for x in cfg.get("groups", []) if x["id"] == gid), None)
+                if g is None:
+                    out.update(code=404, error="沒有這個群組")
+                    return
+                old = g["name"]
+                if act == "delete":
+                    if old == groups.DEFAULT:
+                        out.update(code=400, error="「未分類」是預設群組，不能刪除")
+                        return
+                    cfg["groups"] = [x for x in cfg["groups"] if x["id"] != gid]
+                    moved = [n["id"] for n in cfg["nodes"] if n.get("group") == old]
+                    for n in cfg["nodes"]:
+                        if n.get("group") == old:
+                            n["group"] = groups.DEFAULT     # 機器不刪，移到「未分類」
+                    groups.ensure(cfg)
+                    out.update(code=200, name=old, moved=moved)
+                    return
+                try:
+                    name, changed = groups.update(g, body.get("name"), body.get("kind"), body.get("settings"),
+                                                  taken={x["name"] for x in cfg["groups"] if x["id"] != gid})
+                except ValueError as exc:
+                    out.update(code=409 if "同名" in str(exc) else 400, error=str(exc))
+                    return
+                for n in cfg["nodes"]:
+                    if n.get("group") == old:
+                        n["group"] = name               # 改名時成員一起改，不會掉出群組
+                out.update(code=200, group=dict(g), changed=changed, old=old)
+            update_fleet(edit)
+            if out.get("code") != 200:
+                return self._json(out.get("code", 400), {"error": out.get("error")})
+            if act == "delete":
+                self._audit("group.delete", out["name"], True, {"moved": len(out["moved"])})
+                return self._json(200, {"ok": True, "moved": len(out["moved"])})
+            g = out["group"]
+            self._audit("group.update", g["name"], True, {"from": out["old"], "version": g["version"], "settings_changed": out["changed"]})
+            return self._json(200, {"ok": True, "group": g, "changed": out["changed"]})
         if path == "/api/link/settings":
             pub = [str(a).strip() for a in body.get("public") or [] if str(a).strip()]
             proxy = str(body.get("proxy") or "").strip()
@@ -3588,6 +3663,8 @@ def main():
     elif not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
     moved = migrate_tokens()
+    if groups.ensure(fleet()):
+        update_fleet(groups.ensure)          # 舊版只有群組名稱：補上群組物件（版本號從 1 起）
     if moved:
         print(f"已把 {moved} 個明文代理權杖轉成密文（fleet.json）", flush=True)
     if not DESKTOP or cfg.get("lan_access"):

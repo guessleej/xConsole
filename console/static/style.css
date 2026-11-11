@@ -516,7 +516,7 @@ pre.log {
 .modal h3 { font-size: 18px; margin-bottom: 8px; }
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-input[type="password"], input[type="text"], input[type="number"], select {
+input[type="password"], input[type="text"], input[type="number"], input[type="datetime-local"], select {
   width: 100%;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
@@ -1374,3 +1374,10 @@ input.switch:checked::after { transform: translateX(18px); }
 .sd-engine b { display: block; color: var(--brand); margin-bottom: 4px; }
 h3.sd-sec { margin: 24px 0 10px; font-size: 16px; }
 .rec-list.sd-list { max-height: none; min-height: 0; overflow: visible; }
+
+/* 群組設定：兩欄表單，窄螢幕一欄 */
+.grp-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }
+.grp-form .wide { grid-column: 1 / -1; }
+.grp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 14px; }
+.grp-checks label { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 720px) { .grp-form { grid-template-columns: 1fr; } }

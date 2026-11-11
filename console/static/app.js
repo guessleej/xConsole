@@ -3632,7 +3632,7 @@ function hfRepoOf(text) {
 }
 
 const SETTINGS_TABS = [
-  ["machines", "機器"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
+  ["machines", "機器"], ["groups", "群組"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
   ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
 // 桌面版（一般人單機用）：只留會用到的，照先後排；機群、使用報告、品牌是管理一群機器才用的。
@@ -3653,7 +3653,7 @@ function viewSettings() {
   main.textContent = "";
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
-  ({ machines: settingsMachines, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
+  ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
      account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
 }
 
@@ -3864,6 +3864,185 @@ async function checkTlsBanner() {
 }
 
 /* ---------------------------------------------------------------- 1 機器 */
+
+/* ---------------------------------------------------------------- 群組 */
+
+const GROUP_LOCK_NAMES = { models: "要哪些模型", profile: "執行參數", reserve_user_gib: "保留記憶體", allowed_models: "只准用的模型", gpu_power_limit: "顯卡功耗上限" };
+const GROUP_SRC_NAMES = { group: "同群組互傳", mirror: "內部鏡像", huggingface: "Hugging Face" };
+const GROUP_APPLY_NAMES = { now: "立即", boot: "下次開機", at: "指定時間" };
+
+function groupField(form, label, node, wide) {
+  const f = el("label", "field" + (wide ? " wide" : ""), label);
+  f.appendChild(node);
+  form.appendChild(f);
+  return node;
+}
+
+function groupInputBox(type, value, attrs) {
+  const i = el("input");
+  i.type = type;
+  if (value !== null && value !== undefined) i.value = value;
+  Object.assign(i, attrs || {});
+  return i;
+}
+
+async function settingsGroups(wrap) {
+  let d;
+  const head = card("群組", "同一群組的機器用同一份設定；設定一改，版本號就加一");
+  wrap.appendChild(head);
+  try { d = await api("/api/groups"); } catch (ex) { head.appendChild(el("p", "note warn", ex.message)); return; }
+  head.appendChild(el("p", "small muted",
+    "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。機器依群組設定自動準備與套用的功能，會在下一版接上；目前先保存設定與版本號。"));
+  const add = el("div", "slot-actions");
+  const fName = groupInputBox("text", "", { placeholder: "新群組名稱，例：電腦教室 A" });
+  fName.style.maxWidth = "280px";
+  const fKind = el("select");
+  d.kinds.forEach((k) => { const o = el("option", null, k); o.value = k; fKind.appendChild(o); });
+  fKind.style.maxWidth = "120px";
+  const ab = el("button", "btn sm primary", "新增群組");
+  ab.onclick = async () => {
+    try {
+      const r = await api("/api/groups", { method: "POST", body: { name: fName.value.trim(), kind: fKind.value } });
+      S.groupEdit = r.group.id;
+      toast("已新增群組", "ok");
+      render();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  [fName, fKind, ab].forEach((x) => add.appendChild(x));
+  head.appendChild(add);
+
+  const list = card("全部群組", `${d.groups.length} 個`);
+  const tbl = el("table", "api-table");
+  const hr = el("tr");
+  ["名稱", "種類", "機器", "設定版本", "更新時間（台北時間）", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  tbl.appendChild(hr);
+  d.groups.forEach((g) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, g.name));
+    tr.appendChild(el("td", null, g.kind));
+    tr.appendChild(el("td", null, `${g.members} 台`));
+    tr.appendChild(el("td", "mono", `v${g.version}`));
+    tr.appendChild(el("td", "nowrap", new Date(g.updated * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" })));
+    const td = el("td", "nowrap");
+    const eb = el("button", "btn sm" + (S.groupEdit === g.id ? " primary" : ""), "編輯設定");
+    eb.onclick = () => { S.groupEdit = S.groupEdit === g.id ? null : g.id; render(); };
+    td.appendChild(eb);
+    if (g.name !== "未分類") {
+      const db = el("button", "btn sm", "刪除");
+      db.onclick = () => modal({
+        title: `刪除群組「${g.name}」`, hasInput: false, danger: true, confirmText: "刪除",
+        bodyNode: el("p", "small muted", g.members
+          ? `這個群組有 ${g.members} 台機器。刪除後它們移到「未分類」，機器本身不受影響。`
+          : "這個群組沒有機器。"),
+        onConfirm: async () => {
+          try { const r = await api(`/api/groups/${g.id}/delete`, { method: "POST" }); toast(r.moved ? `已刪除，${r.moved} 台移到「未分類」` : "已刪除", "ok"); }
+          catch (ex) { toast(ex.message, "bad"); }
+          if (S.groupEdit === g.id) S.groupEdit = null;
+          render();
+        },
+      });
+      td.appendChild(db);
+    }
+    tr.appendChild(td);
+    tbl.appendChild(tr);
+  });
+  const tw = el("div", "md-table-wrap");
+  tw.appendChild(tbl);
+  list.appendChild(tw);
+  wrap.appendChild(list);
+
+  const g = d.groups.find((x) => x.id === S.groupEdit);
+  if (g) wrap.appendChild(groupEditor(g, d));
+}
+
+function groupEditor(g, d) {
+  const st = g.settings || d.defaults;
+  const p = st.profile || {};
+  const c = card(`「${g.name}」的設定`, `目前版本 v${g.version}；內容有變才會加一`);
+  const form = el("div", "grp-form");
+  const fName = groupField(form, "群組名稱", groupInputBox("text", g.name, { disabled: g.name === "未分類" }));
+  const fKind = el("select");
+  d.kinds.forEach((k) => { const o = el("option", null, k); o.value = k; o.selected = k === g.kind; fKind.appendChild(o); });
+  groupField(form, "種類（只是標籤）", fKind);
+  const lines = (a) => (a || []).join("\n");
+  const fModels = groupField(form, "要哪些模型（一行一個；寫 auto 由主控台依每台硬體挑版本）", el("textarea"), true);
+  fModels.value = lines(st.models);
+  const fAllowed = groupField(form, "只准用的模型（一行一個；空的就是不限）", el("textarea"), true);
+  fAllowed.value = lines(st.allowed_models);
+  const num = (v) => (v === null || v === undefined ? "" : v);
+  const fCtx = groupField(form, "上下文長度（token，空的就是不指定）", groupInputBox("number", num(p.ctx), { min: 512, step: 512 }));
+  const fPar = groupField(form, "並行數", groupInputBox("number", num(p.parallel), { min: 1, max: 64 }));
+  const fThink = el("select");
+  [["", "不指定"], ["on", "開"], ["off", "關"]].forEach(([v, t]) => {
+    const o = el("option", null, t); o.value = v; o.selected = v === (p.thinking === true ? "on" : p.thinking === false ? "off" : ""); fThink.appendChild(o);
+  });
+  groupField(form, "思考", fThink);
+  const fTemp = groupField(form, "溫度（0～2）", groupInputBox("number", num(p.temperature), { min: 0, max: 2, step: 0.05 }));
+  const fTopP = groupField(form, "top_p（0～1）", groupInputBox("number", num(p.top_p), { min: 0, max: 1, step: 0.05 }));
+  const fRes = groupField(form, "保留給使用者其他程式的記憶體（GiB）", groupInputBox("number", num(st.reserve_user_gib), { min: 0, step: 1 }));
+  const fPow = groupField(form, "顯卡功耗上限（瓦，空的就是不限）", groupInputBox("number", num(st.gpu_power_limit), { min: 30, step: 10 }));
+  const fRoot = groupField(form, "模型存放位置（完整路徑；還原卡要指到不還原的磁碟；空的用預設）", groupInputBox("text", st.storage_root || "", { placeholder: "/data/xconsole 或 D:\\xconsole" }), true);
+
+  const checks = (names, on) => {
+    const box = el("div", "grp-checks");
+    const cbs = {};
+    Object.entries(names).forEach(([k, t]) => {
+      const l = el("label");
+      const cb = el("input");
+      cb.type = "checkbox"; cb.checked = on.includes(k);
+      l.appendChild(cb);
+      l.appendChild(document.createTextNode(t));
+      box.appendChild(l);
+      cbs[k] = cb;
+    });
+    return [box, cbs];
+  };
+  const [srcBox, srcCb] = checks(GROUP_SRC_NAMES, st.sources || []);
+  groupField(form, "模型可以從哪裡取得（至少選一個）", srcBox, true);
+  const [lockBox, lockCb] = checks(GROUP_LOCK_NAMES, st.locked || []);
+  groupField(form, "鎖定（使用者在自己那台不能改）", lockBox, true);
+
+  const fApply = el("select");
+  Object.entries(GROUP_APPLY_NAMES).forEach(([k, t]) => { const o = el("option", null, t); o.value = k; o.selected = k === (st.apply_at?.mode || "now"); fApply.appendChild(o); });
+  groupField(form, "套用時機", fApply);
+  const at = st.apply_at?.at ? new Date(st.apply_at.at * 1000) : null;
+  // datetime-local 用瀏覽器本地時間；送出前換成時間戳，主控台以自己的時鐘為準
+  const local = at ? new Date(at.getTime() - at.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+  const fAt = groupField(form, "指定時間（選「指定時間」才用）", groupInputBox("datetime-local", local));
+  c.appendChild(form);
+
+  const act = el("div", "slot-actions");
+  const sb = el("button", "btn primary", "儲存設定");
+  sb.onclick = async () => {
+    const n = (i) => (i.value.trim() === "" ? null : Number(i.value));
+    const ls = (t) => t.value.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    const profile = {};
+    if (n(fCtx) !== null) profile.ctx = n(fCtx);
+    if (n(fPar) !== null) profile.parallel = n(fPar);
+    if (fThink.value) profile.thinking = fThink.value === "on";
+    if (n(fTemp) !== null) profile.temperature = n(fTemp);
+    if (n(fTopP) !== null) profile.top_p = n(fTopP);
+    const apply = { mode: fApply.value };
+    if (apply.mode === "at") {
+      if (!fAt.value) { toast("選了「指定時間」就要填時間", "bad"); return; }
+      apply.at = Math.floor(new Date(fAt.value).getTime() / 1000);
+    }
+    const settings = {
+      models: ls(fModels), allowed_models: ls(fAllowed), profile,
+      reserve_user_gib: n(fRes), gpu_power_limit: n(fPow), storage_root: fRoot.value.trim(),
+      sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
+      locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
+    };
+    try {
+      const r = await api(`/api/groups/${g.id}/update`, { method: "POST", body: { name: fName.value.trim(), kind: fKind.value, settings } });
+      toast(r.changed ? `已儲存，設定版本升到 v${r.group.version}` : "已儲存（設定內容沒變，版本不動）", "ok");
+      render();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  act.appendChild(sb);
+  c.appendChild(act);
+  return c;
+}
 
 async function settingsMachines(wrap) {
   const c = card("納管的機器", `共 ${S.fleet.nodes.length} 台`);

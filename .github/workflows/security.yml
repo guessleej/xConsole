@@ -35,6 +35,8 @@ jobs:
         run: cd console && python test_agentlink.py
       - name: 代理主動連回（代理這一側：釘住通道憑證、代理伺服器、位址輪流試）
         run: cd agent && python test_link.py
+      - name: 群組（設定檢查、版本號、改名與刪除）
+        run: cd console && python test_groups.py
       - name: 服務使用報告
         run: cd console && python test_usage_report.py
       - name: 網頁換憑證端對端
