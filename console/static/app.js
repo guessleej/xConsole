@@ -3983,7 +3983,7 @@ function groupMembers(g) {
     tr.appendChild(el("td", null, m.name || m.id));
     tr.appendChild(el("td", "mono", m.prepared ? `v${m.prepared}` : "—"));
     tr.appendChild(el("td", "mono", m.applied ? `v${m.applied}` : "—"));
-    const status = m.idle ? "群組沒有設定，不用對齊" : !m.checked ? "還沒連到（主動連回的機器要在線才送）"
+    const status = !m.checked ? "還沒連到（主動連回的機器要在線才送）"
       : m.error && !m.phase ? m.error : GROUP_PHASE[m.phase] || m.phase || "—";
     tr.appendChild(el("td", m.phase === "failed" || (m.error && !m.phase) ? "bad" : null, status));
     const last = m.steps[m.steps.length - 1];

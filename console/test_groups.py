@@ -251,9 +251,13 @@ def e2e_align():
             except urllib.error.HTTPError as e:
                 return e.code, json.load(e)
         call("/api/login", {"username": "admin", "password": "align-pass-2026"})
-        g = next(x for x in call("/api/groups")[1]["groups"] if x["name"] == "教室")
-        m0 = g["nodes"][0]
-        check("群組沒有設定：不送，畫面標「不用對齊」", m0["idle"] and m0["applied"] == 0, m0)
+        for _ in range(40):
+            g = next(x for x in call("/api/groups")[1]["groups"] if x["name"] == "教室")
+            if g["done"] == 1:
+                break
+            time.sleep(0.5)
+        check("預設設定的群組也送（機器移到這種群組時，代理才會放掉舊群組的鎖定）", g["done"] == 1
+              and g["nodes"][0]["applied"] == 1, g["nodes"][0])
         t0 = time.time()
         st, out = call(f"/api/groups/{g['id']}/update", {"settings": {"locked": ["models"], "apply_at": {"mode": "now"}}})
         g = None

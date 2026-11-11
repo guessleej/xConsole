@@ -716,13 +716,16 @@ def align_once():
     gmap = {g["name"]: g for g in cfg.get("groups", [])}
     for n in cfg["nodes"]:
         g = gmap.get(n.get("group") or groups.DEFAULT)
-        if not g or g.get("settings") in (None, groups.defaults()):
-            ALIGN_STATE[n["id"]] = {"at": int(time.time()), "idle": True}
+        if not g:
             continue
         if n.get("link") == "push" and not LINK.online(n["id"]):
             continue
-        code, out = call_node(n["id"], "/group/sync", "POST", {
-            "group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}, timeout=20)
+        # 預設設定的群組（例如原本的群組被刪、機器移到未分類）也要送：代理才會放掉舊群組的鎖定與限制
+        # ponytail: 一台一台依序送；連不到的伺服器各等 20 秒，機器多了再改並行
+        body = {"group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}
+        if hf_token():
+            body["hf_token"] = hf_token()        # 受限模型要下載才帶；代理只放記憶體、不寫檔
+        code, out = call_node(n["id"], "/group/sync", "POST", body, timeout=20)
         if code == 200:
             ALIGN_STATE[n["id"]] = {"at": int(time.time()), "state": out}
         else:
@@ -754,7 +757,7 @@ def group_members(g, nodes):
         a = ALIGN_STATE.get(n["id"]) or {}
         st = a.get("state") or {}
         same = st.get("group_id") == g["id"]
-        out.append({"id": n["id"], "name": n.get("name"), "checked": a.get("at"), "idle": bool(a.get("idle")),
+        out.append({"id": n["id"], "name": n.get("name"), "checked": a.get("at"),
                     "error": a.get("error") or (st.get("error") if same else None),
                     "prepared": st.get("prepared", 0) if same else 0, "applied": st.get("applied", 0) if same else 0,
                     "phase": st.get("phase") if same else None, "steps": (st.get("steps") or [])[-6:] if same else []})
