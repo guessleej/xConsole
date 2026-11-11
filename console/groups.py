@@ -38,7 +38,9 @@ def _models(v, name):
         raise ValueError(f"{name} 要是清單，最多 32 個")
     out = []
     for m in v:
-        m = str(m).strip()
+        if not isinstance(m, str):
+            raise ValueError(f"{name} 每一項都要是文字（模型名稱）")
+        m = m.strip()
         if m != "auto" and not MODEL_RX.fullmatch(m):
             raise ValueError(f"{name} 的「{m[:40]}」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）")
         if m not in out:
@@ -114,9 +116,11 @@ def check_name(name):
     return name
 
 
-def new(name, kind="一般"):
-    return {"id": secrets.token_hex(4), "name": check_name(name), "kind": kind if kind in KINDS else "一般",
-            "settings": defaults(), "version": 1, "updated": int(time.time())}
+def new(name, kind="一般", legacy=False):
+    """legacy：舊版留下的群組名稱，可能有現在不收的字元（引號、反斜線）。照原樣保留，
+    群組頁才管得到它；管理者之後可以改成合法的名稱。"""
+    return {"id": secrets.token_hex(4), "name": str(name)[:60] if legacy else check_name(name),
+            "kind": kind if kind in KINDS else "一般", "settings": defaults(), "version": 1, "updated": int(time.time())}
 
 
 def ensure(cfg):
@@ -126,10 +130,7 @@ def ensure(cfg):
     added = False
     for name in [DEFAULT] + [n.get("group") or DEFAULT for n in cfg.get("nodes", [])]:
         if name not in have:
-            try:
-                gs.append(new(name))
-            except ValueError:
-                continue                     # 舊資料的名稱不合法：留著不動，畫面上照樣顯示
+            gs.append(new(name, legacy=True))
             have.add(name)
             added = True
     return added
@@ -138,7 +139,7 @@ def ensure(cfg):
 def update(g, name=None, kind=None, settings=None, taken=()):
     """改名、改種類、改設定，全部檢查過才動。設定內容真的不同才把版本號加一。
     taken：別的群組已用的名稱。回 (新名稱, 設定有沒有變)。"""
-    new_name = g["name"] if name is None else check_name(name)
+    new_name = g["name"] if name is None or name == g["name"] else check_name(name)   # 沒改名就不重驗（舊名稱可能有現在不收的字元）
     if g["name"] == DEFAULT and new_name != DEFAULT:
         raise ValueError("「未分類」是預設群組，不能改名")
     if new_name != g["name"] and new_name in taken:

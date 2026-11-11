@@ -2921,7 +2921,6 @@ class Handler(BaseHTTPRequestHandler):
                 for n in cfg["nodes"]:
                     if n["id"] == nid:
                         n.update(name=name, group=group, host=host, agent_port=port)
-                groups.ensure(cfg)                  # 打了新的群組名稱：同時建出群組物件
             update_fleet(put)
             if moved:
                 # 換位址先實際連一次，連不上就換回來，免得改一個字就整台失聯
@@ -2930,6 +2929,7 @@ class Handler(BaseHTTPRequestHandler):
                     update_fleet(lambda cfg: [n.update(old) for n in cfg["nodes"] if n["id"] == nid])
                     self._audit("node.update", nid, False, {"message": out.get("error")})
                     return self._json(400, {"error": f"新位址連不到這台的代理，已改回原本的位址。{out.get('error') or ''}"})
+            update_fleet(groups.ensure)             # 打了新的群組名稱：確定改成功才建群組物件，失敗改回時不會留下空群組
             self._audit("node.update", nid, True, {"from": old, "to": {"name": name, "group": group, "host": host,
                                                                        "agent_port": port}})
             return self._json(200, {"ok": True})

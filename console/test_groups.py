@@ -58,7 +58,8 @@ def unit():
                      ({"locked": ["storage_root"]}, "鎖定"), ({"storage_root": "models"}, "完整路徑"),
                      ({"storage_root": "/data/../etc"}, "完整路徑"), ({"sources": []}, "至少選一個"),
                      ({"apply_at": {"mode": "later"}}, "套用時機"), ({"apply_at": {"mode": "at"}}, "指定時間"),
-                     ({"gpu_power_limit": 5}, "功耗"), ({"reserve_user_gib": True}, "數字")):
+                     ({"gpu_power_limit": 5}, "功耗"), ({"reserve_user_gib": True}, "數字"),
+                     ({"models": [None]}, "文字"), ({"allowed_models": [123]}, "文字")):
         msg = bad(s_)
         check(f"不合法的擋下並講原因：{json.dumps(s_, ensure_ascii=False)}", want in msg, msg)
 
@@ -94,9 +95,14 @@ def unit():
         except ValueError:
             ok = True
         check(f"群組名稱不合法：{nm[:12]!r}", ok)
-    cfg = {"nodes": [{"id": "a", "group": "教室 A"}, {"id": "b"}, {"id": "c", "group": "教室 A"}]}
-    check("舊資料補群組物件：每個用到的名稱一個，加上未分類", groups.ensure(cfg)
-          and sorted(g["name"] for g in cfg["groups"]) == sorted(["未分類", "教室 A"]) and not groups.ensure(cfg))
+    cfg = {"nodes": [{"id": "a", "group": "教室 A"}, {"id": "b"}, {"id": "c", "group": "教室 A"}, {"id": "d", "group": "Bob's lab"}]}
+    check("舊資料補群組物件：每個用到的名稱一個，加上未分類；舊版收過、現在不收的名稱照樣保留",
+          groups.ensure(cfg) and sorted(g["name"] for g in cfg["groups"]) == sorted(["未分類", "教室 A", "Bob's lab"])
+          and not groups.ensure(cfg))
+    old = next(g for g in cfg["groups"] if g["name"] == "Bob's lab")
+    _, ch = groups.update(old, name="Bob's lab", settings={"models": ["auto"]})
+    check("  這種舊名稱的群組照樣能改設定（名稱沒改就不重驗），也能改成合法的名稱",
+          ch and groups.update(old, name="Bob lab")[0] == "Bob lab")
 
 
 def free_port():
@@ -166,6 +172,8 @@ def e2e():
         fl = call("/api/nodes")[1]["nodes"]
         check("改名：成員一起改，不會掉出群組", st == 200 and sum(1 for n in fl if n["group"] == "電腦教室 101") == 3
               and by_name()["電腦教室 101"]["version"] == 2, [n["group"] for n in fl])
+        st, out = call("/api/nodes/pc-4/update", {"name": "PC 4", "group": "失敗組", "host": "10.0.0.99", "agent_port": 9401})
+        check("換位址連不到而改回：不會留下空的新群組", st == 400 and "失敗組" not in by_name(), (st, out))
         st, out = call("/api/nodes/pc-3/update", {"name": "PC 3", "group": "研發部", "host": "10.0.0.3", "agent_port": 9401})
         gs = by_name()
         check("機器改到新的群組名稱：自動建出群組", st == 200 and gs.get("研發部", {}).get("members") == 1, (st, out))
