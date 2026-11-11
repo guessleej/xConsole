@@ -4104,7 +4104,7 @@
 "pattern": false
 },
 {
-"zh": "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。機器依群組設定自動準備與套用的功能，會在下一版接上；目前先保存設定與版本號。",
+"zh": "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。存檔後每台機器會先「準備」（下載並核對模型），到了套用時機才「套用」（換上模型、生效鎖定），上課或上班中改設定不會提早換掉正在用的模型。",
 "pattern": false
 },
 {
@@ -4129,6 +4129,14 @@
 },
 {
 "zh": "設定版本",
+"pattern": false
+},
+{
+"zh": "就緒",
+"pattern": false
+},
+{
+"zh": "已套用",
 "pattern": false
 },
 {
@@ -4177,6 +4185,62 @@
 },
 {
 "zh": "台移到「未分類」",
+"pattern": false
+},
+{
+"zh": "收到，排隊中",
+"pattern": false
+},
+{
+"zh": "準備中",
+"pattern": false
+},
+{
+"zh": "已準備，等下次開機套用",
+"pattern": false
+},
+{
+"zh": "已準備，等指定時間套用",
+"pattern": false
+},
+{
+"zh": "套用中",
+"pattern": false
+},
+{
+"zh": "各台進度",
+"pattern": false
+},
+{
+"zh": "設定 v{0}；就緒 {1}/{2}、已套用 {3}/{4}",
+"pattern": true
+},
+{
+"zh": "設定 v",
+"pattern": false
+},
+{
+"zh": "重新整理",
+"pattern": false
+},
+{
+"zh": "這個群組還沒有機器。到「機器」把機器的群組改成這一個。",
+"pattern": false
+},
+{
+"zh": "已準備",
+"pattern": false
+},
+{
+"zh": "最後一步",
+"pattern": false
+},
+{
+"zh": "群組沒有設定，不用對齊",
+"pattern": false
+},
+{
+"zh": "還沒連到（主動連回的機器要在線才送）",
 "pattern": false
 },
 {
@@ -8356,10 +8420,6 @@
 "pattern": false
 },
 {
-"zh": "準備中",
-"pattern": false
-},
-{
 "zh": "沒有完成",
 "pattern": false
 },
@@ -9216,6 +9276,18 @@
 "pattern": false
 },
 {
+"zh": "這台的代理版本太舊，不支援群組設定，請更新代理",
+"pattern": false
+},
+{
+"zh": "群組對齊出錯：{0}",
+"pattern": true
+},
+{
+"zh": "群組對齊出錯",
+"pattern": false
+},
+{
 "zh": "取樣失敗：{0}",
 "pattern": true
 },
@@ -9445,6 +9517,10 @@
 },
 {
 "zh": "代理回",
+"pattern": false
+},
+{
+"zh": "群組對齊出錯：",
 "pattern": false
 },
 {
@@ -11576,6 +11652,18 @@
 "pattern": false
 },
 {
+"zh": "這台的這個項目被群組鎖定，請到主控台改群組設定",
+"pattern": false
+},
+{
+"zh": "{0}：下載並核對 SHA-256",
+"pattern": true
+},
+{
+"zh": "下載並核對 SHA-256",
+"pattern": false
+},
+{
 "zh": "DNS 解析",
 "pattern": false
 },
@@ -11705,6 +11793,14 @@
 },
 {
 "zh": "這台沒有可以送滑鼠鍵盤事件的工具：sudo apt install xdotool（Wayland 桌面請改用 X11 工作階段）",
+"pattern": false
+},
+{
+"zh": "：下載並核對 SHA-256",
+"pattern": false
+},
+{
+"zh": "準備完成",
 "pattern": false
 },
 {
@@ -12261,6 +12357,82 @@
 },
 {
 "zh": "桌面版第一次啟動：記憶體架構自動套用偵測結果",
+"pattern": false
+},
+{
+"zh": "{0}：存放區已有",
+"pattern": true
+},
+{
+"zh": "存放區已有",
+"pattern": false
+},
+{
+"zh": "{0}：查不到 Hugging Face 上的檔案（{1}）",
+"pattern": true
+},
+{
+"zh": "查不到 Hugging Face 上的檔案",
+"pattern": false
+},
+{
+"zh": "{0}：這個 repo 沒有這個量化",
+"pattern": true
+},
+{
+"zh": "這個 repo 沒有這個量化",
+"pattern": false
+},
+{
+"zh": "{0}：下載沒完成（{1}）",
+"pattern": true
+},
+{
+"zh": "下載沒完成",
+"pattern": false
+},
+{
+"zh": "{0}：下載完了但存放區掃不到",
+"pattern": true
+},
+{
+"zh": "下載完了但存放區掃不到",
+"pattern": false
+},
+{
+"zh": "auto（依每台硬體挑版本）要等混合機型功能上線，這次先略過",
+"pattern": false
+},
+{
+"zh": "模型存放位置",
+"pattern": false
+},
+{
+"zh": "保留給使用者的記憶體",
+"pattern": false
+},
+{
+"zh": "同群組互傳與內部鏡像還沒上線，這次從 Hugging Face 取得",
+"pattern": false
+},
+{
+"zh": "群組要 {0} 顆模型，這台只有 {1} 個可放語言模型的欄位",
+"pattern": true
+},
+{
+"zh": "群組要",
+"pattern": false
+},
+{
+"zh": "顆模型，這台只有",
+"pattern": false
+},
+{
+"zh": "個可放語言模型的欄位",
+"pattern": false
+},
+{
+"zh": "這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝",
 "pattern": false
 },
 {
@@ -13312,6 +13484,86 @@
 "pattern": false
 },
 {
+"zh": "群組設定格式不對",
+"pattern": false
+},
+{
+"zh": "：存放區已有",
+"pattern": false
+},
+{
+"zh": "：查不到 Hugging Face 上的檔案（",
+"pattern": false
+},
+{
+"zh": "：這個 repo 沒有這個量化",
+"pattern": false
+},
+{
+"zh": "：下載沒完成（",
+"pattern": false
+},
+{
+"zh": "：下載完了但存放區掃不到",
+"pattern": false
+},
+{
+"zh": "{0} 不在「只准用的模型」清單裡",
+"pattern": true
+},
+{
+"zh": "不在「只准用的模型」清單裡",
+"pattern": false
+},
+{
+"zh": "{0}這一版的代理還不支援，先略過",
+"pattern": true
+},
+{
+"zh": "這一版的代理還不支援，先略過",
+"pattern": false
+},
+{
+"zh": "群組要 ",
+"pattern": false
+},
+{
+"zh": " 顆模型，這台只有 ",
+"pattern": false
+},
+{
+"zh": " 個可放語言模型的欄位",
+"pattern": false
+},
+{
+"zh": "{0}：存放區找不到（可能被刪了），下次對齊會重新準備",
+"pattern": true
+},
+{
+"zh": "存放區找不到（可能被刪了），下次對齊會重新準備",
+"pattern": false
+},
+{
+"zh": "{0}：換不上 {1}（{2}），原本的服務沒動",
+"pattern": true
+},
+{
+"zh": "換不上",
+"pattern": false
+},
+{
+"zh": "原本的服務沒動",
+"pattern": false
+},
+{
+"zh": "已套用 v{0}",
+"pattern": true
+},
+{
+"zh": "已套用 v",
+"pattern": false
+},
+{
 "zh": "沒有可以試的位址",
 "pattern": false
 },
@@ -14192,6 +14444,42 @@
 "pattern": false
 },
 {
+"zh": "要帶群組設定的版本號與主控台的時間",
+"pattern": false
+},
+{
+"zh": "收到群組設定 v{0}",
+"pattern": true
+},
+{
+"zh": "收到群組設定 v",
+"pattern": false
+},
+{
+"zh": " 不在「只准用的模型」清單裡",
+"pattern": false
+},
+{
+"zh": "：存放區找不到（可能被刪了），下次對齊會重新準備",
+"pattern": false
+},
+{
+"zh": "拉回群組設定的模型 ",
+"pattern": false
+},
+{
+"zh": "換上 ",
+"pattern": false
+},
+{
+"zh": "：換不上 ",
+"pattern": false
+},
+{
+"zh": "），原本的服務沒動",
+"pattern": false
+},
+{
 "zh": "收到主控台的通道憑證（",
 "pattern": false
 },
@@ -14333,6 +14621,14 @@
 },
 {
 "zh": "），可能連線中斷，重新下載會接續",
+"pattern": false
+},
+{
+"zh": "{0} 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載",
+"pattern": true
+},
+{
+"zh": "的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載",
 "pattern": false
 },
 {
@@ -14784,6 +15080,10 @@
 "pattern": false
 },
 {
+"zh": " 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載",
+"pattern": false
+},
+{
 "zh": "記憶體不夠：需要約 ",
 "pattern": false
 },
@@ -14937,6 +15237,14 @@
 },
 {
 "zh": "連不到模型服務：",
+"pattern": false
+},
+{
+"zh": "這顆不在群組「只准用的模型」清單裡",
+"pattern": false
+},
+{
+"zh": "群組限定了只准用的模型，不能換回 Strata",
 "pattern": false
 },
 {

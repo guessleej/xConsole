@@ -438,7 +438,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_agent_tasks.py` | 任何機器 | 31 | Agent 對話迴圈（假的 OpenAI 相容服務）：等待核准、拒絕、always、步數上限、不支援 tools、單一任務、停止、本機欄位當模型、稽核 |
 | `console/test_e2e_features.py` | 任何機器（要 cryptography） | 18 | 另起隔離的代理與主控台走 HTTPS：HF 等級（假 Hugging Face）、已安裝等級、進度、預覽、第三方 API、打開 Agent 模式、任務核准到完成 |
 | `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 63 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；通道憑證（私鑰不落明文、輪替要在線的都收到才換、SNI 選憑證、退役 30 天後刪）；另起隔離主控台與代理端對端（通道埠與管理網頁埠分開、換管理網頁憑證不斷線、輪替與對外網址幾秒內送達）；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
-| `console/test_groups.py` | 任何 Linux（要 cryptography） | 42 | 群組：設定檢查（不合法的講人話擋下、全部檢查過才動）、內容真的變了版本號才加一、改名撞名、「未分類」不能改名或刪除；另起隔離主控台端對端：舊版群組名稱補成群組物件、改名成員跟著改、刪除時成員移到未分類、機器改到新群組名稱時自動建群組 |
+| `console/test_groups.py` | 任何 Linux（要 cryptography） | 46 | 群組：設定檢查（不合法的講人話擋下、全部檢查過才動）、內容真的變了版本號才加一、改名撞名、「未分類」不能改名或刪除；另起隔離主控台端對端：舊版群組名稱補成群組物件、改名成員跟著改、刪除時成員移到未分類、機器改到新群組名稱時自動建群組；主控台把群組設定送給一支真的代理，幾秒內準備並套用、鎖定經主控台也改不了 |
+| `agent/test_group.py` | Linux／macOS／Windows | 23 | 群組設定對齊代理這一側：準備（下載、核對 SHA-256、只准用的模型）與套用分兩段、指定時間以主控台時鐘為準、下次開機才套用、鎖定時本機 API 回 423、被改掉的模型拉回、換群組重來（本機假的 Hugging Face） |
 | `agent/test_link.py` | Linux／macOS／Windows | 34 | 代理主動連回代理這一側：連回設定、釘住通道憑證、內部位址連不到改走對外網址、經 HTTP 代理伺服器（含帳密）與壞掉時改直連、SNI 選通道憑證與收到新清單、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
 | `test/security/test_security.py` | 任何 Linux | 52 | 從攻擊者角度：未登入、票證、IDOR 等價、SSRF、路徑穿越、節流、標頭、TLS、機密不落地 |
 | `test/test_api_integration.py` | 有 systemd --user | 23 | API 串接設定：改名稱／上下文／金鑰後重啟驗證、失敗自動還原、經網路實測不跟轉址 |

@@ -3892,7 +3892,7 @@ async function settingsGroups(wrap) {
   wrap.appendChild(head);
   try { d = await api("/api/groups"); } catch (ex) { head.appendChild(el("p", "note warn", ex.message)); return; }
   head.appendChild(el("p", "small muted",
-    "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。機器依群組設定自動準備與套用的功能，會在下一版接上；目前先保存設定與版本號。"));
+    "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。存檔後每台機器會先「準備」（下載並核對模型），到了套用時機才「套用」（換上模型、生效鎖定），上課或上班中改設定不會提早換掉正在用的模型。"));
   const add = el("div", "slot-actions");
   const fName = groupInputBox("text", "", { placeholder: "新群組名稱，例：電腦教室 A" });
   fName.style.maxWidth = "280px";
@@ -3914,7 +3914,7 @@ async function settingsGroups(wrap) {
   const list = card("全部群組", `${d.groups.length} 個`);
   const tbl = el("table", "api-table");
   const hr = el("tr");
-  ["名稱", "種類", "機器", "設定版本", "更新時間（台北時間）", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  ["名稱", "種類", "機器", "設定版本", "就緒", "已套用", "更新時間（台北時間）", ""].forEach((h) => hr.appendChild(el("th", null, h)));
   tbl.appendChild(hr);
   d.groups.forEach((g) => {
     const tr = el("tr");
@@ -3922,6 +3922,8 @@ async function settingsGroups(wrap) {
     tr.appendChild(el("td", null, g.kind));
     tr.appendChild(el("td", null, `${g.members} 台`));
     tr.appendChild(el("td", "mono", `v${g.version}`));
+    tr.appendChild(el("td", "nowrap", g.members ? `${g.ready}/${g.members}` : "—"));
+    tr.appendChild(el("td", "nowrap", g.members ? `${g.done}/${g.members}` : "—"));
     tr.appendChild(el("td", "nowrap", new Date(g.updated * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" })));
     const td = el("td", "nowrap");
     const eb = el("button", "btn sm" + (S.groupEdit === g.id ? " primary" : ""), "編輯設定");
@@ -3952,7 +3954,46 @@ async function settingsGroups(wrap) {
   wrap.appendChild(list);
 
   const g = d.groups.find((x) => x.id === S.groupEdit);
-  if (g) wrap.appendChild(groupEditor(g, d));
+  if (g) {
+    wrap.appendChild(groupEditor(g, d));
+    wrap.appendChild(groupMembers(g));
+  }
+}
+
+const GROUP_PHASE = { queued: "收到，排隊中", preparing: "準備中", waiting_boot: "已準備，等下次開機套用", waiting_time: "已準備，等指定時間套用",
+  applying: "套用中", done: "已套用", failed: "失敗", idle: "—" };
+
+function groupMembers(g) {
+  const c = card("各台進度", `設定 v${g.version}；就緒 ${g.ready}/${g.members}、已套用 ${g.done}/${g.members}`);
+  const rb = el("button", "btn sm", "重新整理");
+  rb.onclick = () => render();
+  const ra = el("div", "slot-actions");
+  ra.appendChild(rb);
+  c.appendChild(ra);
+  if (!g.nodes.length) {
+    c.appendChild(el("p", "small muted", "這個群組還沒有機器。到「機器」把機器的群組改成這一個。"));
+    return c;
+  }
+  const tbl = el("table", "api-table");
+  const hr = el("tr");
+  ["機器", "已準備", "已套用", "狀態", "最後一步"].forEach((h) => hr.appendChild(el("th", null, h)));
+  tbl.appendChild(hr);
+  g.nodes.forEach((m) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, m.name || m.id));
+    tr.appendChild(el("td", "mono", m.prepared ? `v${m.prepared}` : "—"));
+    tr.appendChild(el("td", "mono", m.applied ? `v${m.applied}` : "—"));
+    const status = m.idle ? "群組沒有設定，不用對齊" : !m.checked ? "還沒連到（主動連回的機器要在線才送）"
+      : m.error && !m.phase ? m.error : GROUP_PHASE[m.phase] || m.phase || "—";
+    tr.appendChild(el("td", m.phase === "failed" || (m.error && !m.phase) ? "bad" : null, status));
+    const last = m.steps[m.steps.length - 1];
+    tr.appendChild(el("td", "small", last ? last.step : "—"));
+    tbl.appendChild(tr);
+  });
+  const tw = el("div", "md-table-wrap");
+  tw.appendChild(tbl);
+  c.appendChild(tw);
+  return c;
 }
 
 function groupEditor(g, d) {

@@ -38,6 +38,8 @@ jobs:
         run: python agent/test_admit.py
       - name: 代理主動連回（代理這一側：釘憑證、分片、串流、去重、取消）
         run: python agent/test_link.py
+      - name: 群組設定對齊（代理這一側）
+        run: python agent/test_group.py
       - name: 推薦清單
         run: python console/test_recommend.py
       - name: Intel 顯示卡、SSD 判斷、引擎續傳與手動匯入、畫圖參考圖與多張

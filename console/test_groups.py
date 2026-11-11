@@ -3,6 +3,7 @@
 
 一、群組設定的檢查（groups.check／update／ensure，不開網路）：合法的照收、不合法的講人話擋下、
     設定真的變了版本號才加一、改名撞名不動任何東西、「未分類」不能改名。
+三、群組設定對齊：主控台送給一支真的代理，代理準備並套用後回報，鎖定經主控台也改不了。
 二、端對端：舊版只有群組名稱的機器，主控台啟動時補上群組物件；經網頁 API 新增、改設定、改名（成員跟著改）、
     刪除（成員移到未分類）；機器改到新群組名稱時自動建出群組。
 跑法：python3 test_groups.py
@@ -196,8 +197,96 @@ def e2e():
         shutil.rmtree(W, ignore_errors=True)
 
 
+def e2e_align():
+    """主控台把群組設定送給一支真的代理（主控台連代理的伺服器模式），代理套用後回報；鎖定經主控台也改不了。"""
+    import secrets
+    W = tempfile.mkdtemp(prefix="xc-align-")
+    chome, ahome = os.path.join(W, "console"), os.path.join(W, "agent")
+    for d in (os.path.join(chome, ".xconsole", "trust"), os.path.join(ahome, ".xconsole")):
+        os.makedirs(d, mode=0o700)
+    port, lport, aport = free_port(), free_port(), free_port()
+    token = secrets.token_urlsafe(32)
+    open(os.path.join(ahome, ".xconsole", "token"), "w").write(token)
+    agent = subprocess.Popen([sys.executable, os.path.join(HERE, "..", "agent", "xconsole_agent.py"), "--home", ahome,
+                              "--bind", "127.0.0.1"], env={**os.environ, "HOME": ahome, "XCONSOLE_HOME": ahome,
+                                                           "XCONSOLE_AGENT_PORT": str(aport)},
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    cons = None
+    try:
+        acert = os.path.join(ahome, ".xconsole", "agent-cert.pem")
+        for _ in range(100):
+            if os.path.exists(acert):
+                try:
+                    ssl.get_server_certificate(("127.0.0.1", aport), timeout=1)
+                    break
+                except Exception:  # noqa: BLE001
+                    pass
+            time.sleep(0.3)
+        shutil.copy(acert, os.path.join(chome, ".xconsole", "trust", "ws-1.pem"))
+        json.dump({"auth": {}, "nodes": [{"id": "ws-1", "name": "教室 01", "host": "127.0.0.1", "agent_port": aport,
+                                          "group": "教室", "link": "pull", "token": token}]},
+                  open(os.path.join(chome, ".xconsole", "fleet.json"), "w"))
+        env = {**os.environ, "HOME": chome, "XCONSOLE_HOME": chome, "XCONSOLE_PORT": str(port), "XCONSOLE_LINK_PORT": str(lport)}
+        srv = os.path.join(HERE, "xconsole_server.py")
+        subprocess.run([sys.executable, srv, "--set-credentials"], input=b"admin\nalign-pass-2026\n", env=env, check=True, capture_output=True)
+        cons = subprocess.Popen([sys.executable, srv], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        for _ in range(100):
+            try:
+                ssl.get_server_certificate(("127.0.0.1", port), timeout=1)
+                break
+            except Exception:  # noqa: BLE001
+                time.sleep(0.3)
+        ctx = ssl.create_default_context(cafile=os.path.join(chome, ".xconsole", "tls", "cert.pem"))
+        ctx.check_hostname = False
+        op = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx),
+                                         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+        def call(path, body=None):
+            req = urllib.request.Request(f"https://127.0.0.1:{port}{path}", method="POST" if body is not None else "GET",
+                                         data=json.dumps(body).encode() if body is not None else None,
+                                         headers={"Content-Type": "application/json"})
+            try:
+                with op.open(req, timeout=60) as r:
+                    return r.status, json.load(r)
+            except urllib.error.HTTPError as e:
+                return e.code, json.load(e)
+        call("/api/login", {"username": "admin", "password": "align-pass-2026"})
+        g = next(x for x in call("/api/groups")[1]["groups"] if x["name"] == "教室")
+        m0 = g["nodes"][0]
+        check("群組沒有設定：不送，畫面標「不用對齊」", m0["idle"] and m0["applied"] == 0, m0)
+        t0 = time.time()
+        st, out = call(f"/api/groups/{g['id']}/update", {"settings": {"locked": ["models"], "apply_at": {"mode": "now"}}})
+        g = None
+        for _ in range(60):
+            g = next(x for x in call("/api/groups")[1]["groups"] if x["name"] == "教室")
+            if g["done"] == 1:
+                break
+            time.sleep(0.5)
+        m = g["nodes"][0]
+        check(f"改了群組設定：幾秒內送到代理、準備並套用，主控台看得到（{time.time() - t0:.1f} 秒）",
+              st == 200 and g["ready"] == 1 and g["done"] == 1 and m["phase"] == "done" and m["applied"] == g["version"]
+              and time.time() - t0 < 20, m)
+        check("  每一步的紀錄回到主控台", any("已套用" in x["step"] for x in m["steps"]), m["steps"])
+        st, out = call("/api/node/ws-1/slot/main/model", {"engine": "llama", "model": "x/y"})
+        check("群組鎖定了模型：經主控台的機器頁也換不了（要改群組設定）", st == 423 and out.get("group_locked"), (st, out))
+    finally:
+        for p in (cons, agent):
+            if p is not None:
+                p.terminate()
+                try:
+                    p.wait(10)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+        if not OK:
+            for p in (cons, agent):
+                if p is not None:
+                    print(p.stdout.read().decode(errors="replace")[-1500:])
+        shutil.rmtree(W, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unit()
     e2e()
+    e2e_align()
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)
