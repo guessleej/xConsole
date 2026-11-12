@@ -22,7 +22,8 @@ LAYER_MS = 0.1            # 每層固定開銷（毫秒）：MoE 每個 token �
 CTX = 32768               # 推薦時假設的上下文
 ENGINE_OVERHEAD = 1.0     # 計算緩衝，與代理 llama_est 一致
 Q4_GIB_PER_B = 0.57       # Q4_K_M 每十億參數約 0.57 GiB，用來換算「流暢執行 XB 以內」
-NICE_B = (1, 3, 4, 8, 12, 14, 24, 27, 32, 49, 70, 120, 235, 405, 671)
+# 標題「流暢執行 XB 以內」照估算往下取整：100B 以下取到 1B，以上取到 10B。
+# 以前湊到常見尺寸（…70、120、235），算出 131B 卻寫 120B，機器上跑著 128B 的模型時標題自相矛盾
 USES = {"chat": "對話與知識", "code": "寫程式", "vision": "看圖與 OCR"}
 CN_ORIGIN = ("qwen", "deepseek", "glm", "chatglm", "kimi", "moonshot", "minimax", "hunyuan",
              "internlm", "baichuan", "doubao", "ernie", "seed-oss")
@@ -67,7 +68,7 @@ def repo_folder(repo):
 
 
 def _nice(b):
-    return max((x for x in NICE_B if x <= b), default=0)
+    return 0 if b < 1 else int(b) if b < 100 else int(b // 10 * 10)
 
 
 def capacity(state):
