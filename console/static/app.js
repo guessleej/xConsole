@@ -401,6 +401,12 @@ function kvRow(k, v) {
 
 /* ---------------------------------------------------------------- 欄位卡 */
 
+// 代理每 5 分鐘真的請模型生 1 個 token；連續兩次回錯誤才標壞。常見是 GPU 重置後引擎的運算環境死了，重啟就好
+function genBrokenText(g) {
+  const at = g.at ? new Date(g.at * 1000).toLocaleString("zh-TW", { hour12: false }) : "";
+  return `服務還開著、模型清單也回得來，但請它生字回錯誤（${at}）：${g.error || "沒有回答"}。通常是 GPU 重置過，按「重新啟動」多半就好了。`;
+}
+
 function slotCard(node, s, unified) {
   if (!s.unit) {
     const c = el("div", "slot empty");
@@ -418,14 +424,16 @@ function slotCard(node, s, unified) {
 
   const c = el("div", "slot rv");
   const top = el("div", "slot-top");
-  const dot = el("span", "dot" + (s.state === "active" ? " on"
+  const broken = s.gen?.ok === false;      // 模型清單回得來，但實際請它生字回錯誤
+  const dot = el("span", "dot" + (broken ? " bad" : s.state === "active" ? " on"
     : s.state === "activating" || s.state === "deactivating" ? " warn"
       : s.state === "failed" ? " bad" : ""));
   top.appendChild(dot);
   top.appendChild(el("span", "role", `${s.role}・${s.tier || ""}`));
   top.appendChild(el("span", "spacer"));
-  top.appendChild(el("span", "tier", s.state_label));
+  top.appendChild(el("span", "tier", broken ? "生不出字" : s.state_label));
   c.appendChild(top);
+  if (broken) c.appendChild(el("p", "note bad", genBrokenText(s.gen)));
 
   c.appendChild(el("div", "model", s.model || s.unit));
   if (s.quant) c.appendChild(el("div", "quant", s.quant));
