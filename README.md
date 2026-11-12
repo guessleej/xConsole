@@ -306,7 +306,7 @@ LTX-2.3 蒸餾 Q2_K 512×320、17 格、八步 48 秒（webm，含聲音），�
 | 助理 | 對話 › 模型選單的「主控台助理」 | 模型用四個**唯讀**工具查這個主控台管的機器（列機器、這台狀態、推薦模型、已下載的模型），只能查不能動作。最多來回 6 次；同一個工具同樣參數查第二次直接回「已經查過」；最後一輪不給工具逼它作答；小模型產出不合工具格式（llama.cpp 回 500）時改成不帶工具重答 |
 | 執行設定 | 執行頁（也可從欄位卡的「執行設定」） | 上下文 8K／16K／32K／64K／128K 一鍵切換，每個選項先用准入公式試算（`admit(cfg_override=…)`），放不下的反灰並說明原因；思考模式（新版 llama.cpp 用 `--reasoning on/off`，舊版關掉用 `--reasoning-budget 0`，看 `--help` 決定）；區網存取（`--host 0.0.0.0` 或 `127.0.0.1`）。顯示預估速度（跟推薦同一條公式）與載入時間——實際載入過就顯示實測秒數，沒有才依磁碟速度估 |
 | 推理引擎下載與離線安裝 | 安裝推理引擎視窗 | 下載官方預編譯版時可以「暫停下載」，斷線、暫停或代理重啟後按「繼續下載」用 HTTP Range 接著下，整個檔核對官方 sha256 才裝，裝好後下載檔清掉。不能連外：展開「改成手動匯入安裝包」，選官方的 .zip／.tar.gz（可貼官方 sha256），分塊送、可以續傳；送齊後核對、解壓縮（落到資料夾外就整個拒絕）、找出包在子資料夾的 llama-server／sd-cli、試跑，裝進 `~/llama.cpp-import-<sha 前八碼>/` |
-| 用硬碟執行 | 執行頁 | 記憶體放不下時自動往後排（顯示卡→系統記憶體→硬碟），不必另外勾選；按鈕標「會用到硬碟，很慢」。存放區在機械硬碟上會提醒改放 SSD（機械硬碟慢約十倍）。AI 395 這類 BIOS 切兩塊的機器照樣不給 |
+| 用硬碟執行 | 執行頁 | 記憶體放不下時自動往後排（顯示卡→系統記憶體→硬碟），不必另外勾選；按鈕標「會用到硬碟，很慢」。存放區在機械硬碟上會提醒改放 SSD（機械硬碟慢約十倍）。AI 395 這類 BIOS 切兩塊的機器也可以：GPU 那塊當一張卡，系統那塊只當頁快取（作業系統隨時能丟，不會佔死）；跑的時候看門狗每 3 秒看一次系統記憶體，連續三次低於底線的一半就停掉那個模型，執行頁寫出原因 |
 | 匯入 GGUF | 模型 › 右上「匯入本機 GGUF」 | 瀏覽器分塊送（每塊 32 MB）、可以續傳（代理回報已收到多少）；最後一塊到齊才核對 GGUF 檔頭、改成正式檔名。上傳的本文不是 JSON，另外擋跨站：要登入、要 `application/octet-stream`、要自訂標頭 `X-XConsole-Upload` |
 | 搜尋 Hugging Face | 模型 › 搜尋 Hugging Face | 關鍵字找 GGUF（照下載數排），點一下帶進名稱並列出量化；每個量化標這台跑不跑得動、預估 tok/s 與三色分層條，並標「建議」；中國來源標出來 |
 
@@ -319,7 +319,7 @@ LTX-2.3 蒸餾 Q2_K 512×320、17 格、八步 48 秒（webm，含聲音），�
 | `POST /api/node/{n}/library/hf` `{repo, token?, match?}` | 代理讀遠端 GGUF 檔頭（`hf_profile`）取結構；每個 `choices[i]` 多 `plan: {level, tok_s, place, need_gib, split:{gpu,ram,disk}, guess, cpu_moe, kv_gib, ctx, bits, load_est_sec}`，整體多 `pick`、`guess`、`capacity`、`mmproj_pick`。讀不到檔頭退回只有檔案清單，用稠密假設估、`guess: true`、另附 `profile_error`。同一個 repo 10 分鐘內不重抓檔頭 |
 | `GET /api/node/{n}/library` | 每顆 `gguf[i]` 多 `plan`（同上格式，另加 `load_sec`＝代理記的實測載入秒數，沒有是 `null`）；整體多 `capacity` |
 | `GET /api/node/{n}/slot/{s}/progress` | `{state: idle\|loading\|ready\|failed, stage: prepare\|read\|alloc\|warmup\|done, pct, read_gib, total_gib, elapsed_sec, eta_sec, message}`；換模型的請求進行中每秒問一次。載入結束後結果保留 10 分鐘 |
-| `POST /api/node/{n}/slot/{s}/model` | 原本的參數之外多收 `allow_disk`（只有 `true` 才算）、`thinking`（auto／on／off）、`lan`（true／false），同一次啟動就套用；回應多 `disk_mode`、`ngl`、`split`、`thinking`、`lan`。AI 395 這類 BIOS 切兩塊的機器帶 `allow_disk` 一律 400（`disk_denied: true`） |
+| `POST /api/node/{n}/slot/{s}/model` | 原本的參數之外多收 `allow_disk`（只有 `true` 才算）、`thinking`（auto／on／off）、`lan`（true／false），同一次啟動就套用；回應多 `disk_mode`、`ngl`、`split`、`thinking`、`lan`。AI 395 這類 BIOS 切兩塊的機器也收 `allow_disk`；欄位狀態多 `watchdog`（看門狗停掉時的原因，重新啟動就清掉） |
 | `GET /api/node/{n}/apiinfo/{s}` | `run` 多 `split`、`mode`（normal／cpu_moe／disk）、`disk_mode`（現在是不是用硬碟跑）、`disk_allowed`、`disk_needed`、`disk_note` |
 | `POST /api/preview` `{html}` → `{url, id, expires_at}` | `GET /preview/<id>` 回原文，標頭 `Content-Security-Policy: sandbox allow-scripts allow-forms allow-modals allow-popups; …`、`X-Frame-Options: SAMEORIGIN`、`Cross-Origin-Embedder-Policy: credentialless`。只有建立者那一個登入看得到，30 分鐘、單筆 2 MB、最多 50 筆 |
 | `GET /api/providers` | `{items: [{id, name, base_url, default_model, key_set, ca_set, cn_origin, created, updated}], presets: [{key, name, base_url, default_model, note}]}`，永不回金鑰 |
