@@ -1502,7 +1502,7 @@ function capNote(cap) {
   return cap?.note || "";
 }
 
-// 一條橫向分層長條：越左越快。marker＝推薦模型要占多少，標在長條上
+// 一條橫向分層長條：越左越快。marker＝正在跑的模型占多少，標在長條上
 function tierBar(cap, marker) {
   const box = el("div", "tier");
   const total = cap.tiers.reduce((a, t) => a + Math.max(t.gib, 0), 0) || 1;
@@ -1546,9 +1546,11 @@ function hwCard(n, rec) {
     w.appendChild(b);
     left.appendChild(w);
   }
-  const feat = rec.items.find((x) => x.repo === rec.featured);
-  const fp = feat?.plans.find((p) => p.stem === (feat.installed || feat.pick));
-  if (cap.tiers.length) left.appendChild(tierBar(cap, fp ? { label: feat.title, gib: fp.need_gib } : null));
+  // 標正在跑的模型與實際用量。以前標的是推薦模型（xVITA 31B・30 GiB），機器明明在跑別顆，
+  // 看的人會以為在跑它，數字也跟上面的標題對不起來；推薦留在「模型」頁
+  const rs = runningSlot(n);
+  const used = rs && ((rs.vram_gib || 0) + (cap.memory_model === "discrete" ? 0 : rs.ram_gib || 0));
+  if (cap.tiers.length) left.appendChild(tierBar(cap, used ? { label: `現在執行 ${rs.model || rs.role}`, gib: used } : null));
   c.appendChild(left);
 
   const right = el("div", "hw-side");
