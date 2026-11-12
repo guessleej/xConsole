@@ -408,7 +408,7 @@ function drawPlan(c, n, m, p) {
   }
   if (mm !== "unified_single") {
     row("ram", mm === "unified_split" ? "系統那一塊" : "系統記憶體", pools.ram?.total_gib, sp.ram,
-      mm === "unified_split" ? (sp.ram ? "放不下 GPU 那塊的權重以頁快取留在這裡（隨時可以丟，不會佔死），有看門狗盯著" : "平常只給引擎用，模型不放這裡")
+      mm === "unified_split" ? (sp.ram ? "放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著" : "平常只給引擎用，模型不放這裡")
         : sp.ram ? "放不下顯示卡的專家層放這裡，比較慢" : `剩下的保留給系統（至少留 ${fmt(pools.floors?.ram, 0)} GiB）`);
   }
   row("disk", "硬碟・按需讀取", null, sp.disk,
@@ -503,6 +503,9 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   const shorter = !!(st.ctx && p?.ctx && st.ctx < p.ctx);
   btn.disabled = (p?.level === "no" && !shorter) || (diskBlocked && !shorter);
   // 上次是看門狗停掉的：講清楚原因，不要讓人以為模型自己壞了
+  if (diskNeed && m.disk_unsafe_args?.length) {
+    c.appendChild(el("p", "note warn", `用硬碟執行時不會套用這幾個自訂引數：${m.disk_unsafe_args.join("、")}（它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體）。`));
+  }
   const wd = slot?.watchdog;
   if (wd && !running) c.appendChild(el("p", "note warn", wd.message));
   btn.title = p?.level === "no" && !shorter ? "這台放不下這顆；可以先把上下文調短" : "";

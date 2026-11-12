@@ -142,7 +142,8 @@ def pure_tests():
     got = A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
     eq("看門狗：連續三次低於危險線，停掉用硬碟執行的那個", (got, stopped_units), (["big"], ["u-big"]))
     note = A.watchdog_notes().get("big") or {}
-    case("  留下原因給畫面（剩多少、危險線、怎麼辦）", "5.0 GiB" in note.get("message", "") and note.get("line") == 7.5, note)
+    case("  留下原因給畫面（剩多少、危險線、怎麼辦），並記下已取消開機自啟",
+         "5.0 GiB" in note.get("message", "") and note.get("line") == 7.5 and note.get("disabled") is True, note)
     case("  一般放法的模型不停（准入已經算死，不會跑到一半多吃）", "u-ok" not in stopped_units)
     A.watchdog_clear("big")
     eq("  重新啟動前清掉原因", A.watchdog_notes().get("big"), None)
@@ -151,7 +152,39 @@ def pure_tests():
     for _ in range(4):
         A.watchdog_check(wd_reg, 1.0, hits, stop=stopped_units.append)
     eq("看門狗：沒在跑的不理", stopped_units, ["u-big"])
+    # 兩個都用硬碟執行：一次只停一個，停完重新量
+    disk2 = os.path.join(wd_dir, "d2.json")
+    A.save_json(disk2, {"disk": True})
+    wd_reg2 = {"machine": wd_reg["machine"], "slots": [wd_reg["slots"][0], {"id": "big2", "kind": "llama", "unit": "u-big2", "config": disk2}]}
+    A._alive = lambda sl: True
+    stopped_units, hits = [], {}
+    for _ in range(3):
+        A.watchdog_check(wd_reg2, 5.0, hits, stop=stopped_units.append)
+    eq("看門狗：兩個都用硬碟執行，一次只停一個", stopped_units, ["u-big"])
+    A.watchdog_check(wd_reg2, 12.0, hits, stop=stopped_units.append)
+    eq("  停完記憶體回升，另一個不停", stopped_units, ["u-big"])
     A._alive = real_alive
+    A.watchdog_clear("big")
+    calls = []
+    real_sysctl = A.sysctl
+    A.sysctl = lambda unit, verb, timeout=200: (calls.append(verb), (0, "", ""))[1]
+    A.watchdog_stop("u-x")
+    A.sysctl = real_sysctl
+    eq("看門狗停服務：停掉並取消開機自啟（重開機不會自己再起來）", calls, ["stop", "disable"])
+
+    # 用硬碟執行時，會關掉檔案映射或鎖住記憶體的自訂引數一律不套用
+    eq("拿掉 --no-mmap／--mlock／--load-mode 與它的值",
+       A.strip_no_mmap(["--no-mmap", "-t", "8", "--load-mode", "none", "--mlock", "--load-mode=none", "--temp", "0.7"]),
+       ["-t", "8", "--temp", "0.7"])
+    mp = os.path.join(wd_dir, "m.gguf")
+    reg_args = {"machine": {"memory_model": "unified_split", "llama_args": ["--mlock"]},
+                "llama_custom_args": {os.path.abspath(mp): ["--no-mmap", "-t", "8"]}}
+    raw_disk = {"exe": "/x/llama-server", "model": mp, "port": 8290, "alias": "a", "disk": True, "mmap": True, "ngl": 999}
+    argv = A.llama_argv(raw_disk, reg_args)
+    case("  用硬碟執行：指令裡沒有 --no-mmap、--mlock，其他自訂引數照樣套用",
+         "--no-mmap" not in argv and "--mlock" not in argv and "-t" in argv, argv)
+    argv = A.llama_argv({**raw_disk, "disk": False, "mmap": False}, reg_args)
+    case("  一般放法：自訂的 --no-mmap、--mlock 照舊套用", "--no-mmap" in argv and "--mlock" in argv, argv)
 
     # ---- 用硬碟執行的分層
     m = {"size_gib": 100.0, "mmproj_gib": 0.0, "layers": 50, "kv_full_bpt": 131072, "kv_swa_bpt": 0, "swa_window": 0}
@@ -280,6 +313,20 @@ def swap_tests():
         sl = next(x for x in A.registry()["slots"] if x["id"] == "s1")
         opts = A.run_options(sl, A.load_json(A.engine_file("s1", "-llama.json"), {}))
         case("  執行設定 disk_allowed=true，並附上這種機器的說明", opts["disk_allowed"] is True and "看門狗" in (opts["disk_note"] or ""), opts.get("disk_note"))
+
+        # 看門狗停掉之後：換模型失敗要留著原因；按「啟動」要恢復開機自啟、成功才清掉原因
+        A.save_json(A.WATCHDOG_FILE, {"s1": {"message": "看門狗停掉了", "disabled": True}})
+        code, out = A.set_llama_model("s1", "沒有這顆/x", 8192, allow_disk=True)
+        case("換模型失敗（沒有這顆）：看門狗留下的原因還在", code == 400 and A.watchdog_notes().get("s1"), (code, out))
+        verbs = []
+        real_sysctl = A.sysctl
+        A.sysctl = lambda unit, verb, timeout=200: (verbs.append(verb), (0, "", ""))[1]
+        try:
+            code, out = A.do_control("s1", "start", force=True)
+        finally:
+            A.sysctl = real_sysctl
+        case("按啟動：先恢復開機自啟再啟動，成功後清掉原因",
+             code == 200 and "enable" in verbs and verbs.index("enable") < verbs.index("start") and not A.watchdog_notes().get("s1"), (code, verbs))
     finally:
         for u in list(A.SUP.procs):
             A.SUP.ctl(u, "stop")

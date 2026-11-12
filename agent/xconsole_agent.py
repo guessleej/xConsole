@@ -2167,6 +2167,9 @@ def run_options(slot, raw):
             "disk_mode": bool(raw.get("disk")), "disk_allowed": True,
             "disk_needed": bool(lay and lay["mode"] == "disk"),
             "disk_note": DISK_SPLIT_NOTE if mm == "unified_split" else None,
+            # 用硬碟執行時不會套用的自訂引數（會關掉檔案映射或鎖住記憶體）：畫面講清楚，不是默默丟掉
+            "disk_ignored_args": sorted({t.split("=", 1)[0] for t in llama_custom_args(raw)} & DISK_UNSAFE_ARGS)
+            if lay and lay["mode"] == "disk" else [],
             "bandwidth_gbs": chip().get("bandwidth_gbs"), "hdd": (store or {}).get("hdd"),
             "profile": {k: prof.get(k) for k in ("active_frac", "layers", "moe", "arch")},
             "measured_tok_s": ((registry().get("speed") or {}).get(os.path.abspath(raw.get("model") or "")) or {}).get("tok_s"),
@@ -3002,7 +3005,7 @@ def watchdog_check(reg, free_gib, hits, stop=None):
     """看一次：回這次停掉的欄位 id 清單。hits 是各欄位連續低於危險線的次數（呼叫端保存）。
     只盯「用硬碟執行」的 llama.cpp 欄位：一般放法在准入時已經算死了，不會在跑的時候突然多吃。"""
     line = watchdog_line(reg["machine"])
-    stop = stop or (lambda unit: sysctl(unit, "stop"))
+    stop = stop or watchdog_stop
     stopped = []
     for sl in reg["slots"]:
         raw = load_json(sl.get("config") or "", None) if sl.get("kind") == "llama" and sl.get("config") else None
@@ -3010,19 +3013,28 @@ def watchdog_check(reg, free_gib, hits, stop=None):
             hits.pop(sl["id"], None)
             continue
         hits[sl["id"]] = hits.get(sl["id"], 0) + 1 if free_gib < line else 0
-        if hits[sl["id"]] >= WATCHDOG_HITS:
+        if hits[sl["id"]] >= WATCHDOG_HITS and not stopped:
+            # 一次只停一個：停掉之後重新量，夠了就不必再停別的（同一個舊取樣不能拿來判另一個）
             stop(sl["unit"])
-            hits.pop(sl["id"], None)
+            hits.clear()
             msg = (f"系統記憶體只剩 {free_gib:.1f} GiB（危險線 {line:.1f} GiB），為了不讓整台卡死，"
                    f"看門狗在 {time.strftime('%m/%d %H:%M')} 停掉了這個用硬碟執行的模型。"
                    "請縮短上下文、關掉別的程式，或換小一點的量化再啟動")
             with _WD_LOCK:
                 notes = watchdog_notes()
                 notes[sl["id"]] = {"at": int(time.time()), "free_gib": round(free_gib, 1), "line": round(line, 1),
-                                   "model": sl.get("model"), "message": msg}
+                                   "model": sl.get("model"), "disabled": True, "message": msg}
                 save_json(WATCHDOG_FILE, notes)
             stopped.append(sl["id"])
+            break
     return stopped
+
+
+def watchdog_stop(unit):
+    """停掉並取消開機自啟：不然重開機（macOS／Windows 是代理重開）時它會先自己起來，同樣的問題再來一次。
+    使用者在網頁上按啟動或換模型才會重新啟用。"""
+    sysctl(unit, "stop")
+    sysctl(unit, "disable", timeout=30)
 
 
 def disk_watchdog():
@@ -3336,8 +3348,29 @@ def llama_argv(raw, reg=None):
     if not raw.get("mmap", False) and not flags & {"--mmap", "--no-mmap", "--load-mode"}:
         # 統一記憶體機開 mmap 會多一份頁快取，系統記憶體那塊先爆
         argv += no_mmap_args(raw["exe"])
-    extra = reg["machine"].get("llama_args") or []
-    return argv + [str(x) for x in extra if isinstance(x, (str, int))] + custom
+    extra = [str(x) for x in reg["machine"].get("llama_args") or [] if isinstance(x, (str, int))]
+    if raw.get("disk"):
+        # 用硬碟執行：准入沒有把權重算進記憶體，這時再關掉檔案映射或鎖住記憶體，權重就變成丟不掉的記憶體、會把機器吃爆
+        extra, custom = strip_no_mmap(extra), strip_no_mmap(custom)
+    return argv + extra + custom
+
+
+DISK_UNSAFE_ARGS = {"--no-mmap", "--mlock", "--load-mode"}
+
+
+def strip_no_mmap(toks):
+    """拿掉會關掉檔案映射或鎖住記憶體的參數（--no-mmap、--mlock、--load-mode 與它的值）。"""
+    out, skip = [], False
+    for t in toks:
+        if skip:
+            skip = False
+            continue
+        flag = t.split("=", 1)[0]
+        if flag in DISK_UNSAFE_ARGS:
+            skip = flag == "--load-mode" and "=" not in t
+            continue
+        out.append(t)
+    return out
 
 
 def llama_cmd_text(raw, reg=None):
@@ -3484,7 +3517,6 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
         return 400, {"error": "思考模式只能是 auto、on、off"}
     if lan is not None and not isinstance(lan, bool):
         return 400, {"error": "區網存取要是 true 或 false"}
-    watchdog_clear(slot_id)
     if not SAFE_ID_RX.fullmatch(slot_id):
         return 400, {"error": "欄位 id 只能用英數、底線與連字號，才能替它建 llama.cpp 服務"}
     if slot.get("kind") not in (None, "strata", "llama") or (slot.get("unit") and not slot.get("kind")):
@@ -3714,6 +3746,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     r["measure"].pop(slot_id, None)
     save_json(REGISTRY, r)
     _load_end(slot_id, True)
+    watchdog_clear(slot_id)                 # 真的換上去了才清看門狗留下的原因；失敗的話原因要留著
     return 200, {"ok": True, "engine": "llama", "model": m["name"], "quant": m.get("quant"),
                  "api_model_name": alias, "port": int(port), "ctx": want_ctx,
                  "switched_engine": old.get("kind") not in (None, "llama"),
@@ -3845,6 +3878,8 @@ def library():
         m["load_sec"] = loads.get(os.path.abspath(m["path"]))
         sp = speeds.get(os.path.abspath(m["path"])) or {}
         m["measured_tok_s"] = sp.get("tok_s")
+        # 這顆的自訂啟動引數裡，用硬碟執行時不會套用的（執行頁要講清楚）
+        m["disk_unsafe_args"] = sorted({t.split("=", 1)[0] for t in llama_custom_args({"model": m["path"]}, reg)} & DISK_UNSAFE_ARGS)
     strata = []
     sslot = next((s for s in reg["slots"] if s.get("kind") == "strata" or (s.get("engines") or {}).get("strata")), None)
     if sslot:
@@ -4662,7 +4697,12 @@ def do_control(slot_id, action, force=False):
     if action in ("stop", "restart") and slot.get("critical") and not force:
         return 409, {"error": f"「{slot['role']}」標記為關鍵服務，要動它請明確確認"}
 
+    wd = watchdog_notes().get(slot_id) if action in ("start", "restart") else None
+    if wd and wd.get("disabled"):
+        sysctl(slot["unit"], "enable", timeout=30)        # 看門狗停掉時取消了開機自啟；使用者明確按啟動才恢復
     rc, out, err = sysctl(slot["unit"], action)
+    if rc == 0 and wd:
+        watchdog_clear(slot_id)
     return (200 if rc == 0 else 500), {
         "ok": rc == 0, "unit": slot["unit"], "action": action,
         "message": (err or out or "已送出").strip()[:400],
