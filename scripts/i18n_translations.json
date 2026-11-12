@@ -19523,5 +19523,50 @@
 "en": "Invalid external URL, e.g. http://ai.example.com:8081/v1",
 "ja": "外部 URL の形式が正しくありません。例：http://ai.example.com:8081/v1",
 "ko": "외부 URL 형식이 올바르지 않습니다. 예: http://ai.example.com:8081/v1"
+},
+"連不到主控台，請確認網路，或防火牆有沒有放行這台電腦（錯誤碼 NET）": {
+"en": "Cannot reach the console. Check the network, or whether the firewall allows this computer (error code NET)",
+"ja": "コンソールに接続できません。ネットワーク、またはファイアウォールがこのコンピューターを許可しているか確認してください（エラーコード NET）",
+"ko": "콘솔에 연결할 수 없습니다. 네트워크 또는 방화벽이 이 컴퓨터를 허용하는지 확인하세요 (오류 코드 NET)"
+},
+"帳號或密碼不對（錯誤碼 401）。登入已暫停，請 15 分鐘後再試": {
+"en": "Incorrect username or password (error code 401). Sign-in is paused; try again in 15 minutes",
+"ja": "ユーザー名またはパスワードが違います（エラーコード 401）。ログインは一時停止中です。15 分後に再試行してください",
+"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401). 로그인이 일시 중지되었습니다. 15분 후 다시 시도하세요"
+},
+"帳號或密碼不對（錯誤碼 401）": {
+"en": "Incorrect username or password (error code 401)",
+"ja": "ユーザー名またはパスワードが違います（エラーコード 401）",
+"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401)"
+},
+"。再錯 {0} 次會暫停登入 15 分鐘": {
+"en": ". {0} more failed attempts will pause sign-in for 15 minutes",
+"ja": "。あと {0} 回失敗するとログインが 15 分間停止されます",
+"ko": ". {0}번 더 실패하면 로그인이 15분간 중지됩니다"
+},
+"再錯": {
+"en": "More failures:",
+"ja": "あと失敗",
+"ko": "추가 실패"
+},
+"次會暫停登入 15 分鐘": {
+"en": "will pause sign-in for 15 minutes",
+"ja": "回でログインが 15 分間停止されます",
+"ko": "번이면 로그인이 15분간 중지됩니다"
+},
+"{0}（錯誤碼 {1}）": {
+"en": "{0} (error code {1})",
+"ja": "{0}（エラーコード {1}）",
+"ko": "{0} (오류 코드 {1})"
+},
+"錯誤碼": {
+"en": "Error code",
+"ja": "エラーコード",
+"ko": "오류 코드"
+},
+"登入中…": {
+"en": "Signing in…",
+"ja": "ログイン中…",
+"ko": "로그인 중…"
 }
 }
