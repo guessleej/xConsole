@@ -408,7 +408,8 @@ function drawPlan(c, n, m, p) {
   }
   if (mm !== "unified_single") {
     row("ram", mm === "unified_split" ? "系統那一塊" : "系統記憶體", pools.ram?.total_gib, sp.ram,
-      mm === "unified_split" ? "只給引擎用；吃爆會把整台拖死，所以模型不放這裡" : sp.ram ? "放不下顯示卡的專家層放這裡，比較慢" : `剩下的保留給系統（至少留 ${fmt(pools.floors?.ram, 0)} GiB）`);
+      mm === "unified_split" ? (sp.ram ? "放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著" : "平常只給引擎用，模型不放這裡")
+        : sp.ram ? "放不下顯示卡的專家層放這裡，比較慢" : `剩下的保留給系統（至少留 ${fmt(pools.floors?.ram, 0)} GiB）`);
   }
   row("disk", "硬碟・按需讀取", null, sp.disk,
     sp.disk ? "記憶體放不下的部分從硬碟映射，用到才讀；速度取決於硬碟，通常不到 1 tok/s" : "不需要");
@@ -488,18 +489,26 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   c.appendChild(est);
 
   // 要用硬碟：跟 LocModel 一樣自動往後排（顯示卡→系統記憶體→硬碟），不必另外勾選；分層與速度上面已經寫清楚。
-  // BIOS 切兩塊的機器一律不行
+  // 每一種機器都可以，包括 BIOS 切兩塊的 AI 395（系統那塊只當頁快取，跑的時候有看門狗）
   const diskNeed = p?.level === "disk";
-  const diskBlocked = diskNeed && (p.disk_allowed === false || n.state.pools?.memory_model === "unified_split");
+  const diskBlocked = diskNeed && p.disk_allowed === false;
   st.disk = diskNeed && !diskBlocked;
   const err = el("div");
-  if (diskBlocked) {
-    c.appendChild(el("p", "note bad", "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：系統那塊被擠爆會把整台拖死，所以不允許用硬碟補。請換小一點的量化。"));
+  if (diskNeed && n.state.pools?.memory_model === "unified_split") {
+    c.appendChild(el("p", "note", "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：放不下的部分會經過系統那一小塊從 SSD 讀。"
+      + "那是作業系統隨時可以丟掉的頁快取，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死。"));
   }
   const btn = el("button", "btn primary run-go", (running ? "套用設定並重新載入" : "啟動模型") + (st.disk && p.split?.disk ? "（會用到硬碟，很慢）" : ""));
   // 等級是照預設上下文算的；調短了就可能放得下，交給代理用這個長度重做一次記憶體試算
   const shorter = !!(st.ctx && p?.ctx && st.ctx < p.ctx);
   btn.disabled = (p?.level === "no" && !shorter) || (diskBlocked && !shorter);
+  // 上次是看門狗停掉的：講清楚原因，不要讓人以為模型自己壞了
+  if (diskNeed && m.disk_unsafe_args?.length) {
+    c.appendChild(el("p", "note warn", `用硬碟執行時不會套用這幾個自訂引數：${m.disk_unsafe_args.join("、")}（它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體）。`));
+  }
+  const wd = slot?.watchdog;
+  if (wd && !running) c.appendChild(el("p", "note warn", wd.message));
+  if (running && slot?.gen?.ok === false) c.appendChild(el("p", "note bad", genBrokenText(slot.gen)));
   btn.title = p?.level === "no" && !shorter ? "這台放不下這顆；可以先把上下文調短" : "";
   if (shorter && (p?.level === "no" || diskNeed)) {
     c.appendChild(el("p", "note", `上面的規劃是照 ${int(p.ctx)} 個 token 算的。調到 ${st.ctx / 1024}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。`));
@@ -627,7 +636,8 @@ async function startModel(n, m, slot, st, btn, err, prog, statusHolder, force = 
   if (S.view === "run") viewRun();
 }
 
-const STAGES = [["prepare", "準備"], ["read", "讀取模型"], ["alloc", "分配快取"], ["warmup", "預熱"], ["done", "完成"]];
+// upload：用硬碟執行時，讀完檔案還要從映射搬進 GPU（AI 395 每秒約 50 MB，大模型要等很久）；一般載入不會出現這段
+const STAGES = [["prepare", "準備"], ["read", "讀取模型"], ["upload", "搬進 GPU"], ["alloc", "分配快取"], ["warmup", "預熱"], ["done", "完成"]];
 
 function progressCard(m) {
   const c = card(`正在啟動 ${m.name}`);
@@ -650,7 +660,8 @@ function progressCard(m) {
       const i = Math.max(0, STAGES.findIndex(([k]) => k === r.stage));
       marks.forEach((x, j) => { x.className = "stage" + (j < i ? " done" : j === i ? " now" : ""); });
       // 讀權重的百分比只代表「讀取模型」那一段；整體進度依階段推進
-      const pct = r.stage === "done" ? 100 : r.pct != null && r.stage === "read" ? Math.round(10 + r.pct * 0.7) : [3, 10, 82, 92, 100][i];
+      const pct = r.stage === "done" ? 100 : r.pct != null && r.stage === "read" ? Math.round(10 + r.pct * 0.5)
+        : r.stage === "upload" ? Math.round(60 + (r.upload_pct || 0) * 0.25) : [3, 10, 60, 88, 94, 100][i];
       pctEl.textContent = `${pct}%`;
       fill.style.width = `${pct}%`;
       const sec = r.elapsed_sec ?? Math.round((Date.now() - t0) / 1000);

@@ -97,10 +97,13 @@ def capacity(state):
     elif mm == "unified_split":
         v = (pools.get("vram") or {}).get("total_gib") or 0
         r = (pools.get("ram") or {}).get("total_gib") or 0
-        out.update(fast=max(0.0, v - fl.get("vram", 4)), slow=0.0,
+        # 系統那塊平常不放模型（slow=0）；只有「用硬碟執行」時拿來當頁快取：作業系統隨時可以丟，不會佔死。
+        # 兩塊是同一組實體記憶體，頁快取的讀取頻寬跟 GPU 那塊一樣
+        out.update(fast=max(0.0, v - fl.get("vram", 4)), slow=0.0, page_cache=max(0.0, r - fl.get("ram", 15) - 2.5),    # 2.5＝引擎本身（同代理 disk_layout 的 est_ram）
+                   ram_bandwidth_gbs=chip.get("ram_bandwidth_gbs") or chip.get("bandwidth_gbs") or DEFAULT_RAM_BW,
                    tiers=[{"kind": "gpu", "label": "GPU 那一塊", "gib": round(v - fl.get("vram", 4), 1)},
                           {"kind": "floor", "label": "系統那一塊", "gib": round(r, 1)}],
-                   note="BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，吃爆會把整台拖死，所以另外盯")
+                   note="BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，放不下時當頁快取、從 SSD 補，跑的時候有看門狗盯著")
     elif not sum(c.get("total_gib") or 0 for c in pools.get("gpus") or []):
         # 沒有 GPU（或讀不到顯存）：模型全在系統記憶體、用 CPU 算，速度照系統記憶體頻寬
         r = (pools.get("ram") or {}).get("total_gib") or 0
@@ -202,8 +205,7 @@ def _plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False, ctx_want=CT
                 out.update(d)
             else:
                 out.update(level="no", tok_s=None,
-                           place=f"要約 {need:.0f} GiB，這台最多 {cap['fast'] + cap['slow']:.0f} GiB"
-                           + ("（這台 BIOS 把記憶體切成兩塊，不能用硬碟執行）" if cap["memory_model"] == "unified_split" else ""))
+                           place=f"要約 {need:.0f} GiB，這台最多 {cap['fast'] + cap['slow']:.0f} GiB")
     if cap.get("cpu_only"):
         # 沒有 GPU：「快速層」就是系統記憶體，三色條照實畫在系統記憶體那一格
         sp = out["split"]
@@ -228,8 +230,10 @@ def _moe_disk_plan(cap, prof, size, pinned, hdd, fixed_s):
     每個 token：共用部分全讀、專家只讀被選中的那幾個（expert_used_frac）。回 None＝不適用，交給整層的放法。"""
     mm, fast, slow = cap["memory_model"], cap["fast"], cap["slow"]
     frac, n_exp = prof.get("expert_layer_frac"), int(prof.get("expert_layers") or 0)
-    if not prof.get("moe") or not frac or n_exp <= 0 or mm == "unified_split" or fast <= 0 or cap.get("cpu_only"):
+    if not prof.get("moe") or not frac or n_exp <= 0 or fast <= 0 or cap.get("cpu_only"):
         return None
+    if mm == "unified_split":
+        slow = cap.get("page_cache", 0.0)               # 系統那塊只當頁快取
     if mm == "unified_single" and cap.get("os") == "darwin":
         return None
     per = frac * size                                    # expert_layer_frac＝每一層專家占整顆的比例
@@ -263,7 +267,7 @@ def _moe_disk_plan(cap, prof, size, pinned, hdd, fixed_s):
         tok = 1 / t
     else:
         tok = None
-    where = "統一記憶體" if mm == "unified_single" else "顯示卡"
+    where = {"unified_single": "統一記憶體", "unified_split": "GPU 那一塊"}.get(mm, "顯示卡")
     place = (f"注意力與共用權重放{where}，{n_exp - n_gpu} 層專家留在檔案映射"
              + (f"，其中 {spill:.0f} GiB 從 SSD 按需讀" if spill > 0.05 else "（全部在記憶體裡）"))
     return {"level": "disk", "place": place, "tok_s": tok, "split": split, "cpu_moe": n_exp - n_gpu, "tiered": True}
@@ -272,10 +276,12 @@ def _moe_disk_plan(cap, prof, size, pinned, hdd, fixed_s):
 def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
     """放不進記憶體時，以檔案映射（mmap）啟動、權重按需從硬碟讀的規劃。回 None＝連這樣都不行。
     pinned＝不是檔案映射、一定要占記憶體的部分（KV、引擎計算緩衝、投影檔）；放 GPU 的層也是複製進去的，不能被換出。
-    AI 395 這類 BIOS 切兩塊的機器一律不給：檔案映射的頁快取吃的是系統那一小塊，擠爆會把整台拖死。
-    沒有 GPU 的獨立顯卡機也不給（跟「沒有 GPU 不推薦」一致）。"""
+    沒有 GPU 的獨立顯卡機也不給（跟「沒有 GPU 不推薦」一致）。
+    AI 395 這類 BIOS 切兩塊的機器：GPU 那塊放得下的層放 GPU，其餘以系統那塊當頁快取、再從 SSD 補（跑的時候有看門狗）。"""
     mm, fast, slow = cap["memory_model"], cap["fast"], cap["slow"]
-    if mm == "unified_split" or fast <= 0 or pinned > fast:
+    if mm == "unified_split":
+        slow = cap.get("page_cache", 0.0)
+    if fast <= 0 or pinned > fast:
         return None
     if mm == "unified_single":
         cached = min(size, fast - pinned)          # 剩下的統一記憶體當頁快取
@@ -302,6 +308,8 @@ def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
         place = f"有 {spill:.0f} GiB 權重放不進記憶體，執行時從硬碟按需讀（很慢）"
     elif mm == "unified_single":
         place = "以檔案映射載入，權重留在頁快取"
+    elif mm == "unified_split":
+        place = f"GPU 那一塊放 {gpu_w:.0f} GiB，其餘 {ram_w:.0f} GiB 以檔案映射留在系統那塊的頁快取"
     else:
         place = f"顯示卡放 {gpu_w:.0f} GiB，其餘 {ram_w:.0f} GiB 以檔案映射留在系統記憶體"
     return {"level": "disk", "place": place, "tok_s": tok, "split": split}

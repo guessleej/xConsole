@@ -65,6 +65,10 @@ jobs:
         run: cd console && python test_computer.py
       - name: 對齊 LocModel（自訂啟動引數白名單、MoE 依張量分層、內顯、手動指定顯示卡、鏡像不送令牌、連結資料夾、實測校正）
         run: cd agent && python test_parity.py
+      - name: 用硬碟執行（分層、准入、看門狗、擋關映射的引數、實際換模型）
+        run: cd agent && python test_load_disk.py
+      - name: 生字探測與載入診斷（清單回得來但生不出字、不引警告行、搬進 GPU 的進度與逾時）
+        run: cd agent && python test_health.py
       - name: 其他模型資料夾（LM Studio、C:\models）
         run: cd agent && python test_model_dirs.py
       - name: 線上更新（sha256 核對、擋惡意壓縮檔、備份與退回、代理自我更新）
