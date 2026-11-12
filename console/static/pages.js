@@ -508,6 +508,7 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   }
   const wd = slot?.watchdog;
   if (wd && !running) c.appendChild(el("p", "note warn", wd.message));
+  if (running && slot?.gen?.ok === false) c.appendChild(el("p", "note bad", genBrokenText(slot.gen)));
   btn.title = p?.level === "no" && !shorter ? "這台放不下這顆；可以先把上下文調短" : "";
   if (shorter && (p?.level === "no" || diskNeed)) {
     c.appendChild(el("p", "note", `上面的規劃是照 ${int(p.ctx)} 個 token 算的。調到 ${st.ctx / 1024}K 可能就放得下，按啟動會先用這個長度做一次記憶體試算，放不下會擋下來告訴你。`));
@@ -635,7 +636,8 @@ async function startModel(n, m, slot, st, btn, err, prog, statusHolder, force = 
   if (S.view === "run") viewRun();
 }
 
-const STAGES = [["prepare", "準備"], ["read", "讀取模型"], ["alloc", "分配快取"], ["warmup", "預熱"], ["done", "完成"]];
+// upload：用硬碟執行時，讀完檔案還要從映射搬進 GPU（AI 395 每秒約 50 MB，大模型要等很久）；一般載入不會出現這段
+const STAGES = [["prepare", "準備"], ["read", "讀取模型"], ["upload", "搬進 GPU"], ["alloc", "分配快取"], ["warmup", "預熱"], ["done", "完成"]];
 
 function progressCard(m) {
   const c = card(`正在啟動 ${m.name}`);
@@ -658,7 +660,8 @@ function progressCard(m) {
       const i = Math.max(0, STAGES.findIndex(([k]) => k === r.stage));
       marks.forEach((x, j) => { x.className = "stage" + (j < i ? " done" : j === i ? " now" : ""); });
       // 讀權重的百分比只代表「讀取模型」那一段；整體進度依階段推進
-      const pct = r.stage === "done" ? 100 : r.pct != null && r.stage === "read" ? Math.round(10 + r.pct * 0.7) : [3, 10, 82, 92, 100][i];
+      const pct = r.stage === "done" ? 100 : r.pct != null && r.stage === "read" ? Math.round(10 + r.pct * 0.5)
+        : r.stage === "upload" ? Math.round(60 + (r.upload_pct || 0) * 0.25) : [3, 10, 60, 88, 94, 100][i];
       pctEl.textContent = `${pct}%`;
       fill.style.width = `${pct}%`;
       const sec = r.elapsed_sec ?? Math.round((Date.now() - t0) / 1000);

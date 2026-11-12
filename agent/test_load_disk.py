@@ -210,7 +210,7 @@ def pure_tests():
     eq("  顯存只算放進去的層＋計算緩衝", d["est_vram"], round(100 * want_n / 50 + 1.0, 1))
     rest = 100 - 100 * want_n / 50
     eq("  頁快取放不下的量算成溢出到硬碟",
-         d["split"]["disk"], round(rest - (64 - A.floors({"memory_model": "discrete"})["ram"] - 2.5 - kv * d["kv_ram_frac"]), 1))
+         d["split"]["disk"], round(max(0.0, rest - (64 - A.floors({"memory_model": "discrete"})["ram"] - 2.5 - kv * d["kv_ram_frac"])), 1))
     real_os = A.OS
     A.OS = "linux"
     d = A.disk_layout(m, {"memory_model": "unified_single"}, [], None, 8192, 1, 0, ram_free_gib=110)

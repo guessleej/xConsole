@@ -1488,6 +1488,7 @@ def slot_state(slot, reg, hw):
         "config": cfg, "kv_worst_gib": kv_worst_gib(cfg), "measure": meas,
         "critical": slot.get("critical", False), "note": slot.get("note", ""),
         "watchdog": None if busy else watchdog_notes().get(slot["id"]),
+        "gen": gen_state(slot["id"]) if active else None,     # ok=False：模型清單回得來，但實際請它生字回錯誤
         # 換得回 Strata 的欄位：本來就是 Strata，或現在跑 llama.cpp 但還留著 Strata 的設定
         "has_strata": slot.get("kind") == "strata" or bool((slot.get("engines") or {}).get("strata")),
     }
@@ -1779,11 +1780,38 @@ def _load_mark(slot_id):
                 rec["log_off"] = 0
 
 
+def _load_set(slot_id, **fields):
+    with _LOAD_LOCK:
+        if slot_id in _LOAD:
+            _LOAD[slot_id].update(fields)
+
+
+# 用硬碟執行（開檔案映射）時，放 GPU 的權重是 llama.cpp 從映射一塊一塊同步複製進去的，不走一般載入的
+# pinned 非同步上傳。實測 .27（AI 395、ROCm）約 54 MB/s：只放 18 GiB 就要 5.7 分鐘，放 88 GiB 等 34 分鐘還沒完。
+# 獨立顯卡走 PCIe 快得多，沒實測值先當 1 GB/s（等於維持原本的逾時）。
+UPLOAD_BPS = {"unified_split": 50e6}     # ponytail: 只有一個實測點；量到別的機型再補，或改成記錄每次實際花的時間
+LOAD_TIMEOUT_BASE, LOAD_TIMEOUT_MAX = 900, 3 * 3600
+
+
+def upload_bps(machine):
+    return UPLOAD_BPS.get(machine.get("memory_model"), 1e9)
+
+
+def load_timeout(lay, machine):
+    """等模型起來的上限（秒）。一般放法 15 分鐘；用硬碟執行再加「搬進 GPU 預估時間的 1.5 倍」，最多 3 小時。"""
+    if lay.get("mode") != "disk":
+        return LOAD_TIMEOUT_BASE
+    up = (lay.get("est_vram") or 0) * GIB / upload_bps(machine)
+    return int(min(LOAD_TIMEOUT_MAX, max(LOAD_TIMEOUT_BASE, 600 + up * 1.5)))
+
+
 def _load_end(slot_id, ok, message=""):
     with _LOAD_LOCK:
         rec = _LOAD.get(slot_id)
         if rec and rec["state"] == "loading":
             rec.update(state="ready" if ok else "failed", t1=time.time(), message=message[:300])
+    if ok:
+        gen_forget(slot_id)                 # 換了模型：舊的「生不出字」判定不適用，等下一輪重探
 
 
 def proc_read_bytes(pid):
@@ -1872,6 +1900,19 @@ def load_progress(rec, pid=None, read_bytes=None, rss_gib=None, log_text="", rea
         out.update(pct=100.0 if stage == "done" else max(out["pct"] or 0, 99.0), read_gib=out["total_gib"])
     if stage == "read" and out["pct"] and out["pct"] >= 2:
         out["eta_sec"] = round(elapsed * (100 - out["pct"]) / out["pct"])
+    up_gib, up_bps = rec.get("upload_gib") or 0, rec.get("upload_bps") or 0
+    if stage == "read" and up_gib and up_bps and (out["pct"] or 0) >= 99:
+        # 用硬碟執行：檔案讀完之後還要從映射搬進 GPU，這段看不到位元組進度，照實測速度估
+        stage = "upload"
+        exp = up_gib * GIB / up_bps
+        since = max(0.0, now - (rec.get("upload_t0") or now))
+        out["upload_pct"] = round(min(99.0, 100.0 * since / exp), 1) if exp else None
+        out["eta_sec"] = round(max(0.0, exp - since))
+        cap = rec.get("timeout")
+        out["message"] = (f"權重讀完了，正在搬進 GPU：約 {up_gib:.0f} GiB。用硬碟執行時這段走檔案映射，"
+                          f"這台預估每秒約 {up_bps / 1e6:.0f} MB"
+                          + (f"。比預估慢，仍在搬；等到 {int(cap // 60)} 分鐘還沒好會自動換回原本的設定"
+                             if since > exp and cap else ""))
     # 失敗時回報「卡在哪一個階段」：輪詢時記下的最後一個階段
     out["stage"] = stage if rec["state"] == "loading" else (rec.get("stage") or stage)
     return out
@@ -1912,6 +1953,8 @@ def slot_progress(slot_id):
     with _LOAD_LOCK:
         if slot_id in _LOAD and _LOAD[slot_id]["state"] == "loading":
             _LOAD[slot_id]["stage"] = out["stage"]
+            if out["stage"] == "upload" and not _LOAD[slot_id].get("upload_t0"):
+                _LOAD[slot_id]["upload_t0"] = now
     return 200, out
 
 
@@ -3047,6 +3090,123 @@ def disk_watchdog():
             print("看門狗：", ex, file=sys.stderr)
 
 
+# ---------------------------------------------------------------- 生不生得出字
+# /v1/models 回得來不代表引擎還能算：實測 .27 的 Strata 在 GPU 重置後每個請求都回
+# 「CUDA: unspecified launch failure」，/v1/models 卻照回 loaded，靜默壞了一週沒人發現。
+# 所以每隔一段時間真的請它生 1 個 token。只有「明確回錯誤」才算數；逾時、連不上、忙線、還在載入
+# 都當「這次量不到」不改判定（單請求的引擎正在服務長請求時，探測會排隊排到逾時，不能因此判壞）。
+GEN_EVERY, GEN_FAILS, GEN_TIMEOUT = 300, 2, 60   # 5 分鐘探一次，連續 2 次明確失敗才標「生不出字」
+GEN_KINDS = ("llama", "strata")
+_GEN = {}                                         # 欄位 id → {"ok", "at", "error", "fails"}
+_GEN_LOCK = threading.Lock()
+_GEN_BUSY = set()                                 # 探測還沒回來的欄位
+
+
+def gen_verdict(status, data):
+    """一次探測的結果：True＝生得出字、False＝明確壞了、None＝這次量不到。"""
+    if status == 200 and isinstance(data, dict) and data.get("choices"):
+        return True
+    if status in (0, 401, 429, 503):              # 連不上／要金鑰（我們帶了還 401＝設定問題，不是引擎壞）／忙線／載入中
+        return None
+    if status >= 400:
+        return False
+    return None
+
+
+def gen_error_text(status, data):
+    err = (data or {}).get("error") if isinstance(data, dict) else None
+    msg = err.get("message") if isinstance(err, dict) else err
+    return str(msg or f"HTTP {status}")[:200]
+
+
+def gen_record(slot_id, verdict, error="", now=None):
+    """記一次探測，回目前的判定。連續 GEN_FAILS 次明確失敗才把 ok 改成 False，成功一次就恢復。"""
+    with _GEN_LOCK:
+        rec = dict(_GEN.get(slot_id) or {"ok": None, "fails": 0})
+        if verdict is True:
+            rec.update(ok=True, fails=0, error="", at=int(now or time.time()))
+        elif verdict is False:
+            rec["fails"] = rec.get("fails", 0) + 1
+            rec["last_error"] = error
+            if rec["fails"] >= GEN_FAILS:
+                rec.update(ok=False, error=error, at=int(now or time.time()))
+        _GEN[slot_id] = rec
+        return dict(rec)
+
+
+def gen_forget(slot_id):
+    with _GEN_LOCK:
+        _GEN.pop(slot_id, None)
+
+
+def gen_state(slot_id):
+    with _GEN_LOCK:
+        rec = _GEN.get(slot_id)
+        return {k: rec.get(k) for k in ("ok", "at", "error")} if rec and rec.get("ok") is not None else None
+
+
+def gen_probe(slot):
+    """請這個欄位生 1 個 token。回 (verdict, 錯誤文字)。"""
+    _, port, key = _api_parts(slot)
+    if not port:
+        return None, ""
+    body = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 1, "temperature": 0}
+    st, data, _ = _http_json(f"http://127.0.0.1:{int(port)}/v1/chat/completions", body=body, key=key,
+                             timeout=GEN_TIMEOUT)
+    v = gen_verdict(st, data)
+    return v, ("" if v is not False else gen_error_text(st, data))
+
+
+def _gen_one(sl, probe):
+    try:
+        v, err = probe(sl)
+        gen_record(sl["id"], v, err)
+    finally:
+        with _GEN_LOCK:
+            _GEN_BUSY.discard(sl["id"])
+
+
+def gen_check(reg, probe=None, wait=True):
+    """探一輪：跑著的語言模型欄位各開一條執行緒同時探，一個忙線的欄位不會拖到後面的；
+    上一輪還沒回的欄位這輪不再送（不讓探測在單請求的引擎前面排成一串）。正在換模型的跳過；不跑了的清掉判定。"""
+    probe = probe or gen_probe
+    threads = []
+    for sl in reg["slots"]:
+        if sl.get("kind") not in GEN_KINDS or not sl.get("unit"):
+            continue
+        with _LOAD_LOCK:
+            loading = (_LOAD.get(sl["id"]) or {}).get("state") == "loading"
+        if unit_state(sl["unit"]) != "active":
+            with _GEN_LOCK:
+                _GEN.pop(sl["id"], None)
+            continue
+        if loading:
+            continue
+        with _GEN_LOCK:
+            if sl["id"] in _GEN_BUSY:
+                continue
+            _GEN_BUSY.add(sl["id"])
+        t = threading.Thread(target=_gen_one, args=(sl, probe), daemon=True)
+        t.start()
+        threads.append(t)
+    if wait:
+        deadline = time.time() + GEN_TIMEOUT + 5
+        for t in threads:
+            t.join(max(0.0, deadline - time.time()))
+    return len(threads)
+
+
+def gen_watch():
+    time.sleep(60)                                # 剛開機讓服務先起來
+    while True:
+        t0 = time.time()
+        try:
+            gen_check(registry())
+        except Exception as ex:  # noqa: BLE001  探測自己不能掛
+            print("生字探測：", ex, file=sys.stderr)
+        time.sleep(max(1.0, GEN_EVERY - (time.time() - t0)))   # 每 5 分鐘一輪，從這輪開始算，不是等探完才算
+
+
 def llama_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
     """一般啟動（不開檔案映射）的放法：權重全部進快速層；獨立顯卡放不下的 MoE 自動把專家搬到系統記憶體。
     split 是給畫面三色條的：放顯示卡（統一記憶體機＝那一整塊）／系統記憶體／硬碟各幾 GiB。"""
@@ -3500,6 +3660,33 @@ def _slug(text):
     return re.sub(r"[^a-z0-9._-]+", "-", text.lower()).strip("-")[:80] or "model"
 
 
+LOG_LEVEL_RX = re.compile(r"^\s*[\d.]+\s+([DIWE])\s")    # llama.cpp 的記錄格式：「0.00.667.681 W 訊息」
+
+
+def llama_fail_hint(text):
+    """從 llama.cpp 記錄找真正的錯誤原因。有等級標記的只認 E；W 是警告（例
+    「common_fit_params: failed to fit params ... abort」只是自動配置放棄、照使用者給的參數繼續，
+    實測拿它當原因會讓人以為是記憶體配置失敗）。沒有等級標記的舊版才用關鍵字找。"""
+    for ln in reversed((text or "").splitlines()):
+        lv = LOG_LEVEL_RX.match(ln)
+        if lv:
+            if lv.group(1) == "E":
+                return ln.strip()
+            continue
+        low = ln.lower()
+        if "error" in low or "failed" in low:
+            return ln.strip()
+    return ""
+
+
+def slow_load_reason(slot_id, waited):
+    """服務一直在跑、只是等不到它回應：講清楚等了多久、卡在哪一段，不要只說「還沒回應」。"""
+    _, pg = slot_progress(slot_id)
+    where = {"prepare": "剛啟動", "read": "讀權重", "upload": "把權重搬進 GPU", "alloc": "配置記憶體",
+             "warmup": "暖機"}.get(pg.get("stage"), "載入")
+    return f"等了 {int(waited // 60)} 分鐘還沒載完，卡在「{where}」"
+
+
 def _alive(slot):
     return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
 
@@ -3726,7 +3913,10 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     sysctl(unit, "restart")
     new_slot = next(x for x in registry()["slots"] if x["id"] == slot_id)
     t0 = time.time()
-    ok, why = wait_healthy(new_slot, seconds=900)        # 幾十 GB 的權重從 NVMe 讀要幾分鐘
+    secs = load_timeout(lay, reg["machine"])
+    if lay["mode"] == "disk":
+        _load_set(slot_id, upload_gib=lay["est_vram"], upload_bps=upload_bps(reg["machine"]), timeout=secs)
+    ok, why = wait_healthy(new_slot, seconds=secs)       # 幾十 GB 的權重從 NVMe 讀要幾分鐘；用硬碟執行另外算搬進 GPU 的時間
     if ok:
         record_load(m["path"], time.time() - t0)
     if ok:
@@ -3736,7 +3926,9 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
             ok, why = False, f"/v1/models 回 {st}，模型清單 {ids}"
     if not ok:
         tail = load_text(engine_file(slot_id, "-llama.log")) or ""
-        hint = next((ln for ln in reversed(tail.splitlines()) if "error" in ln.lower() or "failed" in ln.lower()), "")
+        hint = llama_fail_hint(tail)
+        if why.startswith("服務在跑但"):
+            why = slow_load_reason(slot_id, time.time() - t0)
         return undo(f"{m['name']} 載不起來（{why}{'；' + hint[-200:] if hint else ''}）")
 
     r = registry()
@@ -4703,6 +4895,8 @@ def do_control(slot_id, action, force=False):
     rc, out, err = sysctl(slot["unit"], action)
     if rc == 0 and wd:
         watchdog_clear(slot_id)
+    if rc == 0:
+        gen_forget(slot_id)                # 重啟過就重新判（GPU 重置後壞掉的引擎，重啟通常就好了）
     return (200 if rc == 0 else 500), {
         "ok": rc == 0, "unit": slot["unit"], "action": action,
         "message": (err or out or "已送出").strip()[:400],
@@ -9682,7 +9876,8 @@ def main():
     srv.ctx = ctx
     threading.Thread(target=AgentLink().run, daemon=True).start()
     threading.Thread(target=group_worker, daemon=True).start()
-    threading.Thread(target=disk_watchdog, daemon=True).start()       # 用硬碟執行的模型：系統記憶體快被吃光就停掉       # 群組設定的準備與套用；「下次開機」的在這裡接手
+    threading.Thread(target=disk_watchdog, daemon=True).start()       # 用硬碟執行的模型：系統記憶體快被吃光就停掉
+    threading.Thread(target=gen_watch, daemon=True).start()           # 每 5 分鐘真的生 1 個 token，抓「清單回得來但算不出來」
     GROUP_WAKE.set()    # 沒有 agent-link.json 就只是每 5 秒看一次
     print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
