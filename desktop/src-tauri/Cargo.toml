@@ -1,6 +1,6 @@
 [package]
 name = "xconsole-desktop"
-version = "2026.11.11"
+version = "2026.11.12"
 description = "xConsole 模型主控台（桌面版）"
 authors = ["xCloudinfo 云碩科技"]
 edition = "2021"
