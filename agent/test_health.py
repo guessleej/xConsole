@@ -77,6 +77,40 @@ def gen_tests():
     eq("探兩輪都失敗：主腦標成生不出字", (A.gen_state("brain") or {}).get("ok"), False)
     eq("服務沒在跑：舊判定清掉", A.gen_state("b3"), None)
 
+    # 同時探：一個忙線的欄位不拖到其他欄位；上一輪還沒回的不重送
+    import threading
+    import time as _t
+    reg2 = {"slots": [{"id": f"s{i}", "kind": "llama", "unit": f"s{i}.service"} for i in range(4)]}
+    A.unit_state = lambda u: "active"
+    gate = threading.Event()
+    seen = []
+
+    def slow(sl):
+        seen.append(sl["id"])
+        if sl["id"] == "s0":
+            gate.wait(10)                      # s0 卡住（像單請求的引擎正在服務長請求）
+        else:
+            _t.sleep(0.3)
+        return True, ""
+    A._GEN.clear()
+    old_to = A.GEN_TIMEOUT
+    A.GEN_TIMEOUT = 0
+    try:
+        t0 = _t.time()
+        A.gen_check(reg2, probe=slow)          # 等到期限（GEN_TIMEOUT＋5）前，其他三個都探完
+        took = _t.time() - t0
+        ok3 = [A.gen_state(f"s{i}") and A.gen_state(f"s{i}")["ok"] for i in range(1, 4)]
+        case("四個欄位同時探：其他三個不被卡住的那個拖住", all(ok3) and took < 5.5, f"{ok3} {took:.1f}s")
+        n = A.gen_check(reg2, probe=slow, wait=False)
+        eq("卡住的那個還沒回：下一輪不重送它", (n, "s0" in A._GEN_BUSY), (3, True))
+        gate.set()
+        _t.sleep(0.6)
+        eq("回來之後清掉進行中標記", "s0" in A._GEN_BUSY, False)
+    finally:
+        A.GEN_TIMEOUT = old_to
+        A.unit_state = orig
+        gate.set()
+
     # 畫面拿得到：slot_state 帶 gen，沒在跑就不帶
     eq("沒在跑的欄位不帶 gen", A.slot_state({"id": "x", "role": "r", "unit": None}, {"slots": [], "measure": {}}, {})["gen"], None)
 

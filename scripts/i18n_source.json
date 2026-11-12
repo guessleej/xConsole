@@ -156,7 +156,27 @@
 "pattern": false
 },
 {
+"zh": "沒有回答",
+"pattern": false
+},
+{
+"zh": "服務還開著、模型清單也回得來，但請它生字回錯誤（{0}）：{1}。通常是 GPU 重置過，按「重新啟動」多半就好了。",
+"pattern": true
+},
+{
+"zh": "服務還開著、模型清單也回得來，但請它生字回錯誤",
+"pattern": false
+},
+{
+"zh": "通常是 GPU 重置過，按「重新啟動」多半就好了",
+"pattern": false
+},
+{
 "zh": "放入",
+"pattern": false
+},
+{
+"zh": "生不出字",
 "pattern": false
 },
 {
@@ -6688,7 +6708,11 @@
 "pattern": false
 },
 {
-"zh": "只給引擎用；吃爆會把整台拖死，所以模型不放這裡",
+"zh": "放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著",
+"pattern": false
+},
+{
+"zh": "平常只給引擎用，模型不放這裡",
 "pattern": false
 },
 {
@@ -6928,7 +6952,11 @@
 "pattern": false
 },
 {
-"zh": "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：系統那塊被擠爆會把整台拖死，所以不允許用硬碟補。請換小一點的量化。",
+"zh": "這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：放不下的部分會經過系統那一小塊從 SSD 讀。",
+"pattern": false
+},
+{
+"zh": "那是作業系統隨時可以丟掉的頁快取，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死。",
 "pattern": false
 },
 {
@@ -6941,6 +6969,18 @@
 },
 {
 "zh": "（會用到硬碟，很慢）",
+"pattern": false
+},
+{
+"zh": "用硬碟執行時不會套用這幾個自訂引數：{0}（它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體）。",
+"pattern": true
+},
+{
+"zh": "用硬碟執行時不會套用這幾個自訂引數",
+"pattern": false
+},
+{
+"zh": "它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體",
 "pattern": false
 },
 {
@@ -7069,6 +7109,10 @@
 },
 {
 "zh": "讀取模型",
+"pattern": false
+},
+{
+"zh": "搬進 GPU",
 "pattern": false
 },
 {
@@ -10616,22 +10660,6 @@
 "pattern": false
 },
 {
-"zh": "顯示卡放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統記憶體",
-"pattern": true
-},
-{
-"zh": "顯示卡放",
-"pattern": false
-},
-{
-"zh": "GiB，其餘",
-"pattern": false
-},
-{
-"zh": "GiB 以檔案映射留在系統記憶體",
-"pattern": false
-},
-{
 "zh": "Hugging Face 名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF",
 "pattern": false
 },
@@ -10728,15 +10756,31 @@
 "pattern": false
 },
 {
-"zh": "顯示卡放 ",
+"zh": "GPU 那一塊放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統那塊的頁快取",
+"pattern": true
+},
+{
+"zh": "GPU 那一塊放",
 "pattern": false
 },
 {
-"zh": " GiB，其餘 ",
+"zh": "GiB，其餘",
 "pattern": false
 },
 {
-"zh": " GiB 以檔案映射留在系統記憶體",
+"zh": "GiB 以檔案映射留在系統那塊的頁快取",
+"pattern": false
+},
+{
+"zh": "顯示卡放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統記憶體",
+"pattern": true
+},
+{
+"zh": "顯示卡放",
+"pattern": false
+},
+{
+"zh": "GiB 以檔案映射留在系統記憶體",
 "pattern": false
 },
 {
@@ -10808,7 +10852,7 @@
 "pattern": false
 },
 {
-"zh": "BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，吃爆會把整台拖死，所以另外盯",
+"zh": "BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，放不下時當頁快取、從 SSD 補，跑的時候有看門狗盯著",
 "pattern": false
 },
 {
@@ -10829,6 +10873,26 @@
 },
 {
 "zh": "張卡",
+"pattern": false
+},
+{
+"zh": "GPU 那一塊放 ",
+"pattern": false
+},
+{
+"zh": " GiB，其餘 ",
+"pattern": false
+},
+{
+"zh": " GiB 以檔案映射留在系統那塊的頁快取",
+"pattern": false
+},
+{
+"zh": "顯示卡放 ",
+"pattern": false
+},
+{
+"zh": " GiB 以檔案映射留在系統記憶體",
 "pattern": false
 },
 {
@@ -10945,10 +11009,6 @@
 },
 {
 "zh": "系統記憶體（CPU 執行）",
-"pattern": false
-},
-{
-"zh": "（這台 BIOS 把記憶體切成兩塊，不能用硬碟執行）",
 "pattern": false
 },
 {
@@ -11644,7 +11704,7 @@
 "pattern": false
 },
 {
-"zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：用硬碟執行時，檔案映射的頁快取吃的是系統那一小塊，擠爆會把整台拖死（連代理與 SSH 一起），所以一律不允許。請換小一點的量化，或縮短上下文",
+"zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死",
 "pattern": false
 },
 {
@@ -11669,6 +11729,18 @@
 },
 {
 "zh": "[Unit]\nDescription=xConsole 欄位",
+"pattern": false
+},
+{
+"zh": "等了 {0} 分鐘還沒載完，卡在「{1}」",
+"pattern": true
+},
+{
+"zh": "等了",
+"pattern": false
+},
+{
+"zh": "分鐘還沒載完，卡在「",
 "pattern": false
 },
 {
@@ -11745,6 +11817,18 @@
 },
 {
 "zh": "[Unit]\nDescription=xConsole 欄位 ",
+"pattern": false
+},
+{
+"zh": "載入",
+"pattern": false
+},
+{
+"zh": "等了 ",
+"pattern": false
+},
+{
+"zh": " 分鐘還沒載完，卡在「",
 "pattern": false
 },
 {
@@ -11912,6 +11996,18 @@
 "pattern": false
 },
 {
+"zh": "權重讀完了，正在搬進 GPU：約 {0} GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 {1} MB",
+"pattern": true
+},
+{
+"zh": "權重讀完了，正在搬進 GPU：約",
+"pattern": false
+},
+{
+"zh": "GiB。用硬碟執行時這段走檔案映射，這台預估每秒約",
+"pattern": false
+},
+{
 "zh": "{0} 載不起來（{1}），正在還原",
 "pattern": true
 },
@@ -11964,11 +12060,31 @@
 "pattern": false
 },
 {
+"zh": "系統記憶體只剩 {0} GiB（危險線 {1} GiB），為了不讓整台卡死，看門狗在 {2} 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動",
+"pattern": true
+},
+{
+"zh": "GiB（危險線",
+"pattern": false
+},
+{
+"zh": "GiB），為了不讓整台卡死，看門狗在",
+"pattern": false
+},
+{
+"zh": "停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動",
+"pattern": false
+},
+{
 "zh": "啟動引數太長（上限 2,000 字）",
 "pattern": false
 },
 {
 "zh": "啟動引數最多 40 個",
+"pattern": false
+},
+{
+"zh": "服務在跑但",
 "pattern": false
 },
 {
@@ -12540,6 +12656,26 @@
 "pattern": false
 },
 {
+"zh": "權重讀完了，正在搬進 GPU：約 ",
+"pattern": false
+},
+{
+"zh": " GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 ",
+"pattern": false
+},
+{
+"zh": "。比預估慢，仍在搬；等到 {0} 分鐘還沒好會自動換回原本的設定",
+"pattern": true
+},
+{
+"zh": "比預估慢，仍在搬；等到",
+"pattern": false
+},
+{
+"zh": "分鐘還沒好會自動換回原本的設定",
+"pattern": false
+},
+{
 "zh": "檢查記憶體、準備設定",
 "pattern": false
 },
@@ -12648,11 +12784,47 @@
 "pattern": false
 },
 {
+"zh": "系統記憶體只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB（危險線 ",
+"pattern": false
+},
+{
+"zh": " GiB），為了不讓整台卡死，看門狗在 ",
+"pattern": false
+},
+{
+"zh": " 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動",
+"pattern": false
+},
+{
 "zh": "啟動引數的引號沒有成對",
 "pattern": false
 },
 {
 "zh": "讀不到 ",
+"pattern": false
+},
+{
+"zh": "剛啟動",
+"pattern": false
+},
+{
+"zh": "讀權重",
+"pattern": false
+},
+{
+"zh": "把權重搬進 GPU",
+"pattern": false
+},
+{
+"zh": "配置記憶體",
+"pattern": false
+},
+{
+"zh": "暖機",
 "pattern": false
 },
 {
@@ -13660,6 +13832,14 @@
 "pattern": false
 },
 {
+"zh": "。比預估慢，仍在搬；等到 ",
+"pattern": false
+},
+{
+"zh": " 分鐘還沒好會自動換回原本的設定",
+"pattern": false
+},
+{
 "zh": "服務起來了，還在載入",
 "pattern": false
 },
@@ -13753,6 +13933,14 @@
 },
 {
 "zh": "讀不到 GGUF 檔頭，檔案可能損壞或還在下載",
+"pattern": false
+},
+{
+"zh": "看門狗：",
+"pattern": false
+},
+{
+"zh": "生字探測：",
 "pattern": false
 },
 {
@@ -14889,10 +15077,6 @@
 },
 {
 "zh": " 複製進來",
-"pattern": false
-},
-{
-"zh": "系統記憶體只剩 ",
 "pattern": false
 },
 {

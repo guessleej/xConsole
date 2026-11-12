@@ -434,7 +434,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `agent/test_gaps.py` | Linux／macOS／Windows（裝執行檔那幾段不跑 Windows） | 58 | Linux 的 Intel 顯示卡偵測、記憶體架構、不綁卡、Vulkan 編譯；macOS／Windows 分辨 SSD；預編譯版接著下載（Range）、sha256、暫停；手動匯入（續傳、檔頭、sha256、子資料夾的執行檔、試跑）；參考圖檢查、`-i`／`--strength`／`-b` |
 | `console/test_extract.py` | Linux／macOS／Windows | 29 | 對話附件抽文字：Word／Excel／PowerPoint／PDF、四種文字編碼、二進位與舊版 Office、壓縮炸彈、截斷；主控台端的獨立行程、逾時、被砍、上限 |
 | `agent/test_load_disk.py` | 任何機器（實際換模型那段不跑 Windows） | 57 | 載入進度的階段與百分比、用硬碟執行的分層與 `-ngl`（含 AI 395）、准入的 KV 分池、看門狗（危險線、一次停一個、取消開機自啟、原因留到成功）、擋關映射的引數、假 llama-server 實際換模型（mmap、思考模式與區網同次套用與沿用、進行中問得到進度） |
-| `agent/test_health.py` | 任何機器 | 37 | 生字探測（.27 實際的 CUDA 錯誤判壞、逾時忙線不判、連續兩次才判、成功即恢復、只探跑著的語言模型）、載入失敗不引 W 級警告、等不到回應講卡在哪、「搬進 GPU」階段的剩餘時間與放寬的逾時 |
+| `agent/test_health.py` | 任何機器 | 40 | 生字探測（.27 實際的 CUDA 錯誤判壞、逾時忙線不判、連續兩次才判、成功即恢復、只探跑著的語言模型、各欄位同時探、沒回的不重送）、載入失敗不引 W 級警告、等不到回應講卡在哪、「搬進 GPU」階段的剩餘時間與放寬的逾時 |
 | `console/test_providers.py` | 任何機器 | 40 | 第三方 API：金鑰加密落地（資料庫檔找不到明文）、GET 不回金鑰、編輯空白保留、cn_origin、http 只限私有位址、不跟轉址、錯誤遮罩、串流跟本機對話逐位元組相同 |
 | `console/test_preview.py` | 任何機器 | 21 | 執行預覽：sandbox 標頭、別人的登入拿不到、過期、2 MB、50 筆、其他頁仍是 DENY |
 | `console/test_agent_tasks.py` | 任何機器 | 31 | Agent 對話迴圈（假的 OpenAI 相容服務）：等待核准、拒絕、always、步數上限、不支援 tools、單一任務、停止、本機欄位當模型、稽核 |

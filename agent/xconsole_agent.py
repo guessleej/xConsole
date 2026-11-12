@@ -3099,6 +3099,7 @@ GEN_EVERY, GEN_FAILS, GEN_TIMEOUT = 300, 2, 60   # 5 分鐘探一次，連續 2 
 GEN_KINDS = ("llama", "strata")
 _GEN = {}                                         # 欄位 id → {"ok", "at", "error", "fails"}
 _GEN_LOCK = threading.Lock()
+_GEN_BUSY = set()                                 # 探測還沒回來的欄位
 
 
 def gen_verdict(status, data):
@@ -3156,9 +3157,20 @@ def gen_probe(slot):
     return v, ("" if v is not False else gen_error_text(st, data))
 
 
-def gen_check(reg, probe=None):
-    """探一輪：跑著的語言模型欄位逐一探；正在換模型的跳過；不跑了的清掉判定。"""
+def _gen_one(sl, probe):
+    try:
+        v, err = probe(sl)
+        gen_record(sl["id"], v, err)
+    finally:
+        with _GEN_LOCK:
+            _GEN_BUSY.discard(sl["id"])
+
+
+def gen_check(reg, probe=None, wait=True):
+    """探一輪：跑著的語言模型欄位各開一條執行緒同時探，一個忙線的欄位不會拖到後面的；
+    上一輪還沒回的欄位這輪不再送（不讓探測在單請求的引擎前面排成一串）。正在換模型的跳過；不跑了的清掉判定。"""
     probe = probe or gen_probe
+    threads = []
     for sl in reg["slots"]:
         if sl.get("kind") not in GEN_KINDS or not sl.get("unit"):
             continue
@@ -3170,18 +3182,29 @@ def gen_check(reg, probe=None):
             continue
         if loading:
             continue
-        v, err = probe(sl)
-        gen_record(sl["id"], v, err)
+        with _GEN_LOCK:
+            if sl["id"] in _GEN_BUSY:
+                continue
+            _GEN_BUSY.add(sl["id"])
+        t = threading.Thread(target=_gen_one, args=(sl, probe), daemon=True)
+        t.start()
+        threads.append(t)
+    if wait:
+        deadline = time.time() + GEN_TIMEOUT + 5
+        for t in threads:
+            t.join(max(0.0, deadline - time.time()))
+    return len(threads)
 
 
 def gen_watch():
     time.sleep(60)                                # 剛開機讓服務先起來
     while True:
+        t0 = time.time()
         try:
             gen_check(registry())
         except Exception as ex:  # noqa: BLE001  探測自己不能掛
             print("生字探測：", ex, file=sys.stderr)
-        time.sleep(GEN_EVERY)
+        time.sleep(max(1.0, GEN_EVERY - (time.time() - t0)))   # 每 5 分鐘一輪，從這輪開始算，不是等探完才算
 
 
 def llama_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
