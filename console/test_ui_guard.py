@@ -87,6 +87,14 @@ check("設定排在最後", keys[-1:] == ["settings"], str(keys))
 check("頂層不再逐一列出群組（群組一多就塞爆頂列）", "group:" not in (nv.group(1) if nv else ""))
 check("renderNav() 用的是 NAV", bool(re.search(r"function renderNav\(\)\s*\{.*?const items = NAV;", JS, re.S)))
 
+# ---- 4b. 登入失敗要看得出來（2026-11-12 使用者密碼打錯，畫面只有灰色小字「請先登入」，以為沒反應）
+lf = re.search(r'\$\("#login-form"\)\.addEventListener\("submit".*?\n\}\);', JS, re.S)
+check("登入本身的 401 不當成登入逾時（不改寫成「請先登入」）",
+      bool(re.search(r"res\.status === 401 && !opts\.noRelogin", JS)) and lf is not None and "noRelogin: true" in lf.group(0))
+le = re.search(r"function loginErrorText\(ex\) \{.*?\n\}", JS, re.S)
+check("登入錯誤顯示錯誤碼與剩餘次數", le is not None and all(k in le.group(0) for k in ("錯誤碼 401", "remaining", "錯誤碼 NET", "錯誤碼 ${ex.status}")))
+check("登入中按鈕停用，避免以為沒按到", lf is not None and "btn.disabled = true" in lf.group(0))
+
 # ---- 5. 樣式表的大括號要成對：少一個「}」，後面所有規則都會被瀏覽器當成上一個區塊的一部分丟掉
 # （2026-11-01 合併衝突時吃掉品牌區 @media 的結尾，畫圖與影片的樣式整段失效，畫面才看得出來）
 CSS = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "style.css"), encoding="utf-8").read()
@@ -96,6 +104,7 @@ for ch in css:
     depth += (ch == "{") - (ch == "}")
     low = min(low, depth)
 check("style.css 的大括號成對", depth == 0 and low == 0, f"結尾深度 {depth}、最低 {low}")
+check("登入錯誤是紅底整塊，壓過 .login-card p 的灰色小字", bool(re.search(r"\.login-card \.login-err\s*\{[^}]*background", CSS)))
 
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)

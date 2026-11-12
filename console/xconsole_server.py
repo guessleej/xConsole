@@ -2897,7 +2897,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not check_credentials(user, str(body.get("password") or "")):
                     STORE.audit(user, self.ip, "auth.login", user, False)
                     time.sleep(1.0)
-                    return self._json(401, {"error": "帳號或密碼不對"})
+                    left = max(0, LOGIN_MAX_PER_IP - STORE.failed_logins(since, self.ip))
+                    return self._json(401, {"error": "帳號或密碼不對", "remaining": left})
             STORE.audit(user, self.ip, "auth.login", user, True)
             sid = STORE.session_new(user, self.ip, SESSION_HOURS)
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "

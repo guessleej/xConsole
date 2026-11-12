@@ -113,6 +113,9 @@ def main():
         def f(name):
             return {"name": name, "data": base64.b64encode(open(os.path.join(W, name), "rb").read()).decode()}
 
+        code, r = call("/api/login", {"username": "admin", "password": "wrong-pass"})
+        check("密碼錯：回 401、說明原因、帶還能再試幾次", code == 401 and r.get("error") == "帳號或密碼不對" and r.get("remaining") == 4,
+              (code, r))
         code, _ = call("/api/login", {"username": "admin", "password": "e2e-pass-2026"})
         check("隔離主控台登入", code == 200, code)
         code, st = call("/api/tls/status")
