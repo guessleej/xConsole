@@ -37,8 +37,8 @@ async function api(path, opts = {}) {
   });
   let data = {};
   try { data = await res.json(); } catch (_) { /* 沒有 JSON 就算了 */ }
-  if (res.status === 401) { showLogin(); throw new Error("請先登入"); }
-  if (!res.ok) { const e = new Error(data.error || `伺服器回 ${res.status}`); e.data = data; throw e; }
+  if (res.status === 401 && !opts.noRelogin) { showLogin(); throw new Error("請先登入"); }
+  if (!res.ok) { const e = new Error(data.error || `伺服器回 ${res.status}`); e.data = data; e.status = res.status; throw e; }
   if (typeof i18nData === "function") i18nData(data);
   return data;
 }
@@ -124,17 +124,37 @@ function showLogin() {
   if (S.timer) { clearInterval(S.timer); S.timer = null; }
 }
 
+/* 登入失敗一定要讓人一眼看出來：紅底整塊、錯誤碼、還能再試幾次。
+   以前密碼錯會被 api() 當成「登入逾時」改寫成灰色小字「請先登入」，使用者以為什麼事都沒發生。 */
+function loginErrorText(ex) {
+  if (!ex.status) return "連不到主控台，請確認網路，或防火牆有沒有放行這台電腦（錯誤碼 NET）";
+  if (ex.status === 401) {
+    const left = ex.data?.remaining;
+    if (left === 0) return "帳號或密碼不對（錯誤碼 401）。登入已暫停，請 15 分鐘後再試";
+    return "帳號或密碼不對（錯誤碼 401）" + (left ? `。再錯 ${left} 次會暫停登入 15 分鐘` : "");
+  }
+  return `${ex.message}（錯誤碼 ${ex.status}）`;
+}
+
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const err = $("#login-err");
+  const err = $("#login-err"), btn = $(".login-submit"), pw = $("#pw");
   err.hidden = true;
+  pw.removeAttribute("aria-invalid");
+  btn.disabled = true;
+  btn.textContent = "登入中…";
   try {
-    await api("/api/login", { method: "POST", body: { username: $("#un").value.trim(), password: $("#pw").value } });
-    $("#pw").value = "";
+    await api("/api/login", { method: "POST", noRelogin: true, body: { username: $("#un").value.trim(), password: pw.value } });
+    pw.value = "";
     start();
   } catch (ex) {
-    err.textContent = ex.message;
+    err.textContent = loginErrorText(ex);
     err.hidden = false;
+    pw.setAttribute("aria-invalid", "true");
+    pw.select();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "登入";
   }
 });
 
@@ -4903,7 +4923,7 @@ function openAddMachine(group) {
   fUses.step = "1"; fUses.min = "1"; fUses.max = "1000";
   const fMin = numInput(30);
   fMin.step = "1"; fMin.min = "5"; fMin.max = "10080";
-  const fCidr = textInput("", "選填，例：192.168.10.0/24");
+  const fCidr = textInput("", "選填，例：198.51.100.0/24");
   const fReplace = selectInput([["", "不是，這是新的一台"], ...(S.fleet?.nodes || []).map((x) => [x.id, `${x.name}（${x.host}）`])], "");
   const replaceBox = fieldBox("這是哪一台重新安裝？", fReplace, "代理重裝或換了 IP 時選它，加入後會更新那一筆，名稱與群組不變；新機器不用選");
   fUses.oninput = () => { replaceBox.hidden = Number(fUses.value) > 1; if (replaceBox.hidden) fReplace.value = ""; };

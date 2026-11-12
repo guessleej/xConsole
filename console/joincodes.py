@@ -44,13 +44,13 @@ def parse_cidrs(v):
     if isinstance(v, str):
         v = [x for x in re.split(r"[,\s，、]+", v) if x]
     if not isinstance(v, list) or len(v) > 8:
-        raise ValueError("限定網段最多 8 個，例：192.168.10.0/24")
+        raise ValueError("限定網段最多 8 個，例：198.51.100.0/24")
     out = []
     for x in v:
         try:
             out.append(str(ipaddress.ip_network(str(x).strip(), strict=False)))
         except ValueError:
-            raise ValueError(f"「{str(x)[:40]}」不是網段，例：192.168.10.0/24") from None
+            raise ValueError(f"「{str(x)[:40]}」不是網段，例：198.51.100.0/24") from None
     return out
 
 

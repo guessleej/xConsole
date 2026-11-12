@@ -12,6 +12,46 @@
 "pattern": false
 },
 {
+"zh": "連不到主控台，請確認網路，或防火牆有沒有放行這台電腦（錯誤碼 NET）",
+"pattern": false
+},
+{
+"zh": "帳號或密碼不對（錯誤碼 401）。登入已暫停，請 15 分鐘後再試",
+"pattern": false
+},
+{
+"zh": "帳號或密碼不對（錯誤碼 401）",
+"pattern": false
+},
+{
+"zh": "。再錯 {0} 次會暫停登入 15 分鐘",
+"pattern": true
+},
+{
+"zh": "再錯",
+"pattern": false
+},
+{
+"zh": "次會暫停登入 15 分鐘",
+"pattern": false
+},
+{
+"zh": "{0}（錯誤碼 {1}）",
+"pattern": true
+},
+{
+"zh": "錯誤碼",
+"pattern": false
+},
+{
+"zh": "登入中…",
+"pattern": false
+},
+{
+"zh": "登入",
+"pattern": false
+},
+{
 "zh": "取消",
 "pattern": false
 },
@@ -5328,10 +5368,6 @@
 "pattern": false
 },
 {
-"zh": "登入",
-"pattern": false
-},
-{
 "zh": "切換情境",
 "pattern": false
 },
@@ -5512,7 +5548,7 @@
 "pattern": false
 },
 {
-"zh": "選填，例：192.168.10.0/24",
+"zh": "選填，例：198.51.100.0/24",
 "pattern": false
 },
 {
