@@ -21,6 +21,7 @@ import hashlib
 import http.client
 import hmac
 import ipaddress
+import itertools
 import json
 import os
 import re
@@ -1198,9 +1199,24 @@ def _join_node(handler, body):
                             f"請確認防火牆讓主控台連得到這台的 {port} 埠，而且送來的權杖與憑證是這台代理的。", j)
             # 工作站：防火牆擋連入、IP 會換。改由這台用長輪詢連回主控台，權杖由它第一次連回時證明
             link, good = "push", ip
-        nid = None
+        nid = gname = None
 
         def put(cfg):
+            nonlocal nid, gname
+            # 在主控台這把鎖底下再看一次：驗證期間管理者作廢了加入碼、或刪了群組，就不納管
+            with JOINS.lock:
+                if j.get("revoked"):
+                    return
+                gname = j.get("group") or groups.DEFAULT
+                if j.get("group_id"):
+                    g = next((x for x in cfg.get("groups", []) if x["id"] == j["group_id"]), None)
+                    if g is None:
+                        return
+                    gname = g["name"]
+                nid = None
+                _put(cfg)
+
+        def _put(cfg):
             nonlocal nid
             # 加入一律新增一台；只有管理者產碼時指定「重新安裝哪一台」才覆寫那一筆。
             # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）
@@ -1212,12 +1228,14 @@ def _join_node(handler, body):
             taken = {n["id"] for n in cfg["nodes"]}
             # 名稱樣板（A01、A02…）拿來當代號：教室映像的主機名稱常常每台都一樣
             base = next((x for x in ((jname if j.get("names") else ""), hostname) if x and NODE_ID_RX.fullmatch(x)), "node")
-            nid = base if base not in taken else next(f"{base}-{i}" for i in range(2, 999) if f"{base}-{i}" not in taken)
+            nid = base if base not in taken else next(f"{base}-{i}" for i in itertools.count(2) if f"{base}-{i}" not in taken)
             cfg["nodes"].append({"id": nid, "name": jname or hostname, "host": good,
-                                 "group": j.get("group") or "未分類", "agent_port": port, "link": link,
+                                 "group": gname, "agent_port": port, "link": link,
                                  "token": tls.seal(CERTS.p, token.encode())})
             groups.ensure(cfg)
         update_fleet(put)
+        if nid is None:
+            return fail("加入碼在驗證期間被作廢，或它的群組被刪掉了；請在主控台重新產生加入碼", j)
         if link == "pull":
             os.replace(tmp, trust_file(nid))
         elif os.path.exists(trust_file(nid)):
@@ -2914,12 +2932,26 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError as ex:
                     return self._json(400, {"error": str(ex)})
             code = secrets.token_urlsafe(24)
+            cfg = fleet()
+            # 記群組的代號而不是名稱：之後群組改名，加入的機器跟著進改名後的群組；群組刪掉，加入碼一起作廢
+            gobj = next((g for g in cfg.get("groups", []) if g["name"] == (group or groups.DEFAULT)), None) \
+                or groups.new(group or groups.DEFAULT)
             try:
-                j = JOINS.add(code, minutes=body.get("minutes", 30), uses=body.get("uses", 1), name=name, group=group,
-                              replace=replace, cidrs=body.get("cidrs") or [], console=host, pin=console_pin(),
-                              fp=console_fp(), by=self.user)
+                j = JOINS.add(code, minutes=body.get("minutes", 30), uses=body.get("uses", 1), name=name, group=gobj["name"],
+                              group_id=gobj["id"], replace=replace, cidrs=body.get("cidrs") or [], console=host,
+                              pin=console_pin(), fp=console_fp(), by=self.user, taken={n["name"] for n in cfg["nodes"]})
             except ValueError as ex:
                 return self._json(400, {"error": str(ex)})
+
+            def add_group(c):                 # 新群組在加入碼建好之後才建，參數不合法不會留下空群組
+                gs = c.setdefault("groups", [])
+                same = next((g for g in gs if g["name"] == gobj["name"]), None)
+                if same is None:
+                    gs.append(gobj)
+                elif same["id"] != gobj["id"]:
+                    with JOINS.lock:
+                        j["group_id"] = same["id"]
+            update_fleet(add_group)
             self._audit("node.join_code", host, True, {"id": j["id"], "name": name, "group": group, "uses": j["uses"],
                                                         "minutes": j["minutes"], "cidrs": j["cidrs"]})
             url = f"https://{host}/install/{code}/agent.sh"
@@ -3437,7 +3469,7 @@ class Handler(BaseHTTPRequestHandler):
                         if n.get("group") == old:
                             n["group"] = groups.DEFAULT     # 機器不刪，移到「未分類」
                     groups.ensure(cfg)
-                    out.update(code=200, name=old, moved=moved)
+                    out.update(code=200, name=old, moved=moved, revoked=JOINS.revoke_group(gid))
                     return
                 try:
                     name, changed = groups.update(g, body.get("name"), body.get("kind"), body.get("settings"),
@@ -3448,13 +3480,14 @@ class Handler(BaseHTTPRequestHandler):
                 for n in cfg["nodes"]:
                     if n.get("group") == old:
                         n["group"] = name               # 改名時成員一起改，不會掉出群組
+                JOINS.rename_group(gid, name)           # 還能用的加入碼也跟著改
                 out.update(code=200, group=dict(g), changed=changed, old=old)
             update_fleet(edit)
             if out.get("code") != 200:
                 return self._json(out.get("code", 400), {"error": out.get("error")})
             if act == "delete":
-                self._audit("group.delete", out["name"], True, {"moved": len(out["moved"])})
-                return self._json(200, {"ok": True, "moved": len(out["moved"])})
+                self._audit("group.delete", out["name"], True, {"moved": len(out["moved"]), "join_codes_revoked": out["revoked"]})
+                return self._json(200, {"ok": True, "moved": len(out["moved"]), "join_codes_revoked": out["revoked"]})
             g = out["group"]
             self._audit("group.update", g["name"], True, {"from": out["old"], "version": g["version"], "settings_changed": out["changed"]})
             if out["changed"]:

@@ -43,7 +43,7 @@ def unit():
     check("樣板 A{01..03} 補零展開", J.expand("A{01..03}") == ["A01", "A02", "A03"])
     check("  前後綴都保留、位數照起頭", J.expand("PC-{8..10}-x") == ["PC-8-x", "PC-9-x", "PC-10-x"])
     check("  沒有大括號就是一般名稱", J.expand("三樓教室") is None)
-    for bad in ("A{3..1}", "A{1..2}{3..4}", "A{x}", "A{0..1000}"):
+    for bad in ("A{3..1}", "A{1..2}{3..4}", "A{x}", "A{0..1000}", "A{01..03}{bad}", "A{{1..3}}"):
         check(f"  不合法的樣板 {bad} 拒絕", raises(lambda b=bad: J.expand(b), "樣板"))
     check("網段可用逗號或空白分隔", J.parse_cidrs("192.168.10.0/24, 10.0.0.5") == ["192.168.10.0/24", "10.0.0.5/32"])
     check("  不是網段就拒絕", raises(lambda: J.parse_cidrs(["abc"]), "不是網段"))
@@ -58,7 +58,8 @@ def unit():
     check("多台卻給同一個名稱 → 要用樣板", raises(lambda: c.add("x", uses=3, name="教室"), "樣板"))
     check("樣板名稱比次數少 → 拒絕", raises(lambda: c.add("x", uses=5, name="A{1..3}"), "比可用次數"))
     check("重新安裝只能一次", raises(lambda: c.add("x", uses=2, replace="n1"), "只能是 1"))
-    r = c.add("code-1", uses=2, name="A{01..03}", group="教室", console="h:1")
+    check("樣板扣掉已有機器在用的名稱後不夠次數 → 拒絕並點名", raises(lambda: c.add("x", uses=3, name="A{01..03}", taken={"A01"}), "A01"))
+    r = c.add("code-1", uses=2, name="A{01..03}", group="教室", group_id="g1", console="h:1", taken={"A01"})
     check("檔案權限 0600、只存雜湊不存碼", oct(os.stat(p).st_mode & 0o777) == "0o600" and "code-1" not in open(p).read())
     out = {}
 
@@ -84,6 +85,11 @@ def unit():
     check("  重啟後沒有殘留預留，下一個名稱是 A01", rr[1] == "A01", rr)
     c2.finish(rr[0], "A01", rr[1], "127.0.0.1")
     check("  用完 → 已加入，不能再用", J.state(c2.get("code-1")) == "joined" and c2.reserve("code-1", "127.0.0.1")[0] is None)
+    c2.add("code-g", uses=2, group="教室", group_id="g1")
+    c2.rename_group("g1", "三樓教室")
+    check("群組改名：還能用的加入碼跟著改", c2.get("code-g")["group"] == "三樓教室")
+    check("群組刪除：它還能用的加入碼一起作廢（已用完的不動）", c2.revoke_group("g1") == 1
+          and J.state(c2.get("code-g")) == "revoked" and J.state(c2.get("code-1")) == "joined")
     c2.add("code-2", minutes=5, cidrs=["10.0.0.0/8"])
     check("限定網段：網段外下載不到腳本、也加入不了",
           c2.usable("code-2", "127.0.0.1") is None and "網段" in c2.reserve("code-2", "127.0.0.1")[2])
@@ -207,17 +213,30 @@ def e2e():
         st, js = co("GET", f"/api/nodes/join-code/{jc['id']}")
         check("  網頁上看得到已用 2／3 與加入了哪些機器", js.get("used") == 2 and js.get("state") == "waiting"
               and [n["name"] for n in js.get("nodes", [])] == ["A01", "A02"], js)
+        _, gs = co("GET", "/api/groups")
+        gid = next(g["id"] for g in gs["groups"] if g["name"] == "三樓教室")
+        st, _ = co("POST", f"/api/groups/{gid}/update", {"name": "301 教室"})
         st, d = join(code)
-        check("  第 3 台 A03", st == 200 and d.get("id") == "A03", d)
+        check("  群組中途改名：第 3 台 A03 進改名後的群組，不會把舊名稱建回來", st == 200 and d.get("id") == "A03", d)
         st, d = join(code)
         check("  用完之後第 4 台擋下", st == 400 and "用完" in d.get("error", ""), d)
         st, _ = anon("GET", f"/install/{code}/agent.sh", raw=True)
         check("  用完之後腳本也下載不到", st == 404)
         _, nodes = co("GET", "/api/nodes")
         mine = {n["id"]: n for n in nodes["nodes"]}
-        check("清單上三台都在三樓教室", all(mine.get(k, {}).get("group") == "三樓教室" for k in ("A01", "A02", "A03")), mine)
+        check("清單上三台都在 301 教室", all(mine.get(k, {}).get("group") == "301 教室" for k in ("A01", "A02", "A03")), mine)
         _, gs = co("GET", "/api/groups")
-        check("  群組自動建好", any(g["name"] == "三樓教室" for g in gs["groups"]))
+        check("  舊名稱「三樓教室」沒有被建回來", not any(g["name"] == "三樓教室" for g in gs["groups"]), [g["name"] for g in gs["groups"]])
+        st, d = co("POST", "/api/nodes/join-code", {"name": "A{01..05}", "uses": 3, "console": f"127.0.0.1:{cport}"})
+        check("產碼：樣板裡 A01～A03 已有機器在用，剩下的不夠 → 400", st == 400 and "已經有機器在用" in d.get("error", ""), d)
+        st, d = co("POST", "/api/nodes/join-code", {"name": "B{1..2}", "uses": 2, "group": "暫時群組", "console": f"127.0.0.1:{cport}"})
+        _, gs = co("GET", "/api/groups")
+        tg = next((g for g in gs["groups"] if g["name"] == "暫時群組"), None)
+        check("產碼時指定新群組：群組跟著建好", tg is not None, gs)
+        st, dd = co("POST", f"/api/groups/{tg['id']}/delete")
+        check("  刪掉群組 → 它還能用的加入碼一起作廢", st == 200 and dd.get("join_codes_revoked") == 1, dd)
+        st, dj = join(d["command"].split("/install/")[1].split("/")[0])
+        check("  作廢後加入不了", st == 400, dj)
 
         st, jc2 = co("POST", "/api/nodes/join-code", {"uses": 5, "cidrs": ["10.9.0.0/16"], "console": f"127.0.0.1:{cport}"})
         code2 = jc2["command"].split("/install/")[1].split("/")[0]
@@ -233,7 +252,7 @@ def e2e():
         check("  作廢後加入不了", st == 400, d)
         st, lst = co("GET", "/api/nodes/join-codes")
         ids = [x["id"] for x in lst.get("codes", [])]
-        check("加入碼清單列出全部，新的在前，不含公鑰", ids[:3] == [jc3["id"], jc2["id"], jc["id"]]
+        check("加入碼清單列出全部，新的在前，不含公鑰", ids[:2] == [jc3["id"], jc2["id"]] and jc["id"] in ids
               and all("pin" not in x for x in lst["codes"]), ids)
         st, _ = anon("GET", "/api/nodes/join-codes")
         check("  沒登入看不到清單", st == 401)

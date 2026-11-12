@@ -3960,7 +3960,7 @@ async function settingsGroups(wrap) {
           ? `這個群組有 ${g.members} 台機器。刪除後它們移到「未分類」，機器本身不受影響。`
           : "這個群組沒有機器。"),
         onConfirm: async () => {
-          try { const r = await api(`/api/groups/${g.id}/delete`, { method: "POST" }); toast(r.moved ? `已刪除，${r.moved} 台移到「未分類」` : "已刪除", "ok"); }
+          try { const r = await api(`/api/groups/${g.id}/delete`, { method: "POST" }); toast((r.moved ? `已刪除，${r.moved} 台移到「未分類」` : "已刪除") + (r.join_codes_revoked ? `；這個群組還能用的 ${r.join_codes_revoked} 個加入碼一起作廢` : ""), "ok"); }
           catch (ex) { toast(ex.message, "bad"); }
           if (S.groupEdit === g.id) S.groupEdit = null;
           render();

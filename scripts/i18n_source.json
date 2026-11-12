@@ -4232,6 +4232,18 @@
 "pattern": false
 },
 {
+"zh": "；這個群組還能用的 {0} 個加入碼一起作廢",
+"pattern": true
+},
+{
+"zh": "這個群組還能用的",
+"pattern": false
+},
+{
+"zh": "個加入碼一起作廢",
+"pattern": false
+},
+{
 "zh": "收到，排隊中",
 "pattern": false
 },
@@ -9177,6 +9189,10 @@
 },
 {
 "zh": "代理的憑證不能是 CA 憑證",
+"pattern": false
+},
+{
+"zh": "加入碼在驗證期間被作廢，或它的群組被刪掉了；請在主控台重新產生加入碼",
 "pattern": false
 },
 {

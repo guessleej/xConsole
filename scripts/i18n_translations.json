@@ -18955,9 +18955,9 @@
 "ko": "제 "
 },
 " 張": {
-"en": "",
-"ja": " 枚目",
-"ko": "장"
+"en": " cards",
+"ja": " 枚",
+"ko": " 장"
 },
 "幾乎是同一個顏色（亮度 ": {
 "en": "is almost a single color (brightness ",
@@ -20093,5 +20093,25 @@
 "en": "Signing in…",
 "ja": "ログイン中…",
 "ko": "로그인 중…"
+},
+"；這個群組還能用的 {0} 個加入碼一起作廢": {
+"en": "; the group's {0} unused join codes were revoked as well",
+"ja": "。このグループの未使用の参加コード {0} 個も無効化しました",
+"ko": "; 이 그룹의 아직 쓸 수 있던 가입 코드 {0}개도 무효화했습니다"
+},
+"這個群組還能用的": {
+"en": "The group's unused",
+"ja": "このグループの未使用の",
+"ko": "이 그룹의 아직 쓸 수 있던"
+},
+"個加入碼一起作廢": {
+"en": "join codes were revoked as well",
+"ja": "個の参加コードも無効化しました",
+"ko": "개 가입 코드도 무효화했습니다"
+},
+"加入碼在驗證期間被作廢，或它的群組被刪掉了；請在主控台重新產生加入碼": {
+"en": "The join code was revoked or its group was deleted while verifying; create a new join code in the console",
+"ja": "確認中に参加コードが無効化されたか、グループが削除されました。コンソールで参加コードを作り直してください",
+"ko": "확인 중에 가입 코드가 무효화되었거나 그룹이 삭제되었습니다. 콘솔에서 가입 코드를 다시 생성하세요"
 }
 }

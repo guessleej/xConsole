@@ -25,12 +25,11 @@ def key(code):
 def expand(tpl):
     """名稱樣板：`A{01..20}` → A01～A20（位數照起頭那個數字補零）。沒有 {a..b} 回 None（＝一般名稱）。"""
     ms = RANGE_RX.findall(tpl)
+    rest = RANGE_RX.sub("", tpl, count=1)
+    if "{" in rest or "}" in rest:             # 範圍以外還有大括號（A{01..03}{x}、A{{1..3}}）也算寫錯
+        raise ValueError("名稱樣板只能有一段 {起..迄}，例：A{01..20}")
     if not ms:
-        if "{" in tpl or "}" in tpl:
-            raise ValueError("名稱樣板寫法是 前綴{起..迄}，例：A{01..20}")
         return None
-    if len(ms) > 1:
-        raise ValueError("名稱樣板只能有一段 {起..迄}")
     a, b = ms[0]
     lo, hi = int(a), int(b)
     if hi < lo or hi - lo >= MAX_USES:
@@ -98,8 +97,9 @@ class Codes:
             json.dump(self.recs, fh, ensure_ascii=False)
         os.replace(tmp, self.path)
 
-    def add(self, code, *, minutes=30, uses=1, name="", group="", replace="", cidrs=(), **extra):
-        """建一個加入碼。參數不合法丟 ValueError（訊息給管理者看）。回紀錄（不含碼本身）。"""
+    def add(self, code, *, minutes=30, uses=1, name="", group="", group_id=None, replace="", cidrs=(), taken=(), **extra):
+        """建一個加入碼。參數不合法丟 ValueError（訊息給管理者看）。回紀錄（不含碼本身）。
+        taken：已經有機器在用的名稱；樣板扣掉這些之後還要夠可用次數。"""
         if isinstance(uses, bool) or not isinstance(uses, int) or not 1 <= uses <= MAX_USES:
             raise ValueError(f"可用次數要是 1～{MAX_USES} 的整數")
         if isinstance(minutes, bool) or not isinstance(minutes, int) or not MIN_MIN <= minutes <= MAX_MIN:
@@ -107,13 +107,17 @@ class Codes:
         names = expand(name) if name else None
         if names is not None and len(names) < uses:
             raise ValueError(f"名稱樣板只有 {len(names)} 個名稱，比可用次數 {uses} 少")
+        if names is not None and len(set(names) - set(taken)) < uses:
+            used = [x for x in names if x in set(taken)]
+            raise ValueError(f"名稱樣板裡 {'、'.join(used[:5])}{'…' if len(used) > 5 else ''} 已經有機器在用，"
+                             f"剩下 {len(names) - len(used)} 個名稱，不夠可用次數 {uses}；請把範圍加大或換個前綴")
         if names is None and name and uses > 1:
             raise ValueError("一個加入碼要加入多台時，名稱請用樣板（例：A{01..20}），或留空用各台的主機名稱")
         if replace and uses != 1:
             raise ValueError("重新安裝某一台時，可用次數只能是 1")
         now = time.time()
         rec = dict(extra, id=key(code)[:12], created=now, exp=now + minutes * 60, minutes=minutes, uses=uses, used=0,
-                   name="" if names else name, template=name if names else "", names=names or [], group=group,
+                   name="" if names else name, template=name if names else "", names=names or [], group=group, group_id=group_id,
                    replace=replace, cidrs=parse_cidrs(cidrs if isinstance(cidrs, str) else list(cidrs)), nodes=[], revoked=False, error=None)
         with self.lock:
             self.recs[key(code)] = rec
@@ -185,6 +189,25 @@ class Codes:
             r["revoked"], r["closed"] = True, time.time()
             self._save()
             return r
+
+    def rename_group(self, gid, name):
+        """群組改名：還能用的加入碼跟著改，之後加入的機器進改名後的群組。"""
+        with self.lock:
+            hit = [r for r in self.recs.values() if r.get("group_id") == gid]
+            for r in hit:
+                r["group"] = name
+            if hit:
+                self._save()
+
+    def revoke_group(self, gid):
+        """群組刪除：它的加入碼一律作廢（不讓之後加入的機器把刪掉的群組又建回來）。回作廢幾個。"""
+        with self.lock:
+            hit = [r for r in self.recs.values() if r.get("group_id") == gid and state(r) == "waiting"]
+            for r in hit:
+                r["revoked"], r["closed"] = True, time.time()
+            if hit:
+                self._save()
+            return len(hit)
 
     def listing(self):
         with self.lock:
