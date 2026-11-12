@@ -59,7 +59,7 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || die
 
 say "2/6 複製程式到 $DST"
 mkdir -p -m 700 "$ST" "$DST/static" "$DST/agent"
-for f in xconsole_server.py tls.py agentlink.py linkcert.py groups.py store.py report.py recommend.py extract.py chats.py computer.py updater.py catalog_default.json sd_catalog_default.json; do cp "$SRC/console/$f" "$DST/$f"; done
+for f in xconsole_server.py tls.py agentlink.py linkcert.py groups.py joincodes.py store.py report.py recommend.py extract.py chats.py computer.py updater.py catalog_default.json sd_catalog_default.json; do cp "$SRC/console/$f" "$DST/$f"; done
 cp "$SRC/console/static/"* "$DST/static/"
 cp "$SRC/agent/xconsole_agent.py" "$DST/agent/xconsole_agent.py"       # 「加一台機器」要發給別台的那一份
 cp "$SRC/agent/xconsole_agent.py" "$HOME/xconsole_agent.py"
