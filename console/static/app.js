@@ -1548,9 +1548,13 @@ function hwCard(n, rec) {
   }
   // 標正在跑的模型與實際用量。以前標的是推薦模型（xVITA 31B・30 GiB），機器明明在跑別顆，
   // 看的人會以為在跑它，數字也跟上面的標題對不起來；推薦留在「模型」頁
+  // 純 CPU 的機器用量在系統記憶體；統一記憶體兩塊都算；獨顯只算顯示記憶體。
+  // 欄位沒綁特定顯示卡時，顯示記憶體是整台分攤的（含其他程式），要標明是整機用量，不能說成模型本身多大
   const rs = runningSlot(n);
-  const used = rs && ((rs.vram_gib || 0) + (cap.memory_model === "discrete" ? 0 : rs.ram_gib || 0));
-  if (cap.tiers.length) left.appendChild(tierBar(cap, used ? { label: `現在執行 ${rs.model || rs.role}`, gib: used } : null));
+  const onRam = cap.cpu_only, onGpu = !onRam && cap.memory_model === "discrete";
+  const used = rs && (onRam ? rs.ram_gib || 0 : (rs.vram_gib || 0) + (onGpu ? 0 : rs.ram_gib || 0));
+  const whole = !onRam && rs?.vram_exact === false ? "（整機用量）" : "";
+  if (cap.tiers.length) left.appendChild(tierBar(cap, used ? { label: `現在執行 ${rs.model || rs.role}${whole}`, gib: used } : null));
   c.appendChild(left);
 
   const right = el("div", "hw-side");

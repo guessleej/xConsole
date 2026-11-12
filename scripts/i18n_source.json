@@ -1512,7 +1512,11 @@
 "pattern": false
 },
 {
-"zh": "現在執行 {0}",
+"zh": "（整機用量）",
+"pattern": false
+},
+{
+"zh": "現在執行 {0}{1}",
 "pattern": true
 },
 {
