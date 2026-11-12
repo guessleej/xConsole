@@ -2289,7 +2289,7 @@ def api_settings(slot_id, body, force=False):
     if url is not None:
         url = str(url).strip().rstrip("/")
         if url and (len(url) > 200 or not API_URL_RX.fullmatch(url)):
-            errors.append("對外網址格式不對，例：http://192.168.11.26:8081/v1")
+            errors.append("對外網址格式不對，例：http://ai.example.com:8081/v1")
 
     want = {}
     if raw is not None:
@@ -3410,7 +3410,7 @@ def _alive(slot):
     return unit_state(slot["unit"]) in ("active", "activating") if slot.get("unit") else False
 
 
-def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_disk=False, thinking=None, lan=None):
+def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_disk=False, thinking=None, lan=None, parallel=None):
     """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。
     allow_disk：一般放法放不下時，允許以檔案映射啟動（用硬碟執行）；BIOS 切兩塊的機器一律 400。
     thinking（auto／on／off）、lan（True／False）：同一次啟動就套用；沒帶就沿用欄位原本的設定。
@@ -3472,7 +3472,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     if m.get("ctx_train"):
         want_ctx = min(want_ctx, int(m["ctx_train"]))
     want_ctx = max(2048, want_ctx)
-    par = int(old_cfg.get("parallel") or 1)
+    par = int(parallel or old_cfg.get("parallel") or 1)      # parallel：群組設定指定的並行數
     # 思考模式與區網存取：這次有帶就用帶的，沒帶就沿用欄位原本的（換引擎也一樣）；全新的欄位預設 auto、區網開
     prev_raw = (load_json(slot["config"], {}) or {}) if slot.get("config") and slot.get("kind") in ("llama", "strata") else {}
     if thinking is None:
@@ -3880,6 +3880,25 @@ def _hf_get(url, token="", rng=None, timeout=30):
     return _HF_OPENER.open(urllib.request.Request(url, headers=h), timeout=timeout)
 
 
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(8 * 1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _hf_shas(repo, token=""):
+    """Hugging Face 公布的每個大檔 SHA-256（LFS 的 oid）。拿不到（鏡像沒有這支 API）就回空的，下載照常但不核對。"""
+    try:
+        with _hf_get(f"{hf_base()}/api/models/{urllib.parse.quote(repo, safe='/')}/tree/main?recursive=true", token) as resp:
+            items = json.loads(resp.read(8 * 1024 * 1024) or b"[]")
+    except Exception:  # noqa: BLE001
+        return {}
+    return {x["path"]: x["lfs"]["oid"] for x in items if isinstance(x, dict) and isinstance(x.get("lfs"), dict)
+            and re.fullmatch(r"[0-9a-f]{64}", str(x["lfs"].get("oid") or ""))}
+
+
 def hf_files(repo, token=""):
     """列出 Hugging Face 上這個 repo 的 GGUF，依量化分組，並估每組放不放得下。"""
     if not HF_REPO_RX.fullmatch(repo or ""):
@@ -4195,6 +4214,9 @@ def _download_job(jid, dest):
             with _hf_get(_hf_file_url(repo, f), j["_token"], timeout=60) as resp:
                 sizes[repo, f] = int(resp.headers.get("Content-Length") or 0)
         j["total"] = sum(sizes.values())
+        shas = {}
+        for repo in {r for r, _, _ in files}:
+            shas.update({(repo, k): v for k, v in _hf_shas(repo, j["_token"]).items()})
         done_before = 0
         for repo, f, out in files:
             if os.path.exists(out) and os.path.getsize(out) == sizes[repo, f]:
@@ -4224,6 +4246,15 @@ def _download_job(jid, dest):
                             last = time.time()
             if os.path.getsize(part) != sizes[repo, f]:
                 raise IOError(f"{os.path.basename(f)} 大小不對（{os.path.getsize(part)}／{sizes[repo, f]}），可能連線中斷，重新下載會接續")
+            want = shas.get((repo, f))
+            if want:
+                j["verifying"] = os.path.basename(f)
+                got = _sha256_file(part)
+                j.pop("verifying", None)
+                if not secrets.compare_digest(got, want):
+                    os.remove(part)               # 內容不對就不留：下次從頭下載
+                    raise IOError(f"{os.path.basename(f)} 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載")
+                j.setdefault("verified", []).append(os.path.basename(f))
             os.replace(part, out)
             done_before += sizes[repo, f]
         j["state"] = "done"
@@ -7836,6 +7867,8 @@ class Handler(BaseHTTPRequestHandler):
             return None
         if path in ("/", "/state"):
             return self._send(200, full_state())
+        if path == "/group/state":
+            return self._send(200, group_public())
         if path == "/registry":
             return self._send(200, registry())
         m = re.fullmatch(r"/logs/([\w.-]+)", path)
@@ -7947,8 +7980,23 @@ class Handler(BaseHTTPRequestHandler):
             record_model_measure(m.group(1), nm)
             return self._send(200, {"ok": True, "model": nm,
                                     "est": (registry().get("model_est") or {}).get(nm)})
+        if path == "/group/sync":
+            return self._send(*group_sync(body))
         m = re.fullmatch(r"/slot/([\w.-]+)/model", path)
         if m:
+            if group_lock("models"):
+                return self._send(423, dict(GROUP_LOCKED))
+            if group_lock("profile"):
+                # 執行參數被鎖：這裡帶來的上下文、思考一律換成群組設定的，不能藉換模型改掉
+                gp = (group_state().get("active") or {}).get("profile") or {}
+                body["ctx"] = gp.get("ctx")
+                body["thinking"] = None if gp.get("thinking") is None else ("on" if gp["thinking"] else "off")
+            if body.get("engine") == "llama":
+                gm = next((x for x in scan_gguf()[1] if x["id"] == str(body.get("model") or "")), None)
+                if gm and not group_allowed(gm["path"]):
+                    return self._send(403, {"error": "這顆不在群組「只准用的模型」清單裡"})
+            elif not group_allowed(""):
+                return self._send(403, {"error": "群組限定了只准用的模型，不能換回 Strata"})
             sid = m.group(1)
             cur = _slot(sid) or {}
             if body.get("engine") == "llama":
@@ -7993,6 +8041,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, out)
         m = re.fullmatch(r"/profile/([\w.-]+)", path)
         if m:
+            if group_lock("models"):
+                return self._send(423, dict(GROUP_LOCKED))
             code, out = do_profile(m.group(1), force=force)
             return self._send(code, out)
         m = re.fullmatch(r"/all/(start|stop|restart)", path)
@@ -8004,6 +8054,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/agent/folders/create":
             return self._send(*agent_folder_create(body.get("name")))
         if path == "/llama/args":
+            if group_lock("profile"):
+                return self._send(423, dict(GROUP_LOCKED))
             return self._send(*llama_args_set(str(body.get("model") or ""), body.get("args")))
         if path == "/self/update":
             return self._send(*self_update(body))
@@ -8064,6 +8116,8 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return self._send(*delete_profile(m.group(1)))
         m = re.fullmatch(r"/slot/([\w.-]+)/(edit|delete)", path)
+        if m and (group_lock("models") or group_lock("profile")):
+            return self._send(423, dict(GROUP_LOCKED))
         if m:
             return self._send(*(edit_slot(m.group(1), body) if m.group(2) == "edit" else delete_slot(m.group(1))))
         # ⚠️ 不提供「經 API 覆寫整份登錄檔」：拿到權杖的人就能把欄位的記錄檔指到 ~/.ssh/id_rsa，
@@ -8749,6 +8803,398 @@ def desktop_first_run():
 # 加入時安裝腳本寫下 agent-link.json（主控台網址、節點編號）與 agent-link.pem（主控台憑證），有這兩個檔才會連。
 # 每筆指令轉給本機自己這支代理（https://127.0.0.1:PORT），路由、權杖檢查、串流都跟主控台直接連進來一樣。
 # 協定與主控台那一側見 console/agentlink.py。
+# ---------------------------------------------------------------- 群組設定對齊（清單 #5）
+# 主控台每分鐘送一次這台所屬群組的設定（POST /group/sync），附上主控台的時間。代理分兩段做：
+#   準備（收到就做）：模型下載並核對 SHA-256、檢查只准用的模型、准入預檢。不碰正在跑的服務。
+#   套用（到了 apply_at 才做）：換上模型與參數、生效鎖定。立即＝準備完就套用；下次開機＝代理下次啟動時；
+#   指定時間＝以主控台的時鐘為準（用它算出跟本機時鐘的差，不信本機時鐘）。
+# 每一步都記下來回報；失敗就停在那一步，正在跑的服務不動（換模型本來就會失敗還原）。
+GROUP_FILE = os.path.join(STATE_DIR, "group.json")
+GROUP_LOCK = threading.RLock()
+GROUP_HF = {"token": ""}                   # 主控台設定的 Hugging Face 權杖：只放記憶體，不寫進 group.json
+GROUP_WAKE = threading.Event()
+GROUP_BOOT = secrets.token_hex(8)          # 這次代理啟動的編號：「下次開機」套用看它換了沒
+GROUP_STEPS_MAX = 40
+GROUP_LOCKED = {"error": "這台的這個項目被群組鎖定，請到主控台改群組設定", "group_locked": True}
+
+
+def group_state():
+    st = load_json(GROUP_FILE, None) or {}
+    for k, v in (("group_id", ""), ("version", 0), ("prepared", 0), ("applied", 0), ("settings", None), ("active", None),
+                 ("steps", []), ("phase", "idle"), ("error", None), ("offset", 0.0), ("prepared_boot", ""),
+                 ("console_at", 0.0), ("mono_at", 0.0), ("mono_boot", "")):
+        st.setdefault(k, v)
+    return st
+
+
+class GroupSuperseded(Exception):
+    """做到一半主控台送來更新的版本（或換了群組）：這一輪不再寫、不再套用，下一輪做新的。"""
+
+
+def _gwrite(st):
+    st["steps"] = st["steps"][-GROUP_STEPS_MAX:]
+    save_json(GROUP_FILE, st)
+
+
+def _gsave(st):
+    """對齊工作用的存檔：先確認磁碟上還是同一個群組、同一版，不然丟 GroupSuperseded，絕不蓋掉新版本。"""
+    with GROUP_LOCK:
+        cur = group_state()
+        if (cur["group_id"], cur["version"]) != (st["group_id"], st["version"]):
+            raise GroupSuperseded()
+        _gwrite(st)
+
+
+def _console_now(st):
+    """主控台現在的時間：同一次代理執行中用單調時鐘往前推（本機時鐘被改也不受影響）；代理重啟過就退回用時鐘差。"""
+    if st.get("mono_boot") == GROUP_BOOT and st.get("console_at"):
+        return float(st["console_at"]) + time.monotonic() - float(st["mono_at"])
+    return time.time() + float(st.get("offset") or 0)
+
+
+def group_public(st=None):
+    st = st or group_state()
+    return {k: st.get(k) for k in ("group_id", "version", "prepared", "applied", "phase", "error", "steps")} | {
+        "locked": (st.get("active") or {}).get("locked") or [], "apply_at": (st.get("settings") or {}).get("apply_at")}
+
+
+def _gstep(st, text, state="ok"):
+    """記一步。同一步（文字相同）從進行中變成完成時，改原本那一筆，不重複加。"""
+    if st["steps"] and st["steps"][-1]["step"] == text and st["steps"][-1]["state"] == "run":
+        st["steps"][-1].update(state=state, at=int(time.time()))
+    else:
+        st["steps"].append({"step": text, "state": state, "at": int(time.time())})
+    _gsave(st)
+
+
+def group_sync(body):
+    try:
+        v = int(body.get("version"))
+        now = float(body.get("now"))
+    except (TypeError, ValueError):
+        return 400, {"error": "要帶群組設定的版本號與主控台的時間"}
+    gid = str(body.get("group_id") or "")[:40]
+    s = body.get("settings")
+    if v < 1 or not isinstance(s, dict) or not re.fullmatch(r"[0-9a-f]{8}", gid):
+        return 400, {"error": "群組設定格式不對"}
+    tok = body.get("hf_token")
+    if isinstance(tok, str) and len(tok) < 400:
+        GROUP_HF["token"] = tok
+    with GROUP_LOCK:
+        st = group_state()
+        st["offset"] = now - time.time()     # 主控台時鐘減本機時鐘（代理重啟後的後備）
+        st.update(console_at=now, mono_at=time.monotonic(), mono_boot=GROUP_BOOT)
+        if gid != st["group_id"]:
+            # 換到別的群組：舊群組的鎖定與限制立刻不算，新群組的等套用了才生效（版本號各群組各自算）
+            st.update(group_id=gid, version=0, prepared=0, applied=0, active=None, steps=[], error=None)
+        if v > st["version"]:
+            st.update(version=v, settings=s, error=None, phase="queued")
+            st["steps"] = [{"step": f"收到群組設定 v{v}", "state": "ok", "at": int(time.time())}]
+        _gwrite(st)
+    GROUP_WAKE.set()
+    return 200, group_public()
+
+
+def group_lock(item):
+    """這個項目是不是被群組鎖住了（已套用的設定才算）。"""
+    return item in ((group_state().get("active") or {}).get("locked") or [])     # 已套用的那一版才算，準備中的不算
+
+
+def group_allowed(model_path):
+    """只准用的模型：空的就是不限。比對的是存放區裡的檔案路徑（由群組的「作者/repo:量化」換算）。"""
+    allowed = (group_state().get("active") or {}).get("allowed_models") or []
+    if not allowed:
+        return True
+    _, models, _ = scan_gguf()
+    m = next((x for x in models if os.path.abspath(x["path"]) == os.path.abspath(model_path or "")), None)
+    return bool(m) and any(_group_match(spec, m) for spec in allowed)
+
+
+def _group_spec(spec):
+    """「作者/repo:量化」→（repo, 量化）。"""
+    repo, _, quant = spec.partition(":")
+    return repo, quant
+
+
+def _group_match(spec, m):
+    repo, quant = _group_spec(spec)
+    if "/" not in repo:
+        return False
+    owner, name = repo.split("/", 1)
+    folder = _slug(f"{owner}--{name.removesuffix('-GGUF').removesuffix('-gguf')}")
+    try:
+        rel = os.path.relpath(m["path"], gguf_root())
+    except ValueError:
+        return False
+    return rel.split(os.sep)[0] == folder and (not quant or str(m.get("quant") or "").lower() == quant.lower())
+
+
+def _group_find(spec):
+    _, models, _ = scan_gguf()
+    return next((m for m in models if _group_match(spec, m)), None)
+
+
+def _group_fetch(st, spec):
+    """存放區沒有就從 Hugging Face 下載（核對 SHA-256），一次一個。回模型，失敗丟例外。"""
+    m = _group_find(spec)
+    if m:
+        _gstep(st, f"{spec}：存放區已有")
+        return m
+    repo, quant = _group_spec(spec)
+    code, info = hf_files(repo, GROUP_HF["token"])
+    if code != 200:
+        raise RuntimeError(f"{spec}：查不到 Hugging Face 上的檔案（{info.get('error')}）")
+    pick = next((c for c in info["choices"] if not c["aux"] and (not quant or str(c.get("quant") or "").lower() == quant.lower())), None)
+    if not pick:
+        raise RuntimeError(f"{spec}：這個 repo 沒有這個量化")
+    text = f"{spec}：下載並核對 SHA-256"
+    _gstep(st, text, "run")
+    while True:
+        code, out = start_download(repo, pick["stem"], token=GROUP_HF["token"])
+        if code != 409:
+            break
+        time.sleep(15)                        # 別的下載在跑：一次只下載一個，等它
+    if code != 200:
+        raise RuntimeError(f"{spec}：{out.get('error')}")
+    while _DL[out["id"]]["state"] in ("queued", "running"):
+        time.sleep(2)
+    j = _DL[out["id"]]
+    if j["state"] != "done":
+        raise RuntimeError(f"{spec}：下載沒完成（{j.get('error') or j['state']}）")
+    _gstep(st, text)
+    m = _group_find(spec)
+    if not m:
+        raise RuntimeError(f"{spec}：下載完了但存放區掃不到")
+    return m
+
+
+def _group_slots(reg):
+    """可以放語言模型的欄位，依登錄檔順序：群組的第 1 顆放第 1 個欄位，依此類推。"""
+    return [x for x in reg["slots"] if x.get("kind") in (None, "strata", "llama") and not (x.get("unit") and not x.get("kind"))]
+
+
+def _slot_model_path(sl):
+    if sl.get("kind") != "llama" or not sl.get("config"):
+        return ""
+    return os.path.abspath((load_json(sl["config"], {}) or {}).get("model") or "")
+
+
+def _group_prepare(st, s):
+    specs = [x for x in s.get("models") or [] if x != "auto"]
+    if "auto" in (s.get("models") or []):
+        _gstep(st, "auto（依每台硬體挑版本）要等混合機型功能上線，這次先略過", "skip")
+    allowed = s.get("allowed_models") or []
+    for spec in specs:
+        if allowed and spec not in allowed:
+            raise RuntimeError(f"{spec} 不在「只准用的模型」清單裡")
+    for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置"), ("reserve_user_gib", "保留給使用者的記憶體")):
+        if s.get(k) not in (None, "", 0):
+            _gstep(st, f"{label}這一版的代理還不支援，先略過", "skip")
+    if set(s.get("sources") or []) - {"huggingface"}:
+        _gstep(st, "同群組互傳與內部鏡像還沒上線，這次從 Hugging Face 取得", "skip")
+    reg = registry()
+    slots = _group_slots(reg)
+    if len(specs) > len(slots):
+        raise RuntimeError(f"群組要 {len(specs)} 顆模型，這台只有 {len(slots)} 個可放語言模型的欄位")
+    for spec in specs:
+        _group_fetch(st, spec)
+    if specs and not llama_server_exe(reg):
+        raise RuntimeError("這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝")
+    p = s.get("profile") or {}
+    for spec, sl in zip(specs, slots):
+        ok, why = llama_precheck(sl["id"], _group_find(spec), p.get("ctx"), p.get("parallel"))
+        if not ok:
+            raise RuntimeError(f"{sl['id']}：{spec} 放不下（{why}），請改小上下文或換小一點的量化")
+    if specs:
+        _gstep(st, "准入預檢通過（逐欄試算，實際換上時會再算一次）")
+    _gstep(st, "準備完成")
+
+
+def llama_precheck(slot_id, m, ctx=None, parallel=None):
+    """不動任何東西，試算這顆換進這個欄位放不放得下（同 set_llama_model 的准入，含沒指定上下文時自動縮短）。
+    ponytail: 逐欄獨立試算，沒把同一批其他欄位的新模型算進去；多欄合計以實際套用時的准入為準。"""
+    reg = registry()
+    slot = next((x for x in reg["slots"] if x["id"] == slot_id), None)
+    if not slot or not m:
+        return False, "找不到欄位或模型"
+    hw = hardware()
+    cards = pools(reg, hw)["gpus"]
+    gpu_ids, err = pick_gpus(slot.get("gpu_ids"), cards)
+    if err:
+        return False, err
+    alive = _alive(slot)
+    old_v, old_r = _usage_reclaim(slot) if alive else (0.0, 0.0)
+    old_cfg = slot_config(slot) or {}
+    par = int(parallel or old_cfg.get("parallel") or 1)
+    want = max(2048, min(int(ctx or old_cfg.get("max_context") or 32768), int(m.get("ctx_train") or 10 ** 9)))
+    for c in [want] + ([] if ctx else [x for x in (16384, 8192) if x < want]):
+        lay = llama_layout(m, reg["machine"], cards, gpu_ids, c, par, old_v if alive else 0.0)
+        r2 = json.loads(json.dumps(reg))
+        for x in r2["slots"]:
+            if x["id"] == slot_id:
+                x.update(est_vram_gib=lay["est_vram"], est_ram_gib=lay["est_ram"])
+        same = slot.get("kind") == "llama"      # 同一個服務：admit 自己會把它占的量算回
+        v = admit(slot_id, reg=r2, hw=hw, extra_free=None if same else (old_v, old_r))
+        if v["allow"]:
+            return True, ""
+    return False, "；".join(v.get("reasons") or [])[:200] or "記憶體不夠"
+
+
+def _slot_snapshot(sl):
+    snap = {"slot": json.loads(json.dumps(sl)), "llama": None, "strata": None}
+    if sl.get("kind") == "llama" and sl.get("config"):
+        raw = load_json(sl["config"], {}) or {}
+        snap["llama"] = {"path": os.path.abspath(raw.get("model") or ""), "ctx": raw.get("ctx"), "parallel": raw.get("parallel"),
+                         "thinking": raw.get("reasoning")}
+    elif sl.get("kind") == "strata":
+        c = slot_config(sl) or {}
+        snap["strata"] = {"pack": c.get("_pack") or "", "native": c.get("_native") or ""}
+    return snap
+
+
+def _slot_restore(sid, snap):
+    """把一個欄位換回套用前的樣子（多欄套用中途失敗時用）。回 True 表示換回去了。"""
+    if snap["llama"]:
+        m = next((x for x in scan_gguf()[1] if os.path.abspath(x["path"]) == snap["llama"]["path"]), None)
+        if m:
+            code, _ = set_llama_model(sid, m["id"], snap["llama"]["ctx"], thinking=snap["llama"]["thinking"],
+                                      parallel=snap["llama"]["parallel"])
+            return code == 200
+        return False
+    if snap["strata"] and (_slot(sid) or {}).get("kind") == "llama":
+        code, _ = back_to_strata(sid, snap["strata"]["pack"], snap["strata"]["native"])
+        return code == 200
+    do_control(sid, "stop")                   # 原本是空的欄位：停掉新起的服務，登錄檔換回原樣
+    with REG_LOCK:
+        r = registry()
+        r["slots"] = [snap["slot"] if x["id"] == sid else x for x in r["slots"]]
+        save_json(REGISTRY, r)
+    return True
+
+
+def _group_apply(st, s, only_missing=False):
+    """把模型與參數換上。多個欄位一組：中途有一個換不上，前面換好的全部換回去，不留半套。
+    only_missing：已套用後的檢查，只把被改掉的欄位拉回來。"""
+    specs = [x for x in s.get("models") or [] if x != "auto"]
+    p = s.get("profile") or {}
+    reg = registry()
+    slots = _group_slots(reg)
+    done = []                                  # (欄位, 套用前的樣子)
+    try:
+        for spec, sl in zip(specs, slots):
+            m = _group_find(spec)
+            if not m:
+                raise RuntimeError(f"{spec}：存放區找不到（可能被刪了），下次對齊會重新準備")
+            same = _slot_model_path(sl) == os.path.abspath(m["path"])
+            if only_missing and same:
+                continue
+            _gsave(st)                         # 換之前確認沒有更新的版本進來
+            text = f"{sl['id']}：{'拉回群組設定的模型 ' if only_missing else '換上 '}{spec}"
+            _gstep(st, text, "run")
+            snap = _slot_snapshot(sl)
+            toks = [t for t in llama_custom_args({"model": m["path"]}, registry())]
+            keep, i = [], 0
+            while i < len(toks):              # 換掉舊的 --temp／--top-p，其他自訂引數不動
+                if toks[i] in ("--temp", "--top-p"):
+                    i += 2
+                    continue
+                keep.append(toks[i])
+                i += 1
+            for flag, key in (("--temp", "temperature"), ("--top-p", "top_p")):
+                if p.get(key) is not None:
+                    keep += [flag, str(p[key])]
+            set_custom_args(m["path"], keep)
+            thinking = None if p.get("thinking") is None else ("on" if p["thinking"] else "off")
+            code, out = set_llama_model(sl["id"], m["id"], p.get("ctx"), thinking=thinking, parallel=p.get("parallel"))
+            if code != 200:
+                raise RuntimeError(f"{sl['id']}：換不上 {spec}（{out.get('error')}），這個欄位原本的服務沒動")
+            done.append((sl["id"], snap))
+            _gstep(st, text)
+        _group_enforce_allowlist(st, s, {sl["id"] for _, sl in zip(specs, slots)})
+    except Exception:
+        for sid, snap in reversed(done):
+            ok = _slot_restore(sid, snap)
+            st["steps"].append({"step": f"{sid}：{'已換回套用前的模型' if ok else '換回套用前的模型失敗，請到機器頁查看'}",
+                                "state": "ok" if ok else "fail", "at": int(time.time())})
+        raise
+
+
+def _group_enforce_allowlist(st, s, mine):
+    """群組限定了只准用的模型：其他欄位在跑的不在清單裡，就停掉（不是群組指定的欄位也一樣）。"""
+    allowed = s.get("allowed_models") or []
+    if not allowed:
+        return
+    _, models, _ = scan_gguf()
+    for sl in _group_slots(registry()):
+        if sl["id"] in mine or not _alive(sl):
+            continue
+        path = _slot_model_path(sl)
+        m = next((x for x in models if os.path.abspath(x["path"]) == path), None) if path else None
+        if m and any(_group_match(spec, m) for spec in allowed):
+            continue
+        do_control(sl["id"], "stop")
+        _gstep(st, f"{sl['id']}：在跑的模型不在只准用的清單裡，已停掉")
+
+
+def _group_due(st, s):
+    a = s.get("apply_at") or {"mode": "now"}
+    if a.get("mode") == "boot":
+        return st.get("prepared_boot") and st["prepared_boot"] != GROUP_BOOT
+    if a.get("mode") == "at":
+        return _console_now(st) >= float(a.get("at") or 0)
+    return True
+
+
+def group_tick():
+    with GROUP_LOCK:
+        st = group_state()
+    s, v = st.get("settings"), st.get("version")
+    if not s or not v:
+        return
+    try:
+        if st["prepared"] < v:
+            st.update(phase="preparing", error=None)
+            _gsave(st)
+            _group_prepare(st, s)
+            st.update(prepared=v, prepared_boot=GROUP_BOOT)
+            _gsave(st)
+        if st["applied"] < v:
+            if not _group_due(st, s):
+                mode = (s.get("apply_at") or {}).get("mode")
+                st["phase"] = "waiting_boot" if mode == "boot" else "waiting_time"
+                _gsave(st)
+                return
+            st["phase"] = "applying"
+            _gsave(st)
+            _group_apply(st, s)
+            st.update(applied=v, active=s, phase="done")     # 鎖定與只准用的清單從這一刻起才算
+            _gstep(st, f"已套用 v{v}")
+        elif "models" in (s.get("locked") or []):
+            _group_apply(st, s, only_missing=True)    # 鎖定的模型被改掉了：拉回群組設定的值
+            st["phase"] = "done"
+            _gsave(st)
+    except GroupSuperseded:
+        GROUP_WAKE.set()                              # 有更新的版本：馬上做新的
+    except Exception as exc:  # noqa: BLE001
+        st.update(phase="failed", error=str(exc)[:300])
+        if st["steps"] and st["steps"][-1]["state"] == "run":
+            st["steps"][-1]["state"] = "fail"
+        try:
+            _gstep(st, str(exc)[:300], "fail")
+        except GroupSuperseded:
+            GROUP_WAKE.set()
+
+
+def group_worker():
+    while True:
+        GROUP_WAKE.wait(60)
+        GROUP_WAKE.clear()
+        try:
+            group_tick()
+        except Exception as exc:  # noqa: BLE001
+            print(f"群組對齊出錯：{exc}", flush=True)
+
+
 LINK_FILE = os.path.join(STATE_DIR, "agent-link.json")
 LINK_CERT = os.path.join(STATE_DIR, "agent-link.pem")
 LINK_FRAME = 4 * 1024 * 1024        # 結果超過這麼大就分片送
@@ -9134,7 +9580,9 @@ def main():
         threading.Thread(target=_watch_parent, args=(int(sys.argv[sys.argv.index("--parent-pid") + 1]),), daemon=True).start()
     srv = AgentTLSServer((bind, PORT), Handler)
     srv.ctx = ctx
-    threading.Thread(target=AgentLink().run, daemon=True).start()    # 沒有 agent-link.json 就只是每 5 秒看一次
+    threading.Thread(target=AgentLink().run, daemon=True).start()
+    threading.Thread(target=group_worker, daemon=True).start()       # 群組設定的準備與套用；「下次開機」的在這裡接手
+    GROUP_WAKE.set()    # 沒有 agent-link.json 就只是每 5 秒看一次
     print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
 

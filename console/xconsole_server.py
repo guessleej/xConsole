@@ -703,6 +703,67 @@ def fleet_state():
 
 # ---------------------------------------------------------------- 背景取樣
 
+# ---------------------------------------------------------------- 群組設定對齊（清單 #5）
+# 每分鐘（改了群組設定就馬上）把每台所屬群組的設定送過去，附主控台的時間；代理自己分「準備」與「套用」兩段做，
+# 回報兩個版本號與每一步。主動連回的機器不在線就跳過（不排舊指令，等它連上再送）。
+ALIGN_WAKE = threading.Event()
+ALIGN_STATE = {}                  # 機器 → {"at", "state"} 或 {"at", "error"}
+ALIGN_EVERY = 60
+
+
+def align_once():
+    cfg = fleet()
+    gmap = {g["name"]: g for g in cfg.get("groups", [])}
+    for n in cfg["nodes"]:
+        g = gmap.get(n.get("group") or groups.DEFAULT)
+        if not g:
+            continue
+        if n.get("link") == "push" and not LINK.online(n["id"]):
+            continue
+        # 預設設定的群組（例如原本的群組被刪、機器移到未分類）也要送：代理才會放掉舊群組的鎖定與限制
+        # ponytail: 一台一台依序送；連不到的伺服器各等 20 秒，機器多了再改並行
+        body = {"group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}
+        if hf_token():
+            body["hf_token"] = hf_token()        # 受限模型要下載才帶；代理只放記憶體、不寫檔
+        code, out = call_node(n["id"], "/group/sync", "POST", body, timeout=20)
+        if code == 200:
+            ALIGN_STATE[n["id"]] = {"at": int(time.time()), "state": out}
+        else:
+            ALIGN_STATE[n["id"]] = {"at": int(time.time()), "error": "這台的代理版本太舊，不支援群組設定，請更新代理"
+                                    if code == 404 else (out.get("error") or f"HTTP {code}")}
+
+
+ALIGN_BUSY = ("queued", "preparing", "applying")
+
+
+def aligner():
+    while True:
+        # 有機器正在準備或套用：5 秒後再問一次，畫面上的進度才跟得上；其他時候每分鐘一次
+        busy = any((a.get("state") or {}).get("phase") in ALIGN_BUSY for a in list(ALIGN_STATE.values()))
+        ALIGN_WAKE.wait(5 if busy else ALIGN_EVERY)
+        ALIGN_WAKE.clear()
+        try:
+            align_once()
+        except Exception as exc:  # noqa: BLE001
+            print(f"群組對齊出錯：{exc}", flush=True)
+
+
+def group_members(g, nodes):
+    """群組總覽要的每台狀態：已準備、已套用的版本與最後幾步。"""
+    out = []
+    for n in nodes:
+        if (n.get("group") or groups.DEFAULT) != g["name"]:
+            continue
+        a = ALIGN_STATE.get(n["id"]) or {}
+        st = a.get("state") or {}
+        same = st.get("group_id") == g["id"]
+        out.append({"id": n["id"], "name": n.get("name"), "checked": a.get("at"),
+                    "error": a.get("error") or (st.get("error") if same else None),
+                    "prepared": st.get("prepared", 0) if same else 0, "applied": st.get("applied", 0) if same else 0,
+                    "phase": st.get("phase") if same else None, "steps": (st.get("steps") or [])[-6:] if same else []})
+    return out
+
+
 def sampler():
     """每 5 分鐘記一筆各機狀態，服務使用報告從這裡算。另外順便檢查憑證到期提醒。"""
     last_prune = 0
@@ -2736,7 +2797,13 @@ class Handler(BaseHTTPRequestHandler):
             count = {}
             for n in cfg["nodes"]:
                 count[n.get("group") or groups.DEFAULT] = count.get(n.get("group") or groups.DEFAULT, 0) + 1
-            return self._json(200, {"groups": [dict(g, members=count.get(g["name"], 0)) for g in cfg.get("groups", [])],
+            out = []
+            for g in cfg.get("groups", []):
+                ms = group_members(g, cfg["nodes"])
+                out.append(dict(g, members=count.get(g["name"], 0), nodes=ms,
+                                ready=sum(1 for m in ms if m["prepared"] >= g["version"]),
+                                done=sum(1 for m in ms if m["applied"] >= g["version"])))
+            return self._json(200, {"groups": out,
                                     "kinds": groups.KINDS, "lockable": groups.LOCKABLE, "sources": groups.SOURCES,
                                     "defaults": groups.defaults()})
         if path == "/api/link":
@@ -3404,6 +3471,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True, "moved": len(out["moved"])})
             g = out["group"]
             self._audit("group.update", g["name"], True, {"from": out["old"], "version": g["version"], "settings_changed": out["changed"]})
+            if out["changed"]:
+                ALIGN_WAKE.set()                    # 改了設定：馬上送給各台，不必等下一分鐘
             return self._json(200, {"ok": True, "group": g, "changed": out["changed"]})
         if path == "/api/link/settings":
             pub = [str(a).strip() for a in body.get("public") or [] if str(a).strip()]
@@ -3689,6 +3758,8 @@ def main():
         threading.Thread(target=loop.serve_forever, daemon=True).start()
         print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
     threading.Thread(target=sampler, daemon=True).start()
+    threading.Thread(target=aligner, daemon=True).start()
+    ALIGN_WAKE.set()
     cur = CERTS.current()
     kind = "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）" if cur["selfSigned"] else cur["issuer"]
     print(f"xConsole 聽在 https://{bind}:{PORT}；憑證：{kind}"
