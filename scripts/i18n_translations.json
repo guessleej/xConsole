@@ -20113,5 +20113,20 @@
 "en": "The join code was revoked or its group was deleted while verifying; create a new join code in the console",
 "ja": "確認中に参加コードが無効化されたか、グループが削除されました。コンソールで参加コードを作り直してください",
 "ko": "확인 중에 가입 코드가 무효화되었거나 그룹이 삭제되었습니다. 콘솔에서 가입 코드를 다시 생성하세요"
+},
+"現在執行 {0}": {
+"en": "Running {0}",
+"ja": "実行中 {0}",
+"ko": "실행 중 {0}"
+},
+"現在執行 {0}{1}": {
+"en": "Running {0}{1}",
+"ja": "実行中 {0}{1}",
+"ko": "실행 중 {0}{1}"
+},
+"（整機用量）": {
+"en": " (whole-machine usage)",
+"ja": "（マシン全体の使用量）",
+"ko": " (전체 기기 사용량)"
 }
 }

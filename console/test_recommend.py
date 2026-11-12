@@ -56,7 +56,11 @@ def main():
     c = R.capacity(ADA2)
     case("2 張 48G：快速層＝兩張加總扣底線", c["fast"], 94.0)
     case("2 張 48G：備援層＝系統記憶體扣底線與引擎", c["slow"], 201.5)
-    case("2 張 48G：流暢稠密模型上限是好記的整數", c["max_dense_b"] in R.NICE_B, True)
+    case("2 張 48G：流暢稠密模型上限照估算往下取整（100B 以上取到 10B）", c["max_dense_b"], 94)
+    # 兩張 RTX PRO 5000（1344 GB/s）實測跑 128B 稠密模型約 15 tok/s：標題不能寫成比它小的 120B
+    c5000 = R.capacity(state("discrete", 1344, floors={"ram": 8, "vram": 2}, ram={"total_gib": 123},
+                             gpus=[{"id": "0", "total_gib": 48}, {"id": "1", "total_gib": 48}]))
+    case("2 張 RTX PRO 5000：流暢上限 130B，涵蓋正在跑的 128B", c5000["max_dense_b"], 130)
     c = R.capacity(NOGPU)
     case("沒有 GPU：快速層＝系統記憶體扣底線與引擎、標成 CPU 執行", (c["fast"], c["cards"], c.get("cpu_only")), (53.5, 0, True))
     case("  頻寬沒填用假設的系統記憶體頻寬，並標明是假設", (c["bandwidth_gbs"], c["bandwidth_src"]), (R.DEFAULT_RAM_BW, "假設值"))
@@ -152,7 +156,7 @@ def main():
     case("頻寬未知：放得下也不標流暢", R.plan_quant(R.capacity(state("unified_single", None, floors={"ram": 12}, unified={"total_gib": 120})),
                                           DENSE, q("Q4_K_M", 17))["level"], "ok")
     c = R.capacity(AI395)
-    case("流暢上限把頻寬算進去：AI 395 放得下 120B，但流暢只到 24B", (c["max_fit_b"], c["max_dense_b"]), (120, 24))
+    case("流暢上限把頻寬算進去：AI 395 放得下 150B，但流暢只到 25B", (c["max_fit_b"], c["max_dense_b"]), (150, 25))
     case("頻寬未知：上限只照容量、標明速度未知", R.capacity(state("unified_single", None, floors={"ram": 12}, unified={"total_gib": 120}))["speed_known"], False)
     only16 = [R.plan_quant(R.capacity(ADA2), DENSE, x) for x in (q("BF16", 16), q("F32", 32))]
     case("repo 只有 16 位元：放得下就推它", (R.pick(only16) or {}).get("quant"), "BF16")

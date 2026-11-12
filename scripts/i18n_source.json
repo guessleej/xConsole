@@ -1512,6 +1512,18 @@
 "pattern": false
 },
 {
+"zh": "（整機用量）",
+"pattern": false
+},
+{
+"zh": "現在執行 {0}{1}",
+"pattern": true
+},
+{
+"zh": "現在執行",
+"pattern": false
+},
+{
 "zh": "顯示卡",
 "pattern": false
 },
@@ -6705,10 +6717,6 @@
 },
 {
 "zh": "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址",
-"pattern": false
-},
-{
-"zh": "現在執行",
 "pattern": false
 },
 {
