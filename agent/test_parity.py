@@ -89,7 +89,8 @@ def main():
         case("Apple：照舊整層映射（Metal 直接用映射的記憶體）", not A.disk_layout(moe, single, [], None, 32768, 1, 0.0, 100.0).get("tiered"))
     finally:
         A.OS = real_os
-    case("AI 395（BIOS 切兩塊）照舊不允許", A.disk_layout(moe, {"memory_model": "unified_split", "floors": {}}, cards, None, 32768, 1, 0.0, 48.0) is None)
+    lay4 = A.disk_layout(moe, {"memory_model": "unified_split", "floors": {}}, cards, None, 32768, 1, 0.0, 48.0)
+    case("AI 395（BIOS 切兩塊）也照張量分層：GPU 那塊放注意力與共用，專家留在映射", bool(lay4 and lay4.get("tiered") and lay4["ngl"] == 999), lay4)
 
     # ---- 4. Windows 內顯
     real = (A.OS, A.has_nvidia, A._apu_like)

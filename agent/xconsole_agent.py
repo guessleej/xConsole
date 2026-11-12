@@ -1487,6 +1487,7 @@ def slot_state(slot, reg, hw):
         "est_vram_gib": slot.get("est_vram_gib"), "est_ram_gib": slot.get("est_ram_gib"),
         "config": cfg, "kv_worst_gib": kv_worst_gib(cfg), "measure": meas,
         "critical": slot.get("critical", False), "note": slot.get("note", ""),
+        "watchdog": None if busy else watchdog_notes().get(slot["id"]),
         # 換得回 Strata 的欄位：本來就是 Strata，或現在跑 llama.cpp 但還留著 Strata 的設定
         "has_strata": slot.get("kind") == "strata" or bool((slot.get("engines") or {}).get("strata")),
     }
@@ -2163,9 +2164,9 @@ def run_options(slot, raw):
     return {"options": out, "ctx_train": prof.get("ctx_train"), "size_gib": round(size, 1), "load_sec": load,
             "split": lay["split"] if lay else None, "mode": lay["mode"] if lay else None,
             "tiered": bool(lay and lay.get("tiered")), "cpu_moe": (lay or {}).get("cpu_moe") or 0,
-            "disk_mode": bool(raw.get("disk")), "disk_allowed": mm != "unified_split",
+            "disk_mode": bool(raw.get("disk")), "disk_allowed": True,
             "disk_needed": bool(lay and lay["mode"] == "disk"),
-            "disk_note": None if mm != "unified_split" else DISK_DENIED,
+            "disk_note": DISK_SPLIT_NOTE if mm == "unified_split" else None,
             "bandwidth_gbs": chip().get("bandwidth_gbs"), "hdd": (store or {}).get("hdd"),
             "profile": {k: prof.get(k) for k in ("active_frac", "layers", "moe", "arch")},
             "measured_tok_s": ((registry().get("speed") or {}).get(os.path.abspath(raw.get("model") or "")) or {}).get("tok_s"),
@@ -2195,7 +2196,7 @@ def _run_layout(slot, raw, prof, size_gib, ctx, par):
     else:
         fits = (not cards or lay["est_vram"] + lay["kv"] <= p["vram"]["free_gib"] + back_v - floors(reg["machine"])["vram"]) \
             and lay["est_ram"] <= p["ram"]["free_gib"] + back_r - floors(reg["machine"])["ram"]
-    if fits or mm == "unified_split":
+    if fits:
         return lay
     dl = disk_layout(m, reg["machine"], cards, slot.get("gpu_ids"), ctx, par, back_v, ram_pool()["free_gib"] + back_r)
     return dl or lay
@@ -2971,8 +2972,67 @@ def auto_cpu_moe(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
     return n if n <= m.get("expert_layers", 0) else 0
 
 
-DISK_DENIED = ("這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：用硬碟執行時，檔案映射的頁快取吃的是系統那一小塊，"
-               "擠爆會把整台拖死（連代理與 SSH 一起），所以一律不允許。請換小一點的量化，或縮短上下文")
+DISK_SPLIT_NOTE = ("這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。"
+                   "頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死")
+
+# ---- 用硬碟執行的看門狗：模型跑起來之後，系統記憶體（可用量含可丟的頁快取）跌破危險線就停掉那個模型。
+# 頁快取算在「可用」裡，所以 SSD 讀進來的資料不會讓它誤判；真正會觸發的是丟不掉的記憶體（KV 長大、別的程式）。
+WATCHDOG_FILE = os.path.join(STATE_DIR, "watchdog.json")
+WATCHDOG_EVERY, WATCHDOG_HITS = 3, 3          # 每 3 秒看一次，連續 3 次都低於危險線才停（避開瞬間的尖峰）
+_WD_LOCK = threading.Lock()
+
+
+def watchdog_line(machine):
+    """危險線：底線的一半，至少 HARD_MIN_GIB。AI 395 底線 15 → 7.5 GiB；一般機器底線 4～12 → 2～6 GiB。"""
+    return max(HARD_MIN_GIB, floors(machine)["ram"] / 2)
+
+
+def watchdog_notes():
+    return load_json(WATCHDOG_FILE, {}) or {}
+
+
+def watchdog_clear(slot_id):
+    with _WD_LOCK:
+        notes = watchdog_notes()
+        if notes.pop(slot_id, None) is not None:
+            save_json(WATCHDOG_FILE, notes)
+
+
+def watchdog_check(reg, free_gib, hits, stop=None):
+    """看一次：回這次停掉的欄位 id 清單。hits 是各欄位連續低於危險線的次數（呼叫端保存）。
+    只盯「用硬碟執行」的 llama.cpp 欄位：一般放法在准入時已經算死了，不會在跑的時候突然多吃。"""
+    line = watchdog_line(reg["machine"])
+    stop = stop or (lambda unit: sysctl(unit, "stop"))
+    stopped = []
+    for sl in reg["slots"]:
+        raw = load_json(sl.get("config") or "", None) if sl.get("kind") == "llama" and sl.get("config") else None
+        if not raw or not raw.get("disk") or not _alive(sl):
+            hits.pop(sl["id"], None)
+            continue
+        hits[sl["id"]] = hits.get(sl["id"], 0) + 1 if free_gib < line else 0
+        if hits[sl["id"]] >= WATCHDOG_HITS:
+            stop(sl["unit"])
+            hits.pop(sl["id"], None)
+            msg = (f"系統記憶體只剩 {free_gib:.1f} GiB（危險線 {line:.1f} GiB），為了不讓整台卡死，"
+                   f"看門狗在 {time.strftime('%m/%d %H:%M')} 停掉了這個用硬碟執行的模型。"
+                   "請縮短上下文、關掉別的程式，或換小一點的量化再啟動")
+            with _WD_LOCK:
+                notes = watchdog_notes()
+                notes[sl["id"]] = {"at": int(time.time()), "free_gib": round(free_gib, 1), "line": round(line, 1),
+                                   "model": sl.get("model"), "message": msg}
+                save_json(WATCHDOG_FILE, notes)
+            stopped.append(sl["id"])
+    return stopped
+
+
+def disk_watchdog():
+    hits = {}
+    while True:
+        time.sleep(WATCHDOG_EVERY)
+        try:
+            watchdog_check(registry(), ram_pool()["free_gib"], hits)
+        except Exception as ex:  # noqa: BLE001  看門狗自己不能掛
+            print("看門狗：", ex, file=sys.stderr)
 
 
 def llama_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
@@ -2991,14 +3051,14 @@ def llama_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib):
 def disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_free_gib=None):
     """用硬碟執行：以檔案映射（mmap）啟動，權重不必全部放進記憶體，沒放進去的按需從硬碟讀。
     准入只算「不是檔案映射」的部分：KV、引擎計算緩衝、投影檔、放進 GPU 的層（那幾層是複製進顯存的，不能被換出）。
-      unified_split   一律不給（回 None，呼叫端講人話）
+      unified_split   AI 395 這類 BIOS 切兩塊的機器：GPU 那一塊當成一張卡，放法跟獨立顯卡一樣；
+                      系統那一小塊只拿來當頁快取（作業系統隨時可以丟掉，不會佔死），准入只算丟不掉的部分，
+                      跑起來之後另有看門狗（disk_watchdog）盯著系統那塊
       unified_single  Apple：-ngl 999（Metal 直接用映射的記憶體，不另外複製）；
                       其他（DGX Spark、Jetson）：-ngl 0——CUDA 會把卸載的層複製成不可換頁的記憶體，等於沒映射
       discrete        -ngl 照顯存放得下的層數；KV 跟著層走，沒放 GPU 的層的 KV 在系統記憶體
     ram_free_gib：系統記憶體現在可用多少（算頁快取放得下多少、溢出到硬碟多少），None＝不算溢出量"""
     mm = machine.get("memory_model", "discrete")
-    if mm == "unified_split":
-        return None
     fl = floors(machine)
     size, mmproj = float(m["size_gib"]), float(m.get("mmproj_gib") or 0)
     kv = llama_kv_gib(m, ctx, parallel)
@@ -3039,12 +3099,13 @@ def moe_disk_layout(m, machine, cards, gpu_ids, ctx, parallel, back_gib, ram_fre
     注意力、共用權重、KV 放顯示卡（-ngl 999）→ 專家層從第一層起留在檔案映射的記憶體（--n-cpu-moe N）→
     記憶體放不下的專家由作業系統按需從 SSD 讀。每 token 只用到少數幾個專家，所以比整層搬出去快得多。
       discrete        顯卡先放注意力＋共用＋KV，剩下的空間放得下幾層專家就放幾層，其餘 N 層留在映射記憶體
+      unified_split   跟 discrete 同一套：GPU 那一塊放注意力、共用與 KV，專家留在系統那塊的頁快取與 SSD
       unified_single  Apple 以外（DGX Spark、Jetson）：CUDA 會把放上 GPU 的張量複製成不可換頁的記憶體，
                       所以專家全部留在映射記憶體（N＝全部），只有注意力與共用部分常駐；Apple 走原本的整層映射
     不是 MoE、拿不到專家比例、或連注意力＋KV 都放不進顯卡時回 None，由呼叫端用整層的放法。"""
     mm = machine.get("memory_model", "discrete")
     frac, n_exp = m.get("expert_layer_frac"), int(m.get("expert_layers") or 0)
-    if not m.get("moe") or not frac or n_exp <= 0 or mm == "unified_split" or (mm == "unified_single" and OS == "darwin"):
+    if not m.get("moe") or not frac or n_exp <= 0 or (mm == "unified_single" and OS == "darwin"):
         return None
     fl = floors(machine)
     size, mmproj = float(m["size_gib"]), float(m.get("mmproj_gib") or 0)
@@ -3412,7 +3473,7 @@ def _alive(slot):
 
 def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_disk=False, thinking=None, lan=None, parallel=None):
     """把欄位換成存放區裡的某顆 GGUF（llama.cpp）。欄位原本跑 Strata、另一顆 GGUF、或是空欄位都可以。
-    allow_disk：一般放法放不下時，允許以檔案映射啟動（用硬碟執行）；BIOS 切兩塊的機器一律 400。
+    allow_disk：一般放法放不下時，允許以檔案映射啟動（用硬碟執行）。BIOS 切兩塊的機器也可以，跑起來之後由看門狗盯系統那塊。
     thinking（auto／on／off）、lan（True／False）：同一次啟動就套用；沒帶就沿用欄位原本的設定。
     整段同步做完才回；進行中的階段另由 slot_progress() 回報（前端換模型時每秒問一次）。"""
     reg = registry()
@@ -3423,8 +3484,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
         return 400, {"error": "思考模式只能是 auto、on、off"}
     if lan is not None and not isinstance(lan, bool):
         return 400, {"error": "區網存取要是 true 或 false"}
-    if allow_disk and reg["machine"].get("memory_model", "discrete") == "unified_split":
-        return 400, {"error": DISK_DENIED, "disk_denied": True}
+    watchdog_clear(slot_id)
     if not SAFE_ID_RX.fullmatch(slot_id):
         return 400, {"error": "欄位 id 只能用英數、底線與連字號，才能替它建 llama.cpp 服務"}
     if slot.get("kind") not in (None, "strata", "llama") or (slot.get("unit") and not slot.get("kind")):
@@ -9581,7 +9641,8 @@ def main():
     srv = AgentTLSServer((bind, PORT), Handler)
     srv.ctx = ctx
     threading.Thread(target=AgentLink().run, daemon=True).start()
-    threading.Thread(target=group_worker, daemon=True).start()       # 群組設定的準備與套用；「下次開機」的在這裡接手
+    threading.Thread(target=group_worker, daemon=True).start()
+    threading.Thread(target=disk_watchdog, daemon=True).start()       # 用硬碟執行的模型：系統記憶體快被吃光就停掉       # 群組設定的準備與套用；「下次開機」的在這裡接手
     GROUP_WAKE.set()    # 沒有 agent-link.json 就只是每 5 秒看一次
     print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()

@@ -117,9 +117,56 @@ def pure_tests():
     else:
         case("不是 Linux：/proc 讀數回 None（改用 RSS 估）", A.proc_read_bytes(os.getpid()) is None)
 
+    # ---- 用硬碟執行的看門狗
+    wd_dir = tempfile.mkdtemp(prefix="wd-")
+    disk_cfg, norm_cfg = os.path.join(wd_dir, "d.json"), os.path.join(wd_dir, "n.json")
+    A.save_json(disk_cfg, {"disk": True, "mmap": True})
+    A.save_json(norm_cfg, {"disk": False})
+    wd_reg = {"machine": {"memory_model": "unified_split"},
+              "slots": [{"id": "big", "kind": "llama", "unit": "u-big", "config": disk_cfg, "model": "Big-Q8"},
+                        {"id": "ok", "kind": "llama", "unit": "u-ok", "config": norm_cfg, "model": "Small"}]}
+    real_alive = A._alive
+    A._alive = lambda sl: True
+    stopped_units, hits = [], {}
+    line = A.watchdog_line(wd_reg["machine"])
+    eq("看門狗：AI 395 的危險線＝底線 15 的一半", line, 7.5)
+    A.watchdog_clear("big")
+    eq("看門狗：記憶體夠，不動", A.watchdog_check(wd_reg, 20.0, hits, stop=stopped_units.append), [])
+    A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
+    A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
+    eq("看門狗：只低兩次（尖峰）不停", stopped_units, [])
+    A.watchdog_check(wd_reg, 20.0, hits, stop=stopped_units.append)
+    A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
+    A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
+    eq("看門狗：中間回升就重新算", stopped_units, [])
+    got = A.watchdog_check(wd_reg, 5.0, hits, stop=stopped_units.append)
+    eq("看門狗：連續三次低於危險線，停掉用硬碟執行的那個", (got, stopped_units), (["big"], ["u-big"]))
+    note = A.watchdog_notes().get("big") or {}
+    case("  留下原因給畫面（剩多少、危險線、怎麼辦）", "5.0 GiB" in note.get("message", "") and note.get("line") == 7.5, note)
+    case("  一般放法的模型不停（准入已經算死，不會跑到一半多吃）", "u-ok" not in stopped_units)
+    A.watchdog_clear("big")
+    eq("  重新啟動前清掉原因", A.watchdog_notes().get("big"), None)
+    A._alive = lambda sl: False
+    hits = {}
+    for _ in range(4):
+        A.watchdog_check(wd_reg, 1.0, hits, stop=stopped_units.append)
+    eq("看門狗：沒在跑的不理", stopped_units, ["u-big"])
+    A._alive = real_alive
+
     # ---- 用硬碟執行的分層
     m = {"size_gib": 100.0, "mmproj_gib": 0.0, "layers": 50, "kv_full_bpt": 131072, "kv_swa_bpt": 0, "swa_window": 0}
-    eq("BIOS 切兩塊（AI 395）：不給用硬碟執行", A.disk_layout(m, {"memory_model": "unified_split"}, [], None, 8192, 1, 0), None)
+    # BIOS 切兩塊（AI 395）：GPU 那塊當一張卡，放法跟獨立顯卡一樣；系統那塊只當頁快取
+    apu = [{"id": "1", "total_gib": 96, "free_gib": 90}]
+    d = A.disk_layout(m, {"memory_model": "unified_split"}, apu, None, 8192, 1, 0, ram_free_gib=25)
+    kv0 = A.llama_kv_gib(m, 8192)
+    n0 = int((90 - A.floors({"memory_model": "unified_split"})["vram"] - 1.0) // (100 / 50 + kv0 / 50))
+    eq("AI 395：可以用硬碟執行，-ngl 照 GPU 那塊放得下的層數", (d["mode"], d["ngl"], d["mmap"]), ("disk", n0, True))
+    cache0 = 25 - A.floors({"memory_model": "unified_split"})["ram"] - 2.5 - kv0 * d["kv_ram_frac"]
+    eq("  系統那塊只當頁快取：其餘從 SSD 讀", d["split"]["disk"], round(100 - 100 * n0 / 50 - cache0, 1))
+    eq("  准入只算丟不掉的部分（引擎 2.5 GiB）", d["est_ram"], 2.5)
+    moe_m = {**m, "moe": True, "expert_layer_frac": 0.017, "expert_layers": 50}
+    dm = A.disk_layout(moe_m, {"memory_model": "unified_split"}, apu, None, 8192, 1, 0, ram_free_gib=25)
+    eq("AI 395 的 MoE：照張量分層（-ngl 999 ＋ --n-cpu-moe）", (dm.get("tiered"), dm["ngl"], dm["cpu_moe"] > 0), (True, 999, True))
     cards = [{"id": "0", "total_gib": 24, "free_gib": 24}, {"id": "1", "total_gib": 24, "free_gib": 24}]
     d = A.disk_layout(m, {"memory_model": "discrete"}, cards, None, 8192, 1, 0, ram_free_gib=64)
     kv = A.llama_kv_gib(m, 8192)
@@ -229,9 +276,10 @@ def swap_tests():
         r["machine"]["memory_model"] = "unified_split"
         A.save_json(A.REGISTRY, r)
         code, out = A.set_llama_model("s1", mid, 8192, allow_disk=True)
-        case("BIOS 切兩塊的機器帶 allow_disk → 400 並講人話", code == 400 and "BIOS" in out["error"] and out.get("disk_denied"), out)
+        case("BIOS 切兩塊的機器也可以帶 allow_disk（不再回 400）", code != 400 or "BIOS" not in out.get("error", ""), out)
         sl = next(x for x in A.registry()["slots"] if x["id"] == "s1")
-        eq("  這種機器的執行設定 disk_allowed=false", A.run_options(sl, raw)["disk_allowed"], False)
+        opts = A.run_options(sl, A.load_json(A.engine_file("s1", "-llama.json"), {}))
+        case("  執行設定 disk_allowed=true，並附上這種機器的說明", opts["disk_allowed"] is True and "看門狗" in (opts["disk_note"] or ""), opts.get("disk_note"))
     finally:
         for u in list(A.SUP.procs):
             A.SUP.ctl(u, "stop")
