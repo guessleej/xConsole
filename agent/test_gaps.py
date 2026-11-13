@@ -555,5 +555,31 @@ A.sd_output_check, A._gen_sample, A._sd_jobs_save = real_chk, real_sample, real_
 A.GEN_DIR = real_gen
 shutil.rmtree(chk, ignore_errors=True)
 
+# ---- 用量計數：llama.cpp 欄位也要算（以前只認得 Strata 的記錄格式，llama.cpp 機器永遠是 0）
+# 記錄是 llama.cpp 實際印的格式（某一版 llama-server 的輸出原樣）：一個請求從 launch 到 release，
+# 中間每 3 秒一行 n_gen 進度，完成時印 prompt eval／eval／total time，最後 release 帶 n_tokens（整段上下文）
+LLAMA_REQ = """5.01.604.365 I slot launch_slot_: id  0 | task {t} | processing task, is_child = 0
+5.07.612.382 I slot print_timing: id  0 | task {t} | n_gen =    142, tg =  46.83 t/s, tg_3s =  47.16 t/s
+5.17.964.855 I slot print_timing: id  0 | task {t} | prompt eval time =    2997.43 ms /   {p} tokens (    5.51 ms per token,   181.49 tokens per second)
+5.17.964.879 I slot print_timing: id  0 | task {t} |        eval time =   13363.64 ms /   {g} tokens (   22.31 ms per token,    44.82 tokens per second)
+5.17.964.883 I slot print_timing: id  0 | task {t} |       total time =   16361.07 ms /  1144 tokens
+5.17.965.036 I slot      release: id  0 | task {t} | stop processing: n_tokens = {n}, truncated = 0
+"""
+reg = A.registry()
+reg["slots"] = [x for x in reg["slots"] if x.get("id") != "cnt"] + [{"id": "cnt", "role": "計數", "kind": "llama", "unit": "xc-cnt-llama.service"}]
+A.save_json(A.REGISTRY, reg)
+lg = A.engine_file("cnt", "-llama.log")
+with open(lg, "w") as fh:
+    fh.write("main: server is listening on http://0.0.0.0:8080\n")
+    fh.write(LLAMA_REQ.format(t=1256, p=544, g=600, n=1457) + LLAMA_REQ.format(t=1860, p=517, g=600, n=1457))
+    fh.write(LLAMA_REQ.format(t=2464, p=5, g=600, n=1457).split("5.17.964.855")[0])      # 第三個還在跑
+c = A.counters()["slots"].get("cnt")
+# 上下文 1457 = 提示 857 + 生成 600；提示裡新算的是 prompt eval 那一段，其餘是沿用快取
+eq("llama.cpp 欄位：完成的請求、提示、沿用、生成都有算到", c, {"requests": 2, "prompt": 1714, "reused": 653, "generated": 1200})
+with open(lg, "a") as fh:
+    fh.write(LLAMA_REQ.format(t=2464, p=5, g=600, n=1457).split("is_child = 0\n", 1)[1])
+eq("  還在跑的那個寫完之後下一次才算（不重複、不漏）", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
+eq("  沒有新請求：數字不變", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
