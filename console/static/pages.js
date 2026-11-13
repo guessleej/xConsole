@@ -17,7 +17,7 @@ function setNode(id) {
   try { localStorage.setItem("xconsole-node", id); } catch (_) { /* 無痕模式：只記在這個分頁 */ }
 }
 
-// 頂列右側的機器切換：只有一台時只顯示名稱
+// 頂列右側的機器切換：只有一台時不顯示（名稱已在品牌區，重複又會擠壞導覽列）
 function renderNodePick() {
   const box = $("#nodepick");
   if (!box) return;
@@ -25,10 +25,7 @@ function renderNodePick() {
   const n = curNode();
   box.textContent = "";
   if (!n) return;
-  if (ns.length < 2) {
-    box.appendChild(el("span", "nodepick-one", n.name + (n.online ? "" : "（連不上）")));
-    return;
-  }
+  if (ns.length < 2) return;
   const sel = el("select", "nodepick-sel");
   sel.setAttribute("aria-label", "目前這台機器");
   for (const [gname, gnodes] of groups()) {
