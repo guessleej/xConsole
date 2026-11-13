@@ -1253,11 +1253,12 @@ function libJobsCard(entries) {
   entries.forEach(({ n, jobs }) => jobs.slice(0, 5).forEach((j) => {
     const g = el("div", "dl");
     const pct = j.total ? Math.floor((j.done / j.total) * 100) : 0;
-    const label = { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
+    const label = j.gone ? "檔案已刪除"
+      : { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
     const top = el("div", "dl-top");
     top.appendChild(el("span", "mono", `${multi ? n.name + "　" : ""}${j.sd_model ? j.title : j.repo + "　" + j.stem}`));
     top.appendChild(el("span", "spacer"));
-    top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"), label));
+    top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : j.gone ? "warn-t" : "muted"), label));
     if (jobActive(j)) {
       const c = el("button", "btn sm", "取消");
       c.onclick = async () => { try { await api(`/api/node/${n.id}/library/download/${j.id}/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); } };
