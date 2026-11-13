@@ -2137,7 +2137,8 @@ def _no_key_blocked(port):
     return st == 401, st
 
 
-def api_info(slot_id):
+def api_info(slot_id, brief=False):
+    """brief：API 串接清單頁只要網址、模型名與實測結果，不算執行設定（那一段要對每種上下文試算准入，最慢）。"""
     slot = _slot(slot_id)
     if not slot or not slot.get("unit"):
         return 404, {"error": "沒有這個欄位"}
@@ -2176,7 +2177,7 @@ def api_info(slot_id):
         "tools": True if strata else None,
         "vision": any(m["vision"] for m in served),
         "last_test": slot.get("api_last_test"),
-        "run": run_options(slot, raw) if llama else None,
+        "run": run_options(slot, raw) if llama and not brief else None,
     }
 
 
@@ -2190,10 +2191,11 @@ def run_options(slot, raw):
     par = int(cfg.get("parallel") or 1)
     top = prof.get("ctx_train") or max(RUN_CTX)
     out = []
+    reg, hw = registry(), hardware()          # 五種上下文共用同一份硬體量測：每次重查 GPU 與服務狀態要好幾秒
     for ctx in [c for c in RUN_CTX if c <= top] or [min(RUN_CTX)]:
         per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or ctx) / ctx)) if prof else None
         what = {**cfg, "max_context": ctx, **({"kv_bytes_per_cell": int(per)} if per else {})}
-        v = admit(slot["id"], cfg_override=what)
+        v = admit(slot["id"], reg=reg, hw=hw, cfg_override=what)
         worst = min([d.get("worst") for d in (v.get("pools") or {}).values() if isinstance(d, dict) and "worst" in d] or [None],
                     key=lambda x: x if x is not None else 1e9)
         out.append({"ctx": ctx, "kv_gib": round(llama_kv_gib(prof, ctx, par), 2) if prof else None, "allow": v["allow"],
@@ -2203,7 +2205,7 @@ def run_options(slot, raw):
     real = os.path.realpath(raw.get("model") or "")
     store = max((x for x in storage_choices() if real.startswith(x["mount"].rstrip("/\\") + os.sep) or real == x["mount"]),
                 key=lambda x: len(x["mount"]), default=None)
-    lay = _run_layout(slot, raw, prof, size, int(cfg.get("max_context") or raw.get("ctx") or 4096), par)
+    lay = _run_layout(slot, raw, prof, size, int(cfg.get("max_context") or raw.get("ctx") or 4096), par, hw)
     mm = registry()["machine"].get("memory_model", "discrete")
     return {"options": out, "ctx_train": prof.get("ctx_train"), "size_gib": round(size, 1), "load_sec": load,
             "split": lay["split"] if lay else None, "mode": lay["mode"] if lay else None,
@@ -2226,16 +2228,17 @@ def run_options(slot, raw):
             "thinking_supported": bool(reasoning_args(raw["exe"], "off")) if raw.get("exe") else False}
 
 
-def _run_layout(slot, raw, prof, size_gib, ctx, par):
+def _run_layout(slot, raw, prof, size_gib, ctx, par, hw=None):
     """執行設定頁的分層：照目前這台剩下的記憶體試算一般放法；放不下而且這台允許，再試用硬碟的放法。"""
     if not raw.get("model") or not size_gib or not prof:
         return None
     reg = registry()
     m = {**prof, "size_gib": size_gib, "mmproj_gib": round(os.path.getsize(raw["mmproj"]) / GIB, 2)
          if raw.get("mmproj") and os.path.exists(raw["mmproj"]) else 0.0}
-    p = pools(reg, hardware())
+    hw = hw if hw is not None else hardware()
+    p = pools(reg, hw)
     cards = p["gpus"]
-    back_v, back_r = _usage_reclaim(slot) if _alive(slot) else (0.0, 0.0)
+    back_v, back_r = _usage_reclaim(slot, hw) if _alive(slot) else (0.0, 0.0)
     lay = llama_layout(m, reg["machine"], cards, slot.get("gpu_ids"), ctx, par, back_v)
     mm = reg["machine"].get("memory_model", "discrete")
     if mm == "unified_single":
@@ -4008,10 +4011,10 @@ def wait_vram_released(before_gib, expect_gib, seconds=60):
     return False
 
 
-def _usage_reclaim(old_slot):
+def _usage_reclaim(old_slot, hw=None):
     """切換引擎時，舊引擎占的量要算成「會被釋放」。用舊欄位的原樣去量。"""
     reg = registry()
-    hw = hardware()
+    hw = hw if hw is not None else hardware()
     # 量「換之前」的樣子：換模型時登錄檔裡這個欄位已經先寫成新模型的預估，沒綁卡時顯存是照各欄位的預估比例分攤，
     # 分母若用新的、分子用舊的，舊模型會釋出的量就被少算（128B 換 118B 時 93.1 GiB 只算成 80.6，誤擋下來）
     probe = dict(old_slot)
@@ -8227,9 +8230,9 @@ class Handler(BaseHTTPRequestHandler):
             if m.group(2) or m.group(4):
                 return self._send(*sd_output(m.group(1), int(m.group(3) or 0), init=bool(m.group(4))))
             return self._send(*sd_job(m.group(1)))
-        m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
+        m = re.fullmatch(r"/apiinfo/([\w.-]+)(/brief)?", path)
         if m:
-            code, out = api_info(m.group(1))
+            code, out = api_info(m.group(1), brief=bool(m.group(2)))
             return self._send(code, out)
         m = re.fullmatch(r"/catalog/([\w.-]+)", path)
         if m:

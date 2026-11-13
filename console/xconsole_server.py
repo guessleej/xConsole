@@ -392,7 +392,7 @@ def network_test(node_id, slot_id, key=""):
     """用 IDE 會打的那個網址，從主控台這台經網路實際連一次。
     代理在本機測過只證明服務活著；這一步證明別台電腦也連得到、金鑰保護真的有效。
     key 是管理者這次貼進來的，只用這一次，不存、不寫稽核。"""
-    code, info = call_node(node_id, f"/apiinfo/{slot_id}", timeout=20)
+    code, info = call_node(node_id, f"/apiinfo/{slot_id}/brief", timeout=20)
     if code != 200:
         return {"ok": False, "url": None, "detail": info.get("error") or f"讀不到設定（{code}）"}
     base = str(info.get("public_url") or "").rstrip("/")
@@ -2687,9 +2687,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/build(/progress)?", path)
         if m:
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/build{m.group(3) or ''}", timeout=60))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)(/brief)?", path)
         if m:
-            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=60)
+            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}{m.group(3) or ''}", timeout=60)
             run = out.get("run") if code == 200 else None
             if run:
                 # 預估速度與推薦清單同一條公式（recommend.decode_speed），畫面不自己算

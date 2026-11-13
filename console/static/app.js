@@ -2961,7 +2961,7 @@ function viewApis() {
     tr.style.cursor = "pointer";
     tr.onclick = (e) => { if (e.target.tagName !== "BUTTON") go(`api:${n.id}:${s.id}`); };
     body.appendChild(tr);
-    api(`/api/node/${n.id}/apiinfo/${s.id}`).then((info) => {
+    api(`/api/node/${n.id}/apiinfo/${s.id}/brief`).then((info) => {
       cells[2].textContent = info.model_name || "—";
       cells[3].textContent = info.public_url;
       cells[4].textContent = int(info.max_context);

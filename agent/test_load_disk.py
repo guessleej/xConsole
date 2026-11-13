@@ -295,7 +295,17 @@ def swap_tests():
         reg2 = A.registry()
         sl = next(x for x in reg2["slots"] if x["id"] == "s1")
         case("  准入用的估計值不含權重（檔案映射）", sl["est_vram_gib"] <= 1.5, sl)
-        opts = A.run_options(sl, raw)
+        hw_calls = []
+        real_hw = A.hardware
+        A.hardware = lambda: (hw_calls.append(1), real_hw())[1]
+        try:
+            opts = A.run_options(sl, raw)
+        finally:
+            A.hardware = real_hw
+        case("執行設定：五種上下文共用一次硬體量測（不是每種重查）", len(hw_calls) <= 1, len(hw_calls))
+        code, brief = A.api_info("s1", brief=True)
+        case("API 清單頁的精簡版：不算執行設定，模型名稱照給",
+             code == 200 and brief["run"] is None and brief.get("model_name"), (code, brief.get("run") is None, brief.get("model_name")))
         case("執行設定回 split、disk_allowed、disk_needed",
              opts.get("split") is not None and opts["disk_allowed"] is True and opts["disk_needed"] is True and opts["disk_mode"], opts)
 
