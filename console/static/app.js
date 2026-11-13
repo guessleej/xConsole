@@ -1253,7 +1253,7 @@ function libJobsCard(entries) {
   entries.forEach(({ n, jobs }) => jobs.slice(0, 5).forEach((j) => {
     const g = el("div", "dl");
     const pct = j.total ? Math.floor((j.done / j.total) * 100) : 0;
-    const label = j.gone ? "檔案已刪除"
+    const label = j.gone === "some" ? "檔案不完整" : j.gone ? "檔案已刪除"
       : { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
     const top = el("div", "dl-top");
     top.appendChild(el("span", "mono", `${multi ? n.name + "　" : ""}${j.sd_model ? j.title : j.repo + "　" + j.stem}`));
