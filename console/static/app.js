@@ -794,9 +794,9 @@ async function viewLib() {
     else if (tab === "installed") body.appendChild(libInstalledCard(ok, models, jobs));
     else if (tab === "hf") {
       body.appendChild(libDownloadCard(ok, only));
-      // 畫圖／影片模型是好幾個檔組成的，不在這裡一個一個下載；不在推薦清單上的（含中國來源）只限內部測試手動組
+      // 畫圖／影片模型是好幾個檔組成的，不在這裡一個一個下載；不在推薦清單上的可以自己手動組
       const sdNote = el("p", "small muted");
-      const sdBtn = el("button", "linkbtn", "手動組一顆畫圖／影片模型（內部測試）");
+      const sdBtn = el("button", "linkbtn", "手動組一顆不在清單上的畫圖／影片模型");
       sdBtn.onclick = () => openSdManual((ok.find((x) => x.n.id === only) || ok[0]).n);
       sdNote.append("已經有 GGUF 檔案就按右上「匯入本機 GGUF」。畫圖與影片模型請到「畫圖與影片模型」分頁一鍵下載（主體、文字編碼器、VAE 一起）。", sdBtn);
       body.appendChild(sdNote);
@@ -2098,7 +2098,8 @@ function sdMine(n, rec, redraw) {
     const tr = el("tr");
     const nm = el("td");
     nm.appendChild(el("div", null, m.title));
-    if (m.internal) nm.appendChild(el("span", "chip " + (m.cn_origin ? "bad" : "warn"), m.cn_origin ? "中國來源・只限內部測試" : "內部測試"));
+    if (m.internal) nm.appendChild(el("span", "chip", "手動組"));
+    if (m.cn_origin) nm.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
     tr.appendChild(nm);
     tr.appendChild(el("td", "small nowrap", SD_KIND[m.kind]));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
@@ -2143,7 +2144,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     w.appendChild(b);
     left.appendChild(w);
   }
-  const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・內部測試" : ""}）`]), S.sdModel);
+  const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・手動組" : ""}）`]), S.sdModel);
   const fPrompt = el("textarea");
   fPrompt.placeholder = "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格";
   fPrompt.maxLength = 2000;
@@ -2501,7 +2502,7 @@ async function openSdCatalog(after) {
     try { data = await api("/api/sd/catalog"); } catch (ex) { errNote(body, ex.message); return; }
     body.textContent = "";
     body.appendChild(el("p", "small muted", "這份清單決定每台機器「畫圖與影片」列出哪些模型；順序就是同等級時的排列先後。每顆寫明主體、文字編碼器、VAE 各是哪個 repo 的哪個檔，"
-      + "大小由機器從 Hugging Face 讀。中國來源的模型不能加入——文字編碼器、VAE 也算。"));
+      + "大小由機器從 Hugging Face 讀。中國來源的模型照樣可以加入，畫面上會標出來——文字編碼器、VAE 是中國來源也算。"));
     const sb = el("div", "scrollbox cat-box");
     const tb = el("table", "api-table");
     tb.innerHTML = "<thead><tr><th>名稱</th><th>主體</th><th>種類</th><th>元件</th><th>更新於</th><th></th></tr></thead>";
@@ -2641,12 +2642,12 @@ function sdCatalogEditor(e, meta, done) {
   });
 }
 
-// 內部測試：自己組一顆不在清單上的（含中國來源，例 Qwen-Image、Wan），一定要勾「內部測試」，畫面上會一直標著
+// 手動組一顆不在清單上的模型；中國來源（含文字編碼器、VAE）照樣可以用，畫面上標出來
 async function openSdManual(n) {
   let meta;
   try { meta = await api("/api/sd/catalog"); } catch (ex) { toast(ex.message, "bad"); return; }
   const body = el("div");
-  body.appendChild(el("p", "note warn", "給內部測試用：不在推薦清單上的模型（含中國來源，例 Qwen-Image、Wan）可以在這裡自己組。政府案不得使用中國來源模型，交付前要刪掉。"));
+  body.appendChild(el("p", "note warn", "不在推薦清單上的模型可以在這裡自己組。中國來源的模型（文字編碼器、VAE 也算）照樣可以用，畫面上會標出來；政府案依規定不得使用。"));
   const f = el("div", "form-row");
   const fTitle = textInput("", "例：Qwen-Image Q4（測試）");
   const fKind = selectInput(Object.entries(meta.kinds), "image");
@@ -2663,18 +2664,12 @@ async function openSdManual(n) {
   const defs = sdDefaultsEditor({}, "image", meta.samplers);
   fKind.onchange = () => defs.setKind(fKind.value);
   body.appendChild(defs.node);
-  const ack = el("label", "check-row");
-  const cb = el("input");
-  cb.type = "checkbox";
-  ack.append(cb, document.createTextNode(" 這顆只做內部測試，不會出現在交付給客戶的機器上"));
-  body.appendChild(ack);
   const err = el("div");
   body.appendChild(err);
   imeGuard(fTitle, () => {});
   const ov = modal({ title: `手動組一顆（${n.name}）`, bodyNode: body, hasInput: true });
   ov.querySelector(".modal").classList.add("wide", "xwide");
   const b = formButton(ov, "開始下載", "primary", async () => {
-    if (!cb.checked) { errNote(err, "要勾「只做內部測試」才能下載"); return; }
     const title = fTitle.value.trim();
     const slug = (title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "model").slice(0, 40);
     b.textContent = "核對檔案中…";
