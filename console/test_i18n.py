@@ -70,21 +70,16 @@ def main():
         print("（沒有 node 或沒有英文字典，略過翻譯函式的實跑）")
     else:
         sample = {"重新整理": "Refresh", "已啟動 {0}": "Started {0}", "約 {0} tok/s": "about {0} tok/s",
-                  "記憶體不夠": "Not enough memory", "請換小一點的量化": "Use a smaller quantization"}
+                  "記憶體不夠": "Not enough memory", "請換小一點的量化": "Use a smaller quantization",
+                  "剩 {0} GiB{1}": "{0} GiB free{1}", "，固態硬碟": ", SSD"}
         prog = js + """
 const out = [];
 globalThis.__run = async () => {
-  I18N.lang = "en"; I18N.exact = new Map(); I18N.patterns = [];
-  const dict = %s;
-  const pieces = [];
-  for (const [zh, tr] of Object.entries(dict)) {
-    if (/\\{\\d+\\}/.test(zh)) { const names = []; const rx = new RegExp("^" + reEsc(zh).replace(/\\\\\\{(\\d+)\\\\\\}/g, (_, d) => { names.push(Number(d)); return "([\\\\s\\\\S]+?)"; }) + "$"); I18N.patterns.push({ rx, names, tr, len: zh.length }); }
-    else { I18N.exact.set(zh, tr); pieces.push(zh); }
-  }
-  pieces.sort((a, b) => b.length - a.length);
-  I18N.re = new RegExp(pieces.map(reEsc).join("|"), "g");
+  I18N.lang = "en";
+  i18nLoad(%s);
   console.log(JSON.stringify([i18nText("重新整理"), i18nText("  重新整理 "), i18nText("已啟動 gemma-4"), i18nText("約 12 tok/s"),
-    i18nText("記憶體不夠，請換小一點的量化"), i18nText("gemma-4-E2B"), i18nText("已啟動 約 3 tok/s")]));
+    i18nText("記憶體不夠，請換小一點的量化"), i18nText("gemma-4-E2B"), i18nText("已啟動 約 3 tok/s"), i18nText("剩 84 GiB"),
+    i18nText("剩 84 GiB，固態硬碟")]));
   i18nData({ nodes: [{ id: "n1", name: "重新整理", slots: [{ role: "記憶體不夠" }] }], error: "請換小一點的量化" });
   console.log(JSON.stringify([i18nText("重新整理"), i18nText("已啟動 記憶體不夠"), i18nText("請換小一點的量化")]));
 };
@@ -107,6 +102,8 @@ __run();
             check("拼起來的句子：認得的片段換掉", "Not enough memory" in got[4] and "Use a smaller quantization" in got[4], got[4])
             check("沒有中文的字不動（模型名稱）", got[5] == "gemma-4-E2B", got[5])
             check("樣板的變數本身也會翻（巢狀）", got[6] == "Started about 3 tok/s", got[6])
+            check("句尾的佔位是空的也對得到（剩 84 GiB，後面沒接硬碟種類）", got[7] == "84 GiB free", got[7])
+            check("  句尾的佔位有內容時照翻", got[8] == "84 GiB free, SSD", got[8])
             check("使用者資料（機器名）跟介面文字一樣也不翻", data[0] == "重新整理", data[0])
             check("  句子裡夾著的資料（角色名）原樣保留，其他照翻", data[1] == "Started 記憶體不夠", data[1])
             check("  錯誤訊息不是資料，照翻", data[2] == "Use a smaller quantization", data[2])
