@@ -298,6 +298,16 @@ def main():
     A._gen_run(j3, ["/nonexistent/sd-cli"], {}, "unified_single", {"ram": 12})
     case("sd-cli 啟動不了：這件標失敗，不會一直卡在產生中擋住後面", (j3["state"], "啟動失敗" in j3["error"]), ("failed", True))
 
+    # ---- 產出紀錄存在磁碟：代理重啟（記憶體裡的清單清空）後照樣讀得回來，件數與狀態不變
+    j4 = {**j, "id": "aaaa0004", "out": "w4.png", "state": "running"}
+    A._GEN["jobs"].append(j4)
+    A._sd_jobs_save()
+    before = [(x["id"], x["state"]) for x in A._GEN["jobs"]]
+    A._GEN["jobs"] = None
+    after = [(x["id"], x["state"]) for x in A.sd_jobs_list()]
+    case("代理重啟後產出紀錄件數不變、完成的仍是完成", (len(after), [s for i, s in after if i == "aaaa0001"]), (len(before), ["done"]))
+    case("  重啟時還在產的那件標成中斷，不會永遠卡在產生中", [s for i, s in after if i == "aaaa0004"], ["interrupted"])
+
     sysd, which, sok = A.SYSTEMD, A.shutil.which, A._scope_ok
     A.SYSTEMD, A.shutil.which, A._scope_ok = True, lambda x: None if x.startswith("/nonexistent") else "/usr/bin/" + x, lambda: True
     case("systemd 底下：編譯與產圖開在自己的 scope，不吃代理服務的 256M 上限",
