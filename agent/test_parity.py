@@ -213,6 +213,22 @@ def main():
     finally:
         A._profile_cached = real_prof
 
+    # ---- 8a. 改頻寬：舊的校正倍數與擬合作廢
+    r0 = A.registry()
+    r0["machine"].update(speed_factor=1.5, speed_factor_n=3, speed_fit={"eff": 0.8, "layer_ms": 0.2, "n": 2, "bw": 100})
+    A.save_json(A.REGISTRY, r0)
+    real_root, real_llama, real_sd = A.check_root, A.check_llama, A.check_sd_cli
+    A.check_root = A.check_llama = A.check_sd_cli = lambda v: (None, None)
+    try:
+        mm0 = r0["machine"].get("memory_model") or "discrete"
+        A.save_machine({"memory_model": mm0, "bandwidth_gbs": 100})
+        case("頻寬沒變：校正保留", A.registry()["machine"].get("speed_factor") == 1.5)
+        A.save_machine({"memory_model": mm0, "bandwidth_gbs": 120})
+        m0 = A.registry()["machine"]
+        case("頻寬改了：校正倍數與擬合都作廢", not any(k in m0 for k in ("speed_factor", "speed_factor_n", "speed_fit")))
+    finally:
+        A.check_root, A.check_llama, A.check_sd_cli = real_root, real_llama, real_sd
+
     # ---- 8b. 擬合頻寬效率與每層開銷（HP 筆電：E2B 38.6、12B 6.9 tok/s，89.6 GB/s）
     def tok(read, layers, eff=0.83, lms=0.28, bw=89.6):
         return 1 / (read * A.GIB / (eff * bw * 1e9) + layers * lms / 1000)

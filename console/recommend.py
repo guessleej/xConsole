@@ -134,10 +134,16 @@ def capacity(state):
     # 「放得下」只看記憶體；「流暢」還要夠快：稠密模型每個 token 讀整顆，頻寬 × 效率 ÷ 10 tok/s 就是流暢的大小上限
     fit_b = (fast - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B if fast > 6 else 0
     bw = out["bandwidth_gbs"]
-    eff, _, fitted = speed_params(out)
+    eff, lms, fitted = speed_params(out)
     if not fitted and out["speed_factor"]:
         eff *= out["speed_factor"]
     speed_b = eff * bw * 1e9 / SMOOTH_TOKS / GIB / Q4_GIB_PER_B if bw else None
+    if speed_b and fitted and lms:
+        # 擬合出的每層開銷要算進去，否則標題會比清單裡同大小的模型樂觀。層數照常見稠密模型的規模估
+        b = speed_b
+        while b > 0.5 and 1 / (b * Q4_GIB_PER_B * GIB / (eff * bw * 1e9) + _dense_layers(b) * lms / 1000) < SMOOTH_TOKS:
+            b -= 0.5
+        speed_b = b
     out["max_fit_b"] = _nice(fit_b)
     out["max_dense_b"] = _nice(min(fit_b, speed_b)) if speed_b is not None else _nice(fit_b)
     out["speed_known"] = speed_b is not None
@@ -148,6 +154,11 @@ def capacity(state):
 def _assumptions(cap):
     eff, lms, fitted = speed_params(cap)
     return {"efficiency": eff, "layer_ms": lms, "fitted": fitted, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}
+
+
+def _dense_layers(b):
+    """稠密模型大概幾層（Llama／Gemma／Mistral 常見規模）：8B 約 32、14B 約 48、32B 約 64、70B 以上約 80。"""
+    return 32 if b <= 9 else 48 if b <= 16 else 64 if b <= 40 else 80
 
 
 def speed_params(cap):

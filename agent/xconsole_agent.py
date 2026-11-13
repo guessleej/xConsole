@@ -2327,8 +2327,9 @@ def record_speed(slot_id, tok_s, n_tokens):
                 sp["fit_tok_s"] = round(tok_s if not sp.get("fit_tok_s") else 0.7 * sp["fit_tok_s"] + 0.3 * tok_s, 2)
                 sp["read_gib"] = round(size * (prof.get("active_frac") or 1.0), 3)
                 sp["layers"] = prof.get("layers")
+                c = chip(m)               # 頻寬跟 estimate_decode 取同一個（沒 GPU 的機器用系統記憶體頻寬）
                 fit = fit_speed([(v.get("read_gib"), v.get("layers"), v.get("fit_tok_s")) for v in reg["speed"].values()],
-                                chip(m).get("bandwidth_gbs"))
+                                c.get("bandwidth_gbs") or c.get("ram_bandwidth_gbs") or SPEED_DEFAULT_BW)
                 if fit:
                     m["speed_fit"] = fit
                 else:
@@ -6358,6 +6359,10 @@ def save_machine(body):
         else:
             m.pop("agent_enabled", None)
     m["confirmed"] = True             # 管理者在網頁上確認過記憶體架構（不再拿偵測建議比對）
+    if any((m.get(k) or None) != (new.get(k) or None) for k in ("bandwidth_gbs", "ram_bandwidth_gbs")):
+        # 校正倍數與擬合都是照舊頻寬算的，頻寬改了就作廢，之後對話再重新量
+        for k in ("speed_factor", "speed_factor_n", "speed_fit"):
+            m.pop(k, None)
     for k, v in new.items():
         if v in (None, "") and k not in ("memory_model", "note"):
             m.pop(k, None)

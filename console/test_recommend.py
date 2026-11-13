@@ -302,6 +302,9 @@ def main():
                 gpus=[{"id": "0", "total_gib": 48}, {"id": "1", "total_gib": 48}])
     big["chip"].update(speed_factor=1.534, speed_factor_n=54)
     case("流暢上限標題也套校正倍數（中原主機實測 ×1.53）", R.capacity(big)["max_dense_b"] > 130, True)
+    c = hp(speed_fit=fit)
+    p12 = R.plan_quant(c, d48, q("Q4_K_M", 12 * R.Q4_GIB_PER_B))
+    case("流暢上限標題算進擬合的每層開銷，不比清單樂觀", c["max_dense_b"] < 12 and p12["level"] == "ok", True)
     case("執行頁的預估也套擬合", R.decode_speed(9.11, d48, 89.6, fit), 6.9)
     case("執行頁的預估也套單一倍數", R.decode_speed(9.11, d48, 89.6, None, 1.29), 6.9)
     rec = R.recommend({"pools": {"memory_model": "unified_single", "floors": {"ram": 5.7}, "unified": {"total_gib": 31.8}, "gpus": []},
