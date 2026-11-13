@@ -6350,6 +6350,11 @@ def save_machine(body):
         if not isinstance(body["desktop_enabled"], bool):
             return 400, {"error": "操作電腦要是 true 或 false"}
         if body["desktop_enabled"]:
+            if not m.get("desktop_enabled"):
+                # 只擋「從關到開」：已經開著的機器桌面暫時不在（例如沒人登入），存其他設定不能被擋
+                how, why = desktop_route()
+                if how is None:
+                    return 400, {"error": f"這台不能操作桌面：{why}"}
             m["desktop_enabled"] = True
         else:
             m.pop("desktop_enabled", None)

@@ -5183,6 +5183,8 @@ async function openMachineSettings(nid) {
     fDesk.checked = !!st.desktop_enabled;
     pcRow.append(fDesk, document.createTextNode(" 讓模型操作這台的桌面（看螢幕、控制滑鼠鍵盤）"));
     const dk = info.desktop || {};
+    // 不能操作桌面就停用；已經開著的保留可以取消勾選（後端只擋「從關到開」）
+    if (!dk.how && !fDesk.checked) { fDesk.disabled = true; pcRow.classList.add("disabled"); }
     body.append(pcRow, el("p", "small " + (dk.how ? "muted" : "warn-t"), dk.how
       ? `${dk.how === "helper" ? "由桌面小幫手代為操作（使用者登入後才有桌面）" : "代理直接操作這台的桌面"}。對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉。`
       : `這台現在不能操作桌面：${dk.why || "沒有圖形桌面"}`));
