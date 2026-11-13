@@ -1661,7 +1661,7 @@ function recRow(n, it, lib, ctx) {
       q.appendChild(el("span", "small muted", "還沒從 Hugging Face 讀到大小"));
     } else if (ctx.compact) {
       q.appendChild(el("b", "mono", p?.quant || "單一檔案"));
-      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib)} GB` : ""));
+      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib)} GiB` : ""));
     } else {
       const sel = el("select");
       it.plans.forEach((x) => {
@@ -1673,7 +1673,9 @@ function recRow(n, it, lib, ctx) {
       sel.value = stem;
       sel.onchange = () => draw(sel.value);
       q.appendChild(sel);
-      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib + (it.vision ? recMmproj(it)?.gib || 0 : 0))} GB` : ""));
+      // 看圖模型連投影檔（mmproj）一起下載，這裡算的是兩個合計；概覽只算主檔，所以要寫明
+      const mmGib = it.vision ? recMmproj(it)?.gib || 0 : 0;
+      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib + mmGib)} GiB${mmGib ? "（含投影檔）" : ""}` : ""));
     }
     row.appendChild(q);
 
@@ -1975,7 +1977,7 @@ async function libSd(body, ok, only, v) {
   const intro = el("div", "sd-intro");
   const txt = el("div", "small muted");
   txt.append(el("div", null, "每顆模型包含主體、文字編碼器和 VAE，一鍵全部下載。照這台的記憶體推薦了合適的量化版本，也可以自己選。"),
-    el("div", null, `存放在 ${rec.root || "—"}，剩 ${fmt(rec.free_gib, 0)} GB。`));
+    el("div", null, `存放在 ${rec.root || "—"}，剩 ${fmt(rec.free_gib, 0)} GiB。`));
   const man = el("button", "btn sm", "自己組一顆");
   man.title = "不在清單上的模型：自己挑主體、文字編碼器、VAE 的檔案";
   man.onclick = () => openSdManual(n);
@@ -2041,7 +2043,7 @@ function sdRow(n, rec, it, redraw, toGen) {
       sel.value = path;
       sel.onchange = () => draw(sel.value);
       q.appendChild(sel);
-      if (p) q.appendChild(el("span", "small muted", `共 ${fmt(p.size_gib)} GB`));
+      if (p) q.appendChild(el("span", "small muted", `共 ${fmt(p.size_gib)} GiB`));
     }
     row.appendChild(q);
     const fit = el("div", "rec-fit");
@@ -2064,7 +2066,7 @@ function sdRow(n, rec, it, redraw, toGen) {
     } else if (it.job) {
       act.appendChild(el("span", "small muted", `下載中 ${it.job.total ? Math.floor((it.job.done / it.job.total) * 100) : 0}%`));
     } else if (p) {
-      const b = el("button", "btn sm primary", p.installed_id ? "補齊下載" : p.download_gib ? `下載 ${fmt(p.download_gib)} GB` : "加入（檔案都在了）");
+      const b = el("button", "btn sm primary", p.installed_id ? "補齊下載" : p.download_gib ? `下載 ${fmt(p.download_gib)} GiB` : "加入（檔案都在了）");
       b.disabled = !p.fits_disk;
       b.title = !p.fits_disk ? "存放區空間不夠（另需保留 10 GiB）" : lv === "no" ? "這台記憶體不夠，下載了也跑不動" : "";
       b.onclick = () => sdDownload(n, it, p);
