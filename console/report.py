@@ -217,7 +217,7 @@ def build(store, certs, cfg, days=30, now=None):
         "period": {"days": days, "from": _t(since), "to": _t(now),
                    "data_since": _t(data_since) if data_since else None,
                    "note": (None if first and first <= since else
-                            "取樣自 " + (_t(first) if first else "（尚無）") + " 起才開始收集，本期之前沒有資料")},
+                            f"取樣自 {_t(first) if first else '（尚無）'} 起才開始收集，本期之前沒有資料")},
         "people": people,
         "spend": spend,
         "build_vs_buy": build_vs_buy,
