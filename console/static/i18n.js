@@ -45,14 +45,25 @@ async function i18nInit() {
     if (!res.ok) throw new Error(String(res.status));
     dict = await res.json();
   } catch (_) { I18N.lang = "zh-TW"; return; }       // 字典讀不到就照原文，不擋畫面
+  i18nLoad(dict);
+}
+
+// 字典 → 整句對照、樣板、片段（測試也直接呼叫這一支，不另外抄一份）
+function i18nLoad(dict) {
   I18N.exact = new Map();
+  I18N.patterns = [];
   const pieces = [];
   for (const [zh, tr] of Object.entries(dict)) {
     if (!tr) continue;
     if (/\{\d+\}/.test(zh)) {
       // 樣板：{n} 換成擷取群組；翻好的那句裡的 {n} 照編號放回
       const names = [];
-      const rx = new RegExp("^" + reEsc(zh).replace(/\\\{(\d+)\\\}/g, (_, d) => { names.push(Number(d)); return "([\\s\\S]+?)"; }) + "$");
+      // 句尾的佔位可以是空的：程式常在句尾接一段可有可無的補充（例「剩 84 GiB」後面的「，固態硬碟」）
+      const esc = reEsc(zh);
+      const rx = new RegExp("^" + esc.replace(/\\\{(\d+)\\\}/g, (m, d, at) => {
+        names.push(Number(d));
+        return at + m.length === esc.length ? "([\\s\\S]*?)" : "([\\s\\S]+?)";
+      }) + "$");
       I18N.patterns.push({ rx, names, tr, len: zh.length });
     } else {
       I18N.exact.set(zh, tr);
