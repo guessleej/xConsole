@@ -156,6 +156,23 @@ def test_mobile_width(ctx, base):
         pg.close()
 
 
+def test_desktop_toggle(pg):
+    """BUG-4：這台不能操作桌面時，「操作電腦」核取方塊要停用，不是只用橘字說明。"""
+    def machine(route):
+        r = route.fetch()
+        data = r.json()
+        data["desktop"] = {"how": None, "why": "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）"}
+        data.setdefault("settings", {})["desktop_enabled"] = False
+        route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
+    pg.route("**/api/node/local/machine", machine)
+    pg.evaluate("openMachineSettings('local')")
+    box = pg.locator(".modal label.check-row:has-text('操作這台的桌面') input[type=checkbox]")
+    box.wait_for(state="attached", timeout=15000)
+    check("不能操作桌面：「操作電腦」核取方塊停用", box.is_disabled())
+    pg.locator(".modal .x, .modal button:has-text('取消')").first.click()
+    pg.unroute("**/api/node/local/machine")
+
+
 def main():
     agent, console, base = start()
     errs = []
@@ -168,6 +185,7 @@ def main():
             pg.route("**/api/fleet", with_slot)
             login(pg, base)
             test_api_list(pg)
+            test_desktop_toggle(pg)
             test_mobile_width(ctx, base)
             b.close()
         check("瀏覽器沒有 JavaScript 錯誤", not errs, errs[:3])
