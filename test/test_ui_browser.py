@@ -244,6 +244,14 @@ def test_english(ctx, base):
         if got:
             left[v] = got
     check("英文介面：概覽、執行與設定各分頁沒有沒翻到的介面字", not left, left)
+    # 分開翻譯的兩段接在一起，中間要有空格（不能變成「first.The」「yet(complete」）
+    glued = []
+    for tab in ("machines", "tls"):
+        pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", tab)
+        pg.wait_for_timeout(2000)
+        glued += pg.evaluate("() => [...document.querySelectorAll('#main p, #main .st')].map(e => e.textContent)"
+                             ".filter(t => /[a-z][.)][A-Z]|[a-z]\\(/.test(t)).slice(0, 3)")
+    check("  分開翻譯的兩段中間有空格", not glued, glued)
     pg.close()
 
 

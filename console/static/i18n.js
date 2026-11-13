@@ -79,8 +79,12 @@ function i18nLoad(dict) {
 // 使用者與伺服器給的資料（機器名、對話標題、模型、資料夾、設定檔、角色…）不是介面文字，不翻：
 // 主控台每次拿到回應就把這些欄位的值記下來；翻譯時整段相同就不動，句子裡夾著的也原樣保留
 // label 不算：伺服器回的 label 都是程式產生的介面字（分層長條的「顯示卡」「系統記憶體」、埠的用途），沒有使用者自己填的
+// node／slot：使用報告裡的機器名與欄位名（管理者取的）
 const I18N_DATA_KEYS = new Set(["name", "title", "role", "model", "path", "folder", "goal", "note", "profile",
-  "user", "username", "subject", "display_name", "alias"]);
+  "user", "username", "subject", "display_name", "alias", "node", "slot"]);
+
+// 兩段各自翻譯的文字接在一起時中間的分隔：英文、韓文要空格，中文、日文不用
+const i18nGap = () => document.createTextNode(I18N.lang === "en" || I18N.lang === "ko" ? " " : "");
 
 function i18nData(obj) {
   if (I18N.lang === "zh-TW") return;                // 字典還沒載入也先記：之後才畫的畫面一樣要擋
