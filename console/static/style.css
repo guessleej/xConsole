@@ -1123,6 +1123,10 @@ textarea.short { min-height: 48px; }
   max-width: 220px; padding: 5px 30px 5px 10px; border-radius: var(--radius-sm);
   background-color: var(--bg-hover); border: 1px solid transparent; font-weight: 600; color: var(--ink);
 }
+.nodepick-off {
+  padding: 4px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad);
+}
 .menubtn { display: none; }
 .topbar.tight .nav { display: none; }
 .topbar.tight .menubtn { display: grid; }

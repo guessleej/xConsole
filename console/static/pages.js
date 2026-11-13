@@ -37,7 +37,7 @@ function renameMachine(n) {
   fName.select();
 }
 
-// 頂列右側的機器切換：只有一台時不顯示（名稱已在品牌區，重複又會擠壞導覽列）
+// 頂列右側的機器切換：只有一台時不顯示名稱（重複又會擠壞導覽列），連不上時留一個短標示
 function renderNodePick() {
   const box = $("#nodepick");
   if (!box) return;
@@ -45,7 +45,10 @@ function renderNodePick() {
   const n = curNode();
   box.textContent = "";
   if (!n) return;
-  if (ns.length < 2) return;
+  if (ns.length < 2) {
+    if (!n.online) box.appendChild(el("span", "nodepick-off", "連不上"));
+    return;
+  }
   const sel = el("select", "nodepick-sel");
   sel.setAttribute("aria-label", "目前這台機器");
   for (const [gname, gnodes] of groups()) {
