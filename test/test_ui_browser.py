@@ -62,6 +62,7 @@ def start():
         if os.path.exists(cert) and os.path.exists(os.path.join(AH, ".xconsole", "token")):
             try:
                 cx = ssl.create_default_context(cafile=cert)
+                cx.minimum_version = ssl.TLSVersion.TLSv1_2
                 cx.wrap_socket(socket.create_connection(("127.0.0.1", ap), 1), server_hostname="127.0.0.1").close()
                 break
             except Exception:  # noqa: BLE001
