@@ -7043,6 +7043,35 @@ REQ_RX = re.compile(r"serve: prompt (\d+) tokens = (\d+) reused \+ \d+ read in [
                     r"\([\d.]+ tok/s\), (\d+) generated")
 
 
+# llama.cpp 每個請求完成時印 prompt eval／eval 兩行，release 那一行帶整段上下文的 token 數
+LLAMA_PROMPT_RX = re.compile(r"task (\d+) \| prompt eval time = +[\d.]+ ms / +(\d+) tokens")
+LLAMA_EVAL_RX = re.compile(r"task (\d+) \| +eval time = +[\d.]+ ms / +(\d+) tokens")
+LLAMA_DONE_RX = re.compile(r"task (\d+) \| stop processing: n_tokens = (\d+)")
+
+
+def _llama_requests(text):
+    """llama.cpp 記錄 → [(提示 token、沿用快取、生成)]，以及讀到哪裡（最後一個完成請求那行的結尾）。
+    一個請求的幾行可能被兩次讀取切開：只吃到最後一個 release 為止，沒寫完的下次從頭再讀。"""
+    seen, out, cut, pos = {}, [], 0, 0
+    for line in text.splitlines(keepends=True):
+        pos += len(line.encode("utf-8"))
+        m = LLAMA_PROMPT_RX.search(line)
+        if m:
+            seen.setdefault(m.group(1), [0, 0])[0] = int(m.group(2))
+            continue
+        m = LLAMA_EVAL_RX.search(line)
+        if m:
+            seen.setdefault(m.group(1), [0, 0])[1] = int(m.group(2))
+            continue
+        m = LLAMA_DONE_RX.search(line)
+        if m and m.group(1) in seen:
+            fresh, gen = seen.pop(m.group(1))
+            prompt = max(int(m.group(2)) - gen, fresh)     # 整段上下文扣掉生成的就是提示，新算的以外都是沿用
+            out.append((prompt, prompt - fresh, gen))
+            cut = pos
+    return out, cut
+
+
 def counters():
     """引擎每處理一個請求寫一行記錄，但那一行沒有時間戳——
     所以「本期處理多少 token」不能事後從記錄切。這裡把每個欄位的處理量一路累計，
@@ -7052,7 +7081,9 @@ def counters():
     state = load_json(COUNTERS, {})
     out = {}
     for slot in reg["slots"]:
-        log = slot.get("log")
+        llama = slot.get("kind") == "llama"
+        # llama.cpp 欄位的記錄檔固定在引擎目錄（服務的 StandardOutput 或代理看管時寫進去的那個）
+        log = engine_file(slot["id"], "-llama.log") if llama and SAFE_ID_RX.fullmatch(slot.get("id") or "") else slot.get("log")
         if not log or not os.path.exists(log):
             continue
         st = state.get(slot["id"]) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
@@ -7068,13 +7099,16 @@ def counters():
             chunk = fh.read()
         # 最後一行可能還沒寫完：只吃到最後一個換行為止，剩下的下次再讀
         cut = chunk.rfind(b"\n") + 1
-        for line in chunk[:cut].decode("utf-8", "replace").splitlines():
-            m = REQ_RX.search(line)
-            if m:
-                st["requests"] += 1
-                st["prompt"] += int(m.group(1))
-                st["reused"] += int(m.group(2))
-                st["generated"] += int(m.group(3))
+        if llama:
+            reqs, cut = _llama_requests(chunk[:cut].decode("utf-8", "replace"))
+        else:
+            reqs = [(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                    for m in map(REQ_RX.search, chunk[:cut].decode("utf-8", "replace").splitlines()) if m]
+        for prompt, reused, gen in reqs:
+            st["requests"] += 1
+            st["prompt"] += prompt
+            st["reused"] += reused
+            st["generated"] += gen
         st["offset"] += cut
         state[slot["id"]] = st
         out[slot["id"]] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
