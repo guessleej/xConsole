@@ -7047,71 +7047,86 @@ REQ_RX = re.compile(r"serve: prompt (\d+) tokens = (\d+) reused \+ \d+ read in [
 LLAMA_PROMPT_RX = re.compile(r"task (\d+) \| prompt eval time = +[\d.]+ ms / +(\d+) tokens")
 LLAMA_EVAL_RX = re.compile(r"task (\d+) \| +eval time = +[\d.]+ ms / +(\d+) tokens")
 LLAMA_DONE_RX = re.compile(r"task (\d+) \| stop processing: n_tokens = (\d+)")
+COUNTER_READ_MAX = 64 << 20          # 一次最多讀 64 MiB：第一次讀到很大的舊記錄檔時分幾次讀完，記憶體不跟著檔案長
 
 
-def _llama_requests(text):
-    """llama.cpp 記錄 → [(提示 token、沿用快取、生成)]，以及讀到哪裡（最後一個完成請求那行的結尾）。
-    一個請求的幾行可能被兩次讀取切開：只吃到最後一個 release 為止，沒寫完的下次從頭再讀。"""
-    seen, out, cut, pos = {}, [], 0, 0
-    for line in text.splitlines(keepends=True):
-        pos += len(line.encode("utf-8"))
+def _llama_requests(text, pending):
+    """llama.cpp 記錄 → [(提示 token、沿用快取、生成)]，以及還沒寫完的請求（下次接著用）。
+    一個請求的幾行可能被兩次讀取、甚至記錄輪替切開，所以沒等到 release 的先記在 pending，跟著計數狀態一起存。"""
+    pending = dict(pending or {})
+    out = []
+    for line in text.splitlines():
         m = LLAMA_PROMPT_RX.search(line)
         if m:
-            seen.setdefault(m.group(1), [0, 0])[0] = int(m.group(2))
+            pending.setdefault(m.group(1), [None, 0])[0] = int(m.group(2))
             continue
         m = LLAMA_EVAL_RX.search(line)
         if m:
-            seen.setdefault(m.group(1), [0, 0])[1] = int(m.group(2))
+            pending.setdefault(m.group(1), [None, 0])[1] = int(m.group(2))
             continue
         m = LLAMA_DONE_RX.search(line)
-        if m and m.group(1) in seen:
-            fresh, gen = seen.pop(m.group(1))
-            prompt = max(int(m.group(2)) - gen, fresh)     # 整段上下文扣掉生成的就是提示，新算的以外都是沿用
-            out.append((prompt, prompt - fresh, gen))
-            cut = pos
-    return out, cut
+        if m:
+            fresh, gen = pending.pop(m.group(1), [None, 0])
+            prompt = max(int(m.group(2)) - gen, fresh or 0)      # 整段上下文扣掉生成的就是提示
+            # 沒讀到新算多少（那幾行不見了）就不猜沿用：整段當新算，寧可少算沿用
+            out.append((prompt, prompt - fresh if fresh is not None else 0, gen))
+    # 只留最近的幾個：請求中斷沒印 release 的不會一直累積
+    return out, dict(list(pending.items())[-64:])
 
 
 def counters():
     """引擎每處理一個請求寫一行記錄，但那一行沒有時間戳——
     所以「本期處理多少 token」不能事後從記錄切。這裡把每個欄位的處理量一路累計，
     主控台每 5 分鐘取一次，兩次的差就是那段時間的量。
-    只讀上次讀到之後新增的部分；記錄被輪替（inode 變了或檔案變小）就從頭讀。"""
+    每個記錄檔各有自己的讀取位置：欄位換引擎（Strata ↔ llama.cpp）再換回來，不會把舊記錄重算一次；
+    換到一個第一次讀的記錄檔時從檔尾開始，那個檔以前的歷史不算進本期。
+    記錄被輪替（inode 變了或檔案變小）就從頭讀。"""
     reg = registry()
     state = load_json(COUNTERS, {})
     out = {}
     for slot in reg["slots"]:
+        sid = slot.get("id") or ""
         llama = slot.get("kind") == "llama"
         # llama.cpp 欄位的記錄檔固定在引擎目錄（服務的 StandardOutput 或代理看管時寫進去的那個）
-        log = engine_file(slot["id"], "-llama.log") if llama and SAFE_ID_RX.fullmatch(slot.get("id") or "") else slot.get("log")
+        log = engine_file(sid, "-llama.log") if llama and SAFE_ID_RX.fullmatch(sid) else slot.get("log")
         if not log or not os.path.exists(log):
             continue
-        st = state.get(slot["id"]) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
+        new_slot = sid not in state
+        st = state.get(sid) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
+        curs = st.setdefault("cursors", {})
+        if "inode" in st:
+            # 舊格式只有一組讀取位置，屬於當時讀的那個檔（Strata 的記錄）
+            old = {"inode": st.pop("inode"), "offset": st.pop("offset", 0)}
+            if slot.get("log"):
+                curs.setdefault(slot["log"], old)
         try:
             info = os.stat(log)
         except OSError:
             continue
-        if st.get("inode") != info.st_ino or info.st_size < st.get("offset", 0):
-            st["offset"] = 0
-            st["inode"] = info.st_ino
+        cur = curs.get(log)
+        if cur is None:
+            cur = curs[log] = {"inode": info.st_ino, "offset": 0 if new_slot else info.st_size}
+        if cur.get("inode") != info.st_ino or info.st_size < cur.get("offset", 0):
+            cur["offset"] = 0                         # 輪替：pending 留著，切在兩個檔之間的請求照樣接得起來
+            cur["inode"] = info.st_ino
         with open(log, "rb") as fh:
-            fh.seek(st["offset"])
-            chunk = fh.read()
+            fh.seek(cur["offset"])
+            chunk = fh.read(COUNTER_READ_MAX)
         # 最後一行可能還沒寫完：只吃到最後一個換行為止，剩下的下次再讀
         cut = chunk.rfind(b"\n") + 1
+        text = chunk[:cut].decode("utf-8", "replace")
         if llama:
-            reqs, cut = _llama_requests(chunk[:cut].decode("utf-8", "replace"))
+            reqs, cur["pending"] = _llama_requests(text, cur.get("pending"))
         else:
-            reqs = [(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-                    for m in map(REQ_RX.search, chunk[:cut].decode("utf-8", "replace").splitlines()) if m]
+            reqs = [(int(m.group(1)), int(m.group(2)), int(m.group(3))) for m in map(REQ_RX.search, text.splitlines()) if m]
         for prompt, reused, gen in reqs:
             st["requests"] += 1
             st["prompt"] += prompt
             st["reused"] += reused
             st["generated"] += gen
-        st["offset"] += cut
-        state[slot["id"]] = st
-        out[slot["id"]] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
+        cur["offset"] += cut
+        state[sid] = st
+        out[sid] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
     save_json(COUNTERS, state)
     return {"ts": time.time(), "slots": out}
 
