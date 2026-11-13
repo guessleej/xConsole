@@ -214,6 +214,39 @@ def test_home_quiet(pg):
     check("  只有屬性變：留著的元素屬性也換成新的", got == [True, True, "2"], got)
 
 
+UNTRANSLATED = """() => { const out = new Set();
+  const w = document.createTreeWalker(document.querySelector('#app'), NodeFilter.SHOW_TEXT);
+  let n; while ((n = w.nextNode())) {
+    // 管理者取的名稱（機器「本機」、欄位「主腦」）是資料，照設計不翻；推薦清單的模型說明另案決定
+    const t = n.nodeValue.replace(/本機|主腦/g, '').trim();
+    if (!t || !/[\u3400-\u9fff]/.test(t)) continue;
+    const p = n.parentElement;
+    if (!p || p.closest(I18N_SKIP) || p.closest('[hidden]') || p.closest('.rec-row, .rec-list') || !p.offsetParent) continue;
+    out.add(t.slice(0, 60)); }
+  return [...out]; }"""
+
+
+def test_english(ctx, base):
+    """BUG-9：英文介面下，概覽、執行、設定各分頁不准留下介面中文（資料除外）。"""
+    pg = ctx.new_page()
+    pg.add_init_script("try { localStorage.setItem('xconsole-lang', 'en') } catch (e) {}")
+    pg.route("**/api/fleet", with_slot)
+    pg.goto(base + "/")
+    pg.wait_for_selector("#nav button", state="attached", timeout=30000)
+    left = {}
+    for v in ["home", "run", "settings:machines", "settings:engine", "settings:tls", "settings:report"]:
+        if v.startswith("settings:"):
+            pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", v.split(":", 1)[1])
+        else:
+            pg.evaluate("(v) => go(v)", v)
+        pg.wait_for_timeout(2500)
+        got = pg.evaluate(UNTRANSLATED)
+        if got:
+            left[v] = got
+    check("英文介面：概覽、執行與設定各分頁沒有沒翻到的介面字", not left, left)
+    pg.close()
+
+
 def main():
     agent, console, base = start()
     errs = []
@@ -229,6 +262,7 @@ def main():
             test_desktop_toggle(pg)
             test_home_quiet(pg)
             test_mobile_width(ctx, base)
+            test_english(ctx, base)
             b.close()
         check("瀏覽器沒有 JavaScript 錯誤", not errs, errs[:3])
     finally:

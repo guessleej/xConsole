@@ -67,7 +67,8 @@ async function i18nInit() {
 
 // 使用者與伺服器給的資料（機器名、對話標題、模型、資料夾、設定檔、角色…）不是介面文字，不翻：
 // 主控台每次拿到回應就把這些欄位的值記下來；翻譯時整段相同就不動，句子裡夾著的也原樣保留
-const I18N_DATA_KEYS = new Set(["name", "title", "role", "label", "model", "path", "folder", "goal", "note", "profile",
+// label 不算：伺服器回的 label 都是程式產生的介面字（分層長條的「顯示卡」「系統記憶體」、埠的用途），沒有使用者自己填的
+const I18N_DATA_KEYS = new Set(["name", "title", "role", "model", "path", "folder", "goal", "note", "profile",
   "user", "username", "subject", "display_name", "alias"]);
 
 function i18nData(obj) {
@@ -116,6 +117,15 @@ function i18nText(s) {
     const t = I18N.exact.get(m);
     return t == null ? m : (I18N.lang === "en" ? ` ${t} ` : t);
   }).replace(/ {2,}/g, " ");
+}
+
+// 伺服器產生、但放在 note 這類資料欄位裡的介面字（例：使用報告的「取樣自 … 起才開始收集」）：明確要翻
+function i18nUi(s) {
+  if (!I18N.exact || typeof s !== "string") return s;
+  const keep = [I18N.data, I18N.dataRe];
+  I18N.data = null;
+  I18N.dataRe = null;
+  try { return i18nText(s); } finally { [I18N.data, I18N.dataRe] = keep; }
 }
 
 function i18nNode(root) {
