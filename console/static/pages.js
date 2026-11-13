@@ -210,6 +210,15 @@ function viewHome() {
         .then(([, lib]) => { S.rec[n.id].lib = lib; if (S.view === "home") quietRender(); }).catch(() => {});
     }
   }
+  const old = main.children;
+  if (S.quiet && old.length === 2 && old[0].matches("section.hero")) {
+    // 自動更新：主視覺區與下面的卡片只換有變的部分（每 15 秒整塊換新，光暈動畫會一直重來）
+    reveal(hero);
+    reveal(wrap);
+    swapChanged(old[1], wrap);
+    swapChanged(old[0], hero);
+    return;
+  }
   main.textContent = "";
   main.append(hero, wrap);
   reveal(main);

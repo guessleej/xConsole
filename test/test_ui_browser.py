@@ -173,6 +173,29 @@ def test_desktop_toggle(pg):
     pg.unroute("**/api/node/local/machine")
 
 
+def test_home_quiet(pg):
+    """BUG-8：概覽每 15 秒自動更新時，主視覺區（含漂移光暈）不准整塊換新，只換有變的數字。"""
+    pg.evaluate("go('home')")
+    pg.wait_for_selector("section.hero .hero-glow", state="attached", timeout=15000)
+    pg.wait_for_timeout(1500)
+    # 用 JS 屬性做記號，不用 data-*：屬性會改到 outerHTML，比對時就被當成有變
+    pg.evaluate("""() => { document.querySelector('section.hero .hero-glow').__keep = 1;
+                           document.querySelector('.hero h1').__keep = 1; }""")
+    pg.evaluate("refresh()")
+    pg.wait_for_timeout(1500)
+    kept = pg.evaluate("() => [!!document.querySelector('section.hero .hero-glow').__keep, !!document.querySelector('.hero h1').__keep,"
+                       " document.querySelectorAll('section.hero').length, document.querySelector('#live-text').textContent]")
+    check("概覽自動更新：光暈與標題原封不動（動畫不重播）", kept[:3] == [True, True, 1], kept)
+    check("  自動更新本身成功（不是重畫出錯被吞掉）", kept[3] == "即時", kept[3])
+    # 有變的數字要真的換上去：把「現在執行」改成別顆再更新一次
+    SLOT["model"] = "Changed-Model-For-Test"
+    pg.evaluate("refresh()")
+    pg.wait_for_timeout(1500)
+    shown = pg.evaluate("() => [document.querySelector('.hero .tiles').textContent, !!document.querySelector('section.hero .hero-glow').__keep]")
+    SLOT["model"] = "Mistral-Medium-3.5-128B-Instruct-UD-Q4_K_XL"
+    check("  有變的數字會換上去，光暈照樣不動", "Changed-Model-For-Test" in shown[0] and shown[1], shown)
+
+
 def main():
     agent, console, base = start()
     errs = []
@@ -186,6 +209,7 @@ def main():
             login(pg, base)
             test_api_list(pg)
             test_desktop_toggle(pg)
+            test_home_quiet(pg)
             test_mobile_width(ctx, base)
             b.close()
         check("瀏覽器沒有 JavaScript 錯誤", not errs, errs[:3])
