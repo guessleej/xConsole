@@ -248,6 +248,16 @@ function groups() {
 const NAV = [["home", "概覽"], ["models", "模型"], ["run", "執行"], ["chat", "對話"], ["agent", "Agent"],
   ["image", "畫圖"], ["video", "影片"], ["settings", "設定"]];
 
+// 頂列放不下（窄螢幕、日文等較長的分頁名）就把分頁收進漢堡，不讓整頁往右溢出
+function fitTopbar() {
+  const t = $("#topbar"), row = t && t.querySelector(".topbar-row.one");
+  if (!row) return;
+  t.classList.remove("tight");
+  t.classList.toggle("tight", row.scrollWidth > row.clientWidth + 1);
+}
+window.addEventListener("resize", fitTopbar, { passive: true });
+if (window.ResizeObserver && $("#nav")) new ResizeObserver(fitTopbar).observe($("#nav"));
+
 function renderNav() {
   const nav = $("#nav");
   const sub = $("#subnav");
@@ -263,6 +273,7 @@ function renderNav() {
     nav.appendChild(b);
   });
   renderNodePick();
+  fitTopbar();
   const subBtn = (label, view, on, fn) => {
     const b = el("button", null, label);
     if (on) b.setAttribute("aria-current", "true");

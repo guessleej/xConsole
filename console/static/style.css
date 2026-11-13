@@ -221,6 +221,12 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
 }
 .hero .wrap { position: relative; padding: 26px 24px 28px; }
 .hero h1 { font-size: 25px; font-weight: 700; }
+.hero-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hero-edit {
+  border: 0; border-radius: 99px; padding: 5px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: rgba(255, 255, 255, .10); color: rgba(255, 255, 255, .78);
+}
+.hero-edit:hover, .hero-edit:focus-visible { background: rgba(255, 255, 255, .18); color: #fff; }
 .hero p { margin: 6px 0 0; color: rgba(238, 244, 248, .72); font-size: 14px; }
 
 .tiles {
@@ -1117,8 +1123,13 @@ textarea.short { min-height: 48px; }
   max-width: 220px; padding: 5px 30px 5px 10px; border-radius: var(--radius-sm);
   background-color: var(--bg-hover); border: 1px solid transparent; font-weight: 600; color: var(--ink);
 }
-.nodepick-one { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.nodepick-off {
+  padding: 4px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad);
+}
 .menubtn { display: none; }
+.topbar.tight .nav { display: none; }
+.topbar.tight .menubtn { display: grid; }
 .mnav { position: fixed; inset: 0; z-index: 60; background: rgba(13, 25, 34, .45); }
 .mnav-panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: min(300px, 84vw); background: var(--card);
