@@ -4156,20 +4156,30 @@ def downloads_list():
         rows = sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
                       key=lambda j: -j["created"])[:20]
     for j in rows:
-        if j.get("state") == "done" and _dl_gone(j):
-            j["gone"] = True                        # 下載完成後檔案被刪了：不能還寫「完成」
+        gone = _dl_gone(j) if j.get("state") == "done" else None
+        if gone:
+            j["gone"] = gone                        # 下載完成後檔案被刪了（全部或一部分）：不能還寫「完成」
     return rows
 
 
 def _dl_gone(j):
-    """完成的下載，檔案是不是全都不在了。舊紀錄沒存 dest，照當時的規則推回去（文字模型：存放區/資料夾）。"""
+    """完成的下載，檔案還在不在："all" 全都不在、"some" 少了幾個（分片或畫圖模型的元件不齊、不能用）、None 都在。
+    新紀錄存了 dest；舊紀錄沒存，存放區可能改過，所以目前的存放區與其他模型資料夾都找一遍，任何一處齊全就不標。"""
     try:
-        dest = j.get("dest") or (sd_root(registry()) if j.get("folder") == "sd" else inside(gguf_root(), j["folder"]))
-        paths = [os.path.join(dest, f[2], f[3]) if isinstance(f, list) else os.path.join(dest, os.path.basename(f))
-                 for f in j.get("files") or []]
+        if j.get("dest"):
+            dests = [j["dest"]]
+        elif j.get("folder") == "sd":
+            dests = [sd_root(registry())]
+        else:
+            dests = [inside(r, j["folder"]) for r in [gguf_root()] + [expand(d) for d in model_dirs()]]
+        files = j.get("files") or []
+        if not files:
+            return None
+        missing = min(sum(not os.path.exists(os.path.join(d, f[2], f[3]) if isinstance(f, list) else os.path.join(d, os.path.basename(f)))
+                          for f in files) for d in dests)
     except (KeyError, ValueError, IndexError, TypeError):
-        return False
-    return bool(paths) and not any(os.path.exists(p) for p in paths)
+        return None
+    return None if not missing else "all" if missing == len(files) else "some"
 
 
 def _hf_file_url(repo, path):

@@ -624,11 +624,31 @@ with A._DL_LOCK:
     A._DL["g0ne0001"] = {"id": "g0ne0001", "repo": "gonetest/Model-GGUF", "stem": "Q4_K_M", "folder": fold,
                          "files": ["Model-Q4_K_M.gguf"], "total": 1, "done": 1, "state": "done", "created": 1, "error": None}
 row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
-case("下載完成但資料夾不在：標成檔案已刪除", row.get("gone") is True, row)
+case("下載完成但資料夾不在：標成檔案已刪除", row.get("gone") == "all", row)
 os.makedirs(os.path.join(A.gguf_root(), fold), exist_ok=True)
 open(os.path.join(A.gguf_root(), fold, "Model-Q4_K_M.gguf"), "wb").close()
 row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
 case("  檔案還在：不標", not row.get("gone"), row)
+eq("  檔案都在：沒有 gone", next(j for j in A.downloads_list() if j["id"] == "g0ne0001").get("gone"), None)
+with A._DL_LOCK:
+    A._DL["g0ne0001"]["files"] = ["Model-Q4_K_M.gguf", "Model-Q4_K_M-00002-of-00002.gguf"]
+eq("  分片少了一個：標成不完整（模型不能用）", next(j for j in A.downloads_list() if j["id"] == "g0ne0001").get("gone"), "some")
+# 舊紀錄沒存 dest、存放區後來改了：檔案在其他模型資料夾找得到就不標
+other = tempfile.mkdtemp(prefix="xc-otherdir-")
+os.makedirs(os.path.join(other, "legacy--Old"))
+open(os.path.join(other, "legacy--Old", "Old-Q4.gguf"), "wb").close()
+reg = A.registry()
+reg["machine"]["model_dirs"] = [other]
+A.save_json(A.REGISTRY, reg)
+with A._DL_LOCK:
+    A._DL["legacy01"] = {"id": "legacy01", "repo": "legacy/Old-GGUF", "stem": "Q4", "folder": "legacy--Old",
+                         "files": ["Old-Q4.gguf"], "total": 1, "done": 1, "state": "done", "created": 2, "error": None}
+eq("  舊紀錄（沒存位置）在其他模型資料夾找得到：不標", next(j for j in A.downloads_list() if j["id"] == "legacy01").get("gone"), None)
+reg["machine"]["model_dirs"] = []
+A.save_json(A.REGISTRY, reg)
+eq("  哪裡都找不到才標", next(j for j in A.downloads_list() if j["id"] == "legacy01").get("gone"), "all")
+with A._DL_LOCK:
+    A._DL.pop("legacy01", None)
 with A._DL_LOCK:
     A._DL.pop("g0ne0001", None)
 
