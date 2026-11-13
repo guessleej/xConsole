@@ -617,5 +617,20 @@ for x in reg["slots"]:
 A.save_json(A.REGISTRY, reg)
 eq("  換回 llama.cpp：llama 記錄檔以前讀過的不重算", A.counters()["slots"]["cnt"]["requests"], 5)
 
+# ---- 下載紀錄：檔案後來被刪了，不能還寫「完成」（現場：816B 的資料夾早就不在，清單照寫完成）
+A.downloads_list()
+fold = "gonetest--Model"
+with A._DL_LOCK:
+    A._DL["g0ne0001"] = {"id": "g0ne0001", "repo": "gonetest/Model-GGUF", "stem": "Q4_K_M", "folder": fold,
+                         "files": ["Model-Q4_K_M.gguf"], "total": 1, "done": 1, "state": "done", "created": 1, "error": None}
+row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
+case("下載完成但資料夾不在：標成檔案已刪除", row.get("gone") is True, row)
+os.makedirs(os.path.join(A.gguf_root(), fold), exist_ok=True)
+open(os.path.join(A.gguf_root(), fold, "Model-Q4_K_M.gguf"), "wb").close()
+row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
+case("  檔案還在：不標", not row.get("gone"), row)
+with A._DL_LOCK:
+    A._DL.pop("g0ne0001", None)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

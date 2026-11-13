@@ -4153,8 +4153,23 @@ def downloads_list():
                 j["state"] = "interrupted"                 # 代理重啟過；.part 還在，重新下載會接續
             _DL[j["id"]] = j
     with _DL_LOCK:
-        return sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
+        rows = sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
                       key=lambda j: -j["created"])[:20]
+    for j in rows:
+        if j.get("state") == "done" and _dl_gone(j):
+            j["gone"] = True                        # 下載完成後檔案被刪了：不能還寫「完成」
+    return rows
+
+
+def _dl_gone(j):
+    """完成的下載，檔案是不是全都不在了。舊紀錄沒存 dest，照當時的規則推回去（文字模型：存放區/資料夾）。"""
+    try:
+        dest = j.get("dest") or (sd_root(registry()) if j.get("folder") == "sd" else inside(gguf_root(), j["folder"]))
+        paths = [os.path.join(dest, f[2], f[3]) if isinstance(f, list) else os.path.join(dest, os.path.basename(f))
+                 for f in j.get("files") or []]
+    except (KeyError, ValueError, IndexError, TypeError):
+        return False
+    return bool(paths) and not any(os.path.exists(p) for p in paths)
 
 
 def _hf_file_url(repo, path):
@@ -4508,7 +4523,7 @@ def start_download(repo, stem, mmproj=None, token=""):
             return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
         jid = secrets.token_hex(4)
         files = pick["files"] + ([mmproj] if mmproj else [])
-        _DL[jid] = {"id": jid, "repo": repo, "stem": stem, "folder": folder, "files": files,
+        _DL[jid] = {"id": jid, "repo": repo, "stem": stem, "folder": folder, "files": files, "dest": dest,
                     "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
                     "_token": token, "_cancel": False}
     threading.Thread(target=_download_job, args=(jid, dest), daemon=True).start()
@@ -7518,7 +7533,7 @@ def sd_download(spec, token=""):
             return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
         jid = secrets.token_hex(4)
         _DL[jid] = {"id": jid, "repo": spec["parts"][0]["repo"], "stem": spec["quant"] or spec["title"],
-                    "title": spec["title"], "folder": "sd", "files": todo, "sd_model": spec["id"],
+                    "title": spec["title"], "folder": "sd", "files": todo, "sd_model": spec["id"], "dest": root,
                     "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
                     "_token": token, "_cancel": False}
     threading.Thread(target=_download_job, args=(jid, root), daemon=True).start()
