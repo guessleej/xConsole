@@ -1529,8 +1529,14 @@ function tierBar(cap, marker) {
     const pos = Math.min(100, (marker.gib / total) * 100);
     const m = el("div", "tier-mark");
     m.style.left = `clamp(0px, calc(${pos}% - 1px), calc(100% - 2px))`;
-    m.appendChild(el("span", "tier-tag", `${marker.label}・${fmt(marker.gib, 0)} GiB`));
     box.appendChild(m);
+    // 標籤放在長條這一層、不掛在細線上：靠右半邊時往左長，寬度不超過那一側，太長就截斷（手機上才不會把整頁撐寬）
+    const text = `${marker.label}・${fmt(marker.gib, 0)} GiB`;
+    const tag = el("span", "tier-tag", text);
+    tag.title = text;
+    if (pos > 50) { tag.style.right = `calc(${100 - pos}% - 12px)`; tag.style.maxWidth = `calc(${pos}% + 12px)`; }
+    else { tag.style.left = `max(0px, calc(${pos}% - 12px))`; tag.style.maxWidth = `calc(${100 - pos}% + 12px)`; }
+    box.appendChild(tag);
   }
   const bar = el("div", "tier-bar");
   cap.tiers.forEach((t) => {
