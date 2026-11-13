@@ -5605,12 +5605,24 @@ function machineSteps(n, info) {
 
 // 自動更新時只換內容有變的元素：沒變的原封不動（背景光暈的動畫不重播、按鈕不閃）。
 // 子元素數量或種類對不上、或元素裡直接夾著文字，就整個換掉，不去猜怎麼對應。
+// 留下來的元素：屬性換成新的（長條寬度這類只改 style 的），事件處理也換成新的
+// （按鈕的 onclick 抓著當時的資料，留舊的會用到過期的值，例如改名後再按一次改名帶出舊名稱）。
+const SWAP_HANDLERS = ["onclick", "onchange", "oninput", "onkeydown", "onsubmit"];
 function swapChanged(oldEl, newEl) {
-  if (oldEl.outerHTML === newEl.outerHTML) return;
   const a = [...oldEl.children], b = [...newEl.children];   // 先拍下來：換掉時新元素會被搬走，活的清單會縮
+  const same = oldEl.outerHTML === newEl.outerHTML;
   const pure = (x) => x.childNodes.length === x.children.length;
-  if (oldEl.tagName !== newEl.tagName || oldEl.className !== newEl.className || !a.length || a.length !== b.length
-      || !pure(oldEl) || !pure(newEl)) { oldEl.replaceWith(newEl); return; }
+  if (!same && (oldEl.tagName !== newEl.tagName || !a.length || a.length !== b.length || !pure(oldEl) || !pure(newEl))) {
+    oldEl.replaceWith(newEl);
+    return;
+  }
+  if (!same) {
+    // style 要走 CSSOM：CSP 不准 style 屬性，setAttribute("style") 寫得進去但瀏覽器不套用
+    [...oldEl.attributes].forEach((at) => { if (at.name !== "style" && !newEl.hasAttribute(at.name)) oldEl.removeAttribute(at.name); });
+    [...newEl.attributes].forEach((at) => { if (at.name !== "style" && oldEl.getAttribute(at.name) !== at.value) oldEl.setAttribute(at.name, at.value); });
+    if (oldEl.style.cssText !== newEl.style.cssText) oldEl.style.cssText = newEl.style.cssText;
+  }
+  SWAP_HANDLERS.forEach((h) => { if (oldEl[h] !== newEl[h]) oldEl[h] = newEl[h]; });
   a.forEach((x, i) => swapChanged(x, b[i]));
 }
 
