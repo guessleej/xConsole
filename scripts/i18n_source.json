@@ -6688,11 +6688,27 @@
 "pattern": false
 },
 {
-"zh": "（連不上）",
+"zh": "例：AI 研究中心主機",
+"pattern": false
+},
+{
+"zh": "1～40 個字；概覽標題、機器清單與報表都用這個名稱",
+"pattern": false
+},
+{
+"zh": "改機器名稱",
+"pattern": false
+},
+{
+"zh": "名稱已更新",
 "pattern": false
 },
 {
 "zh": "目前這台機器",
+"pattern": false
+},
+{
+"zh": "（連不上）",
 "pattern": false
 },
 {
@@ -6729,6 +6745,10 @@
 },
 {
 "zh": "先把一台機器加進來，主控台會讀出它的顯示卡、記憶體與磁碟，算出能跑多大的模型",
+"pattern": false
+},
+{
+"zh": "改名稱",
 "pattern": false
 },
 {
