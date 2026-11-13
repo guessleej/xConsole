@@ -905,12 +905,14 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
 .tier-seg.ram { background: #1f5f8b; }
 .tier-seg.floor { background: repeating-linear-gradient(135deg, rgba(22, 32, 42, .08) 0 8px, rgba(22, 32, 42, .14) 8px 16px); color: var(--ink-2); }
 :root[data-theme="dark"] .tier-seg.floor { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .06) 0 8px, rgba(255, 255, 255, .11) 8px 16px); }
-.tier-mark { position: absolute; top: 24px; bottom: 30px; width: 2px; background: var(--ink); z-index: 1; }
+.tier-mark { position: absolute; top: 24px; height: 58px; width: 2px; background: var(--ink); z-index: 1; }
 .tier-tag {
-  position: absolute; bottom: 100%; left: 0; transform: translateX(-12px); margin-bottom: 2px;
+  position: absolute; top: 0; z-index: 1;
   background: var(--ink); color: var(--card); font-size: 13px; font-weight: 600;
-  padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+  padding: 2px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
 }
+/* 手機上表格在自己的框裡橫向捲，不把整頁撐寬 */
+@media (max-width: 600px) { .api-table { display: block; overflow-x: auto; } }
 
 .rec-for { align-items: center; margin-bottom: 12px; }
 /* 推薦清單照 LocModel：上面一排圓角篩選，下面一個圓角容器、一列一顆、列間細分隔。

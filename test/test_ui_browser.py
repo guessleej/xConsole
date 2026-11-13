@@ -42,8 +42,10 @@ def free_port():
 
 
 # 一個開著的 llama.cpp 主腦欄位：清單頁、概覽都靠它
+# 模型名故意取長：概覽分層長條上的「現在執行…」標籤最容易把手機版撐寬（BUG-3）
 SLOT = {"id": "brain", "role": "主腦", "tier": "一般", "unit": "xconsole-llama-brain", "kind": "llama", "busy": True,
-        "model": "UI-Test-Model", "quant": "Q4_K_M", "config": {"max_context": 32768}, "port": 18080}
+        "model": "Mistral-Medium-3.5-128B-Instruct-UD-Q4_K_XL", "quant": "Q4_K_XL", "config": {"max_context": 32768},
+        "port": 18080, "vram_gib": 40, "ram_gib": 0, "vram_exact": True}
 INFO = {"slot": "brain", "role": "主腦", "model": "UI-Test-Model", "kind": "llama", "engine": "llama", "port": 18080,
         "public_url": "http://127.0.0.1:18080/v1", "default_url": "http://127.0.0.1:18080/v1", "public_url_custom": False,
         "model_name": "ui-test-model-q4", "online": True, "status": 200, "served": [], "max_context": 32768,
@@ -128,6 +130,32 @@ def test_api_list(pg):
     pg.unroute("**/api/node/*/apiinfo/brain**")
 
 
+def test_mobile_width(ctx, base):
+    """BUG-3：390 與 360 寬逐頁檢查，整頁不准比視窗寬（不准出現橫向捲動）。"""
+    views = ["home", "models", "run", "node:local", "apis", "api:local:brain", "chat", "agent", "image", "video"]
+    for w in (390, 360):
+        pg = ctx.new_page()
+        pg.set_viewport_size({"width": w, "height": 800})
+        pg.route("**/api/fleet", with_slot)
+        pg.route("**/api/node/*/apiinfo/brain**",
+                 lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+        pg.goto(base + "/")
+        pg.wait_for_selector("#nav button", state="attached", timeout=30000)
+        tabs = pg.evaluate("settingsTabs().map(([k]) => k)")
+        bad = []
+        for v in views + [f"settings:{t}" for t in tabs]:
+            if v.startswith("settings:"):
+                pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", v.split(":", 1)[1])
+            else:
+                pg.evaluate("(v) => go(v)", v)
+            pg.wait_for_timeout(1200)
+            sw = pg.evaluate("document.documentElement.scrollWidth")
+            if sw > w:
+                bad.append(f"{v}={sw}")
+        check(f"手機 {w} 寬：每一頁都不比視窗寬", not bad, "、".join(bad))
+        pg.close()
+
+
 def main():
     agent, console, base = start()
     errs = []
@@ -140,6 +168,7 @@ def main():
             pg.route("**/api/fleet", with_slot)
             login(pg, base)
             test_api_list(pg)
+            test_mobile_width(ctx, base)
             b.close()
         check("瀏覽器沒有 JavaScript 錯誤", not errs, errs[:3])
     finally:
