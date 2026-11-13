@@ -194,6 +194,24 @@ def test_home_quiet(pg):
     shown = pg.evaluate("() => [document.querySelector('.hero .tiles').textContent, !!document.querySelector('section.hero .hero-glow').__keep]")
     SLOT["model"] = "Mistral-Medium-3.5-128B-Instruct-UD-Q4_K_XL"
     check("  有變的數字會換上去，光暈照樣不動", "Changed-Model-For-Test" in shown[0] and shown[1], shown)
+    # 留下來的元素要換上新的事件處理（改名按鈕抓著當時的機器資料，留舊的會用到改名前的名稱）
+    # 卡片本身也要留著（進場動畫的 class 不能讓它每次都被當成不一樣而整張換掉）
+    pg.evaluate("""() => { window.__fn = document.querySelector('.hero-edit').onclick;
+                           document.querySelector('.hero-edit').__keep = 1;
+                           const hw = document.querySelector('#main section.card.hw'); if (hw) hw.__keep = 1; }""")
+    pg.evaluate("refresh()")
+    pg.wait_for_timeout(1500)
+    st = pg.evaluate("""() => { const b = document.querySelector('.hero-edit'), hw = document.querySelector('#main section.card.hw');
+                                return [!!b.__keep, b.onclick !== window.__fn, hw ? !!hw.__keep : null]; }""")
+    check("  留下來的按鈕換上新的 onclick（不會用到過期的資料）", st[0] and st[1], st)
+    check("  內容沒變的卡片整張留著（進場動畫的 class 不影響比對）", st[2] is not False, st)
+    # 只有屬性變（例：分層長條的寬度）、子元素結構一樣：屬性要跟著換
+    got = pg.evaluate("""() => { const a = el('div', 'x'); a.appendChild(el('span', null, '1')); a.style.flex = '1 1 0';
+                                 document.body.appendChild(a);
+                                 const b = el('div', 'x'); b.appendChild(el('span', null, '2')); b.style.flex = '5 1 0';
+                                 a.style.display = b.style.display = 'flex'; swapChanged(a, b);
+                                 const r = [a.isConnected, getComputedStyle(a).flexGrow === '5', a.textContent]; a.remove(); return r; }""")
+    check("  只有屬性變：留著的元素屬性也換成新的", got == [True, True, "2"], got)
 
 
 def main():
