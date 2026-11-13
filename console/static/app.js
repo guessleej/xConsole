@@ -2144,7 +2144,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     w.appendChild(b);
     left.appendChild(w);
   }
-  const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・手動組" : ""}）`]), S.sdModel);
+  const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・手動組" : ""}${m.cn_origin ? "・中國來源" : ""}）`]), S.sdModel);
   const fPrompt = el("textarea");
   fPrompt.placeholder = "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格";
   fPrompt.maxLength = 2000;
