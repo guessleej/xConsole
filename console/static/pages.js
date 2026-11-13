@@ -17,7 +17,27 @@ function setNode(id) {
   try { localStorage.setItem("xconsole-node", id); } catch (_) { /* 無痕模式：只記在這個分頁 */ }
 }
 
-// 頂列右側的機器切換：只有一台時只顯示名稱
+// 概覽標題旁直接改這台的顯示名稱（完整設定仍在「設定 › 機器 › 修改」）
+function renameMachine(n) {
+  const body = el("div");
+  const fName = textInput(n.name, "例：AI 研究中心主機");
+  body.appendChild(fieldBox("名稱", fName, "1～40 個字；概覽標題、機器清單與報表都用這個名稱"));
+  const ov = modal({ title: "改機器名稱", bodyNode: body, hasInput: true });
+  const save = async () => {
+    try {
+      await api(`/api/nodes/${n.id}/update`, { method: "POST", body: { name: fName.value.trim() } });
+      ov.remove();
+      toast("名稱已更新", "ok");
+      await refresh();
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  imeGuard(fName, save);
+  formButton(ov, "儲存", "primary", save);
+  fName.focus();
+  fName.select();
+}
+
+// 頂列右側的機器切換：只有一台時不顯示名稱（重複又會擠壞導覽列），連不上時留一個短標示
 function renderNodePick() {
   const box = $("#nodepick");
   if (!box) return;
@@ -26,7 +46,7 @@ function renderNodePick() {
   box.textContent = "";
   if (!n) return;
   if (ns.length < 2) {
-    box.appendChild(el("span", "nodepick-one", n.name + (n.online ? "" : "（連不上）")));
+    if (!n.online) box.appendChild(el("span", "nodepick-off", "連不上"));
     return;
   }
   const sel = el("select", "nodepick-sel");
@@ -142,7 +162,11 @@ function viewHome() {
   const hero = el("section", "hero");
   hero.appendChild(el("div", "hero-glow"));
   const hw = el("div", "wrap");
-  hw.appendChild(el("h1", null, n.name));
+  const ht = el("div", "hero-title");
+  const rn = el("button", "hero-edit", "改名稱");
+  rn.onclick = () => renameMachine(n);
+  ht.append(el("h1", null, n.name), rn);
+  hw.appendChild(ht);
   hw.appendChild(el("p", null, n.online ? [st.chip?.gpu, st.chip?.cpu].filter(Boolean).join("・") || "已連線"
     : "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址"));
   const tiles = el("div", "tiles");
