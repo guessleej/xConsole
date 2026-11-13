@@ -207,8 +207,38 @@ def main():
         A.record_speed("s9", est * 2, 10)
         eq("太短的回答（不到 32 個 token）不算", A.registry()["speed"][os.path.abspath(mp)]["n"], 1)
         eq("校正倍數出現在晶片資訊（推薦清單會用）", A.chip()["speed_factor"], 2.0)
+        sp = A.registry()["speed"][os.path.abspath(mp)]
+        case("一般放法另記擬合用的點（讀多少、幾層、速度）", sp.get("layers") == 32 and sp.get("read_gib") and sp.get("fit_tok_s"))
+        case("只量過一顆：不擬合，留單一倍數", "speed_fit" not in A.registry()["machine"])
     finally:
         A._profile_cached = real_prof
+
+    # ---- 8a. 改頻寬：舊的校正倍數與擬合作廢
+    r0 = A.registry()
+    r0["machine"].update(speed_factor=1.5, speed_factor_n=3, speed_fit={"eff": 0.8, "layer_ms": 0.2, "n": 2, "bw": 100})
+    A.save_json(A.REGISTRY, r0)
+    real_root, real_llama, real_sd = A.check_root, A.check_llama, A.check_sd_cli
+    A.check_root = A.check_llama = A.check_sd_cli = lambda v: (None, None)
+    try:
+        mm0 = r0["machine"].get("memory_model") or "discrete"
+        A.save_machine({"memory_model": mm0, "bandwidth_gbs": 100})
+        case("頻寬沒變：校正保留", A.registry()["machine"].get("speed_factor") == 1.5)
+        A.save_machine({"memory_model": mm0, "bandwidth_gbs": 120})
+        m0 = A.registry()["machine"]
+        case("頻寬改了：校正倍數與擬合都作廢", not any(k in m0 for k in ("speed_factor", "speed_factor_n", "speed_fit")))
+    finally:
+        A.check_root, A.check_llama, A.check_sd_cli = real_root, real_llama, real_sd
+
+    # ---- 8b. 擬合頻寬效率與每層開銷（HP 筆電：E2B 38.6、12B 6.9 tok/s，89.6 GB/s）
+    def tok(read, layers, eff=0.83, lms=0.28, bw=89.6):
+        return 1 / (read * A.GIB / (eff * bw * 1e9) + layers * lms / 1000)
+    f = A.fit_speed([(1.125, 35, tok(1.125, 35)), (9.11, 48, tok(9.11, 48))], 89.6)
+    eq("擬合：頻寬效率", f["eff"], 0.83)
+    eq("擬合：每層開銷（毫秒）", f["layer_ms"], 0.28)
+    eq("擬合記下當時的頻寬（改了頻寬就不再用）", f["bw"], 89.6)
+    case("只有一顆不擬合", A.fit_speed([(1.125, 35, 38.6)], 89.6) is None)
+    case("讀的量差不到兩倍不擬合（分不開兩項）", A.fit_speed([(4, 32, 10), (6, 40, 7)], 89.6) is None)
+    eq("開銷算出負的就全部算在頻寬上", A.fit_speed([(1, 30, 200), (8, 30, 10)], 89.6)["layer_ms"], 0.0)
 
     # ---- 9. 桌面小幫手的權杖不出這台
     import json as _j
