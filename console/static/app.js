@@ -5603,6 +5603,17 @@ function machineSteps(n, info) {
 
 /* ---------------------------------------------------------------- 主迴圈 */
 
+// 自動更新時只換內容有變的元素：沒變的原封不動（背景光暈的動畫不重播、按鈕不閃）。
+// 子元素數量或種類對不上、或元素裡直接夾著文字，就整個換掉，不去猜怎麼對應。
+function swapChanged(oldEl, newEl) {
+  if (oldEl.outerHTML === newEl.outerHTML) return;
+  const a = [...oldEl.children], b = [...newEl.children];   // 先拍下來：換掉時新元素會被搬走，活的清單會縮
+  const pure = (x) => x.childNodes.length === x.children.length;
+  if (oldEl.tagName !== newEl.tagName || oldEl.className !== newEl.className || !a.length || a.length !== b.length
+      || !pure(oldEl) || !pure(newEl)) { oldEl.replaceWith(newEl); return; }
+  a.forEach((x, i) => swapChanged(x, b[i]));
+}
+
 // 資料更新造成的重畫：不播動畫、捲動位置不動。使用者按導覽切頁才走 render()。
 function quietRender() {
   const y = window.scrollY;
