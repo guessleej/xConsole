@@ -390,11 +390,19 @@ def same_machine(node_host, url_host):
     return theirs if theirs and theirs <= mine else set()
 
 
+def apiinfo_brief(node_id, slot_id, timeout=20):
+    """API 資訊的精簡版（不算執行設定）。主控台先升級、代理還是舊版時，舊代理不認得 /brief，退回完整版。"""
+    code, out = call_node(node_id, f"/apiinfo/{slot_id}/brief", timeout=timeout)
+    if code == 404 and (out or {}).get("error") != "沒有這個欄位":
+        code, out = call_node(node_id, f"/apiinfo/{slot_id}", timeout=timeout)
+    return code, out
+
+
 def network_test(node_id, slot_id, key=""):
     """用 IDE 會打的那個網址，從主控台這台經網路實際連一次。
     代理在本機測過只證明服務活著；這一步證明別台電腦也連得到、金鑰保護真的有效。
     key 是管理者這次貼進來的，只用這一次，不存、不寫稽核。"""
-    code, info = call_node(node_id, f"/apiinfo/{slot_id}", timeout=20)
+    code, info = apiinfo_brief(node_id, slot_id)
     if code != 200:
         return {"ok": False, "url": None, "detail": info.get("error") or f"讀不到設定（{code}）"}
     base = str(info.get("public_url") or "").rstrip("/")
@@ -2674,9 +2682,10 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/build(/progress)?", path)
         if m:
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/build{m.group(3) or ''}", timeout=60))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)(/brief)?", path)
         if m:
-            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=60)
+            code, out = (apiinfo_brief(m.group(1), m.group(2), timeout=60) if m.group(3)
+                         else call_node(m.group(1), f"/apiinfo/{m.group(2)}", timeout=60))
             run = out.get("run") if code == 200 else None
             if run:
                 # 預估速度與推薦清單同一條公式（recommend.decode_speed），畫面不自己算

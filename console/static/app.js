@@ -1253,11 +1253,12 @@ function libJobsCard(entries) {
   entries.forEach(({ n, jobs }) => jobs.slice(0, 5).forEach((j) => {
     const g = el("div", "dl");
     const pct = j.total ? Math.floor((j.done / j.total) * 100) : 0;
-    const label = { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
+    const label = j.gone === "some" ? "檔案不完整" : j.gone ? "檔案已刪除"
+      : { queued: "排隊中", running: `下載中 ${pct}%`, done: "完成", failed: "失敗", cancelled: "已取消", interrupted: "中斷（再下載一次會接續）" }[j.state] || j.state;
     const top = el("div", "dl-top");
     top.appendChild(el("span", "mono", `${multi ? n.name + "　" : ""}${j.sd_model ? j.title : j.repo + "　" + j.stem}`));
     top.appendChild(el("span", "spacer"));
-    top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : "muted"), label));
+    top.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : j.gone ? "warn-t" : "muted"), label));
     if (jobActive(j)) {
       const c = el("button", "btn sm", "取消");
       c.onclick = async () => { try { await api(`/api/node/${n.id}/library/download/${j.id}/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); } };
@@ -1529,8 +1530,14 @@ function tierBar(cap, marker) {
     const pos = Math.min(100, (marker.gib / total) * 100);
     const m = el("div", "tier-mark");
     m.style.left = `clamp(0px, calc(${pos}% - 1px), calc(100% - 2px))`;
-    m.appendChild(el("span", "tier-tag", `${marker.label}・${fmt(marker.gib, 0)} GiB`));
     box.appendChild(m);
+    // 標籤放在長條這一層、不掛在細線上：靠右半邊時往左長，寬度不超過那一側，太長就截斷（手機上才不會把整頁撐寬）
+    const text = `${marker.label}・${fmt(marker.gib, 0)} GiB`;
+    const tag = el("span", "tier-tag", text);
+    tag.title = text;
+    if (pos > 50) { tag.style.right = `calc(${100 - pos}% - 12px)`; tag.style.maxWidth = `calc(${pos}% + 12px)`; }
+    else { tag.style.left = `max(0px, calc(${pos}% - 12px))`; tag.style.maxWidth = `calc(${100 - pos}% + 12px)`; }
+    box.appendChild(tag);
   }
   const bar = el("div", "tier-bar");
   cap.tiers.forEach((t) => {
@@ -1655,7 +1662,7 @@ function recRow(n, it, lib, ctx) {
       q.appendChild(el("span", "small muted", "還沒從 Hugging Face 讀到大小"));
     } else if (ctx.compact) {
       q.appendChild(el("b", "mono", p?.quant || "單一檔案"));
-      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib)} GB` : ""));
+      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib)} GiB` : ""));
     } else {
       const sel = el("select");
       it.plans.forEach((x) => {
@@ -1667,7 +1674,9 @@ function recRow(n, it, lib, ctx) {
       sel.value = stem;
       sel.onchange = () => draw(sel.value);
       q.appendChild(sel);
-      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib + (it.vision ? recMmproj(it)?.gib || 0 : 0))} GB` : ""));
+      // 看圖模型連投影檔（mmproj）一起下載，這裡算的是兩個合計；概覽只算主檔，所以要寫明
+      const mmGib = it.vision ? recMmproj(it)?.gib || 0 : 0;
+      q.appendChild(el("span", "small muted", p ? `${fmt(p.size_gib + mmGib)} GiB${mmGib ? "（含投影檔）" : ""}` : ""));
     }
     row.appendChild(q);
 
@@ -1969,7 +1978,7 @@ async function libSd(body, ok, only, v) {
   const intro = el("div", "sd-intro");
   const txt = el("div", "small muted");
   txt.append(el("div", null, "每顆模型包含主體、文字編碼器和 VAE，一鍵全部下載。照這台的記憶體推薦了合適的量化版本，也可以自己選。"),
-    el("div", null, `存放在 ${rec.root || "—"}，剩 ${fmt(rec.free_gib, 0)} GB。`));
+    el("div", null, `存放在 ${rec.root || "—"}，剩 ${fmt(rec.free_gib, 0)} GiB。`));
   const man = el("button", "btn sm", "自己組一顆");
   man.title = "不在清單上的模型：自己挑主體、文字編碼器、VAE 的檔案";
   man.onclick = () => openSdManual(n);
@@ -2035,7 +2044,7 @@ function sdRow(n, rec, it, redraw, toGen) {
       sel.value = path;
       sel.onchange = () => draw(sel.value);
       q.appendChild(sel);
-      if (p) q.appendChild(el("span", "small muted", `共 ${fmt(p.size_gib)} GB`));
+      if (p) q.appendChild(el("span", "small muted", `共 ${fmt(p.size_gib)} GiB`));
     }
     row.appendChild(q);
     const fit = el("div", "rec-fit");
@@ -2058,7 +2067,7 @@ function sdRow(n, rec, it, redraw, toGen) {
     } else if (it.job) {
       act.appendChild(el("span", "small muted", `下載中 ${it.job.total ? Math.floor((it.job.done / it.job.total) * 100) : 0}%`));
     } else if (p) {
-      const b = el("button", "btn sm primary", p.installed_id ? "補齊下載" : p.download_gib ? `下載 ${fmt(p.download_gib)} GB` : "加入（檔案都在了）");
+      const b = el("button", "btn sm primary", p.installed_id ? "補齊下載" : p.download_gib ? `下載 ${fmt(p.download_gib)} GiB` : "加入（檔案都在了）");
       b.disabled = !p.fits_disk;
       b.title = !p.fits_disk ? "存放區空間不夠（另需保留 10 GiB）" : lv === "no" ? "這台記憶體不夠，下載了也跑不動" : "";
       b.onclick = () => sdDownload(n, it, p);
@@ -2961,7 +2970,7 @@ function viewApis() {
     tr.style.cursor = "pointer";
     tr.onclick = (e) => { if (e.target.tagName !== "BUTTON") go(`api:${n.id}:${s.id}`); };
     body.appendChild(tr);
-    api(`/api/node/${n.id}/apiinfo/${s.id}`).then((info) => {
+    api(`/api/node/${n.id}/apiinfo/${s.id}/brief`).then((info) => {
       cells[2].textContent = info.model_name || "—";
       cells[3].textContent = info.public_url;
       cells[4].textContent = int(info.max_context);
@@ -4135,9 +4144,11 @@ async function settingsMachines(wrap) {
   const add = el("button", "btn sm primary", "加一台機器");
   add.onclick = openAddMachine;
   c.querySelector(".card-head").append(el("span", "spacer"), add);
-  c.appendChild(el("p", "small muted",
-    "機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"
-    + "主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
+  // 兩句分成兩個文字節點：翻譯是整句比對，拼成一個節點就對不到字典
+  const how = el("p", "small muted");
+  how.append(document.createTextNode("機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"),
+    i18nGap(), document.createTextNode("主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
+  c.appendChild(how);
   const box = el("div");
   loading(box);
   c.appendChild(box);
@@ -4250,7 +4261,9 @@ function renderSteps(steps) {
     const lbl = { done: "已完成", now: "現在做這步", blocked: "還不能做", skip: "可略過" }[s.state];
     const need = s.state === "blocked"
       ? (s.blocked && s.need ? s.need : `（要先完成第 ${steps.findIndex((x) => !x.done && !x.optional) + 1} 步）`) : "";
-    d.appendChild(el("span", "st", lbl + need));
+    const stEl = el("span", "st", lbl);
+    if (need) stEl.append(i18nGap(), document.createTextNode(need));      // 分開放：翻譯才對得到「還不能做」與「（要先完成第 n 步）」
+    d.appendChild(stEl);
     if (s.go && s.state !== "done" && s.state !== "blocked") {
       const b = el("button", "btn sm" + (s.state === "now" ? " primary" : ""), s.go[0]);
       b.onclick = s.go[1];
@@ -4390,7 +4403,7 @@ async function settingsTls(wrap) {
   // ---- 第 3、4 步：上傳、檢查、套用
   const up = card("3. 上傳並檢查　4. 套用", "PFX／P12、PEM、CER、CRT、KEY、P7B 都可以，順序不拘");
   const dz = el("div", "dropzone");
-  dz.innerHTML = "<strong>把憑證檔拖到這裡，或點這裡選檔</strong>可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）";
+  dz.append(el("strong", null, "把憑證檔拖到這裡，或點這裡選檔"), document.createTextNode("可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）"));
   const fi = el("input");
   fi.type = "file"; fi.multiple = true; fi.hidden = true;
   fi.accept = ".pfx,.p12,.pem,.cer,.crt,.key,.p7b,.p7c,.der";
@@ -4605,7 +4618,7 @@ async function settingsReport(wrap) {
   dj.onclick = () => download(`xConsole-使用報告-近${days}天.json`, JSON.stringify(r, null, 1), "application/json");
   box.textContent = "";
   box.appendChild(el("p", "small muted", `${r.period.from} 至 ${r.period.to}（台北時間）`));
-  if (r.period.note) box.appendChild(el("p", "note warn", r.period.note));
+  if (r.period.note) box.appendChild(el("p", "note warn", i18nUi(r.period.note)));
 
   const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString(uiLocale());
   const t = r.build_vs_buy.local;
@@ -5262,6 +5275,8 @@ async function openMachineSettings(nid) {
     fDesk.checked = !!st.desktop_enabled;
     pcRow.append(fDesk, document.createTextNode(" 讓模型操作這台的桌面（看螢幕、控制滑鼠鍵盤）"));
     const dk = info.desktop || {};
+    // 不能操作桌面就停用；已經開著的保留可以取消勾選（後端只擋「從關到開」）
+    if (!dk.how && !fDesk.checked) { fDesk.disabled = true; pcRow.classList.add("disabled"); }
     body.append(pcRow, el("p", "small " + (dk.how ? "muted" : "warn-t"), dk.how
       ? `${dk.how === "helper" ? "由桌面小幫手代為操作（使用者登入後才有桌面）" : "代理直接操作這台的桌面"}。對話頁按「操作電腦」使用；每一步預設都要人按允許，每個動作寫進記錄。不需要就保持關閉。`
       : `這台現在不能操作桌面：${dk.why || "沒有圖形桌面"}`));
@@ -5676,6 +5691,29 @@ function machineSteps(n, info) {
 }
 
 /* ---------------------------------------------------------------- 主迴圈 */
+
+// 自動更新時只換內容有變的元素：沒變的原封不動（背景光暈的動畫不重播、按鈕不閃）。
+// 子元素數量或種類對不上、或元素裡直接夾著文字，就整個換掉，不去猜怎麼對應。
+// 留下來的元素：屬性換成新的（長條寬度這類只改 style 的），事件處理也換成新的
+// （按鈕的 onclick 抓著當時的資料，留舊的會用到過期的值，例如改名後再按一次改名帶出舊名稱）。
+const SWAP_HANDLERS = ["onclick", "onchange", "oninput", "onkeydown", "onsubmit"];
+function swapChanged(oldEl, newEl) {
+  const a = [...oldEl.children], b = [...newEl.children];   // 先拍下來：換掉時新元素會被搬走，活的清單會縮
+  const same = oldEl.outerHTML === newEl.outerHTML;
+  const pure = (x) => x.childNodes.length === x.children.length;
+  if (!same && (oldEl.tagName !== newEl.tagName || !a.length || a.length !== b.length || !pure(oldEl) || !pure(newEl))) {
+    oldEl.replaceWith(newEl);
+    return;
+  }
+  if (!same) {
+    // style 要走 CSSOM：CSP 不准 style 屬性，setAttribute("style") 寫得進去但瀏覽器不套用
+    [...oldEl.attributes].forEach((at) => { if (at.name !== "style" && !newEl.hasAttribute(at.name)) oldEl.removeAttribute(at.name); });
+    [...newEl.attributes].forEach((at) => { if (at.name !== "style" && oldEl.getAttribute(at.name) !== at.value) oldEl.setAttribute(at.name, at.value); });
+    if (oldEl.style.cssText !== newEl.style.cssText) oldEl.style.cssText = newEl.style.cssText;
+  }
+  SWAP_HANDLERS.forEach((h) => { if (oldEl[h] !== newEl[h]) oldEl[h] = newEl[h]; });
+  a.forEach((x, i) => swapChanged(x, b[i]));
+}
 
 // 資料更新造成的重畫：不播動畫、捲動位置不動。使用者按導覽切頁才走 render()。
 function quietRender() {

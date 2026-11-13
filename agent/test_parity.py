@@ -250,6 +250,31 @@ def main():
         eq("  只回怎麼操作", A.machine_info()["desktop"], {"how": "helper", "why": None})
     finally:
         A.desktop_route = real_route
+    mm = A.registry()["machine"].get("memory_model", "discrete")
+    A.desktop_route = lambda: (None, "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）")
+    try:
+        code, out = A.save_machine({"memory_model": mm, "desktop_enabled": True})
+        case("不能操作桌面的機器：打開「操作電腦」→ 400，講原因", code == 400 and "圖形桌面" in out.get("error", ""), (code, out))
+        case("  登錄檔沒有被打開", not A.registry()["machine"].get("desktop_enabled"))
+        eq("  關掉照樣可以存", A.save_machine({"memory_model": mm, "desktop_enabled": False})[0], 200)
+    finally:
+        A.desktop_route = real_route
+    # Windows：小幫手的設定檔留著、但程式已經不在（登出或當掉）→ 要實際問一次，不能只看設定檔
+    A.desktop_route = lambda: ("helper", (1, "STALE-TOKEN"))
+    try:
+        code, out = A.save_machine({"memory_model": mm, "desktop_enabled": True})
+        case("桌面小幫手的設定檔還在但程式沒在跑：打開 → 400", code == 400 and "小幫手" in out.get("error", ""), (code, out))
+    finally:
+        A.desktop_route = real_route
+    A.desktop_route = lambda: ("direct", None)
+    try:
+        code, out = A.save_machine({"memory_model": mm, "desktop_enabled": True})
+        case("能操作桌面的機器：打開照常", code == 200 and A.registry()["machine"].get("desktop_enabled") is True, (code, out))
+        A.desktop_route = lambda: (None, "沒有桌面")
+        eq("  已經打開的、後來桌面不見了：存其他設定不會被擋", A.save_machine({"memory_model": mm, "desktop_enabled": True})[0], 200)
+        A.save_machine({"memory_model": mm, "desktop_enabled": False})
+    finally:
+        A.desktop_route = real_route
     case("save_machine 在登錄檔鎖底下（不會蓋掉同時進來的更新）", hasattr(A.save_machine, "__wrapped__")
          and not hasattr(A.check_mirror, "__wrapped__"))
     saved = (A.OS, A.gpu_override, A.has_nvidia, A.platform_machine, A.sh)

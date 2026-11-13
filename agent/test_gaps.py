@@ -555,5 +555,102 @@ A.sd_output_check, A._gen_sample, A._sd_jobs_save = real_chk, real_sample, real_
 A.GEN_DIR = real_gen
 shutil.rmtree(chk, ignore_errors=True)
 
+# ---- 用量計數：llama.cpp 欄位也要算（以前只認得 Strata 的記錄格式，llama.cpp 機器永遠是 0）
+# 記錄是 llama.cpp 實際印的格式（某一版 llama-server 的輸出原樣）：一個請求從 launch 到 release，
+# 中間每 3 秒一行 n_gen 進度，完成時印 prompt eval／eval／total time，最後 release 帶 n_tokens（整段上下文）
+LLAMA_REQ = """5.01.604.365 I slot launch_slot_: id  0 | task {t} | processing task, is_child = 0
+5.07.612.382 I slot print_timing: id  0 | task {t} | n_gen =    142, tg =  46.83 t/s, tg_3s =  47.16 t/s
+5.17.964.855 I slot print_timing: id  0 | task {t} | prompt eval time =    2997.43 ms /   {p} tokens (    5.51 ms per token,   181.49 tokens per second)
+5.17.964.879 I slot print_timing: id  0 | task {t} |        eval time =   13363.64 ms /   {g} tokens (   22.31 ms per token,    44.82 tokens per second)
+5.17.964.883 I slot print_timing: id  0 | task {t} |       total time =   16361.07 ms /  1144 tokens
+5.17.965.036 I slot      release: id  0 | task {t} | stop processing: n_tokens = {n}, truncated = 0
+"""
+reg = A.registry()
+reg["slots"] = [x for x in reg["slots"] if x.get("id") != "cnt"] + [{"id": "cnt", "role": "計數", "kind": "llama", "unit": "xc-cnt-llama.service"}]
+A.save_json(A.REGISTRY, reg)
+lg = A.engine_file("cnt", "-llama.log")
+with open(lg, "w") as fh:
+    fh.write("main: server is listening on http://0.0.0.0:8080\n")
+    fh.write(LLAMA_REQ.format(t=1256, p=544, g=600, n=1457) + LLAMA_REQ.format(t=1860, p=517, g=600, n=1457))
+    fh.write(LLAMA_REQ.format(t=2464, p=5, g=600, n=1457).split("5.17.964.855")[0])      # 第三個還在跑
+c = A.counters()["slots"].get("cnt")
+# 上下文 1457 = 提示 857 + 生成 600；提示裡新算的是 prompt eval 那一段，其餘是沿用快取
+eq("llama.cpp 欄位：完成的請求、提示、沿用、生成都有算到", c, {"requests": 2, "prompt": 1714, "reused": 653, "generated": 1200})
+with open(lg, "a") as fh:
+    fh.write(LLAMA_REQ.format(t=2464, p=5, g=600, n=1457).split("is_child = 0\n", 1)[1])
+eq("  還在跑的那個寫完之後下一次才算（不重複、不漏）", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
+eq("  沒有新請求：數字不變", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
+
+# 只有生成進度（n_gen）一直長、還沒有請求完成：讀取位置照樣往前，不會每次都從頭重讀整個檔
+with open(lg, "a") as fh:
+    fh.write(LLAMA_REQ.format(t=3000, p=40, g=50, n=1000).split("5.17.964.855")[0] * 50)
+A.counters()
+eq("  只有進度行：讀取位置也推到檔尾", A.load_json(A.COUNTERS, {})["cnt"]["cursors"][lg]["offset"], os.path.getsize(lg))
+# 記錄輪替（copytruncate）切在計時與 release 之間：沒寫完的請求跟著狀態存下來，接得起來
+done_part = LLAMA_REQ.format(t=3000, p=40, g=50, n=1000).split("is_child = 0\n", 1)[1]
+timing, release = done_part.rsplit("5.17.965.036", 1)
+with open(lg, "a") as fh:
+    fh.write(timing)
+A.counters()
+with open(lg, "w") as fh:
+    fh.write("5.17.965.036" + release)
+c = A.counters()["slots"]["cnt"]
+eq("  輪替切在請求中間：release 在新檔也照算，沿用與生成都對",
+   (c["requests"], c["prompt"], c["reused"], c["generated"]), (4, 1714 + 857 + 950, 653 + 852 + 910, 1800 + 50))
+# 換引擎再換回來：每個記錄檔各自記讀到哪；第一次讀的檔從檔尾開始，以前的歷史不算進來
+slog = os.path.join(A.STATE_DIR, "cnt-strata.log")
+SREQ = "serve: prompt 100 tokens = 60 reused + 40 read in 10.0 ms (1000.0 tok/s), 20 generated\n"
+with open(slog, "w") as fh:
+    fh.write(SREQ * 5)
+reg = A.registry()
+for x in reg["slots"]:
+    if x["id"] == "cnt":
+        x.update(kind="strata", log=slog)
+A.save_json(A.REGISTRY, reg)
+eq("  換成 Strata：那個檔以前的 5 筆不算", A.counters()["slots"]["cnt"]["requests"], 4)
+with open(slog, "a") as fh:
+    fh.write(SREQ)
+eq("    之後新的照算", A.counters()["slots"]["cnt"]["requests"], 5)
+for x in reg["slots"]:
+    if x["id"] == "cnt":
+        x["kind"] = "llama"
+A.save_json(A.REGISTRY, reg)
+eq("  換回 llama.cpp：llama 記錄檔以前讀過的不重算", A.counters()["slots"]["cnt"]["requests"], 5)
+
+# ---- 下載紀錄：檔案後來被刪了，不能還寫「完成」（現場：816B 的資料夾早就不在，清單照寫完成）
+A.downloads_list()
+fold = "gonetest--Model"
+with A._DL_LOCK:
+    A._DL["g0ne0001"] = {"id": "g0ne0001", "repo": "gonetest/Model-GGUF", "stem": "Q4_K_M", "folder": fold,
+                         "files": ["Model-Q4_K_M.gguf"], "total": 1, "done": 1, "state": "done", "created": 1, "error": None}
+row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
+case("下載完成但資料夾不在：標成檔案已刪除", row.get("gone") == "all", row)
+os.makedirs(os.path.join(A.gguf_root(), fold), exist_ok=True)
+open(os.path.join(A.gguf_root(), fold, "Model-Q4_K_M.gguf"), "wb").close()
+row = next(j for j in A.downloads_list() if j["id"] == "g0ne0001")
+case("  檔案還在：不標", not row.get("gone"), row)
+eq("  檔案都在：沒有 gone", next(j for j in A.downloads_list() if j["id"] == "g0ne0001").get("gone"), None)
+with A._DL_LOCK:
+    A._DL["g0ne0001"]["files"] = ["Model-Q4_K_M.gguf", "Model-Q4_K_M-00002-of-00002.gguf"]
+eq("  分片少了一個：標成不完整（模型不能用）", next(j for j in A.downloads_list() if j["id"] == "g0ne0001").get("gone"), "some")
+# 舊紀錄沒存 dest、存放區後來改了：檔案在其他模型資料夾找得到就不標
+other = tempfile.mkdtemp(prefix="xc-otherdir-")
+os.makedirs(os.path.join(other, "legacy--Old"))
+open(os.path.join(other, "legacy--Old", "Old-Q4.gguf"), "wb").close()
+reg = A.registry()
+reg["machine"]["model_dirs"] = [other]
+A.save_json(A.REGISTRY, reg)
+with A._DL_LOCK:
+    A._DL["legacy01"] = {"id": "legacy01", "repo": "legacy/Old-GGUF", "stem": "Q4", "folder": "legacy--Old",
+                         "files": ["Old-Q4.gguf"], "total": 1, "done": 1, "state": "done", "created": 2, "error": None}
+eq("  舊紀錄（沒存位置）在其他模型資料夾找得到：不標", next(j for j in A.downloads_list() if j["id"] == "legacy01").get("gone"), None)
+reg["machine"]["model_dirs"] = []
+A.save_json(A.REGISTRY, reg)
+eq("  哪裡都找不到才標", next(j for j in A.downloads_list() if j["id"] == "legacy01").get("gone"), "all")
+with A._DL_LOCK:
+    A._DL.pop("legacy01", None)
+with A._DL_LOCK:
+    A._DL.pop("g0ne0001", None)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)

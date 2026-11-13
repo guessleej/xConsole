@@ -2137,7 +2137,8 @@ def _no_key_blocked(port):
     return st == 401, st
 
 
-def api_info(slot_id):
+def api_info(slot_id, brief=False):
+    """brief：API 串接清單頁只要網址、模型名與實測結果，不算執行設定（那一段要對每種上下文試算准入，最慢）。"""
     slot = _slot(slot_id)
     if not slot or not slot.get("unit"):
         return 404, {"error": "沒有這個欄位"}
@@ -2176,7 +2177,7 @@ def api_info(slot_id):
         "tools": True if strata else None,
         "vision": any(m["vision"] for m in served),
         "last_test": slot.get("api_last_test"),
-        "run": run_options(slot, raw) if llama else None,
+        "run": run_options(slot, raw) if llama and not brief else None,
     }
 
 
@@ -2190,10 +2191,11 @@ def run_options(slot, raw):
     par = int(cfg.get("parallel") or 1)
     top = prof.get("ctx_train") or max(RUN_CTX)
     out = []
+    reg, hw = registry(), hardware()          # 五種上下文共用同一份硬體量測：每次重查 GPU 與服務狀態要好幾秒
     for ctx in [c for c in RUN_CTX if c <= top] or [min(RUN_CTX)]:
         per = (prof.get("kv_full_bpt", 0) + prof.get("kv_swa_bpt", 0) * min(1.0, (prof.get("swa_window") or ctx) / ctx)) if prof else None
         what = {**cfg, "max_context": ctx, **({"kv_bytes_per_cell": int(per)} if per else {})}
-        v = admit(slot["id"], cfg_override=what)
+        v = admit(slot["id"], reg=reg, hw=hw, cfg_override=what)
         worst = min([d.get("worst") for d in (v.get("pools") or {}).values() if isinstance(d, dict) and "worst" in d] or [None],
                     key=lambda x: x if x is not None else 1e9)
         out.append({"ctx": ctx, "kv_gib": round(llama_kv_gib(prof, ctx, par), 2) if prof else None, "allow": v["allow"],
@@ -2203,7 +2205,7 @@ def run_options(slot, raw):
     real = os.path.realpath(raw.get("model") or "")
     store = max((x for x in storage_choices() if real.startswith(x["mount"].rstrip("/\\") + os.sep) or real == x["mount"]),
                 key=lambda x: len(x["mount"]), default=None)
-    lay = _run_layout(slot, raw, prof, size, int(cfg.get("max_context") or raw.get("ctx") or 4096), par)
+    lay = _run_layout(slot, raw, prof, size, int(cfg.get("max_context") or raw.get("ctx") or 4096), par, hw)
     mm = registry()["machine"].get("memory_model", "discrete")
     return {"options": out, "ctx_train": prof.get("ctx_train"), "size_gib": round(size, 1), "load_sec": load,
             "split": lay["split"] if lay else None, "mode": lay["mode"] if lay else None,
@@ -2226,16 +2228,17 @@ def run_options(slot, raw):
             "thinking_supported": bool(reasoning_args(raw["exe"], "off")) if raw.get("exe") else False}
 
 
-def _run_layout(slot, raw, prof, size_gib, ctx, par):
+def _run_layout(slot, raw, prof, size_gib, ctx, par, hw=None):
     """執行設定頁的分層：照目前這台剩下的記憶體試算一般放法；放不下而且這台允許，再試用硬碟的放法。"""
     if not raw.get("model") or not size_gib or not prof:
         return None
     reg = registry()
     m = {**prof, "size_gib": size_gib, "mmproj_gib": round(os.path.getsize(raw["mmproj"]) / GIB, 2)
          if raw.get("mmproj") and os.path.exists(raw["mmproj"]) else 0.0}
-    p = pools(reg, hardware())
+    hw = hw if hw is not None else hardware()
+    p = pools(reg, hw)
     cards = p["gpus"]
-    back_v, back_r = _usage_reclaim(slot) if _alive(slot) else (0.0, 0.0)
+    back_v, back_r = _usage_reclaim(slot, hw) if _alive(slot) else (0.0, 0.0)
     lay = llama_layout(m, reg["machine"], cards, slot.get("gpu_ids"), ctx, par, back_v)
     mm = reg["machine"].get("memory_model", "discrete")
     if mm == "unified_single":
@@ -4008,10 +4011,10 @@ def wait_vram_released(before_gib, expect_gib, seconds=60):
     return False
 
 
-def _usage_reclaim(old_slot):
+def _usage_reclaim(old_slot, hw=None):
     """切換引擎時，舊引擎占的量要算成「會被釋放」。用舊欄位的原樣去量。"""
     reg = registry()
-    hw = hardware()
+    hw = hw if hw is not None else hardware()
     # 量「換之前」的樣子：換模型時登錄檔裡這個欄位已經先寫成新模型的預估，沒綁卡時顯存是照各欄位的預估比例分攤，
     # 分母若用新的、分子用舊的，舊模型會釋出的量就被少算（128B 換 118B 時 93.1 GiB 只算成 80.6，誤擋下來）
     probe = dict(old_slot)
@@ -4150,8 +4153,33 @@ def downloads_list():
                 j["state"] = "interrupted"                 # 代理重啟過；.part 還在，重新下載會接續
             _DL[j["id"]] = j
     with _DL_LOCK:
-        return sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
+        rows = sorted(({k: v for k, v in j.items() if not k.startswith("_")} for j in _DL.values()),
                       key=lambda j: -j["created"])[:20]
+    for j in rows:
+        gone = _dl_gone(j) if j.get("state") == "done" else None
+        if gone:
+            j["gone"] = gone                        # 下載完成後檔案被刪了（全部或一部分）：不能還寫「完成」
+    return rows
+
+
+def _dl_gone(j):
+    """完成的下載，檔案還在不在："all" 全都不在、"some" 少了幾個（分片或畫圖模型的元件不齊、不能用）、None 都在。
+    新紀錄存了 dest；舊紀錄沒存，存放區可能改過，所以目前的存放區與其他模型資料夾都找一遍，任何一處齊全就不標。"""
+    try:
+        if j.get("dest"):
+            dests = [j["dest"]]
+        elif j.get("folder") == "sd":
+            dests = [sd_root(registry())]
+        else:
+            dests = [inside(r, j["folder"]) for r in [gguf_root()] + [expand(d) for d in model_dirs()]]
+        files = j.get("files") or []
+        if not files:
+            return None
+        missing = min(sum(not os.path.exists(os.path.join(d, f[2], f[3]) if isinstance(f, list) else os.path.join(d, os.path.basename(f)))
+                          for f in files) for d in dests)
+    except (KeyError, ValueError, IndexError, TypeError):
+        return None
+    return None if not missing else "all" if missing == len(files) else "some"
 
 
 def _hf_file_url(repo, path):
@@ -4505,7 +4533,7 @@ def start_download(repo, stem, mmproj=None, token=""):
             return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
         jid = secrets.token_hex(4)
         files = pick["files"] + ([mmproj] if mmproj else [])
-        _DL[jid] = {"id": jid, "repo": repo, "stem": stem, "folder": folder, "files": files,
+        _DL[jid] = {"id": jid, "repo": repo, "stem": stem, "folder": folder, "files": files, "dest": dest,
                     "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
                     "_token": token, "_cancel": False}
     threading.Thread(target=_download_job, args=(jid, dest), daemon=True).start()
@@ -6347,6 +6375,16 @@ def save_machine(body):
         if not isinstance(body["desktop_enabled"], bool):
             return 400, {"error": "操作電腦要是 true 或 false"}
         if body["desktop_enabled"]:
+            if not m.get("desktop_enabled"):
+                # 只擋「從關到開」：已經開著的機器桌面暫時不在（例如沒人登入），存其他設定不能被擋
+                how, why = desktop_route()
+                if how is None:
+                    return 400, {"error": f"這台不能操作桌面：{why}"}
+                if how == "helper":
+                    # 小幫手的設定檔在程式結束後還會留著：實際問一次，問不到就不給開
+                    code, _ = desktop_call("GET", "/desktop/info", timeout=5)
+                    if code != 200:
+                        return 400, {"error": "這台不能操作桌面：桌面小幫手沒有在執行，請用要操作的那個帳號登入這台的桌面"}
             m["desktop_enabled"] = True
         else:
             m.pop("desktop_enabled", None)
@@ -7030,41 +7068,90 @@ REQ_RX = re.compile(r"serve: prompt (\d+) tokens = (\d+) reused \+ \d+ read in [
                     r"\([\d.]+ tok/s\), (\d+) generated")
 
 
+# llama.cpp 每個請求完成時印 prompt eval／eval 兩行，release 那一行帶整段上下文的 token 數
+LLAMA_PROMPT_RX = re.compile(r"task (\d+) \| prompt eval time = +[\d.]+ ms / +(\d+) tokens")
+LLAMA_EVAL_RX = re.compile(r"task (\d+) \| +eval time = +[\d.]+ ms / +(\d+) tokens")
+LLAMA_DONE_RX = re.compile(r"task (\d+) \| stop processing: n_tokens = (\d+)")
+COUNTER_READ_MAX = 64 << 20          # 一次最多讀 64 MiB：第一次讀到很大的舊記錄檔時分幾次讀完，記憶體不跟著檔案長
+
+
+def _llama_requests(text, pending):
+    """llama.cpp 記錄 → [(提示 token、沿用快取、生成)]，以及還沒寫完的請求（下次接著用）。
+    一個請求的幾行可能被兩次讀取、甚至記錄輪替切開，所以沒等到 release 的先記在 pending，跟著計數狀態一起存。"""
+    pending = dict(pending or {})
+    out = []
+    for line in text.splitlines():
+        m = LLAMA_PROMPT_RX.search(line)
+        if m:
+            pending.setdefault(m.group(1), [None, 0])[0] = int(m.group(2))
+            continue
+        m = LLAMA_EVAL_RX.search(line)
+        if m:
+            pending.setdefault(m.group(1), [None, 0])[1] = int(m.group(2))
+            continue
+        m = LLAMA_DONE_RX.search(line)
+        if m:
+            fresh, gen = pending.pop(m.group(1), [None, 0])
+            prompt = max(int(m.group(2)) - gen, fresh or 0)      # 整段上下文扣掉生成的就是提示
+            # 沒讀到新算多少（那幾行不見了）就不猜沿用：整段當新算，寧可少算沿用
+            out.append((prompt, prompt - fresh if fresh is not None else 0, gen))
+    # 只留最近的幾個：請求中斷沒印 release 的不會一直累積
+    return out, dict(list(pending.items())[-64:])
+
+
 def counters():
     """引擎每處理一個請求寫一行記錄，但那一行沒有時間戳——
     所以「本期處理多少 token」不能事後從記錄切。這裡把每個欄位的處理量一路累計，
     主控台每 5 分鐘取一次，兩次的差就是那段時間的量。
-    只讀上次讀到之後新增的部分；記錄被輪替（inode 變了或檔案變小）就從頭讀。"""
+    每個記錄檔各有自己的讀取位置：欄位換引擎（Strata ↔ llama.cpp）再換回來，不會把舊記錄重算一次；
+    換到一個第一次讀的記錄檔時從檔尾開始，那個檔以前的歷史不算進本期。
+    記錄被輪替（inode 變了或檔案變小）就從頭讀。"""
     reg = registry()
     state = load_json(COUNTERS, {})
     out = {}
     for slot in reg["slots"]:
-        log = slot.get("log")
+        sid = slot.get("id") or ""
+        llama = slot.get("kind") == "llama"
+        # llama.cpp 欄位的記錄檔固定在引擎目錄（服務的 StandardOutput 或代理看管時寫進去的那個）
+        log = engine_file(sid, "-llama.log") if llama and SAFE_ID_RX.fullmatch(sid) else slot.get("log")
         if not log or not os.path.exists(log):
             continue
-        st = state.get(slot["id"]) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
+        new_slot = sid not in state
+        st = state.get(sid) or {"requests": 0, "prompt": 0, "reused": 0, "generated": 0}
+        curs = st.setdefault("cursors", {})
+        if "inode" in st:
+            # 舊格式只有一組讀取位置，屬於當時讀的那個檔（Strata 的記錄）
+            old = {"inode": st.pop("inode"), "offset": st.pop("offset", 0)}
+            if slot.get("log"):
+                curs.setdefault(slot["log"], old)
         try:
             info = os.stat(log)
         except OSError:
             continue
-        if st.get("inode") != info.st_ino or info.st_size < st.get("offset", 0):
-            st["offset"] = 0
-            st["inode"] = info.st_ino
+        cur = curs.get(log)
+        if cur is None:
+            cur = curs[log] = {"inode": info.st_ino, "offset": 0 if new_slot else info.st_size}
+        if cur.get("inode") != info.st_ino or info.st_size < cur.get("offset", 0):
+            cur["offset"] = 0                         # 輪替：pending 留著，切在兩個檔之間的請求照樣接得起來
+            cur["inode"] = info.st_ino
         with open(log, "rb") as fh:
-            fh.seek(st["offset"])
-            chunk = fh.read()
+            fh.seek(cur["offset"])
+            chunk = fh.read(COUNTER_READ_MAX)
         # 最後一行可能還沒寫完：只吃到最後一個換行為止，剩下的下次再讀
         cut = chunk.rfind(b"\n") + 1
-        for line in chunk[:cut].decode("utf-8", "replace").splitlines():
-            m = REQ_RX.search(line)
-            if m:
-                st["requests"] += 1
-                st["prompt"] += int(m.group(1))
-                st["reused"] += int(m.group(2))
-                st["generated"] += int(m.group(3))
-        st["offset"] += cut
-        state[slot["id"]] = st
-        out[slot["id"]] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
+        text = chunk[:cut].decode("utf-8", "replace")
+        if llama:
+            reqs, cur["pending"] = _llama_requests(text, cur.get("pending"))
+        else:
+            reqs = [(int(m.group(1)), int(m.group(2)), int(m.group(3))) for m in map(REQ_RX.search, text.splitlines()) if m]
+        for prompt, reused, gen in reqs:
+            st["requests"] += 1
+            st["prompt"] += prompt
+            st["reused"] += reused
+            st["generated"] += gen
+        cur["offset"] += cut
+        state[sid] = st
+        out[sid] = {k: st[k] for k in ("requests", "prompt", "reused", "generated")}
     save_json(COUNTERS, state)
     return {"ts": time.time(), "slots": out}
 
@@ -7456,7 +7543,7 @@ def sd_download(spec, token=""):
             return 409, {"error": "已經有一個下載在進行，一次只下載一個，避免把網路與磁碟塞滿"}
         jid = secrets.token_hex(4)
         _DL[jid] = {"id": jid, "repo": spec["parts"][0]["repo"], "stem": spec["quant"] or spec["title"],
-                    "title": spec["title"], "folder": "sd", "files": todo, "sd_model": spec["id"],
+                    "title": spec["title"], "folder": "sd", "files": todo, "sd_model": spec["id"], "dest": root,
                     "total": 0, "done": 0, "state": "queued", "created": int(time.time()), "error": None,
                     "_token": token, "_cancel": False}
     threading.Thread(target=_download_job, args=(jid, root), daemon=True).start()
@@ -8227,9 +8314,9 @@ class Handler(BaseHTTPRequestHandler):
             if m.group(2) or m.group(4):
                 return self._send(*sd_output(m.group(1), int(m.group(3) or 0), init=bool(m.group(4))))
             return self._send(*sd_job(m.group(1)))
-        m = re.fullmatch(r"/apiinfo/([\w.-]+)", path)
+        m = re.fullmatch(r"/apiinfo/([\w.-]+)(/brief)?", path)
         if m:
-            code, out = api_info(m.group(1))
+            code, out = api_info(m.group(1), brief=bool(m.group(2)))
             return self._send(code, out)
         m = re.fullmatch(r"/catalog/([\w.-]+)", path)
         if m:

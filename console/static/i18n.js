@@ -45,14 +45,25 @@ async function i18nInit() {
     if (!res.ok) throw new Error(String(res.status));
     dict = await res.json();
   } catch (_) { I18N.lang = "zh-TW"; return; }       // 字典讀不到就照原文，不擋畫面
+  i18nLoad(dict);
+}
+
+// 字典 → 整句對照、樣板、片段（測試也直接呼叫這一支，不另外抄一份）
+function i18nLoad(dict) {
   I18N.exact = new Map();
+  I18N.patterns = [];
   const pieces = [];
   for (const [zh, tr] of Object.entries(dict)) {
     if (!tr) continue;
     if (/\{\d+\}/.test(zh)) {
       // 樣板：{n} 換成擷取群組；翻好的那句裡的 {n} 照編號放回
       const names = [];
-      const rx = new RegExp("^" + reEsc(zh).replace(/\\\{(\d+)\\\}/g, (_, d) => { names.push(Number(d)); return "([\\s\\S]+?)"; }) + "$");
+      // 句尾的佔位可以是空的：程式常在句尾接一段可有可無的補充（例「剩 84 GiB」後面的「，固態硬碟」）
+      const esc = reEsc(zh);
+      const rx = new RegExp("^" + esc.replace(/\\\{(\d+)\\\}/g, (m, d, at) => {
+        names.push(Number(d));
+        return at + m.length === esc.length ? "([\\s\\S]*?)" : "([\\s\\S]+?)";
+      }) + "$");
       I18N.patterns.push({ rx, names, tr, len: zh.length });
     } else {
       I18N.exact.set(zh, tr);
@@ -67,8 +78,13 @@ async function i18nInit() {
 
 // 使用者與伺服器給的資料（機器名、對話標題、模型、資料夾、設定檔、角色…）不是介面文字，不翻：
 // 主控台每次拿到回應就把這些欄位的值記下來；翻譯時整段相同就不動，句子裡夾著的也原樣保留
-const I18N_DATA_KEYS = new Set(["name", "title", "role", "label", "model", "path", "folder", "goal", "note", "profile",
-  "user", "username", "subject", "display_name", "alias"]);
+// label 不算：伺服器回的 label 都是程式產生的介面字（分層長條的「顯示卡」「系統記憶體」、埠的用途），沒有使用者自己填的
+// node／slot：使用報告裡的機器名與欄位名（管理者取的）
+const I18N_DATA_KEYS = new Set(["name", "title", "role", "model", "path", "folder", "goal", "note", "profile",
+  "user", "username", "subject", "display_name", "alias", "node", "slot"]);
+
+// 兩段各自翻譯的文字接在一起時中間的分隔：英文、韓文要空格，中文、日文不用
+const i18nGap = () => document.createTextNode(I18N.lang === "en" || I18N.lang === "ko" ? " " : "");
 
 function i18nData(obj) {
   if (I18N.lang === "zh-TW") return;                // 字典還沒載入也先記：之後才畫的畫面一樣要擋
@@ -116,6 +132,15 @@ function i18nText(s) {
     const t = I18N.exact.get(m);
     return t == null ? m : (I18N.lang === "en" ? ` ${t} ` : t);
   }).replace(/ {2,}/g, " ");
+}
+
+// 伺服器產生、但放在 note 這類資料欄位裡的介面字（例：使用報告的「取樣自 … 起才開始收集」）：明確要翻
+function i18nUi(s) {
+  if (!I18N.exact || typeof s !== "string") return s;
+  const keep = [I18N.data, I18N.dataRe];
+  I18N.data = null;
+  I18N.dataRe = null;
+  try { return i18nText(s); } finally { [I18N.data, I18N.dataRe] = keep; }
 }
 
 function i18nNode(root) {

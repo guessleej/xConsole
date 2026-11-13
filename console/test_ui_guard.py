@@ -106,5 +106,11 @@ for ch in css:
 check("style.css 的大括號成對", depth == 0 and low == 0, f"結尾深度 {depth}、最低 {low}")
 check("登入錯誤是紅底整塊，壓過 .login-card p 的灰色小字", bool(re.search(r"\.login-card \.login-err\s*\{[^}]*background", CSS)))
 
+# ---- 6. 大小一律 GiB：程式算的是 GiB，畫面寫成 GB 會讓同一顆模型在兩頁看起來不一樣大（2026-11-13 現場回報）
+JS = "".join(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", f), encoding="utf-8").read()
+             for f in ("app.js", "pages.js", "chat.js"))
+gb = re.findall(r"\$\{[^}]*\}\)?\s*GB(?!/s)", JS)
+check("畫面上的大小單位一律 GiB（沒有「${…} GB」）", not gb, gb[:5])
+
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)

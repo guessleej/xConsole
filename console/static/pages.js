@@ -210,6 +210,17 @@ function viewHome() {
         .then(([, lib]) => { S.rec[n.id].lib = lib; if (S.view === "home") quietRender(); }).catch(() => {});
     }
   }
+  const old = main.children;
+  if (S.quiet && old.length === 2 && old[0].matches("section.hero")) {
+    // 自動更新：主視覺區與下面的卡片只換有變的部分（每 15 秒整塊換新，光暈動畫會一直重來）
+    reveal(hero);
+    reveal(wrap);
+    // 第一次進場留下的 rv／in／d1～d4 拿掉，新畫的那份在安靜模式下本來就沒有：不然 class 不同，每張卡都被當成有變
+    [old[0], old[1]].forEach((r) => [r, ...r.querySelectorAll(".rv, .in")].forEach((x) => x.classList.remove("rv", "in", "d1", "d2", "d3", "d4")));
+    swapChanged(old[1], wrap);
+    swapChanged(old[0], hero);
+    return;
+  }
   main.textContent = "";
   main.append(hero, wrap);
   reveal(main);

@@ -87,6 +87,11 @@ jobs:
         run: python test/test_llama_engine.py
       - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
         run: python test/test_machine_admin.py
+      - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.65.0
+          python -m playwright install --with-deps chromium
+          python test/test_ui_browser.py
 
   # ── 1. SAST ────────────────────────────────────────────────
   codeql:

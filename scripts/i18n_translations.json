@@ -19524,6 +19524,1076 @@
 "ja": "外部 URL の形式が正しくありません。例：http://ai.example.com:8081/v1",
 "ko": "외부 URL 형식이 올바르지 않습니다. 예: http://ai.example.com:8081/v1"
 },
+"連不到主控台，請確認網路，或防火牆有沒有放行這台電腦（錯誤碼 NET）": {
+"en": "Cannot reach the console. Check the network, or whether the firewall allows this computer (error code NET)",
+"ja": "コンソールに接続できません。ネットワーク、またはファイアウォールがこのコンピューターを許可しているか確認してください（エラーコード NET）",
+"ko": "콘솔에 연결할 수 없습니다. 네트워크 또는 방화벽이 이 컴퓨터를 허용하는지 확인하세요 (오류 코드 NET)"
+},
+"帳號或密碼不對（錯誤碼 401）。登入已暫停，請 15 分鐘後再試": {
+"en": "Incorrect username or password (error code 401). Sign-in is paused; try again in 15 minutes",
+"ja": "ユーザー名またはパスワードが違います（エラーコード 401）。ログインは一時停止中です。15 分後に再試行してください",
+"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401). 로그인이 일시 중지되었습니다. 15분 후 다시 시도하세요"
+},
+"帳號或密碼不對（錯誤碼 401）": {
+"en": "Incorrect username or password (error code 401)",
+"ja": "ユーザー名またはパスワードが違います（エラーコード 401）",
+"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401)"
+},
+"。再錯 {0} 次會暫停登入 15 分鐘": {
+"en": ". {0} more failed attempts will pause sign-in for 15 minutes",
+"ja": "。あと {0} 回失敗するとログインが 15 分間停止されます",
+"ko": ". {0}번 더 실패하면 로그인이 15분간 중지됩니다"
+},
+"再錯": {
+"en": "More failures:",
+"ja": "あと失敗",
+"ko": "추가 실패"
+},
+"次會暫停登入 15 分鐘": {
+"en": "will pause sign-in for 15 minutes",
+"ja": "回でログインが 15 分間停止されます",
+"ko": "번이면 로그인이 15분간 중지됩니다"
+},
+"{0}（錯誤碼 {1}）": {
+"en": "{0} (error code {1})",
+"ja": "{0}（エラーコード {1}）",
+"ko": "{0} (오류 코드 {1})"
+},
+"錯誤碼": {
+"en": "Error code",
+"ja": "エラーコード",
+"ko": "오류 코드"
+},
+"登入中…": {
+"en": "Signing in…",
+"ja": "ログイン中…",
+"ko": "로그인 중…"
+},
+"現在執行 {0}": {
+"en": "Running {0}",
+"ja": "実行中 {0}",
+"ko": "실행 중 {0}"
+},
+"現在執行 {0}{1}": {
+"en": "Running {0}{1}",
+"ja": "実行中 {0}{1}",
+"ko": "실행 중 {0}{1}"
+},
+"（整機用量）": {
+"en": " (whole-machine usage)",
+"ja": "（マシン全体の使用量）",
+"ko": " (전체 기기 사용량)"
+},
+"沒有回答": {
+"en": "No answer",
+"ja": "応答なし",
+"ko": "응답 없음"
+},
+"服務還開著、模型清單也回得來，但請它生字回錯誤（{0}）：{1}。通常是 GPU 重置過，按「重新啟動」多半就好了。": {
+"en": "The service is running and the model list responds, but asking it to generate returned an error ({0}): {1}. This usually means the GPU was reset; pressing \"Restart\" normally fixes it.",
+"ja": "サービスは動作しておりモデル一覧も返りますが、生成させるとエラーが返ります（{0}）：{1}。多くは GPU がリセットされたためで、「再起動」を押せばたいてい直ります。",
+"ko": "서비스는 켜져 있고 모델 목록도 응답하지만, 생성을 요청하면 오류가 반환됩니다({0}): {1}. 대개 GPU가 리셋된 경우이며 \"다시 시작\"을 누르면 보통 해결됩니다."
+},
+"服務還開著、模型清單也回得來，但請它生字回錯誤": {
+"en": "The service is running and the model list responds, but asking it to generate returned an error",
+"ja": "サービスは動作しておりモデル一覧も返りますが、生成させるとエラーが返ります",
+"ko": "서비스는 켜져 있고 모델 목록도 응답하지만, 생성을 요청하면 오류가 반환됩니다"
+},
+"通常是 GPU 重置過，按「重新啟動」多半就好了": {
+"en": "This usually means the GPU was reset; pressing \"Restart\" normally fixes it",
+"ja": "多くは GPU がリセットされたためで、「再起動」を押せばたいてい直ります",
+"ko": "대개 GPU가 리셋된 경우이며 \"다시 시작\"을 누르면 보통 해결됩니다"
+},
+"生不出字": {
+"en": "Not generating",
+"ja": "生成できない",
+"ko": "생성 불가"
+},
+"放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著": {
+"en": "Weights that do not fit in the GPU portion are held here as page cache, which can be dropped at any time; the KV cache and the engine itself cannot be dropped and are counted in admission. A watchdog monitors it while running",
+"ja": "GPU 側に入りきらない重みはここにページキャッシュとして置かれ、いつでも破棄できます。KV とエンジン本体は破棄できないため受け入れ判定に含めており、実行中はウォッチドッグが監視します",
+"ko": "GPU 쪽에 들어가지 않는 가중치는 여기에 페이지 캐시로 보관되며 언제든 버릴 수 있습니다. KV와 엔진 자체는 버릴 수 없어 승인 계산에 포함되며, 실행 중에는 워치독이 감시합니다"
+},
+"平常只給引擎用，模型不放這裡": {
+"en": "Normally used only by the engine; models are not placed here",
+"ja": "通常はエンジン専用で、モデルは置きません",
+"ko": "평소에는 엔진만 사용하며 모델은 두지 않습니다"
+},
+"這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：放不下的部分會經過系統那一小塊從 SSD 讀。": {
+"en": "This machine's memory is split in two by the BIOS (e.g. AI 395): whatever does not fit is read from the SSD through the small system portion.",
+"ja": "このマシンのメモリは BIOS で 2 つに分割されています（例：AI 395）。入りきらない部分はシステム側の小さな領域を経由して SSD から読み込みます。",
+"ko": "이 머신의 메모리는 BIOS에서 두 부분으로 나뉘어 있습니다(예: AI 395). 들어가지 않는 부분은 시스템 쪽 작은 영역을 거쳐 SSD에서 읽습니다."
+},
+"那是作業系統隨時可以丟掉的頁快取，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死。": {
+"en": "That is page cache the operating system can drop at any time, so it is never locked in; if the system portion is about to run out, the watchdog stops this model automatically so the machine does not freeze.",
+"ja": "これは OS がいつでも破棄できるページキャッシュで、占有されたままにはなりません。システム側が使い切られそうになると、ウォッチドッグがこのモデルを自動停止し、マシン全体が固まるのを防ぎます。",
+"ko": "이는 운영체제가 언제든 버릴 수 있는 페이지 캐시라 계속 점유되지 않습니다. 시스템 쪽이 거의 소진되면 워치독이 이 모델을 자동으로 중지해 머신 전체가 멈추지 않게 합니다."
+},
+"用硬碟執行時不會套用這幾個自訂引數：{0}（它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體）。": {
+"en": "These custom arguments are not applied when running from disk: {0} (they disable file mapping or lock memory, which would make the weights memory that cannot be dropped).",
+"ja": "ディスクから実行する場合、次のカスタム引数は適用しません：{0}（ファイルマッピングを無効にしたりメモリをロックしたりするため、重みが破棄できないメモリになります）。",
+"ko": "디스크에서 실행할 때는 다음 사용자 지정 인수를 적용하지 않습니다: {0}(파일 매핑을 끄거나 메모리를 잠가 가중치가 버릴 수 없는 메모리가 되기 때문입니다)."
+},
+"用硬碟執行時不會套用這幾個自訂引數": {
+"en": "These custom arguments are not applied when running from disk",
+"ja": "ディスクから実行する場合、次のカスタム引数は適用しません",
+"ko": "디스크에서 실행할 때는 다음 사용자 지정 인수를 적용하지 않습니다"
+},
+"它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體": {
+"en": "they disable file mapping or lock memory, which would make the weights memory that cannot be dropped",
+"ja": "ファイルマッピングを無効にしたりメモリをロックしたりするため、重みが破棄できないメモリになります",
+"ko": "파일 매핑을 끄거나 메모리를 잠가 가중치가 버릴 수 없는 메모리가 되기 때문입니다"
+},
+"搬進 GPU": {
+"en": "Copy to GPU",
+"ja": "GPU へ転送",
+"ko": "GPU로 전송"
+},
+"群組對齊出錯：": {
+"en": "Group alignment error: ",
+"ja": "グループの同期でエラー：",
+"ko": "그룹 맞춤 오류: "
+},
+"GPU 那一塊放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統那塊的頁快取": {
+"en": "{0} GiB in the GPU portion; the remaining {1} GiB stays memory-mapped in the system portion's page cache",
+"ja": "GPU 側に {0} GiB、残り {1} GiB はファイルマッピングでシステム側のページキャッシュに置きます",
+"ko": "GPU 쪽에 {0} GiB, 나머지 {1} GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
+},
+"GPU 那一塊放": {
+"en": "In the GPU portion:",
+"ja": "GPU 側に",
+"ko": "GPU 쪽에"
+},
+"GiB 以檔案映射留在系統那塊的頁快取": {
+"en": "GiB stays memory-mapped in the system portion's page cache",
+"ja": "GiB はファイルマッピングでシステム側のページキャッシュに置きます",
+"ko": "GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
+},
+"BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，放不下時當頁快取、從 SSD 補，跑的時候有看門狗盯著": {
+"en": "The BIOS splits memory in two: models go in the GPU portion; the system portion is only for the engine, and when a model does not fit it serves as page cache filled from the SSD, monitored by a watchdog while running",
+"ja": "BIOS がメモリを 2 つに分割しています。モデルは GPU 側に置き、システム側はエンジン専用です。入りきらない場合はページキャッシュとして SSD から補い、実行中はウォッチドッグが監視します",
+"ko": "BIOS가 메모리를 두 부분으로 나눕니다. 모델은 GPU 쪽에 두고 시스템 쪽은 엔진 전용입니다. 들어가지 않으면 페이지 캐시로 SSD에서 보충하며, 실행 중에는 워치독이 감시합니다"
+},
+"GPU 那一塊放 ": {
+"en": "In the GPU portion: ",
+"ja": "GPU 側に ",
+"ko": "GPU 쪽에 "
+},
+" GiB 以檔案映射留在系統那塊的頁快取": {
+"en": " GiB stays memory-mapped in the system portion's page cache",
+"ja": " GiB はファイルマッピングでシステム側のページキャッシュに置きます",
+"ko": " GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
+},
+"這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死": {
+"en": "This machine's memory is split in two by the BIOS (e.g. AI 395): expert layers that do not fit are read from the SSD through the small system portion. The OS can drop that page cache at any time, so it is never locked in; if the system portion is about to run out, the watchdog stops this model automatically so the machine does not freeze",
+"ja": "このマシンはメモリが BIOS で 2 つに分割されています（例：AI 395）。入りきらないエキスパート層はシステム側の小さな領域を経由して SSD から読み込みます。ページキャッシュは OS がいつでも破棄でき、占有されたままにはなりません。システム側が使い切られそうになると、ウォッチドッグがこのモデルを自動停止し、マシン全体が固まるのを防ぎます",
+"ko": "이 머신은 메모리가 BIOS에서 두 부분으로 나뉘어 있습니다(예: AI 395). 들어가지 않는 전문가 레이어는 시스템 쪽 작은 영역을 거쳐 SSD에서 읽습니다. 페이지 캐시는 운영체제가 언제든 버릴 수 있어 계속 점유되지 않으며, 시스템 쪽이 거의 소진되면 워치독이 이 모델을 자동으로 중지해 머신 전체가 멈추지 않게 합니다"
+},
+"等了 {0} 分鐘還沒載完，卡在「{1}」": {
+"en": "Still not loaded after {0} minutes; stuck at \"{1}\"",
+"ja": "{0} 分待ってもロードが終わらず、「{1}」で止まっています",
+"ko": "{0}분을 기다려도 로드가 끝나지 않았으며 \"{1}\" 단계에서 멈춰 있습니다"
+},
+"等了": {
+"en": "Waited",
+"ja": "待ち時間",
+"ko": "대기"
+},
+"分鐘還沒載完，卡在「": {
+"en": "minutes and still not loaded; stuck at \"",
+"ja": "分たってもロードが終わらず、「",
+"ko": "분이 지나도 로드가 끝나지 않았으며 \""
+},
+"{0}：下載並核對 SHA-256": {
+"en": "{0}: download and verify SHA-256",
+"ja": "{0}：ダウンロードして SHA-256 を照合",
+"ko": "{0}: 다운로드 후 SHA-256 확인"
+},
+"下載並核對 SHA-256": {
+"en": "Download and verify SHA-256",
+"ja": "ダウンロードして SHA-256 を照合",
+"ko": "다운로드 후 SHA-256 확인"
+},
+"載入": {
+"en": "Loading",
+"ja": "ロード",
+"ko": "로드"
+},
+"等了 ": {
+"en": "Waited ",
+"ja": "待ち時間 ",
+"ko": "대기 "
+},
+" 分鐘還沒載完，卡在「": {
+"en": " minutes and still not loaded; stuck at \"",
+"ja": " 分たってもロードが終わらず、「",
+"ko": "분이 지나도 로드가 끝나지 않았으며 \""
+},
+"：下載並核對 SHA-256": {
+"en": ": download and verify SHA-256",
+"ja": "：ダウンロードして SHA-256 を照合",
+"ko": ": 다운로드 후 SHA-256 확인"
+},
+"權重讀完了，正在搬進 GPU：約 {0} GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 {1} MB": {
+"en": "Weights have been read and are being copied to the GPU: about {0} GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about {1} MB per second",
+"ja": "重みの読み込みが終わり、GPU へ転送中です：約 {0} GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約 {1} MB の見込みです",
+"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약 {0} GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약 {1} MB입니다"
+},
+"權重讀完了，正在搬進 GPU：約": {
+"en": "Weights have been read and are being copied to the GPU: about",
+"ja": "重みの読み込みが終わり、GPU へ転送中です：約",
+"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약"
+},
+"GiB。用硬碟執行時這段走檔案映射，這台預估每秒約": {
+"en": "GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about",
+"ja": "GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約",
+"ko": "GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약"
+},
+"系統記憶體只剩 {0} GiB（危險線 {1} GiB），為了不讓整台卡死，看門狗在 {2} 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
+"en": "System memory was down to {0} GiB (danger line {1} GiB). To keep the machine from freezing, the watchdog stopped this disk-backed model at {2}. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
+"ja": "システムメモリが残り {0} GiB になりました（危険ライン {1} GiB）。マシン全体が固まらないよう、ウォッチドッグが {2} にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
+"ko": "시스템 메모리가 {0} GiB만 남았습니다(위험선 {1} GiB). 머신 전체가 멈추지 않도록 워치독이 {2}에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
+},
+"GiB（危險線": {
+"en": "GiB (danger line",
+"ja": "GiB（危険ライン",
+"ko": "GiB(위험선"
+},
+"GiB），為了不讓整台卡死，看門狗在": {
+"en": "GiB). To keep the machine from freezing, the watchdog at",
+"ja": "GiB）。マシン全体が固まらないよう、ウォッチドッグが",
+"ko": "GiB). 머신 전체가 멈추지 않도록 워치독이"
+},
+"停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
+"en": "stopped this disk-backed model. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
+"ja": "にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
+"ko": "에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
+},
+"服務在跑但": {
+"en": "The service is running but",
+"ja": "サービスは動作していますが",
+"ko": "서비스는 실행 중이지만"
+},
+"{0}：存放區已有": {
+"en": "{0}: already in the model store",
+"ja": "{0}：保存先にすでにあります",
+"ko": "{0}: 저장소에 이미 있습니다"
+},
+"存放區已有": {
+"en": "Already in the model store",
+"ja": "保存先にすでにあります",
+"ko": "저장소에 이미 있습니다"
+},
+"{0}：查不到 Hugging Face 上的檔案（{1}）": {
+"en": "{0}: could not find the files on Hugging Face ({1})",
+"ja": "{0}：Hugging Face 上のファイルが見つかりません（{1}）",
+"ko": "{0}: Hugging Face에서 파일을 찾을 수 없습니다({1})"
+},
+"查不到 Hugging Face 上的檔案": {
+"en": "Could not find the files on Hugging Face",
+"ja": "Hugging Face 上のファイルが見つかりません",
+"ko": "Hugging Face에서 파일을 찾을 수 없습니다"
+},
+"{0}：這個 repo 沒有這個量化": {
+"en": "{0}: this repo does not have that quantization",
+"ja": "{0}：このリポジトリにはその量子化がありません",
+"ko": "{0}: 이 저장소에는 해당 양자화가 없습니다"
+},
+"這個 repo 沒有這個量化": {
+"en": "This repo does not have that quantization",
+"ja": "このリポジトリにはその量子化がありません",
+"ko": "이 저장소에는 해당 양자화가 없습니다"
+},
+"{0}：下載沒完成（{1}）": {
+"en": "{0}: download did not finish ({1})",
+"ja": "{0}：ダウンロードが完了しませんでした（{1}）",
+"ko": "{0}: 다운로드가 완료되지 않았습니다({1})"
+},
+"下載沒完成": {
+"en": "Download did not finish",
+"ja": "ダウンロードが完了しませんでした",
+"ko": "다운로드가 완료되지 않았습니다"
+},
+"{0}：下載完了但存放區掃不到": {
+"en": "{0}: downloaded, but the model store scan does not find it",
+"ja": "{0}：ダウンロードしましたが保存先のスキャンで見つかりません",
+"ko": "{0}: 다운로드했지만 저장소 검색에서 찾을 수 없습니다"
+},
+"下載完了但存放區掃不到": {
+"en": "Downloaded, but the model store scan does not find it",
+"ja": "ダウンロードしましたが保存先のスキャンで見つかりません",
+"ko": "다운로드했지만 저장소 검색에서 찾을 수 없습니다"
+},
+"模型存放位置": {
+"en": "Model storage location",
+"ja": "モデルの保存場所",
+"ko": "모델 저장 위치"
+},
+"保留給使用者的記憶體": {
+"en": "Memory reserved for the user",
+"ja": "ユーザー用に確保するメモリ",
+"ko": "사용자용으로 남겨 둘 메모리"
+},
+"群組要 {0} 顆模型，這台只有 {1} 個可放語言模型的欄位": {
+"en": "The group needs {0} models, but this machine has only {1} slots that can hold a language model",
+"ja": "グループは {0} 個のモデルを必要としますが、このマシンには言語モデルを置けるスロットが {1} 個しかありません",
+"ko": "그룹에는 모델 {0}개가 필요하지만 이 머신에는 언어 모델을 둘 수 있는 슬롯이 {1}개뿐입니다"
+},
+"群組要": {
+"en": "The group needs",
+"ja": "グループが必要とするモデル数",
+"ko": "그룹에 필요한 모델"
+},
+"顆模型，這台只有": {
+"en": "models, but this machine has only",
+"ja": "個。このマシンにある言語モデル用スロットは",
+"ko": "개, 이 머신의 언어 모델 슬롯은"
+},
+"個可放語言模型的欄位": {
+"en": "slots that can hold a language model",
+"ja": "個のみです",
+"ko": "개뿐입니다"
+},
+"准入預檢通過（逐欄試算，實際換上時會再算一次）": {
+"en": "Admission pre-check passed (estimated slot by slot; it is calculated again when actually swapped in)",
+"ja": "受け入れ事前チェックに合格（スロットごとに試算。実際に入れ替えるときに再計算します）",
+"ko": "승인 사전 점검 통과(슬롯별로 시산했으며 실제로 교체할 때 다시 계산합니다)"
+},
+"找不到欄位或模型": {
+"en": "Slot or model not found",
+"ja": "スロットまたはモデルが見つかりません",
+"ko": "슬롯 또는 모델을 찾을 수 없습니다"
+},
+"{0}：在跑的模型不在只准用的清單裡，已停掉": {
+"en": "{0}: the running model is not on the allowed list and has been stopped",
+"ja": "{0}：実行中のモデルが許可リストにないため停止しました",
+"ko": "{0}: 실행 중인 모델이 허용 목록에 없어 중지했습니다"
+},
+"在跑的模型不在只准用的清單裡，已停掉": {
+"en": "The running model is not on the allowed list and has been stopped",
+"ja": "実行中のモデルが許可リストにないため停止しました",
+"ko": "실행 중인 모델이 허용 목록에 없어 중지했습니다"
+},
+"權重讀完了，正在搬進 GPU：約 ": {
+"en": "Weights have been read and are being copied to the GPU: about ",
+"ja": "重みの読み込みが終わり、GPU へ転送中です：約 ",
+"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약 "
+},
+" GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 ": {
+"en": " GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about ",
+"ja": " GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約 ",
+"ko": " GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약 "
+},
+"。比預估慢，仍在搬；等到 {0} 分鐘還沒好會自動換回原本的設定": {
+"en": ". Slower than estimated and still copying; if it is not done by {0} minutes it switches back to the previous settings automatically",
+"ja": "。見込みより遅く、まだ転送中です。{0} 分たっても終わらない場合は自動的に元の設定に戻します",
+"ko": ". 예상보다 느려 아직 전송 중입니다. {0}분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
+},
+"比預估慢，仍在搬；等到": {
+"en": "Slower than estimated and still copying; if not done by",
+"ja": "見込みより遅く、まだ転送中です。",
+"ko": "예상보다 느려 아직 전송 중입니다."
+},
+"分鐘還沒好會自動換回原本的設定": {
+"en": "minutes it switches back to the previous settings automatically",
+"ja": "分たっても終わらない場合は自動的に元の設定に戻します",
+"ko": "분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
+},
+" GiB（危險線 ": {
+"en": " GiB (danger line ",
+"ja": " GiB（危険ライン ",
+"ko": " GiB(위험선 "
+},
+" GiB），為了不讓整台卡死，看門狗在 ": {
+"en": " GiB). To keep the machine from freezing, the watchdog at ",
+"ja": " GiB）。マシン全体が固まらないよう、ウォッチドッグが ",
+"ko": " GiB). 머신 전체가 멈추지 않도록 워치독이 "
+},
+" 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
+"en": " stopped this disk-backed model. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
+"ja": " にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
+"ko": "에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
+},
+"剛啟動": {
+"en": "just started",
+"ja": "起動直後",
+"ko": "막 시작됨"
+},
+"讀權重": {
+"en": "reading weights",
+"ja": "重みの読み込み",
+"ko": "가중치 읽기"
+},
+"把權重搬進 GPU": {
+"en": "copying weights to the GPU",
+"ja": "重みを GPU へ転送",
+"ko": "가중치를 GPU로 전송"
+},
+"配置記憶體": {
+"en": "allocating memory",
+"ja": "メモリの割り当て",
+"ko": "메모리 할당"
+},
+"暖機": {
+"en": "warming up",
+"ja": "ウォームアップ",
+"ko": "워밍업"
+},
+"：存放區已有": {
+"en": ": already in the model store",
+"ja": "：保存先にすでにあります",
+"ko": ": 저장소에 이미 있습니다"
+},
+"：查不到 Hugging Face 上的檔案（": {
+"en": ": could not find the files on Hugging Face (",
+"ja": "：Hugging Face 上のファイルが見つかりません（",
+"ko": ": Hugging Face에서 파일을 찾을 수 없습니다("
+},
+"：這個 repo 沒有這個量化": {
+"en": ": this repo does not have that quantization",
+"ja": "：このリポジトリにはその量子化がありません",
+"ko": ": 이 저장소에는 해당 양자화가 없습니다"
+},
+"：下載沒完成（": {
+"en": ": download did not finish (",
+"ja": "：ダウンロードが完了しませんでした（",
+"ko": ": 다운로드가 완료되지 않았습니다("
+},
+"：下載完了但存放區掃不到": {
+"en": ": downloaded, but the model store scan does not find it",
+"ja": "：ダウンロードしましたが保存先のスキャンで見つかりません",
+"ko": ": 다운로드했지만 저장소 검색에서 찾을 수 없습니다"
+},
+"{0} 不在「只准用的模型」清單裡": {
+"en": "{0} is not on the \"allowed models\" list",
+"ja": "{0} は「許可されたモデル」リストにありません",
+"ko": "{0}은(는) \"허용 모델\" 목록에 없습니다"
+},
+"不在「只准用的模型」清單裡": {
+"en": "is not on the \"allowed models\" list",
+"ja": "は「許可されたモデル」リストにありません",
+"ko": "은(는) \"허용 모델\" 목록에 없습니다"
+},
+"{0}這一版的代理還不支援，先略過": {
+"en": "{0} is not supported by this agent version yet; skipped",
+"ja": "{0} はこのバージョンのエージェントではまだ対応していないため、スキップしました",
+"ko": "{0}은(는) 이 버전의 에이전트에서 아직 지원하지 않아 건너뛰었습니다"
+},
+"這一版的代理還不支援，先略過": {
+"en": "Not supported by this agent version yet; skipped",
+"ja": "このバージョンのエージェントではまだ対応していないため、スキップしました",
+"ko": "이 버전의 에이전트에서 아직 지원하지 않아 건너뛰었습니다"
+},
+"群組要 ": {
+"en": "The group needs ",
+"ja": "グループが必要とするモデル数 ",
+"ko": "그룹에 필요한 모델 "
+},
+" 顆模型，這台只有 ": {
+"en": " models, but this machine has only ",
+"ja": " 個。このマシンにある言語モデル用スロットは ",
+"ko": "개, 이 머신의 언어 모델 슬롯은 "
+},
+" 個可放語言模型的欄位": {
+"en": " slots that can hold a language model",
+"ja": " 個のみです",
+"ko": "개뿐입니다"
+},
+"{0}：{1} 放不下（{2}），請改小上下文或換小一點的量化": {
+"en": "{0}: {1} does not fit ({2}); shorten the context or switch to a smaller quantization",
+"ja": "{0}：{1} が入りきりません（{2}）。コンテキストを短くするか、より小さい量子化に替えてください",
+"ko": "{0}: {1}이(가) 들어가지 않습니다({2}). 컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
+},
+"請改小上下文或換小一點的量化": {
+"en": "Shorten the context or switch to a smaller quantization",
+"ja": "コンテキストを短くするか、より小さい量子化に替えてください",
+"ko": "컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
+},
+"：在跑的模型不在只准用的清單裡，已停掉": {
+"en": ": the running model is not on the allowed list and has been stopped",
+"ja": "：実行中のモデルが許可リストにないため停止しました",
+"ko": ": 실행 중인 모델이 허용 목록에 없어 중지했습니다"
+},
+"。比預估慢，仍在搬；等到 ": {
+"en": ". Slower than estimated and still copying; if not done by ",
+"ja": "。見込みより遅く、まだ転送中です。",
+"ko": ". 예상보다 느려 아직 전송 중입니다. "
+},
+" 分鐘還沒好會自動換回原本的設定": {
+"en": " minutes it switches back to the previous settings automatically",
+"ja": " 分たっても終わらない場合は自動的に元の設定に戻します",
+"ko": "분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
+},
+"看門狗：": {
+"en": "Watchdog: ",
+"ja": "ウォッチドッグ：",
+"ko": "워치독: "
+},
+"生字探測：": {
+"en": "Generation probe: ",
+"ja": "生成チェック：",
+"ko": "생성 점검: "
+},
+" 不在「只准用的模型」清單裡": {
+"en": " is not on the \"allowed models\" list",
+"ja": " は「許可されたモデル」リストにありません",
+"ko": "은(는) \"허용 모델\" 목록에 없습니다"
+},
+" 放不下（": {
+"en": " does not fit (",
+"ja": " が入りきりません（",
+"ko": "이(가) 들어가지 않습니다("
+},
+"），請改小上下文或換小一點的量化": {
+"en": "); shorten the context or switch to a smaller quantization",
+"ja": "）。コンテキストを短くするか、より小さい量子化に替えてください",
+"ko": "). 컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
+},
+"{0}：存放區找不到（可能被刪了），下次對齊會重新準備": {
+"en": "{0}: not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
+"ja": "{0}：保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
+"ko": "{0}: 저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
+},
+"存放區找不到（可能被刪了），下次對齊會重新準備": {
+"en": "Not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
+"ja": "保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
+"ko": "저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
+},
+"{0}：換不上 {1}（{2}），這個欄位原本的服務沒動": {
+"en": "{0}: could not swap in {1} ({2}); this slot's original service was left untouched",
+"ja": "{0}：{1} に入れ替えられませんでした（{2}）。このスロットの元のサービスはそのままです",
+"ko": "{0}: {1}(으)로 교체하지 못했습니다({2}). 이 슬롯의 원래 서비스는 그대로입니다"
+},
+"換不上": {
+"en": "Could not swap in",
+"ja": "入れ替えられません",
+"ko": "교체할 수 없음"
+},
+"這個欄位原本的服務沒動": {
+"en": "This slot's original service was left untouched",
+"ja": "このスロットの元のサービスはそのままです",
+"ko": "이 슬롯의 원래 서비스는 그대로입니다"
+},
+"{0} 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
+"en": "The SHA-256 of {0} does not match the one published on Hugging Face; it was deleted, please download it again",
+"ja": "{0} の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
+"ko": "{0}의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
+},
+"的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
+"en": "SHA-256 does not match the one published on Hugging Face; it was deleted, please download it again",
+"ja": "の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
+"ko": "의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
+},
+"：存放區找不到（可能被刪了），下次對齊會重新準備": {
+"en": ": not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
+"ja": "：保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
+"ko": ": 저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
+},
+"拉回群組設定的模型 ": {
+"en": "Restore the group's model ",
+"ja": "グループ設定のモデルに戻す ",
+"ko": "그룹 설정 모델로 되돌리기 "
+},
+"換上 ": {
+"en": "Swap in ",
+"ja": "入れ替え ",
+"ko": "교체 "
+},
+"：換不上 ": {
+"en": ": could not swap in ",
+"ja": "：入れ替えられません ",
+"ko": ": 교체하지 못했습니다 "
+},
+"），這個欄位原本的服務沒動": {
+"en": "); this slot's original service was left untouched",
+"ja": "）。このスロットの元のサービスはそのままです",
+"ko": "). 이 슬롯의 원래 서비스는 그대로입니다"
+},
+" 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
+"en": " SHA-256 does not match the one published on Hugging Face; it was deleted, please download it again",
+"ja": " の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
+"ko": "의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
+},
+"已換回套用前的模型": {
+"en": "Switched back to the model from before applying",
+"ja": "適用前のモデルに戻しました",
+"ko": "적용 전 모델로 되돌렸습니다"
+},
+"換回套用前的模型失敗，請到機器頁查看": {
+"en": "Switching back to the model from before applying failed; check the machine page",
+"ja": "適用前のモデルへの切り戻しに失敗しました。マシンページを確認してください",
+"ko": "적용 전 모델로 되돌리지 못했습니다. 머신 페이지에서 확인하세요"
+},
+"手動組一顆不在清單上的畫圖／影片模型": {
+"en": "Assemble an image/video model that isn't on the list",
+"ja": "リストにない画像／動画モデルを手動で組む",
+"ko": "목록에 없는 이미지/동영상 모델 직접 구성"
+},
+"檔案已刪除": {
+"en": "Files deleted",
+"ja": "ファイル削除済み",
+"ko": "파일 삭제됨"
+},
+"（含投影檔）": {
+"en": " (incl. projector)",
+"ja": "（プロジェクター含む）",
+"ko": " (프로젝터 포함)"
+},
+"上下文以 {0} 計、低於 {1} tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加 {2} 毫秒。標「中國來源」的模型政府案不得使用。": {
+"en": "Context counted as {0}; below {1} tok/s is not smooth. Efficiency is fitted from models measured on this machine, plus {2} ms per layer. Models marked \"China-origin\" may not be used in government projects.",
+"ja": "コンテキストは {0} で計算、{1} tok/s 未満は快適とみなしません。効率はこの機器で実測したモデルから当てはめ、層ごとに {2} ミリ秒を加算。「中国由来」と表示されたモデルは政府案件で使用できません。",
+"ko": "컨텍스트는 {0} 기준, {1} tok/s 미만은 원활하지 않음으로 봅니다. 효율은 이 기기에서 실측한 모델로 맞춘 값이며 층마다 {2}밀리초를 더합니다. \"중국 출처\"로 표시된 모델은 정부 사업에 쓸 수 없습니다."
+},
+"tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加": {
+"en": "tok/s is not smooth; efficiency is fitted from models measured on this machine, plus per layer",
+"ja": "tok/s 未満は快適とみなしません。効率はこの機器の実測から当てはめ、層ごとに加算",
+"ko": "tok/s 미만은 원활하지 않음. 효율은 이 기기 실측으로 맞춘 값, 층마다 추가"
+},
+"毫秒。標「中國來源」的模型政府案不得使用": {
+"en": "ms. Models marked \"China-origin\" may not be used in government projects",
+"ja": "ミリ秒。「中国由来」と表示されたモデルは政府案件で使用できません",
+"ko": "밀리초. \"중국 출처\"로 표시된 모델은 정부 사업에 쓸 수 없습니다"
+},
+"存放在 {0}，剩 {1} GiB。": {
+"en": "Stored in {0}, {1} GiB free.",
+"ja": "保存先 {0}、空き {1} GiB。",
+"ko": "저장 위치 {0}, 남은 공간 {1} GiB."
+},
+"手動組": {
+"en": "Manual",
+"ja": "手動構成",
+"ko": "수동 구성"
+},
+"・手動組": {
+"en": " · manual",
+"ja": "・手動構成",
+"ko": " · 수동 구성"
+},
+"・中國來源": {
+"en": " · China-origin",
+"ja": "・中国由来",
+"ko": " · 중국 출처"
+},
+"大小由機器從 Hugging Face 讀。中國來源的模型照樣可以加入，畫面上會標出來——文字編碼器、VAE 是中國來源也算。": {
+"en": "Sizes are read from Hugging Face by the machine. China-origin models can still be added and are marked on screen; this includes text encoders and VAEs of Chinese origin.",
+"ja": "サイズは機器が Hugging Face から読み取ります。中国由来のモデルも追加でき、画面に表示されます（テキストエンコーダーや VAE が中国由来の場合も含む）。",
+"ko": "크기는 기기가 Hugging Face에서 읽습니다. 중국 출처 모델도 추가할 수 있으며 화면에 표시됩니다(텍스트 인코더, VAE가 중국 출처인 경우 포함)."
+},
+"不在推薦清單上的模型可以在這裡自己組。中國來源的模型（文字編碼器、VAE 也算）照樣可以用，畫面上會標出來；政府案依規定不得使用。": {
+"en": "Models not on the recommended list can be assembled here. China-origin models (including text encoders and VAEs) can still be used and are marked on screen; government projects may not use them.",
+"ja": "推奨リストにないモデルはここで組めます。中国由来のモデル（テキストエンコーダー、VAE を含む）も使用でき、画面に表示されます。政府案件では規定により使用できません。",
+"ko": "추천 목록에 없는 모델은 여기서 직접 구성할 수 있습니다. 중국 출처 모델(텍스트 인코더, VAE 포함)도 사용할 수 있으며 화면에 표시됩니다. 정부 사업에서는 규정상 사용할 수 없습니다."
+},
+"可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）": {
+"en": "You can select several files at once (for example the certificate, private key and intermediate certificate)",
+"ja": "複数のファイルを一度に選べます（例：証明書、秘密鍵、中間証明書の 3 ファイル）",
+"ko": "여러 파일을 한 번에 선택할 수 있습니다(예: 인증서, 개인 키, 중간 인증서 3개 파일)"
+},
+"例：AI 研究中心主機": {
+"en": "e.g. AI Research Center server",
+"ja": "例：AI 研究センターのサーバー",
+"ko": "예: AI 연구센터 서버"
+},
+"1～40 個字；概覽標題、機器清單與報表都用這個名稱": {
+"en": "1–40 characters; used in the overview title, machine list and reports",
+"ja": "1～40 文字。概要のタイトル、機器一覧、レポートで使われます",
+"ko": "1~40자. 개요 제목, 기기 목록, 보고서에 이 이름이 쓰입니다"
+},
+"改機器名稱": {
+"en": "Rename machine",
+"ja": "機器名を変更",
+"ko": "기기 이름 변경"
+},
+"名稱已更新": {
+"en": "Name updated",
+"ja": "名前を更新しました",
+"ko": "이름이 변경되었습니다"
+},
+"改名稱": {
+"en": "Rename",
+"ja": "名前を変更",
+"ko": "이름 변경"
+},
+"依這台實測擬合：頻寬效率 {0}%、每層 {1} 毫秒": {
+"en": "Fitted from this machine's measurements: bandwidth efficiency {0}%, {1} ms per layer",
+"ja": "この機器の実測から当てはめ：帯域効率 {0}%、層ごと {1} ミリ秒",
+"ko": "이 기기 실측으로 맞춤: 대역폭 효율 {0}%, 층마다 {1}밀리초"
+},
+"依這台實測擬合：頻寬效率": {
+"en": "Fitted from this machine's measurements: bandwidth efficiency",
+"ja": "この機器の実測から当てはめ：帯域効率",
+"ko": "이 기기 실측으로 맞춤: 대역폭 효율"
+},
+"%、每層": {
+"en": "%, per layer",
+"ja": "%、層ごと",
+"ko": "%, 층마다"
+},
+"只含 GPU 晶片回報的功耗，不含 CPU、記憶體、硬碟、電源轉換損失與冷氣，整機實際用電會明顯較高。": {
+"en": "Only the power reported by the GPU chips; CPU, memory, disks, power conversion losses and cooling are not included, so the whole machine uses noticeably more.",
+"ja": "GPU チップが報告する消費電力のみで、CPU、メモリ、ディスク、電源変換損失、空調は含みません。機器全体の実際の消費電力はかなり高くなります。",
+"ko": "GPU 칩이 보고한 전력만 포함하며 CPU, 메모리, 디스크, 전원 변환 손실, 냉방은 포함하지 않습니다. 기기 전체의 실제 전력은 훨씬 높습니다."
+},
+"尚未設定雲端參考單價，只報地端處理量，不估算省下的費用。": {
+"en": "No cloud reference price set; only on-premises volume is reported, savings are not estimated.",
+"ja": "クラウド参考単価が未設定のため、オンプレミスの処理量のみ報告し、節約額は見積もりません。",
+"ko": "클라우드 참고 단가가 설정되지 않아 온프레미스 처리량만 보고하며 절감액은 추정하지 않습니다."
+},
+"（未知）": {
+"en": "(unknown)",
+"ja": "（不明）",
+"ko": "(알 수 없음)"
+},
+"電價以每度 NT$ {0} 計算。": {
+"en": "Electricity priced at NT${0} per kWh.",
+"ja": "電気料金は 1 kWh あたり NT$ {0} で計算。",
+"ko": "전기 요금은 kWh당 NT$ {0}로 계산."
+},
+"電價以每度 NT$": {
+"en": "Electricity priced per kWh at NT$",
+"ja": "電気料金 1 kWh あたり NT$",
+"ko": "전기 요금 kWh당 NT$"
+},
+"電價以每度 NT$ ": {
+"en": "Electricity priced per kWh at NT$",
+"ja": "電気料金 1 kWh あたり NT$ ",
+"ko": "전기 요금 kWh당 NT$ "
+},
+"計算": {
+"en": "calculated",
+"ja": "計算",
+"ko": "계산"
+},
+" 計算。": {
+"en": ".",
+"ja": " で計算。",
+"ko": "로 계산."
+},
+"尚未設定電價，不換算金額。": {
+"en": "No electricity price set; no cost is calculated.",
+"ja": "電気料金が未設定のため、金額は換算しません。",
+"ko": "전기 요금이 설정되지 않아 금액은 환산하지 않습니다."
+},
+"（未命名）": {
+"en": "(unnamed)",
+"ja": "（名前なし）",
+"ko": "(이름 없음)"
+},
+"以 {0} 每百萬輸入 token US$ {1}、輸出 US$ {2} 計；重用快取的 token 不計費": {
+"en": "Based on {0} at US${1} per million input tokens and US${2} output; cached tokens are not charged",
+"ja": "{0} の 100 万入力トークンあたり US$ {1}、出力 US$ {2} で計算。キャッシュ再利用分は課金しません",
+"ko": "{0} 기준 입력 토큰 100만 개당 US$ {1}, 출력 US$ {2}로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+"以": {
+"en": "Based on",
+"ja": "基準",
+"ko": "기준"
+},
+"以 ": {
+"en": "Based on ",
+"ja": "基準 ",
+"ko": "기준 "
+},
+"每百萬輸入 token US$": {
+"en": "per million input tokens US$",
+"ja": "100 万入力トークンあたり US$",
+"ko": "입력 토큰 100만 개당 US$"
+},
+" 每百萬輸入 token US$ ": {
+"en": " per million input tokens US$",
+"ja": " 100 万入力トークンあたり US$ ",
+"ko": " 입력 토큰 100만 개당 US$ "
+},
+"輸出 US$": {
+"en": "output US$",
+"ja": "出力 US$",
+"ko": "출력 US$"
+},
+"、輸出 US$ ": {
+"en": ", output US$",
+"ja": "、出力 US$ ",
+"ko": ", 출력 US$ "
+},
+"計；重用快取的 token 不計費": {
+"en": "; cached tokens are not charged",
+"ja": "で計算。キャッシュ再利用分は課金しません",
+"ko": "로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+" 計；重用快取的 token 不計費": {
+"en": "; cached tokens are not charged",
+"ja": " で計算。キャッシュ再利用分は課金しません",
+"ko": "로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+"；匯率 {0}": {
+"en": "; exchange rate {0}",
+"ja": "。為替レート {0}",
+"ko": "; 환율 {0}"
+},
+"匯率": {
+"en": "Exchange rate",
+"ja": "為替レート",
+"ko": "환율"
+},
+"；匯率 ": {
+"en": "; exchange rate ",
+"ja": "。為替レート ",
+"ko": "; 환율 "
+},
+"參考模型": {
+"en": "reference model",
+"ja": "参考モデル",
+"ko": "참고 모델"
+},
+"待改善": {
+"en": "To improve",
+"ja": "要改善",
+"ko": "개선 필요"
+},
+"主控台使用暫用自簽憑證": {
+"en": "The console uses a temporary self-signed certificate",
+"ja": "コンソールが一時的な自己署名証明書を使用しています",
+"ko": "콘솔이 임시 자체 서명 인증서를 사용 중"
+},
+"在「設定 → HTTPS 與憑證」產生 CSR 或上傳正式憑證": {
+"en": "Generate a CSR or upload a proper certificate in Settings → HTTPS and certificates",
+"ja": "「設定 → HTTPS と証明書」で CSR を生成するか正式な証明書をアップロード",
+"ko": "\"설정 → HTTPS 및 인증서\"에서 CSR을 생성하거나 정식 인증서를 업로드"
+},
+"主控台憑證剩 {0} 天，{1}（台北時間）到期": {
+"en": "Console certificate expires in {0} days, on {1} (Taipei time)",
+"ja": "コンソール証明書の残り {0} 日、{1}（台北時間）に期限切れ",
+"ko": "콘솔 인증서 {0}일 남음, {1}(타이베이 시간) 만료"
+},
+"主控台憑證剩 ": {
+"en": "Console certificate expires in ",
+"ja": "コンソール証明書の残り ",
+"ko": "콘솔 인증서 남은 기간 "
+},
+"向憑證廠商續約並在網頁上匯入新憑證": {
+"en": "Renew with the certificate vendor and import the new certificate on the web page",
+"ja": "証明書ベンダーで更新し、新しい証明書を Web 画面でインポート",
+"ko": "인증서 업체에서 갱신하고 웹 화면에서 새 인증서를 가져오기"
+},
+"注意": {
+"en": "Attention",
+"ja": "注意",
+"ko": "주의"
+},
+"有 {0} 次強制略過記憶體准入試算": {
+"en": "Memory admission check was force-skipped {0} times",
+"ja": "メモリ受け入れ試算が {0} 回強制スキップされました",
+"ko": "메모리 허용 시산을 {0}회 강제로 건너뜀"
+},
+"次強制略過記憶體准入試算": {
+"en": "times the memory admission check was force-skipped",
+"ja": "回メモリ受け入れ試算を強制スキップ",
+"ko": "회 메모리 허용 시산을 강제로 건너뜀"
+},
+" 次強制略過記憶體准入試算": {
+"en": " times the memory admission check was force-skipped",
+"ja": " 回メモリ受け入れ試算を強制スキップ",
+"ko": "회 메모리 허용 시산을 강제로 건너뜀"
+},
+"確認當時操作者是否知情；強制載入有機會把統一記憶體機拖死": {
+"en": "Confirm the operator knew; forced loading can freeze a unified-memory machine",
+"ja": "操作者が承知していたか確認してください。強制読み込みは統合メモリ機を停止させる恐れがあります",
+"ko": "당시 조작자가 알고 있었는지 확인하세요. 강제 로드는 통합 메모리 기기를 멈추게 할 수 있습니다"
+},
+"登入失敗 {0} 次": {
+"en": "{0} failed logins",
+"ja": "ログイン失敗 {0} 回",
+"ko": "로그인 실패 {0}회"
+},
+"登入失敗": {
+"en": "Failed logins",
+"ja": "ログイン失敗",
+"ko": "로그인 실패"
+},
+"登入失敗 ": {
+"en": "Failed logins ",
+"ja": "ログイン失敗 ",
+"ko": "로그인 실패 "
+},
+"確認是否有人在猜密碼": {
+"en": "Check whether someone is guessing the password",
+"ja": "誰かがパスワードを推測していないか確認してください",
+"ko": "누군가 비밀번호를 추측하고 있는지 확인하세요"
+},
+"本期無異常": {
+"en": "No issues this period",
+"ja": "今期は異常なし",
+"ko": "이번 기간 이상 없음"
+},
+"共 {0} 項待處理": {
+"en": "{0} items to address",
+"ja": "対応待ち {0} 件",
+"ko": "처리 대기 {0}건"
+},
+"項待處理": {
+"en": "items to address",
+"ja": "件の対応待ち",
+"ko": "건 처리 대기"
+},
+" 項待處理": {
+"en": " items to address",
+"ja": " 件の対応待ち",
+"ko": "건 처리 대기"
+},
+"共 ": {
+"en": "",
+"ja": "合計 ",
+"ko": "총 "
+},
+" 次": {
+"en": " times",
+"ja": " 回",
+"ko": "회"
+},
+"{0} 有 {1}% 的取樣連不上": {
+"en": "{0}: {1}% of samples could not connect",
+"ja": "{0}：サンプルの {1}% で接続できませんでした",
+"ko": "{0}: 샘플의 {1}%가 연결되지 않음"
+},
+"% 的取樣連不上": {
+"en": "% of samples could not connect",
+"ja": "% のサンプルで接続できませんでした",
+"ko": "%의 샘플이 연결되지 않음"
+},
+" 有 ": {
+"en": ": ",
+"ja": "：",
+"ko": ": "
+},
+"查網路或代理服務是否中斷": {
+"en": "Check whether the network or the agent service was down",
+"ja": "ネットワークまたはエージェントサービスが中断していないか確認してください",
+"ko": "네트워크나 에이전트 서비스가 중단되었는지 확인하세요"
+},
+"{0} 系統記憶體低於底線 {1} 次": {
+"en": "{0}: system memory fell below the floor {1} times",
+"ja": "{0}：システムメモリが下限を {1} 回下回りました",
+"ko": "{0}: 시스템 메모리가 하한선 아래로 {1}회 떨어짐"
+},
+"系統記憶體低於底線": {
+"en": "system memory below the floor",
+"ja": "システムメモリが下限未満",
+"ko": "시스템 메모리가 하한선 미만"
+},
+" 系統記憶體低於底線 ": {
+"en": ": system memory below the floor ",
+"ja": "：システムメモリが下限未満 ",
+"ko": ": 시스템 메모리가 하한선 미만 "
+},
+"這台曾因系統記憶體耗盡整台卡死；檢查是否有服務長期吃記憶體": {
+"en": "This machine has frozen from running out of system memory; check for services holding memory long-term",
+"ja": "この機器はシステムメモリ枯渇で停止したことがあります。メモリを長期間占有するサービスがないか確認してください",
+"ko": "이 기기는 시스템 메모리 고갈로 멈춘 적이 있습니다. 메모리를 오래 점유하는 서비스가 있는지 확인하세요"
+},
+"{0} 的代理憑證尚未信任，主控台連不上": {
+"en": "The agent certificate of {0} is not trusted yet; the console cannot connect",
+"ja": "{0} のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "{0}의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+"的代理憑證尚未信任，主控台連不上": {
+"en": "agent certificate not trusted yet; the console cannot connect",
+"ja": "のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+" 的代理憑證尚未信任，主控台連不上": {
+"en": ": agent certificate not trusted yet; the console cannot connect",
+"ja": " のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+"重新執行 deploy_console.sh，或在設定頁匯入該機憑證": {
+"en": "Run deploy_console.sh again, or import that machine's certificate on the settings page",
+"ja": "deploy_console.sh を再実行するか、設定画面でその機器の証明書をインポート",
+"ko": "deploy_console.sh를 다시 실행하거나 설정 화면에서 해당 기기 인증서를 가져오기"
+},
+"{0} 的 {1} 最後狀態為{2}": {
+"en": "{1} on {0} last state: {2}",
+"ja": "{0} の {1} の最終状態：{2}",
+"ko": "{0}의 {1} 마지막 상태: {2}"
+},
+"的": {
+"en": "of",
+"ja": "の",
+"ko": "의"
+},
+" 的 ": {
+"en": " / ",
+"ja": " の ",
+"ko": "의 "
+},
+"最後狀態為": {
+"en": "last state:",
+"ja": "最終状態：",
+"ko": "마지막 상태:"
+},
+" 最後狀態為": {
+"en": " last state:",
+"ja": " の最終状態：",
+"ko": " 마지막 상태:"
+},
+"到「記錄」頁查該服務的記錄": {
+"en": "Check that service's log on the Logs page",
+"ja": "「記録」ページでそのサービスのログを確認",
+"ko": "\"기록\" 페이지에서 해당 서비스의 로그 확인"
+},
+"取樣自 {0} 起才開始收集，本期之前沒有資料": {
+"en": "Sampling started on {0}; there is no data before that in this period",
+"ja": "サンプリングは {0} から開始。それ以前のデータはありません",
+"ko": "샘플링은 {0}부터 시작되어 그 이전 데이터는 없습니다"
+},
+"取樣自": {
+"en": "Sampling started on",
+"ja": "サンプリング開始",
+"ko": "샘플링 시작"
+},
+"取樣自 ": {
+"en": "Sampling started on ",
+"ja": "サンプリング開始 ",
+"ko": "샘플링 시작 "
+},
+"起才開始收集，本期之前沒有資料": {
+"en": "; no data before that in this period",
+"ja": "から。それ以前のデータはありません",
+"ko": "부터 수집, 그 이전 데이터 없음"
+},
+" 起才開始收集，本期之前沒有資料": {
+"en": "; no data before that in this period",
+"ja": " から。それ以前のデータはありません",
+"ko": "부터 수집, 그 이전 데이터 없음"
+},
+"（尚無）": {
+"en": "(none yet)",
+"ja": "（まだなし）",
+"ko": "(아직 없음)"
+},
+"一直停在啟動中": {
+"en": "stuck in starting",
+"ja": "起動中のまま",
+"ko": "계속 시작 중"
+},
+"這台不能操作桌面：{0}": {
+"en": "This machine can't control the desktop: {0}",
+"ja": "この機器ではデスクトップを操作できません：{0}",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: {0}"
+},
+"這台不能操作桌面": {
+"en": "This machine can't control the desktop",
+"ja": "この機器ではデスクトップを操作できません",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다"
+},
+"這台不能操作桌面：": {
+"en": "This machine can't control the desktop: ",
+"ja": "この機器ではデスクトップを操作できません：",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: "
+},
+"檔案不完整": {
+"en": "Files incomplete",
+"ja": "ファイル不足",
+"ko": "파일 일부 없음"
+},
 "產生加入碼": {
 "en": "Create join code",
 "ja": "参加コードを作成",
@@ -19759,340 +20829,10 @@
 "ja": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '注意：管理者として実行されていないため、エージェントはこのアカウントのログイン中のみ動作し、ファイアウォールの 9401 番ポートも開いていません。管理者にもう一度このコマンドを実行してもらってください' }\n",
 "ko": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '참고: 관리자 권한으로 실행하지 않아 에이전트는 이 계정이 로그인한 동안만 실행되며 방화벽의 9401 포트도 열리지 않았습니다. 관리자가 이 명령을 다시 실행하세요' }\n"
 },
-"群組對齊出錯：": {
-"en": "Group alignment error: ",
-"ja": "グループの同期でエラー：",
-"ko": "그룹 맞춤 오류: "
-},
 "加入碼不對、已經用完、過期、被作廢，或這台不在限定的網段裡；請在主控台重新產生加入碼。\n": {
 "en": "The join code is wrong, used up, expired or revoked, or this machine is outside the allowed subnets; create a new join code in the console.\n",
 "ja": "参加コードが正しくない、使い切り、期限切れ、無効化済み、またはこのマシンが許可されたサブネット外です。コンソールで参加コードを作り直してください。\n",
 "ko": "가입 코드가 잘못되었거나, 모두 사용되었거나, 만료 또는 무효화되었거나, 이 장비가 허용된 서브넷 밖에 있습니다. 콘솔에서 가입 코드를 다시 생성하세요.\n"
-},
-"{0}：下載並核對 SHA-256": {
-"en": "{0}: download and verify SHA-256",
-"ja": "{0}：ダウンロードして SHA-256 を照合",
-"ko": "{0}: 다운로드 후 SHA-256 확인"
-},
-"下載並核對 SHA-256": {
-"en": "Download and verify SHA-256",
-"ja": "ダウンロードして SHA-256 を照合",
-"ko": "다운로드 후 SHA-256 확인"
-},
-"：下載並核對 SHA-256": {
-"en": ": download and verify SHA-256",
-"ja": "：ダウンロードして SHA-256 を照合",
-"ko": ": 다운로드 후 SHA-256 확인"
-},
-"{0}：存放區已有": {
-"en": "{0}: already in the model store",
-"ja": "{0}：保存先にすでにあります",
-"ko": "{0}: 저장소에 이미 있습니다"
-},
-"存放區已有": {
-"en": "Already in the model store",
-"ja": "保存先にすでにあります",
-"ko": "저장소에 이미 있습니다"
-},
-"{0}：查不到 Hugging Face 上的檔案（{1}）": {
-"en": "{0}: could not find the files on Hugging Face ({1})",
-"ja": "{0}：Hugging Face 上のファイルが見つかりません（{1}）",
-"ko": "{0}: Hugging Face에서 파일을 찾을 수 없습니다({1})"
-},
-"查不到 Hugging Face 上的檔案": {
-"en": "Could not find the files on Hugging Face",
-"ja": "Hugging Face 上のファイルが見つかりません",
-"ko": "Hugging Face에서 파일을 찾을 수 없습니다"
-},
-"{0}：這個 repo 沒有這個量化": {
-"en": "{0}: this repo does not have that quantization",
-"ja": "{0}：このリポジトリにはその量子化がありません",
-"ko": "{0}: 이 저장소에는 해당 양자화가 없습니다"
-},
-"這個 repo 沒有這個量化": {
-"en": "This repo does not have that quantization",
-"ja": "このリポジトリにはその量子化がありません",
-"ko": "이 저장소에는 해당 양자화가 없습니다"
-},
-"{0}：下載沒完成（{1}）": {
-"en": "{0}: download did not finish ({1})",
-"ja": "{0}：ダウンロードが完了しませんでした（{1}）",
-"ko": "{0}: 다운로드가 완료되지 않았습니다({1})"
-},
-"下載沒完成": {
-"en": "Download did not finish",
-"ja": "ダウンロードが完了しませんでした",
-"ko": "다운로드가 완료되지 않았습니다"
-},
-"{0}：下載完了但存放區掃不到": {
-"en": "{0}: downloaded, but the model store scan does not find it",
-"ja": "{0}：ダウンロードしましたが保存先のスキャンで見つかりません",
-"ko": "{0}: 다운로드했지만 저장소 검색에서 찾을 수 없습니다"
-},
-"下載完了但存放區掃不到": {
-"en": "Downloaded, but the model store scan does not find it",
-"ja": "ダウンロードしましたが保存先のスキャンで見つかりません",
-"ko": "다운로드했지만 저장소 검색에서 찾을 수 없습니다"
-},
-"模型存放位置": {
-"en": "Model storage location",
-"ja": "モデルの保存場所",
-"ko": "모델 저장 위치"
-},
-"保留給使用者的記憶體": {
-"en": "Memory reserved for the user",
-"ja": "ユーザー用に確保するメモリ",
-"ko": "사용자용으로 남겨 둘 메모리"
-},
-"群組要 {0} 顆模型，這台只有 {1} 個可放語言模型的欄位": {
-"en": "The group needs {0} models, but this machine has only {1} slots that can hold a language model",
-"ja": "グループは {0} 個のモデルを必要としますが、このマシンには言語モデルを置けるスロットが {1} 個しかありません",
-"ko": "그룹에는 모델 {0}개가 필요하지만 이 머신에는 언어 모델을 둘 수 있는 슬롯이 {1}개뿐입니다"
-},
-"群組要": {
-"en": "The group needs",
-"ja": "グループが必要とするモデル数",
-"ko": "그룹에 필요한 모델"
-},
-"顆模型，這台只有": {
-"en": "models, but this machine has only",
-"ja": "個。このマシンにある言語モデル用スロットは",
-"ko": "개, 이 머신의 언어 모델 슬롯은"
-},
-"個可放語言模型的欄位": {
-"en": "slots that can hold a language model",
-"ja": "個のみです",
-"ko": "개뿐입니다"
-},
-"准入預檢通過（逐欄試算，實際換上時會再算一次）": {
-"en": "Admission pre-check passed (estimated slot by slot; it is calculated again when actually swapped in)",
-"ja": "受け入れ事前チェックに合格（スロットごとに試算。実際に入れ替えるときに再計算します）",
-"ko": "승인 사전 점검 통과(슬롯별로 시산했으며 실제로 교체할 때 다시 계산합니다)"
-},
-"找不到欄位或模型": {
-"en": "Slot or model not found",
-"ja": "スロットまたはモデルが見つかりません",
-"ko": "슬롯 또는 모델을 찾을 수 없습니다"
-},
-"{0}：在跑的模型不在只准用的清單裡，已停掉": {
-"en": "{0}: the running model is not on the allowed list and has been stopped",
-"ja": "{0}：実行中のモデルが許可リストにないため停止しました",
-"ko": "{0}: 실행 중인 모델이 허용 목록에 없어 중지했습니다"
-},
-"在跑的模型不在只准用的清單裡，已停掉": {
-"en": "The running model is not on the allowed list and has been stopped",
-"ja": "実行中のモデルが許可リストにないため停止しました",
-"ko": "실행 중인 모델이 허용 목록에 없어 중지했습니다"
-},
-"：存放區已有": {
-"en": ": already in the model store",
-"ja": "：保存先にすでにあります",
-"ko": ": 저장소에 이미 있습니다"
-},
-"：查不到 Hugging Face 上的檔案（": {
-"en": ": could not find the files on Hugging Face (",
-"ja": "：Hugging Face 上のファイルが見つかりません（",
-"ko": ": Hugging Face에서 파일을 찾을 수 없습니다("
-},
-"：這個 repo 沒有這個量化": {
-"en": ": this repo does not have that quantization",
-"ja": "：このリポジトリにはその量子化がありません",
-"ko": ": 이 저장소에는 해당 양자화가 없습니다"
-},
-"：下載沒完成（": {
-"en": ": download did not finish (",
-"ja": "：ダウンロードが完了しませんでした（",
-"ko": ": 다운로드가 완료되지 않았습니다("
-},
-"：下載完了但存放區掃不到": {
-"en": ": downloaded, but the model store scan does not find it",
-"ja": "：ダウンロードしましたが保存先のスキャンで見つかりません",
-"ko": ": 다운로드했지만 저장소 검색에서 찾을 수 없습니다"
-},
-"{0} 不在「只准用的模型」清單裡": {
-"en": "{0} is not on the \"allowed models\" list",
-"ja": "{0} は「許可されたモデル」リストにありません",
-"ko": "{0}은(는) \"허용 모델\" 목록에 없습니다"
-},
-"不在「只准用的模型」清單裡": {
-"en": "is not on the \"allowed models\" list",
-"ja": "は「許可されたモデル」リストにありません",
-"ko": "은(는) \"허용 모델\" 목록에 없습니다"
-},
-"{0}這一版的代理還不支援，先略過": {
-"en": "{0} is not supported by this agent version yet; skipped",
-"ja": "{0} はこのバージョンのエージェントではまだ対応していないため、スキップしました",
-"ko": "{0}은(는) 이 버전의 에이전트에서 아직 지원하지 않아 건너뛰었습니다"
-},
-"這一版的代理還不支援，先略過": {
-"en": "Not supported by this agent version yet; skipped",
-"ja": "このバージョンのエージェントではまだ対応していないため、スキップしました",
-"ko": "이 버전의 에이전트에서 아직 지원하지 않아 건너뛰었습니다"
-},
-"群組要 ": {
-"en": "The group needs ",
-"ja": "グループが必要とするモデル数 ",
-"ko": "그룹에 필요한 모델 "
-},
-" 顆模型，這台只有 ": {
-"en": " models, but this machine has only ",
-"ja": " 個。このマシンにある言語モデル用スロットは ",
-"ko": "개, 이 머신의 언어 모델 슬롯은 "
-},
-" 個可放語言模型的欄位": {
-"en": " slots that can hold a language model",
-"ja": " 個のみです",
-"ko": "개뿐입니다"
-},
-"{0}：{1} 放不下（{2}），請改小上下文或換小一點的量化": {
-"en": "{0}: {1} does not fit ({2}); shorten the context or switch to a smaller quantization",
-"ja": "{0}：{1} が入りきりません（{2}）。コンテキストを短くするか、より小さい量子化に替えてください",
-"ko": "{0}: {1}이(가) 들어가지 않습니다({2}). 컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
-},
-"請改小上下文或換小一點的量化": {
-"en": "Shorten the context or switch to a smaller quantization",
-"ja": "コンテキストを短くするか、より小さい量子化に替えてください",
-"ko": "컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
-},
-"：在跑的模型不在只准用的清單裡，已停掉": {
-"en": ": the running model is not on the allowed list and has been stopped",
-"ja": "：実行中のモデルが許可リストにないため停止しました",
-"ko": ": 실행 중인 모델이 허용 목록에 없어 중지했습니다"
-},
-" 不在「只准用的模型」清單裡": {
-"en": " is not on the \"allowed models\" list",
-"ja": " は「許可されたモデル」リストにありません",
-"ko": "은(는) \"허용 모델\" 목록에 없습니다"
-},
-" 放不下（": {
-"en": " does not fit (",
-"ja": " が入りきりません（",
-"ko": "이(가) 들어가지 않습니다("
-},
-"），請改小上下文或換小一點的量化": {
-"en": "); shorten the context or switch to a smaller quantization",
-"ja": "）。コンテキストを短くするか、より小さい量子化に替えてください",
-"ko": "). 컨텍스트를 줄이거나 더 작은 양자화로 바꾸세요"
-},
-"{0}：存放區找不到（可能被刪了），下次對齊會重新準備": {
-"en": "{0}: not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
-"ja": "{0}：保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
-"ko": "{0}: 저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
-},
-"存放區找不到（可能被刪了），下次對齊會重新準備": {
-"en": "Not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
-"ja": "保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
-"ko": "저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
-},
-"{0}：換不上 {1}（{2}），這個欄位原本的服務沒動": {
-"en": "{0}: could not swap in {1} ({2}); this slot's original service was left untouched",
-"ja": "{0}：{1} に入れ替えられませんでした（{2}）。このスロットの元のサービスはそのままです",
-"ko": "{0}: {1}(으)로 교체하지 못했습니다({2}). 이 슬롯의 원래 서비스는 그대로입니다"
-},
-"換不上": {
-"en": "Could not swap in",
-"ja": "入れ替えられません",
-"ko": "교체할 수 없음"
-},
-"這個欄位原本的服務沒動": {
-"en": "This slot's original service was left untouched",
-"ja": "このスロットの元のサービスはそのままです",
-"ko": "이 슬롯의 원래 서비스는 그대로입니다"
-},
-"{0} 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
-"en": "The SHA-256 of {0} does not match the one published on Hugging Face; it was deleted, please download it again",
-"ja": "{0} の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
-"ko": "{0}의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
-},
-"的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
-"en": "SHA-256 does not match the one published on Hugging Face; it was deleted, please download it again",
-"ja": "の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
-"ko": "의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
-},
-"：存放區找不到（可能被刪了），下次對齊會重新準備": {
-"en": ": not found in the model store (it may have been deleted); it will be prepared again at the next alignment",
-"ja": "：保存先に見つかりません（削除された可能性があります）。次回の同期で再準備します",
-"ko": ": 저장소에서 찾을 수 없습니다(삭제되었을 수 있음). 다음 맞춤 때 다시 준비합니다"
-},
-"拉回群組設定的模型 ": {
-"en": "Restore the group's model ",
-"ja": "グループ設定のモデルに戻す ",
-"ko": "그룹 설정 모델로 되돌리기 "
-},
-"換上 ": {
-"en": "Swap in ",
-"ja": "入れ替え ",
-"ko": "교체 "
-},
-"：換不上 ": {
-"en": ": could not swap in ",
-"ja": "：入れ替えられません ",
-"ko": ": 교체하지 못했습니다 "
-},
-"），這個欄位原本的服務沒動": {
-"en": "); this slot's original service was left untouched",
-"ja": "）。このスロットの元のサービスはそのままです",
-"ko": "). 이 슬롯의 원래 서비스는 그대로입니다"
-},
-" 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載": {
-"en": " SHA-256 does not match the one published on Hugging Face; it was deleted, please download it again",
-"ja": " の SHA-256 が Hugging Face で公開されているものと異なるため削除しました。再ダウンロードしてください",
-"ko": "의 SHA-256이 Hugging Face에 공개된 값과 달라 삭제했습니다. 다시 다운로드하세요"
-},
-"已換回套用前的模型": {
-"en": "Switched back to the model from before applying",
-"ja": "適用前のモデルに戻しました",
-"ko": "적용 전 모델로 되돌렸습니다"
-},
-"換回套用前的模型失敗，請到機器頁查看": {
-"en": "Switching back to the model from before applying failed; check the machine page",
-"ja": "適用前のモデルへの切り戻しに失敗しました。マシンページを確認してください",
-"ko": "적용 전 모델로 되돌리지 못했습니다. 머신 페이지에서 확인하세요"
-},
-"連不到主控台，請確認網路，或防火牆有沒有放行這台電腦（錯誤碼 NET）": {
-"en": "Cannot reach the console. Check the network, or whether the firewall allows this computer (error code NET)",
-"ja": "コンソールに接続できません。ネットワーク、またはファイアウォールがこのコンピューターを許可しているか確認してください（エラーコード NET）",
-"ko": "콘솔에 연결할 수 없습니다. 네트워크 또는 방화벽이 이 컴퓨터를 허용하는지 확인하세요 (오류 코드 NET)"
-},
-"帳號或密碼不對（錯誤碼 401）。登入已暫停，請 15 分鐘後再試": {
-"en": "Incorrect username or password (error code 401). Sign-in is paused; try again in 15 minutes",
-"ja": "ユーザー名またはパスワードが違います（エラーコード 401）。ログインは一時停止中です。15 分後に再試行してください",
-"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401). 로그인이 일시 중지되었습니다. 15분 후 다시 시도하세요"
-},
-"帳號或密碼不對（錯誤碼 401）": {
-"en": "Incorrect username or password (error code 401)",
-"ja": "ユーザー名またはパスワードが違います（エラーコード 401）",
-"ko": "사용자 이름 또는 비밀번호가 올바르지 않습니다 (오류 코드 401)"
-},
-"。再錯 {0} 次會暫停登入 15 分鐘": {
-"en": ". {0} more failed attempts will pause sign-in for 15 minutes",
-"ja": "。あと {0} 回失敗するとログインが 15 分間停止されます",
-"ko": ". {0}번 더 실패하면 로그인이 15분간 중지됩니다"
-},
-"再錯": {
-"en": "More failures:",
-"ja": "あと失敗",
-"ko": "추가 실패"
-},
-"次會暫停登入 15 分鐘": {
-"en": "will pause sign-in for 15 minutes",
-"ja": "回でログインが 15 分間停止されます",
-"ko": "번이면 로그인이 15분간 중지됩니다"
-},
-"{0}（錯誤碼 {1}）": {
-"en": "{0} (error code {1})",
-"ja": "{0}（エラーコード {1}）",
-"ko": "{0} (오류 코드 {1})"
-},
-"錯誤碼": {
-"en": "Error code",
-"ja": "エラーコード",
-"ko": "오류 코드"
-},
-"登入中…": {
-"en": "Signing in…",
-"ja": "ログイン中…",
-"ko": "로그인 중…"
 },
 "；這個群組還能用的 {0} 個加入碼一起作廢": {
 "en": "; the group's {0} unused join codes were revoked as well",
@@ -20114,359 +20854,9 @@
 "ja": "確認中に参加コードが無効化されたか、グループが削除されました。コンソールで参加コードを作り直してください",
 "ko": "확인 중에 가입 코드가 무효화되었거나 그룹이 삭제되었습니다. 콘솔에서 가입 코드를 다시 생성하세요"
 },
-"現在執行 {0}": {
-"en": "Running {0}",
-"ja": "実行中 {0}",
-"ko": "실행 중 {0}"
-},
-"現在執行 {0}{1}": {
-"en": "Running {0}{1}",
-"ja": "実行中 {0}{1}",
-"ko": "실행 중 {0}{1}"
-},
-"（整機用量）": {
-"en": " (whole-machine usage)",
-"ja": "（マシン全体の使用量）",
-"ko": " (전체 기기 사용량)"
-},
-"沒有回答": {
-"en": "No answer",
-"ja": "応答なし",
-"ko": "응답 없음"
-},
-"服務還開著、模型清單也回得來，但請它生字回錯誤（{0}）：{1}。通常是 GPU 重置過，按「重新啟動」多半就好了。": {
-"en": "The service is running and the model list responds, but asking it to generate returned an error ({0}): {1}. This usually means the GPU was reset; pressing \"Restart\" normally fixes it.",
-"ja": "サービスは動作しておりモデル一覧も返りますが、生成させるとエラーが返ります（{0}）：{1}。多くは GPU がリセットされたためで、「再起動」を押せばたいてい直ります。",
-"ko": "서비스는 켜져 있고 모델 목록도 응답하지만, 생성을 요청하면 오류가 반환됩니다({0}): {1}. 대개 GPU가 리셋된 경우이며 \"다시 시작\"을 누르면 보통 해결됩니다."
-},
-"服務還開著、模型清單也回得來，但請它生字回錯誤": {
-"en": "The service is running and the model list responds, but asking it to generate returned an error",
-"ja": "サービスは動作しておりモデル一覧も返りますが、生成させるとエラーが返ります",
-"ko": "서비스는 켜져 있고 모델 목록도 응답하지만, 생성을 요청하면 오류가 반환됩니다"
-},
-"通常是 GPU 重置過，按「重新啟動」多半就好了": {
-"en": "This usually means the GPU was reset; pressing \"Restart\" normally fixes it",
-"ja": "多くは GPU がリセットされたためで、「再起動」を押せばたいてい直ります",
-"ko": "대개 GPU가 리셋된 경우이며 \"다시 시작\"을 누르면 보통 해결됩니다"
-},
-"生不出字": {
-"en": "Not generating",
-"ja": "生成できない",
-"ko": "생성 불가"
-},
-"放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著": {
-"en": "Weights that do not fit in the GPU portion are held here as page cache, which can be dropped at any time; the KV cache and the engine itself cannot be dropped and are counted in admission. A watchdog monitors it while running",
-"ja": "GPU 側に入りきらない重みはここにページキャッシュとして置かれ、いつでも破棄できます。KV とエンジン本体は破棄できないため受け入れ判定に含めており、実行中はウォッチドッグが監視します",
-"ko": "GPU 쪽에 들어가지 않는 가중치는 여기에 페이지 캐시로 보관되며 언제든 버릴 수 있습니다. KV와 엔진 자체는 버릴 수 없어 승인 계산에 포함되며, 실행 중에는 워치독이 감시합니다"
-},
-"平常只給引擎用，模型不放這裡": {
-"en": "Normally used only by the engine; models are not placed here",
-"ja": "通常はエンジン専用で、モデルは置きません",
-"ko": "평소에는 엔진만 사용하며 모델은 두지 않습니다"
-},
-"這台的記憶體是 BIOS 切成兩塊的（例 AI 395）：放不下的部分會經過系統那一小塊從 SSD 讀。": {
-"en": "This machine's memory is split in two by the BIOS (e.g. AI 395): whatever does not fit is read from the SSD through the small system portion.",
-"ja": "このマシンのメモリは BIOS で 2 つに分割されています（例：AI 395）。入りきらない部分はシステム側の小さな領域を経由して SSD から読み込みます。",
-"ko": "이 머신의 메모리는 BIOS에서 두 부분으로 나뉘어 있습니다(예: AI 395). 들어가지 않는 부분은 시스템 쪽 작은 영역을 거쳐 SSD에서 읽습니다."
-},
-"那是作業系統隨時可以丟掉的頁快取，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死。": {
-"en": "That is page cache the operating system can drop at any time, so it is never locked in; if the system portion is about to run out, the watchdog stops this model automatically so the machine does not freeze.",
-"ja": "これは OS がいつでも破棄できるページキャッシュで、占有されたままにはなりません。システム側が使い切られそうになると、ウォッチドッグがこのモデルを自動停止し、マシン全体が固まるのを防ぎます。",
-"ko": "이는 운영체제가 언제든 버릴 수 있는 페이지 캐시라 계속 점유되지 않습니다. 시스템 쪽이 거의 소진되면 워치독이 이 모델을 자동으로 중지해 머신 전체가 멈추지 않게 합니다."
-},
-"用硬碟執行時不會套用這幾個自訂引數：{0}（它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體）。": {
-"en": "These custom arguments are not applied when running from disk: {0} (they disable file mapping or lock memory, which would make the weights memory that cannot be dropped).",
-"ja": "ディスクから実行する場合、次のカスタム引数は適用しません：{0}（ファイルマッピングを無効にしたりメモリをロックしたりするため、重みが破棄できないメモリになります）。",
-"ko": "디스크에서 실행할 때는 다음 사용자 지정 인수를 적용하지 않습니다: {0}(파일 매핑을 끄거나 메모리를 잠가 가중치가 버릴 수 없는 메모리가 되기 때문입니다)."
-},
-"用硬碟執行時不會套用這幾個自訂引數": {
-"en": "These custom arguments are not applied when running from disk",
-"ja": "ディスクから実行する場合、次のカスタム引数は適用しません",
-"ko": "디스크에서 실행할 때는 다음 사용자 지정 인수를 적용하지 않습니다"
-},
-"它們會關掉檔案映射或鎖住記憶體，權重會變成丟不掉的記憶體": {
-"en": "they disable file mapping or lock memory, which would make the weights memory that cannot be dropped",
-"ja": "ファイルマッピングを無効にしたりメモリをロックしたりするため、重みが破棄できないメモリになります",
-"ko": "파일 매핑을 끄거나 메모리를 잠가 가중치가 버릴 수 없는 메모리가 되기 때문입니다"
-},
-"搬進 GPU": {
-"en": "Copy to GPU",
-"ja": "GPU へ転送",
-"ko": "GPU로 전송"
-},
-"GPU 那一塊放 {0} GiB，其餘 {1} GiB 以檔案映射留在系統那塊的頁快取": {
-"en": "{0} GiB in the GPU portion; the remaining {1} GiB stays memory-mapped in the system portion's page cache",
-"ja": "GPU 側に {0} GiB、残り {1} GiB はファイルマッピングでシステム側のページキャッシュに置きます",
-"ko": "GPU 쪽에 {0} GiB, 나머지 {1} GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
-},
-"GPU 那一塊放": {
-"en": "In the GPU portion:",
-"ja": "GPU 側に",
-"ko": "GPU 쪽에"
-},
-"GiB 以檔案映射留在系統那塊的頁快取": {
-"en": "GiB stays memory-mapped in the system portion's page cache",
-"ja": "GiB はファイルマッピングでシステム側のページキャッシュに置きます",
-"ko": "GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
-},
-"BIOS 把記憶體切成兩塊：模型放 GPU 那塊；系統那塊只給引擎，放不下時當頁快取、從 SSD 補，跑的時候有看門狗盯著": {
-"en": "The BIOS splits memory in two: models go in the GPU portion; the system portion is only for the engine, and when a model does not fit it serves as page cache filled from the SSD, monitored by a watchdog while running",
-"ja": "BIOS がメモリを 2 つに分割しています。モデルは GPU 側に置き、システム側はエンジン専用です。入りきらない場合はページキャッシュとして SSD から補い、実行中はウォッチドッグが監視します",
-"ko": "BIOS가 메모리를 두 부분으로 나눕니다. 모델은 GPU 쪽에 두고 시스템 쪽은 엔진 전용입니다. 들어가지 않으면 페이지 캐시로 SSD에서 보충하며, 실행 중에는 워치독이 감시합니다"
-},
-"GPU 那一塊放 ": {
-"en": "In the GPU portion: ",
-"ja": "GPU 側に ",
-"ko": "GPU 쪽에 "
-},
-" GiB 以檔案映射留在系統那塊的頁快取": {
-"en": " GiB stays memory-mapped in the system portion's page cache",
-"ja": " GiB はファイルマッピングでシステム側のページキャッシュに置きます",
-"ko": " GiB는 파일 매핑으로 시스템 쪽 페이지 캐시에 둡니다"
-},
-"這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死": {
-"en": "This machine's memory is split in two by the BIOS (e.g. AI 395): expert layers that do not fit are read from the SSD through the small system portion. The OS can drop that page cache at any time, so it is never locked in; if the system portion is about to run out, the watchdog stops this model automatically so the machine does not freeze",
-"ja": "このマシンはメモリが BIOS で 2 つに分割されています（例：AI 395）。入りきらないエキスパート層はシステム側の小さな領域を経由して SSD から読み込みます。ページキャッシュは OS がいつでも破棄でき、占有されたままにはなりません。システム側が使い切られそうになると、ウォッチドッグがこのモデルを自動停止し、マシン全体が固まるのを防ぎます",
-"ko": "이 머신은 메모리가 BIOS에서 두 부분으로 나뉘어 있습니다(예: AI 395). 들어가지 않는 전문가 레이어는 시스템 쪽 작은 영역을 거쳐 SSD에서 읽습니다. 페이지 캐시는 운영체제가 언제든 버릴 수 있어 계속 점유되지 않으며, 시스템 쪽이 거의 소진되면 워치독이 이 모델을 자동으로 중지해 머신 전체가 멈추지 않게 합니다"
-},
-"等了 {0} 分鐘還沒載完，卡在「{1}」": {
-"en": "Still not loaded after {0} minutes; stuck at \"{1}\"",
-"ja": "{0} 分待ってもロードが終わらず、「{1}」で止まっています",
-"ko": "{0}분을 기다려도 로드가 끝나지 않았으며 \"{1}\" 단계에서 멈춰 있습니다"
-},
-"等了": {
-"en": "Waited",
-"ja": "待ち時間",
-"ko": "대기"
-},
-"分鐘還沒載完，卡在「": {
-"en": "minutes and still not loaded; stuck at \"",
-"ja": "分たってもロードが終わらず、「",
-"ko": "분이 지나도 로드가 끝나지 않았으며 \""
-},
-"載入": {
-"en": "Loading",
-"ja": "ロード",
-"ko": "로드"
-},
-"等了 ": {
-"en": "Waited ",
-"ja": "待ち時間 ",
-"ko": "대기 "
-},
-" 分鐘還沒載完，卡在「": {
-"en": " minutes and still not loaded; stuck at \"",
-"ja": " 分たってもロードが終わらず、「",
-"ko": "분이 지나도 로드가 끝나지 않았으며 \""
-},
-"權重讀完了，正在搬進 GPU：約 {0} GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 {1} MB": {
-"en": "Weights have been read and are being copied to the GPU: about {0} GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about {1} MB per second",
-"ja": "重みの読み込みが終わり、GPU へ転送中です：約 {0} GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約 {1} MB の見込みです",
-"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약 {0} GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약 {1} MB입니다"
-},
-"權重讀完了，正在搬進 GPU：約": {
-"en": "Weights have been read and are being copied to the GPU: about",
-"ja": "重みの読み込みが終わり、GPU へ転送中です：約",
-"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약"
-},
-"GiB。用硬碟執行時這段走檔案映射，這台預估每秒約": {
-"en": "GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about",
-"ja": "GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約",
-"ko": "GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약"
-},
-"系統記憶體只剩 {0} GiB（危險線 {1} GiB），為了不讓整台卡死，看門狗在 {2} 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
-"en": "System memory was down to {0} GiB (danger line {1} GiB). To keep the machine from freezing, the watchdog stopped this disk-backed model at {2}. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
-"ja": "システムメモリが残り {0} GiB になりました（危険ライン {1} GiB）。マシン全体が固まらないよう、ウォッチドッグが {2} にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
-"ko": "시스템 메모리가 {0} GiB만 남았습니다(위험선 {1} GiB). 머신 전체가 멈추지 않도록 워치독이 {2}에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
-},
-"GiB（危險線": {
-"en": "GiB (danger line",
-"ja": "GiB（危険ライン",
-"ko": "GiB(위험선"
-},
-"GiB），為了不讓整台卡死，看門狗在": {
-"en": "GiB). To keep the machine from freezing, the watchdog at",
-"ja": "GiB）。マシン全体が固まらないよう、ウォッチドッグが",
-"ko": "GiB). 머신 전체가 멈추지 않도록 워치독이"
-},
-"停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
-"en": "stopped this disk-backed model. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
-"ja": "にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
-"ko": "에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
-},
-"服務在跑但": {
-"en": "The service is running but",
-"ja": "サービスは動作していますが",
-"ko": "서비스는 실행 중이지만"
-},
-"權重讀完了，正在搬進 GPU：約 ": {
-"en": "Weights have been read and are being copied to the GPU: about ",
-"ja": "重みの読み込みが終わり、GPU へ転送中です：約 ",
-"ko": "가중치를 다 읽었고 GPU로 전송 중입니다: 약 "
-},
-" GiB。用硬碟執行時這段走檔案映射，這台預估每秒約 ": {
-"en": " GiB. When running from disk this step goes through file mapping; estimated speed on this machine is about ",
-"ja": " GiB。ディスクから実行する場合この段階はファイルマッピングを経由し、このマシンでは毎秒約 ",
-"ko": " GiB. 디스크에서 실행할 때 이 단계는 파일 매핑을 거치며, 이 머신의 예상 속도는 초당 약 "
-},
-"。比預估慢，仍在搬；等到 {0} 分鐘還沒好會自動換回原本的設定": {
-"en": ". Slower than estimated and still copying; if it is not done by {0} minutes it switches back to the previous settings automatically",
-"ja": "。見込みより遅く、まだ転送中です。{0} 分たっても終わらない場合は自動的に元の設定に戻します",
-"ko": ". 예상보다 느려 아직 전송 중입니다. {0}분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
-},
-"比預估慢，仍在搬；等到": {
-"en": "Slower than estimated and still copying; if not done by",
-"ja": "見込みより遅く、まだ転送中です。",
-"ko": "예상보다 느려 아직 전송 중입니다."
-},
-"分鐘還沒好會自動換回原本的設定": {
-"en": "minutes it switches back to the previous settings automatically",
-"ja": "分たっても終わらない場合は自動的に元の設定に戻します",
-"ko": "분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
-},
-" GiB（危險線 ": {
-"en": " GiB (danger line ",
-"ja": " GiB（危険ライン ",
-"ko": " GiB(위험선 "
-},
-" GiB），為了不讓整台卡死，看門狗在 ": {
-"en": " GiB). To keep the machine from freezing, the watchdog at ",
-"ja": " GiB）。マシン全体が固まらないよう、ウォッチドッグが ",
-"ko": " GiB). 머신 전체가 멈추지 않도록 워치독이 "
-},
-" 停掉了這個用硬碟執行的模型。請縮短上下文、關掉別的程式，或換小一點的量化再啟動": {
-"en": " stopped this disk-backed model. Shorten the context, close other programs, or switch to a smaller quantization, then start it again",
-"ja": " にディスクから実行中のこのモデルを停止しました。コンテキストを短くする、他のプログラムを閉じる、またはより小さい量子化に替えてから起動してください",
-"ko": "에 디스크로 실행 중인 이 모델을 중지했습니다. 컨텍스트를 줄이거나 다른 프로그램을 닫거나 더 작은 양자화로 바꾼 뒤 다시 시작하세요"
-},
-"剛啟動": {
-"en": "just started",
-"ja": "起動直後",
-"ko": "막 시작됨"
-},
-"讀權重": {
-"en": "reading weights",
-"ja": "重みの読み込み",
-"ko": "가중치 읽기"
-},
-"把權重搬進 GPU": {
-"en": "copying weights to the GPU",
-"ja": "重みを GPU へ転送",
-"ko": "가중치를 GPU로 전송"
-},
-"配置記憶體": {
-"en": "allocating memory",
-"ja": "メモリの割り当て",
-"ko": "메모리 할당"
-},
-"暖機": {
-"en": "warming up",
-"ja": "ウォームアップ",
-"ko": "워밍업"
-},
-"。比預估慢，仍在搬；等到 ": {
-"en": ". Slower than estimated and still copying; if not done by ",
-"ja": "。見込みより遅く、まだ転送中です。",
-"ko": ". 예상보다 느려 아직 전송 중입니다. "
-},
-" 分鐘還沒好會自動換回原本的設定": {
-"en": " minutes it switches back to the previous settings automatically",
-"ja": " 分たっても終わらない場合は自動的に元の設定に戻します",
-"ko": "분이 지나도 끝나지 않으면 자동으로 원래 설정으로 되돌립니다"
-},
-"看門狗：": {
-"en": "Watchdog: ",
-"ja": "ウォッチドッグ：",
-"ko": "워치독: "
-},
-"生字探測：": {
-"en": "Generation probe: ",
-"ja": "生成チェック：",
-"ko": "생성 점검: "
-},
-"例：AI 研究中心主機": {
-"en": "e.g. AI Research Center host",
-"ja": "例：AI 研究センターのホスト",
-"ko": "예: AI 연구센터 호스트"
-},
-"1～40 個字；概覽標題、機器清單與報表都用這個名稱": {
-"en": "1–40 characters; used in the overview title, machine list and reports",
-"ja": "1～40 文字。概要のタイトル、マシン一覧、レポートで使われます",
-"ko": "1~40자. 개요 제목, 머신 목록, 보고서에 사용됩니다"
-},
-"改機器名稱": {
-"en": "Rename machine",
-"ja": "マシン名を変更",
-"ko": "머신 이름 변경"
-},
-"名稱已更新": {
-"en": "Name updated",
-"ja": "名前を更新しました",
-"ko": "이름이 변경되었습니다"
-},
-"改名稱": {
-"en": "Rename",
-"ja": "名前を変更",
-"ko": "이름 변경"
-},
-"手動組一顆不在清單上的畫圖／影片模型": {
-"en": "Build an image/video model that is not on the list",
-"ja": "一覧にない画像／動画モデルを手動で組む",
-"ko": "목록에 없는 이미지/영상 모델 직접 구성"
-},
-"手動組": {
-"en": "Custom build",
-"ja": "手動構成",
-"ko": "직접 구성"
-},
-"・手動組": {
-"en": " · Custom build",
-"ja": "・手動構成",
-"ko": " · 직접 구성"
-},
-"・中國來源": {
-"en": " · China-origin",
-"ja": "・中国由来",
-"ko": " · 중국 출처"
-},
-"大小由機器從 Hugging Face 讀。中國來源的模型照樣可以加入，畫面上會標出來——文字編碼器、VAE 是中國來源也算。": {
-"en": "The machine reads the size from Hugging Face. China-origin models can still be added and are marked on screen; a China-origin text encoder or VAE also counts.",
-"ja": "サイズはマシンが Hugging Face から読み取ります。中国由来のモデルも追加でき、画面上に表示されます。テキストエンコーダーや VAE が中国由来の場合も同様です。",
-"ko": "크기는 머신이 Hugging Face에서 읽어 옵니다. 중국 출처 모델도 추가할 수 있으며 화면에 표시됩니다. 텍스트 인코더나 VAE가 중국 출처인 경우도 포함됩니다."
-},
-"不在推薦清單上的模型可以在這裡自己組。中國來源的模型（文字編碼器、VAE 也算）照樣可以用，畫面上會標出來；政府案依規定不得使用。": {
-"en": "Models not on the recommended list can be built here. China-origin models (including text encoders and VAEs) can still be used and are marked on screen; they may not be used in government projects.",
-"ja": "おすすめ一覧にないモデルはここで自分で組めます。中国由来のモデル（テキストエンコーダーや VAE を含む）も使え、画面上に表示されます。政府案件では規定により使用できません。",
-"ko": "추천 목록에 없는 모델은 여기서 직접 구성할 수 있습니다. 중국 출처 모델(텍스트 인코더, VAE 포함)도 사용할 수 있으며 화면에 표시됩니다. 정부 사업에서는 규정상 사용할 수 없습니다."
-},
-"上下文以 {0} 計、低於 {1} tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加 {2} 毫秒。標「中國來源」的模型政府案不得使用。": {
-"en": "context is taken as {0}, and below {1} tok/s counts as not smooth. The efficiency is fitted from models measured on this machine, plus {2} ms per layer. Models marked China-origin are not allowed in government projects.",
-"ja": "コンテキストは {0} として計算し、{1} tok/s 未満は快適とみなしません。効率はこのマシンで実測したモデルから当てはめた値で、1 層ごとに {2} ミリ秒を加えています。「中国製」と表示されたモデルは官公庁案件では使用できません。",
-"ko": "컨텍스트는 {0} 기준이며 {1} tok/s 미만은 원활하지 않은 것으로 봅니다. 효율은 이 머신에서 실측한 모델로 맞춘 값이며 층마다 {2}밀리초를 더합니다. '중국산'으로 표시된 모델은 정부 사업에 사용할 수 없습니다."
-},
-"tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加": {
-"en": "tok/s counts as not smooth. The efficiency is fitted from models measured on this machine, plus",
-"ja": "tok/s 未満は快適とみなしません。効率はこのマシンで実測したモデルから当てはめた値で、1 層ごとに",
-"ko": "tok/s 미만은 원활하지 않은 것으로 봅니다. 효율은 이 머신에서 실측한 모델로 맞춘 값이며 층마다"
-},
-"毫秒。標「中國來源」的模型政府案不得使用": {
-"en": "ms per layer. Models marked China-origin are not allowed in government projects",
-"ja": "ミリ秒を加えています。「中国製」と表示されたモデルは官公庁案件では使用できません",
-"ko": "밀리초를 더합니다. '중국산'으로 표시된 모델은 정부 사업에 사용할 수 없습니다"
-},
-"依這台實測擬合：頻寬效率 {0}%、每層 {1} 毫秒": {
-"en": "Fitted from measurements on this machine: bandwidth efficiency {0}%, {1} ms per layer",
-"ja": "このマシンの実測から当てはめ：帯域効率 {0}%、1 層あたり {1} ミリ秒",
-"ko": "이 머신 실측으로 맞춤: 대역폭 효율 {0}%, 층당 {1}밀리초"
-},
-"依這台實測擬合：頻寬效率": {
-"en": "Fitted from measurements on this machine: bandwidth efficiency",
-"ja": "このマシンの実測から当てはめ：帯域効率",
-"ko": "이 머신 실측으로 맞춤: 대역폭 효율"
-},
-"%、每層": {
-"en": "%, per layer",
-"ja": "%、1 層あたり",
-"ko": "%, 층당"
+"這台不能操作桌面：桌面小幫手沒有在執行，請用要操作的那個帳號登入這台的桌面": {
+"en": "This machine can't control the desktop: the desktop helper isn't running; sign in to this machine's desktop with the account you want to control",
+"ja": "この機器ではデスクトップを操作できません：デスクトップヘルパーが動いていません。操作したいアカウントでこの機器のデスクトップにログインしてください",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: 데스크톱 도우미가 실행 중이 아닙니다. 조작할 계정으로 이 기기의 데스크톱에 로그인하세요"
 }
 }

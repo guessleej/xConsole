@@ -1136,6 +1136,14 @@
 "pattern": false
 },
 {
+"zh": "檔案不完整",
+"pattern": false
+},
+{
+"zh": "檔案已刪除",
+"pattern": false
+},
+{
 "zh": "排隊中",
 "pattern": false
 },
@@ -1672,6 +1680,10 @@
 "pattern": false
 },
 {
+"zh": "（含投影檔）",
+"pattern": false
+},
+{
 "zh": "速度未知",
 "pattern": false
 },
@@ -2040,7 +2052,7 @@
 "pattern": false
 },
 {
-"zh": "存放在 {0}，剩 {1} GB。",
+"zh": "存放在 {0}，剩 {1} GiB。",
 "pattern": true
 },
 {
@@ -2160,7 +2172,7 @@
 "pattern": false
 },
 {
-"zh": "共 {0} GB",
+"zh": "共 {0} GiB",
 "pattern": true
 },
 {
@@ -2188,7 +2200,7 @@
 "pattern": false
 },
 {
-"zh": "下載 {0} GB",
+"zh": "下載 {0} GiB",
 "pattern": true
 },
 {
@@ -3394,10 +3406,6 @@
 {
 "zh": "顯示記憶體使用",
 "pattern": false
-},
-{
-"zh": "共 {0} GiB",
-"pattern": true
 },
 {
 "zh": "每 15 秒自動更新",
@@ -4864,11 +4872,11 @@
 "pattern": false
 },
 {
-"zh": "<strong>把憑證檔拖到這裡，或點這裡選檔</strong>可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）",
+"zh": "把憑證檔拖到這裡，或點這裡選檔",
 "pattern": false
 },
 {
-"zh": "把憑證檔拖到這裡，或點這裡選檔",
+"zh": "可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）",
 "pattern": false
 },
 {
@@ -8948,6 +8956,10 @@
 "pattern": false
 },
 {
+"zh": "沒有這個欄位",
+"pattern": false
+},
+{
 "zh": "對外網址格式不對，主控台不代為實測",
 "pattern": false
 },
@@ -11236,6 +11248,290 @@
 "pattern": false
 },
 {
+"zh": "只含 GPU 晶片回報的功耗，不含 CPU、記憶體、硬碟、電源轉換損失與冷氣，整機實際用電會明顯較高。",
+"pattern": false
+},
+{
+"zh": "尚未設定雲端參考單價，只報地端處理量，不估算省下的費用。",
+"pattern": false
+},
+{
+"zh": "（未知）",
+"pattern": false
+},
+{
+"zh": "電價以每度 NT$ {0} 計算。",
+"pattern": true
+},
+{
+"zh": "電價以每度 NT$",
+"pattern": false
+},
+{
+"zh": "計算",
+"pattern": false
+},
+{
+"zh": "尚未設定電價，不換算金額。",
+"pattern": false
+},
+{
+"zh": "（未命名）",
+"pattern": false
+},
+{
+"zh": "以 {0} 每百萬輸入 token US$ {1}、輸出 US$ {2} 計；重用快取的 token 不計費",
+"pattern": true
+},
+{
+"zh": "以",
+"pattern": false
+},
+{
+"zh": "每百萬輸入 token US$",
+"pattern": false
+},
+{
+"zh": "輸出 US$",
+"pattern": false
+},
+{
+"zh": "計；重用快取的 token 不計費",
+"pattern": false
+},
+{
+"zh": "待改善",
+"pattern": false
+},
+{
+"zh": "主控台使用暫用自簽憑證",
+"pattern": false
+},
+{
+"zh": "在「設定 → HTTPS 與憑證」產生 CSR 或上傳正式憑證",
+"pattern": false
+},
+{
+"zh": "主控台憑證剩 {0} 天，{1}（台北時間）到期",
+"pattern": true
+},
+{
+"zh": "向憑證廠商續約並在網頁上匯入新憑證",
+"pattern": false
+},
+{
+"zh": "注意",
+"pattern": false
+},
+{
+"zh": "有 {0} 次強制略過記憶體准入試算",
+"pattern": true
+},
+{
+"zh": "次強制略過記憶體准入試算",
+"pattern": false
+},
+{
+"zh": "確認當時操作者是否知情；強制載入有機會把統一記憶體機拖死",
+"pattern": false
+},
+{
+"zh": "登入失敗 {0} 次",
+"pattern": true
+},
+{
+"zh": "登入失敗",
+"pattern": false
+},
+{
+"zh": "確認是否有人在猜密碼",
+"pattern": false
+},
+{
+"zh": "取樣自 {0} 起才開始收集，本期之前沒有資料",
+"pattern": true
+},
+{
+"zh": "取樣自",
+"pattern": false
+},
+{
+"zh": "起才開始收集，本期之前沒有資料",
+"pattern": false
+},
+{
+"zh": "本期無異常",
+"pattern": false
+},
+{
+"zh": "共 {0} 項待處理",
+"pattern": true
+},
+{
+"zh": "項待處理",
+"pattern": false
+},
+{
+"zh": "電價以每度 NT$ ",
+"pattern": false
+},
+{
+"zh": " 計算。",
+"pattern": false
+},
+{
+"zh": "以 ",
+"pattern": false
+},
+{
+"zh": " 每百萬輸入 token US$ ",
+"pattern": false
+},
+{
+"zh": "、輸出 US$ ",
+"pattern": false
+},
+{
+"zh": " 計；重用快取的 token 不計費",
+"pattern": false
+},
+{
+"zh": "；匯率 {0}",
+"pattern": true
+},
+{
+"zh": "匯率",
+"pattern": false
+},
+{
+"zh": "{0} 有 {1}% 的取樣連不上",
+"pattern": true
+},
+{
+"zh": "% 的取樣連不上",
+"pattern": false
+},
+{
+"zh": "查網路或代理服務是否中斷",
+"pattern": false
+},
+{
+"zh": "{0} 系統記憶體低於底線 {1} 次",
+"pattern": true
+},
+{
+"zh": "系統記憶體低於底線",
+"pattern": false
+},
+{
+"zh": "這台曾因系統記憶體耗盡整台卡死；檢查是否有服務長期吃記憶體",
+"pattern": false
+},
+{
+"zh": "主控台憑證剩 ",
+"pattern": false
+},
+{
+"zh": " 天，",
+"pattern": false
+},
+{
+"zh": "（台北時間）到期",
+"pattern": false
+},
+{
+"zh": "{0} 的代理憑證尚未信任，主控台連不上",
+"pattern": true
+},
+{
+"zh": "的代理憑證尚未信任，主控台連不上",
+"pattern": false
+},
+{
+"zh": "重新執行 deploy_console.sh，或在設定頁匯入該機憑證",
+"pattern": false
+},
+{
+"zh": " 次強制略過記憶體准入試算",
+"pattern": false
+},
+{
+"zh": "登入失敗 ",
+"pattern": false
+},
+{
+"zh": " 次",
+"pattern": false
+},
+{
+"zh": "取樣自 ",
+"pattern": false
+},
+{
+"zh": " 起才開始收集，本期之前沒有資料",
+"pattern": false
+},
+{
+"zh": "共 ",
+"pattern": false
+},
+{
+"zh": " 項待處理",
+"pattern": false
+},
+{
+"zh": "；匯率 ",
+"pattern": false
+},
+{
+"zh": " 有 ",
+"pattern": false
+},
+{
+"zh": " 系統記憶體低於底線 ",
+"pattern": false
+},
+{
+"zh": " 的代理憑證尚未信任，主控台連不上",
+"pattern": false
+},
+{
+"zh": "{0} 的 {1} 最後狀態為{2}",
+"pattern": true
+},
+{
+"zh": "的",
+"pattern": false
+},
+{
+"zh": "最後狀態為",
+"pattern": false
+},
+{
+"zh": "到「記錄」頁查該服務的記錄",
+"pattern": false
+},
+{
+"zh": "參考模型",
+"pattern": false
+},
+{
+"zh": " 的 ",
+"pattern": false
+},
+{
+"zh": " 最後狀態為",
+"pattern": false
+},
+{
+"zh": "（尚無）",
+"pattern": false
+},
+{
+"zh": "一直停在啟動中",
+"pattern": false
+},
+{
 "zh": "檔案裡的 {0} 解開後超過 64 MB，不處理",
 "pattern": true
 },
@@ -11604,19 +11900,11 @@
 "pattern": false
 },
 {
-"zh": " 天，",
-"pattern": false
-},
-{
 "zh": "（台北時間）到期，請盡快向廠商續約",
 "pattern": false
 },
 {
 "zh": "效期內，剩 ",
-"pattern": false
-},
-{
-"zh": "（台北時間）到期",
 "pattern": false
 },
 {
@@ -12317,10 +12605,6 @@
 },
 {
 "zh": "資料夾只能用英數、底線、點、連字號；檔名要以 .gguf 結尾",
-"pattern": false
-},
-{
-"zh": "沒有這個欄位",
 "pattern": false
 },
 {
@@ -15660,6 +15944,14 @@
 "pattern": false
 },
 {
+"zh": "這台不能操作桌面：{0}",
+"pattern": true
+},
+{
+"zh": "這台不能操作桌面",
+"pattern": false
+},
+{
 "zh": "記憶體不夠：產這一件要約 {0} GiB，現在只剩 {1} GiB，產的時候會剩 {2} GiB（低於 {3} GiB）。",
 "pattern": true
 },
@@ -15801,6 +16093,14 @@
 },
 {
 "zh": "顯存要在 0.5～4096 GiB 之間",
+"pattern": false
+},
+{
+"zh": "這台不能操作桌面：",
+"pattern": false
+},
+{
+"zh": "這台不能操作桌面：桌面小幫手沒有在執行，請用要操作的那個帳號登入這台的桌面",
 "pattern": false
 },
 {
