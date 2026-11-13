@@ -1118,6 +1118,8 @@ textarea.short { min-height: 48px; }
   background-color: var(--bg-hover); border: 1px solid transparent; font-weight: 600; color: var(--ink);
 }
 .menubtn { display: none; }
+.topbar.tight .nav { display: none; }
+.topbar.tight .menubtn { display: grid; }
 .mnav { position: fixed; inset: 0; z-index: 60; background: rgba(13, 25, 34, .45); }
 .mnav-panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: min(300px, 84vw); background: var(--card);
