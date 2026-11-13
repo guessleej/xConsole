@@ -80,8 +80,9 @@ globalThis.__run = async () => {
   console.log(JSON.stringify([i18nText("重新整理"), i18nText("  重新整理 "), i18nText("已啟動 gemma-4"), i18nText("約 12 tok/s"),
     i18nText("記憶體不夠，請換小一點的量化"), i18nText("gemma-4-E2B"), i18nText("已啟動 約 3 tok/s"), i18nText("剩 84 GiB"),
     i18nText("剩 84 GiB，固態硬碟")]));
-  i18nData({ nodes: [{ id: "n1", name: "重新整理", slots: [{ role: "記憶體不夠" }] }], error: "請換小一點的量化" });
-  console.log(JSON.stringify([i18nText("重新整理"), i18nText("已啟動 記憶體不夠"), i18nText("請換小一點的量化")]));
+  i18nData({ nodes: [{ id: "n1", name: "重新整理", slots: [{ role: "記憶體不夠" }] }], error: "請換小一點的量化",
+             health: { items: [{ node: "約 3 tok/s" }] } });
+  console.log(JSON.stringify([i18nText("重新整理"), i18nText("已啟動 記憶體不夠"), i18nText("請換小一點的量化"), i18nText("已啟動 約 3 tok/s")]));
 };
 __run();
 """ % json.dumps(sample, ensure_ascii=False)
@@ -107,6 +108,7 @@ __run();
             check("使用者資料（機器名）跟介面文字一樣也不翻", data[0] == "重新整理", data[0])
             check("  句子裡夾著的資料（角色名）原樣保留，其他照翻", data[1] == "Started 記憶體不夠", data[1])
             check("  錯誤訊息不是資料，照翻", data[2] == "Use a smaller quantization", data[2])
+            check("  使用報告裡的機器名（node）也是資料，夾在句子裡原樣保留", data[3] == "Started 約 3 tok/s", data[3])
     print("全部通過" if OK else "有項目失敗")
     sys.exit(0 if OK else 1)
 
