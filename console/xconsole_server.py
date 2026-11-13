@@ -2680,7 +2680,8 @@ class Handler(BaseHTTPRequestHandler):
             run = out.get("run") if code == 200 else None
             if run:
                 # 預估速度與推薦清單同一條公式（recommend.decode_speed），畫面不自己算
-                run["tok_s"] = recommend.decode_speed(run.get("size_gib"), run.get("profile") or {}, run.get("bandwidth_gbs"))
+                run["tok_s"] = recommend.decode_speed(run.get("size_gib"), run.get("profile") or {}, run.get("bandwidth_gbs"),
+                                                      run.get("speed_fit"), run.get("speed_factor"))
                 run["load_est_sec"] = recommend.load_seconds(run.get("size_gib"), run.get("hdd"))
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/library", path)

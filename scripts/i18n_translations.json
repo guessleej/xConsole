@@ -20438,5 +20438,35 @@
 "en": "Models not on the recommended list can be built here. China-origin models (including text encoders and VAEs) can still be used and are marked on screen; they may not be used in government projects.",
 "ja": "おすすめ一覧にないモデルはここで自分で組めます。中国由来のモデル（テキストエンコーダーや VAE を含む）も使え、画面上に表示されます。政府案件では規定により使用できません。",
 "ko": "추천 목록에 없는 모델은 여기서 직접 구성할 수 있습니다. 중국 출처 모델(텍스트 인코더, VAE 포함)도 사용할 수 있으며 화면에 표시됩니다. 정부 사업에서는 규정상 사용할 수 없습니다."
+},
+"上下文以 {0} 計、低於 {1} tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加 {2} 毫秒。標「中國來源」的模型政府案不得使用。": {
+"en": "context is taken as {0}, and below {1} tok/s counts as not smooth. The efficiency is fitted from models measured on this machine, plus {2} ms per layer. Models marked China-origin are not allowed in government projects.",
+"ja": "コンテキストは {0} として計算し、{1} tok/s 未満は快適とみなしません。効率はこのマシンで実測したモデルから当てはめた値で、1 層ごとに {2} ミリ秒を加えています。「中国製」と表示されたモデルは官公庁案件では使用できません。",
+"ko": "컨텍스트는 {0} 기준이며 {1} tok/s 미만은 원활하지 않은 것으로 봅니다. 효율은 이 머신에서 실측한 모델로 맞춘 값이며 층마다 {2}밀리초를 더합니다. '중국산'으로 표시된 모델은 정부 사업에 사용할 수 없습니다."
+},
+"tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加": {
+"en": "tok/s counts as not smooth. The efficiency is fitted from models measured on this machine, plus",
+"ja": "tok/s 未満は快適とみなしません。効率はこのマシンで実測したモデルから当てはめた値で、1 層ごとに",
+"ko": "tok/s 미만은 원활하지 않은 것으로 봅니다. 효율은 이 머신에서 실측한 모델로 맞춘 값이며 층마다"
+},
+"毫秒。標「中國來源」的模型政府案不得使用": {
+"en": "ms per layer. Models marked China-origin are not allowed in government projects",
+"ja": "ミリ秒を加えています。「中国製」と表示されたモデルは官公庁案件では使用できません",
+"ko": "밀리초를 더합니다. '중국산'으로 표시된 모델은 정부 사업에 사용할 수 없습니다"
+},
+"依這台實測擬合：頻寬效率 {0}%、每層 {1} 毫秒": {
+"en": "Fitted from measurements on this machine: bandwidth efficiency {0}%, {1} ms per layer",
+"ja": "このマシンの実測から当てはめ：帯域効率 {0}%、1 層あたり {1} ミリ秒",
+"ko": "이 머신 실측으로 맞춤: 대역폭 효율 {0}%, 층당 {1}밀리초"
+},
+"依這台實測擬合：頻寬效率": {
+"en": "Fitted from measurements on this machine: bandwidth efficiency",
+"ja": "このマシンの実測から当てはめ：帯域効率",
+"ko": "이 머신 실측으로 맞춤: 대역폭 효율"
+},
+"%、每層": {
+"en": "%, per layer",
+"ja": "%、1 層あたり",
+"ko": "%, 층당"
 }
 }

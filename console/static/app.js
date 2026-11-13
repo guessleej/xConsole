@@ -1756,7 +1756,8 @@ function recList(n, rec, lib, ctx) {
   c.append(bar, list);
   const a = rec.assumptions;
   c.appendChild(el("p", "small muted", `速度是估算：記憶體頻寬 × ${Math.round(a.efficiency * 100)}% ÷ 每個 token 要讀的權重（MoE 只算被選中的專家），`
-    + `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。標「中國來源」的模型政府案不得使用。`));
+    + (a.fitted ? `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加 ${a.layer_ms} 毫秒。標「中國來源」的模型政府案不得使用。`
+      : `上下文以 ${int(a.ctx)} 計、低於 ${a.smooth_toks} tok/s 不算流暢；在這台對話過之後會依實測自動校正。標「中國來源」的模型政府案不得使用。`)));
   return c;
 }
 
