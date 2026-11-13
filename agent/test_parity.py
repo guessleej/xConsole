@@ -259,6 +259,13 @@ def main():
         eq("  關掉照樣可以存", A.save_machine({"memory_model": mm, "desktop_enabled": False})[0], 200)
     finally:
         A.desktop_route = real_route
+    # Windows：小幫手的設定檔留著、但程式已經不在（登出或當掉）→ 要實際問一次，不能只看設定檔
+    A.desktop_route = lambda: ("helper", (1, "STALE-TOKEN"))
+    try:
+        code, out = A.save_machine({"memory_model": mm, "desktop_enabled": True})
+        case("桌面小幫手的設定檔還在但程式沒在跑：打開 → 400", code == 400 and "小幫手" in out.get("error", ""), (code, out))
+    finally:
+        A.desktop_route = real_route
     A.desktop_route = lambda: ("direct", None)
     try:
         code, out = A.save_machine({"memory_model": mm, "desktop_enabled": True})
