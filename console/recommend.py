@@ -850,7 +850,7 @@ def check_sd_defaults(d, kind):
 
 
 def check_sd_fields(body):
-    """管理者在網頁上填的畫圖／影片清單項目。中國來源（含文字編碼器與 VAE）一律不收。"""
+    """管理者在網頁上填的畫圖／影片清單項目。中國來源（含文字編碼器與 VAE）照樣收，只標 cn_origin。"""
     repo = str(body.get("repo") or "").strip()
     if not REPO_RX.fullmatch(repo):
         return None, "主體的 Hugging Face 名稱格式是「作者/模型」，例：leejet/FLUX.1-schnell-gguf"

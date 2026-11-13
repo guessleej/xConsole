@@ -222,7 +222,7 @@ xConsole 管兩種引擎：**Strata 只跑 Qwen3.8-Flash-Next 這一家**（原�
 
 換完會自動帶到「API 串接」頁，提示 IDE 要改成哪個模型名稱，按「實測一次」確認。
 
-模型頁會把中國來源的模型（Qwen、DeepSeek、GLM、Kimi…）標成「政府案不可用」：內部測試可以用，交付政府案的機器不能裝。
+模型頁會把中國來源的模型（Qwen、DeepSeek、GLM、Kimi…）標成「中國來源・政府案不可用」。這是給一般人用的軟體：只標示、不擋，要不要用由使用者決定；交付政府案的機器依規定不裝。
 
 **llama.cpp 欄位怎麼跑起來：** 代理為欄位寫一份 `~/.xconsole/engines/<欄位>-llama.json`（0600）與 systemd 服務
 `xc-<欄位>-llama.service`，服務的進入點是 `xconsole_agent.py --launch-llama <設定檔>`，讀設定後 exec 成 llama-server。
@@ -251,7 +251,7 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 **數字怎麼來（全部在 `console/recommend.py`，畫面不自己算）：**
 - 推薦清單只存人寫的欄位（名稱、用途、說明、標籤、來源）；各量化大小、架構、KV、MoE 比例、授權與發布月份，
   都由代理用 HTTP Range 只抓 Hugging Face 的檔頭讀出來（`hf_profile`，一顆約 5 秒，不下載權重）。
-  隨附的預設清單由 `scripts/build_catalog.py` 走同一段程式產生，目前 14 顆，全部非中國來源。
+  隨附的預設清單由 `scripts/build_catalog.py` 走同一段程式產生，含中國來源的熱門模型，只標示不遮蔽。
 - **每個 token 讀多少權重**：讀 GGUF 的張量清單，相鄰 offset 相減得每個張量的大小（不必認得每種量化格式）；
   MoE 的專家張量只算被選中的比例，`token_embd`（有獨立輸出層時）與 Gemma E 系列的 `per_layer_token_embd` 是查表、不算。
   實測：gpt-oss-20b 約 20%、Gemma 4 26B-A4B 約 21%、Gemma 4 E4B 約 61%、稠密 31B 100%。
@@ -279,7 +279,7 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 |---|---|
 | 推薦模型 › 管理清單 | 增改刪、調順序、從 Hugging Face 重新讀取。每顆寫明每個元件是哪個 repo 的哪個檔，或寫「檔名開頭」讓機器挑量化（其他元件跟著主體的位元數） |
 | 已下載 | 每顆的大小、能不能用（缺哪個檔）、實測，刪除時只刪這顆獨用的檔 |
-| 從 Hugging Face 下載 › 手動組一顆（內部測試） | 不在清單上的（含中國來源，例 Qwen-Image、Wan）只能在這裡組，一定要勾「只做內部測試」，畫面上一直標著 |
+| 從 Hugging Face 下載 › 手動組一顆不在清單上的 | 不在清單上的模型在這裡自己組，畫面上標「手動組」；中國來源照樣可以用，另標「中國來源・政府案不可用」 |
 | 這台的設定 | 指定用哪支 `sd-cli`（預設挑版本最新的）；畫圖模型放在存放區同一層的 `sd/` 資料夾 |
 
 **數字怎麼來（`console/recommend.py` 與代理 `sd_admit`，畫面不自己算）：**
@@ -290,7 +290,7 @@ llama-server 自動挑家目錄下版本最新、有 GPU 後端的那支（`mach
 - **速度不估算**：擴散模型吃算力不吃頻寬，用頻寬推會錯。產過一次之後顯示這台的實測（尺寸、步數、秒數、最高用量）。
 - **准入（每次產之前）**：照三種記憶體架構、用「當下」剩多少試算，不夠就擋；放行時把可用額度交給 `sd-cli --max-vram`，它自己分配也不會越線。
   產的時候**看門狗**每秒看一次系統記憶體，跌破底線就中止並講原因（統一記憶體吃爆會把整台拖死）。
-- **中國來源**：清單不收，而且**文字編碼器與 VAE 也算**——FLUX.2 klein 用 Qwen3、Krea2 用 Wan 的 VAE，主體再乾淨也不能列（政府案判準是「會不會在客戶機器上執行」）。
+- **中國來源**：照樣列、照樣可以下載，只在畫面上標「中國來源・政府案不可用」，而且**文字編碼器與 VAE 也算**——FLUX.2 klein 用 Qwen3、Krea2 用 Wan 的 VAE，主體再乾淨也要標（政府案判準是「會不會在客戶機器上執行」）。
 
 隨附清單（`scripts/build_sd_catalog.py` 產生，`console/sd_catalog_default.json`）：FLUX.1 schnell、Chroma1 HD、Stable Diffusion 3.5 Medium、
 Stable Diffusion 1.5、LTX-2.3 影片（蒸餾版，文字編碼器是 Google Gemma 3 12B）。
@@ -425,7 +425,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `test/e2e_install.py` | 裝好的機器 | 16 | 經網頁 API 走完：登入 → 確認架構 → 推薦 → 裝推理引擎 → 下載模型 → 換上 → 問一句話 → 停掉 |
 | `console/test_sd.py` | 任何機器 | 66 | 畫圖與影片：挑檔與量化、元件跟著主體、三種記憶體架構的准入與 `--max-vram`、中國來源（含文字編碼器與 VAE）、`sd-cli` 參數、進度解析、共用檔刪除、看門狗中止、啟動失敗不卡住、macOS／Windows 預編譯版挑檔 |
 | `agent/test_platform.py` 裡的匯入、搜尋、思考模式 | 三個系統 | 12 | 分塊、續傳位置、同名不覆蓋、不是 GGUF 刪掉、路徑穿越；搜尋字元；新舊版思考模式旗標 |
-| `console/test_recommend.py` | 任何機器 | 77 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源擋下、推薦清單增改刪 |
+| `console/test_recommend.py` | 任何機器 | 77 | 推薦：容量、等級、速度、挑量化、與代理同一條公式（KV、自動分層層數、資料夾名）、GGUF 張量剖析、中國來源標示、推薦清單增改刪 |
 | `console/test_branding.py` | 任何 Linux | 49 | 客戶品牌：名稱驗證、Logo 只認 PNG／JPEG／WebP 檔頭（SVG、偽裝檔、超大檔被擋）、未登入、權限 0600、稽核不記圖檔、頁尾寫死 |
 | `console/test_tls.py` | .27（要 openssl 3） | 36 | 用 openssl 現場產客戶會拿來的各種檔案逐一匯入、熱套用、還原、轉址、到期提醒 |
 | `console/test_usage_report.py` | .27 | 26 | 報告六塊、計數器歸零、取樣空窗不計電、低於底線次數、稽核遮罩 |

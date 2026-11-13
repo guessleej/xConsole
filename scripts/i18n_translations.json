@@ -20408,5 +20408,35 @@
 "en": "Rename",
 "ja": "名前を変更",
 "ko": "이름 변경"
+},
+"手動組一顆不在清單上的畫圖／影片模型": {
+"en": "Build an image/video model that is not on the list",
+"ja": "一覧にない画像／動画モデルを手動で組む",
+"ko": "목록에 없는 이미지/영상 모델 직접 구성"
+},
+"手動組": {
+"en": "Custom build",
+"ja": "手動構成",
+"ko": "직접 구성"
+},
+"・手動組": {
+"en": " · Custom build",
+"ja": "・手動構成",
+"ko": " · 직접 구성"
+},
+"・中國來源": {
+"en": " · China-origin",
+"ja": "・中国由来",
+"ko": " · 중국 출처"
+},
+"大小由機器從 Hugging Face 讀。中國來源的模型照樣可以加入，畫面上會標出來——文字編碼器、VAE 是中國來源也算。": {
+"en": "The machine reads the size from Hugging Face. China-origin models can still be added and are marked on screen; a China-origin text encoder or VAE also counts.",
+"ja": "サイズはマシンが Hugging Face から読み取ります。中国由来のモデルも追加でき、画面上に表示されます。テキストエンコーダーや VAE が中国由来の場合も同様です。",
+"ko": "크기는 머신이 Hugging Face에서 읽어 옵니다. 중국 출처 모델도 추가할 수 있으며 화면에 표시됩니다. 텍스트 인코더나 VAE가 중국 출처인 경우도 포함됩니다."
+},
+"不在推薦清單上的模型可以在這裡自己組。中國來源的模型（文字編碼器、VAE 也算）照樣可以用，畫面上會標出來；政府案依規定不得使用。": {
+"en": "Models not on the recommended list can be built here. China-origin models (including text encoders and VAEs) can still be used and are marked on screen; they may not be used in government projects.",
+"ja": "おすすめ一覧にないモデルはここで自分で組めます。中国由来のモデル（テキストエンコーダーや VAE を含む）も使え、画面上に表示されます。政府案件では規定により使用できません。",
+"ko": "추천 목록에 없는 모델은 여기서 직접 구성할 수 있습니다. 중국 출처 모델(텍스트 인코더, VAE 포함)도 사용할 수 있으며 화면에 표시됩니다. 정부 사업에서는 규정상 사용할 수 없습니다."
 }
 }
