@@ -4143,7 +4143,7 @@ async function settingsMachines(wrap) {
   // 兩句分成兩個文字節點：翻譯是整句比對，拼成一個節點就對不到字典
   const how = el("p", "small muted");
   how.append(document.createTextNode("機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"),
-    document.createTextNode("主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
+    i18nGap(), document.createTextNode("主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
   c.appendChild(how);
   const box = el("div");
   loading(box);
@@ -4258,7 +4258,7 @@ function renderSteps(steps) {
     const need = s.state === "blocked"
       ? (s.blocked && s.need ? s.need : `（要先完成第 ${steps.findIndex((x) => !x.done && !x.optional) + 1} 步）`) : "";
     const stEl = el("span", "st", lbl);
-    if (need) stEl.appendChild(document.createTextNode(need));      // 分開放：翻譯才對得到「還不能做」與「（要先完成第 n 步）」
+    if (need) stEl.append(i18nGap(), document.createTextNode(need));      // 分開放：翻譯才對得到「還不能做」與「（要先完成第 n 步）」
     d.appendChild(stEl);
     if (s.go && s.state !== "done" && s.state !== "blocked") {
       const b = el("button", "btn sm" + (s.state === "now" ? " primary" : ""), s.go[0]);
