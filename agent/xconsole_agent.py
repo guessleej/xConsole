@@ -6355,6 +6355,11 @@ def save_machine(body):
                 how, why = desktop_route()
                 if how is None:
                     return 400, {"error": f"這台不能操作桌面：{why}"}
+                if how == "helper":
+                    # 小幫手的設定檔在程式結束後還會留著：實際問一次，問不到就不給開
+                    code, _ = desktop_call("GET", "/desktop/info", timeout=5)
+                    if code != 200:
+                        return 400, {"error": "這台不能操作桌面：桌面小幫手沒有在執行，請用要操作的那個帳號登入這台的桌面"}
             m["desktop_enabled"] = True
         else:
             m.pop("desktop_enabled", None)
