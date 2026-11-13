@@ -581,5 +581,41 @@ with open(lg, "a") as fh:
 eq("  還在跑的那個寫完之後下一次才算（不重複、不漏）", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
 eq("  沒有新請求：數字不變", (A.counters()["slots"].get("cnt") or {}).get("requests"), 3)
 
+# 只有生成進度（n_gen）一直長、還沒有請求完成：讀取位置照樣往前，不會每次都從頭重讀整個檔
+with open(lg, "a") as fh:
+    fh.write(LLAMA_REQ.format(t=3000, p=40, g=50, n=1000).split("5.17.964.855")[0] * 50)
+A.counters()
+eq("  只有進度行：讀取位置也推到檔尾", A.load_json(A.COUNTERS, {})["cnt"]["cursors"][lg]["offset"], os.path.getsize(lg))
+# 記錄輪替（copytruncate）切在計時與 release 之間：沒寫完的請求跟著狀態存下來，接得起來
+done_part = LLAMA_REQ.format(t=3000, p=40, g=50, n=1000).split("is_child = 0\n", 1)[1]
+timing, release = done_part.rsplit("5.17.965.036", 1)
+with open(lg, "a") as fh:
+    fh.write(timing)
+A.counters()
+with open(lg, "w") as fh:
+    fh.write("5.17.965.036" + release)
+c = A.counters()["slots"]["cnt"]
+eq("  輪替切在請求中間：release 在新檔也照算，沿用與生成都對",
+   (c["requests"], c["prompt"], c["reused"], c["generated"]), (4, 1714 + 857 + 950, 653 + 852 + 910, 1800 + 50))
+# 換引擎再換回來：每個記錄檔各自記讀到哪；第一次讀的檔從檔尾開始，以前的歷史不算進來
+slog = os.path.join(A.STATE_DIR, "cnt-strata.log")
+SREQ = "serve: prompt 100 tokens = 60 reused + 40 read in 10.0 ms (1000.0 tok/s), 20 generated\n"
+with open(slog, "w") as fh:
+    fh.write(SREQ * 5)
+reg = A.registry()
+for x in reg["slots"]:
+    if x["id"] == "cnt":
+        x.update(kind="strata", log=slog)
+A.save_json(A.REGISTRY, reg)
+eq("  換成 Strata：那個檔以前的 5 筆不算", A.counters()["slots"]["cnt"]["requests"], 4)
+with open(slog, "a") as fh:
+    fh.write(SREQ)
+eq("    之後新的照算", A.counters()["slots"]["cnt"]["requests"], 5)
+for x in reg["slots"]:
+    if x["id"] == "cnt":
+        x["kind"] = "llama"
+A.save_json(A.REGISTRY, reg)
+eq("  換回 llama.cpp：llama 記錄檔以前讀過的不重算", A.counters()["slots"]["cnt"]["requests"], 5)
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
