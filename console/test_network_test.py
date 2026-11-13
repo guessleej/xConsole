@@ -71,5 +71,26 @@ else:
 check("遠端節點、網址是同一個遠端位址：放行", x.same_machine("192.0.2.10", "192.0.2.10") == {"192.0.2.10"})
 check("遠端節點、網址是另一台：擋下", not x.same_machine("192.0.2.10", "192.0.2.11"))
 
+# 主控台先升級、代理還是舊版：舊代理不認得 /brief（回 404 找不到），要退回完整版，不能整列顯示錯誤
+_cn = x.call_node
+asked = []
+
+
+def _old_agent(node_id, path, method="GET", body=None, timeout=40):
+    asked.append(path)
+    return (404, {"error": "找不到"}) if path.endswith("/brief") else (200, {"public_url": "http://127.0.0.1:8080/v1", "run": None})
+
+
+x.call_node = _old_agent
+try:
+    code, out = x.apiinfo_brief("n1", "brain")
+    check("舊版代理不認得精簡版：自動退回完整版", code == 200 and out.get("public_url") and asked == ["/apiinfo/brain/brief", "/apiinfo/brain"], (code, asked))
+    asked.clear()
+    x.call_node = lambda *a, **k: (asked.append(a[1]), (404, {"error": "沒有這個欄位"}))[1]
+    code, out = x.apiinfo_brief("n1", "nope")
+    check("  欄位本來就不存在：照實回 404，不再多問一次", code == 404 and len(asked) == 1, (code, asked))
+finally:
+    x.call_node = _cn
+
 print("全部通過" if OK else "有項目失敗")
 sys.exit(0 if OK else 1)
