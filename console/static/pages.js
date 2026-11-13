@@ -115,7 +115,7 @@ function planCell(p) {
   top.appendChild(el("span", "chip " + cls, lbl));
   top.appendChild(el("span", "small mono", p.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `${p.measured ? "實測" : "約"} ${fmt(p.tok_s, 0)} tok/s`) : "速度未知"));
   if (p.guess) top.appendChild(el("span", "small muted", "（估算）"));
-  else if (!p.measured && p.calibrated) top.appendChild(el("span", "small muted", "（依這台實測校正）"));
+  else if (!p.measured && (p.calibrated || p.fit)) top.appendChild(el("span", "small muted", "（依這台實測校正）"));
   cell.appendChild(top);
   cell.appendChild(splitBar(p.split));
   return cell;
@@ -506,7 +506,8 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
   const est = el("div", "tiles light run-est");
   est.append(
     tileOf(p?.measured ? "實測速度" : "預估速度", p?.tok_s != null ? (p.tok_s < 1 ? "不到 1 tok/s" : `${p.measured ? "" : "約 "}${fmt(p.tok_s, 0)} tok/s`) : "未知",
-      p?.measured ? "這顆在這台實際對話量到的" : p?.calibrated ? `依記憶體頻寬估、乘上這台實測的校正（×${p.calibrated}）`
+      p?.measured ? "這顆在這台實際對話量到的" : p?.fit ? `依這台實測擬合：頻寬效率 ${Math.round(p.fit.eff * 100)}%、每層 ${p.fit.layer_ms} 毫秒`
+        : p?.calibrated ? `依記憶體頻寬估、乘上這台實測的校正（×${p.calibrated}）`
         : p?.tok_s != null ? "依記憶體頻寬估算；對話過一次就會改成實測" : "到這台的設定填記憶體頻寬"),
     tileOf("第一次載入", p?.load_sec != null ? `${fmt(p.load_sec, 0)} 秒` : p?.load_est_sec != null ? `約 ${fmtDur(p.load_est_sec)}` : "—",
       p?.load_sec != null ? "上次實際載入" : "依磁碟速度估"));

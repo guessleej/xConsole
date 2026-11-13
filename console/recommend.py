@@ -83,7 +83,9 @@ def capacity(state):
            "ram_bw_assumed": not chip.get("ram_bandwidth_gbs"), "cards": len(pools.get("gpus") or []),
            "os": chip.get("os"),
            # 這台實測過的校正倍數（代理比對「實測 ÷ 公式估」的移動平均）：所有估計速度乘上它
-           "speed_factor": chip.get("speed_factor") if chip.get("speed_factor_n") else None}
+           "speed_factor": chip.get("speed_factor") if chip.get("speed_factor_n") else None,
+           # 這台用兩顆以上實測擬合出的頻寬效率與每層開銷（代理 fit_speed）；有它就不再乘單一倍數
+           "speed_fit": chip.get("speed_fit")}
     if mm == "unified_single":
         tot = (pools.get("unified") or {}).get("total_gib") or 0
         fast = tot - fl.get("ram", 12) - 1.5
@@ -132,12 +134,28 @@ def capacity(state):
     # 「放得下」只看記憶體；「流暢」還要夠快：稠密模型每個 token 讀整顆，頻寬 × 效率 ÷ 10 tok/s 就是流暢的大小上限
     fit_b = (fast - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B if fast > 6 else 0
     bw = out["bandwidth_gbs"]
-    speed_b = EFFICIENCY * bw * 1e9 / SMOOTH_TOKS / GIB / Q4_GIB_PER_B if bw else None
+    eff, _, fitted = speed_params(out)
+    if not fitted and out["speed_factor"]:
+        eff *= out["speed_factor"]
+    speed_b = eff * bw * 1e9 / SMOOTH_TOKS / GIB / Q4_GIB_PER_B if bw else None
     out["max_fit_b"] = _nice(fit_b)
     out["max_dense_b"] = _nice(min(fit_b, speed_b)) if speed_b is not None else _nice(fit_b)
     out["speed_known"] = speed_b is not None
     out["max_moe_b"] = _nice((fast + out["slow"] - ENGINE_OVERHEAD - 4) / Q4_GIB_PER_B) if out["slow"] and fast > 6 else 0
     return out
+
+
+def _assumptions(cap):
+    eff, lms, fitted = speed_params(cap)
+    return {"efficiency": eff, "layer_ms": lms, "fitted": fitted, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}
+
+
+def speed_params(cap):
+    """這台的頻寬效率、每層開銷（毫秒）、是不是實測擬合的。擬合是照當時的頻寬算的，管理者改了頻寬就不再用。"""
+    f = cap.get("speed_fit")
+    if f and f.get("eff") and f.get("bw") == cap.get("bandwidth_gbs"):
+        return f["eff"], f.get("layer_ms") or 0.0, True
+    return EFFICIENCY, LAYER_MS, False
 
 
 CTX_STEPS = (32768, 16384, 8192)    # 跟 LocModel 一樣：放不下先把上下文縮到 16K、8K，再考慮放硬碟
@@ -176,12 +194,13 @@ def _plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False, ctx_want=CT
            "ctx": ctx, "kv_gib": round(kv, 1), "cpu_moe": 0, "bits": quant_bits(q["quant"]), "guess": bool(guess),
            "split": {"gpu": 0.0, "ram": 0.0, "disk": 0.0}}
     read = size * act * GIB
-    fixed = (prof.get("layers") or 0) * LAYER_MS / 1000
+    eff, lms, fitted = speed_params(cap)
+    fixed = (prof.get("layers") or 0) * lms / 1000
     if need <= cap["fast"]:
         place = "全部放進系統記憶體（CPU 執行）" if cap.get("cpu_only") else {"unified_single": "全部放進統一記憶體", "unified_split": "全部放進 GPU 那一塊"}.get(
             cap["memory_model"], f"分到 {cap['cards']} 張卡" if cap["cards"] > 1 else "全部放進顯示卡")
         # 多張卡是一層接一層輪流算（llama.cpp 預設依層切），頻寬不會相加，照單張卡算
-        tok = 1 / (read / (EFFICIENCY * bw * 1e9) + fixed) if bw else None
+        tok = 1 / (read / (eff * bw * 1e9) + fixed) if bw else None
         # 速度不知道就不說流暢（頻寬沒填的機器），先標「能跑」
         out.update(level="smooth" if tok is not None else "ok", place=place, tok_s=tok,
                    split={"gpu": need, "ram": 0.0, "disk": 0.0})
@@ -194,7 +213,7 @@ def _plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False, ctx_want=CT
             if n <= prof.get("expert_layers", 0) and moved <= cap["slow"]:
                 # 搬出去的專家每個 token 只讀被選中的那幾個；其餘照 GPU 頻寬
                 cpu_read = moved * (prof.get("expert_used_frac") or act) * GIB
-                tok = 1 / (((read - cpu_read) / (bw * 1e9) + cpu_read / (rbw * 1e9)) / EFFICIENCY + fixed) if bw else None
+                tok = 1 / (((read - cpu_read) / (bw * 1e9) + cpu_read / (rbw * 1e9)) / eff + fixed) if bw else None
                 out.update(level="ok", place=f"{n} 層專家放系統記憶體", tok_s=tok, cpu_moe=n,
                            split={"gpu": need - moved, "ram": moved, "disk": 0.0})
                 moe_ok = True
@@ -211,7 +230,9 @@ def _plan_quant(cap, prof, q, mmproj_gib=0.0, hdd=None, guess=False, ctx_want=CT
         sp = out["split"]
         out["split"] = {"gpu": 0.0, "ram": sp["gpu"] + sp["ram"], "disk": sp["disk"]}
     out["split"] = {k: round(v, 1) for k, v in out["split"].items()}
-    if out["tok_s"] is not None and cap.get("speed_factor"):
+    if out["tok_s"] is not None and fitted:
+        out["fit"] = {"eff": eff, "layer_ms": lms}
+    elif out["tok_s"] is not None and cap.get("speed_factor"):
         out["tok_s"] *= cap["speed_factor"]
         out["calibrated"] = round(cap["speed_factor"], 2)
     if out["tok_s"] is not None:
@@ -262,7 +283,7 @@ def _moe_disk_plan(cap, prof, size, pinned, hdd, fixed_s):
         return None
     disk_gbs = DISK_GBS.get(hdd, DISK_GBS[None])
     if bw and rbw:
-        t = ((dense + gpu_exp * euf) * GIB / (bw * 1e9) + ram_w * euf * GIB / ((bw if ram_w_fast else rbw) * 1e9)) / EFFICIENCY \
+        t = ((dense + gpu_exp * euf) * GIB / (bw * 1e9) + ram_w * euf * GIB / ((bw if ram_w_fast else rbw) * 1e9)) / speed_params(cap)[0] \
             + spill * euf * GIB / (disk_gbs * 1e9) + fixed_s
         tok = 1 / t
     else:
@@ -299,7 +320,7 @@ def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
     disk_gbs = DISK_GBS.get(hdd, DISK_GBS[None])
     if bw and rbw:
         # 每個 token：快速層與頁快取照各自的頻寬讀；溢出到硬碟的那段照硬碟讀取頻寬（MoE 只讀被選中的專家）
-        t = (gpu_w * act * GIB / (bw * 1e9) + ram_w * act * GIB / (rbw * 1e9)) / EFFICIENCY \
+        t = (gpu_w * act * GIB / (bw * 1e9) + ram_w * act * GIB / (rbw * 1e9)) / speed_params(cap)[0] \
             + spill * act * GIB / (disk_gbs * 1e9) + fixed_s
         tok = 1 / t
     else:
@@ -315,12 +336,14 @@ def _disk_plan(cap, size, pinned, act, hdd, fixed_s):
     return {"level": "disk", "place": place, "tok_s": tok, "split": split}
 
 
-def decode_speed(size_gib, prof, bw):
-    """已經裝好的模型大概多快（執行設定頁）：跟推薦清單同一條公式。頻寬不知道回 None。"""
+def decode_speed(size_gib, prof, bw, fit=None, factor=None):
+    """已經裝好的模型大概多快（執行設定頁）：跟推薦清單同一條公式，也套這台的實測校正。頻寬不知道回 None。"""
     if not size_gib or not bw:
         return None
+    eff, lms, fitted = speed_params({"speed_fit": fit, "bandwidth_gbs": bw})
     read = size_gib * (prof.get("active_frac") or 1.0) * GIB
-    return round(1 / (read / (EFFICIENCY * bw * 1e9) + (prof.get("layers") or 0) * LAYER_MS / 1000), 1)
+    tok = 1 / (read / (eff * bw * 1e9) + (prof.get("layers") or 0) * lms / 1000)
+    return round(tok * (factor if factor and not fitted else 1), 1)
 
 
 # 第一次載入大概幾秒：權重從磁碟讀進記憶體。實際載入過一次之後畫面改顯示實測秒數，這個只在還沒有實測時用
@@ -396,7 +419,7 @@ def plan_hf(state, info, hdd=None):
             mains.append(p)
     best = pick(mains)
     return {**info, "pick": best["stem"] if best else None, "capacity": cap, "mmproj_pick": proj, "guess": guess,
-            "assumptions": {"efficiency": EFFICIENCY, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}}
+            "assumptions": _assumptions(cap)}
 
 
 def plan_installed(state, lib):
@@ -408,7 +431,7 @@ def plan_installed(state, lib):
         stem = m["id"].rsplit("/", 1)[-1]
         p = plan_quant(cap, m, {"stem": stem, "quant": m.get("quant"), "size_gib": m["size_gib"]},
                        m.get("mmproj_gib") or 0.0, lib.get("hdd"), False)
-        m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec"), "calibrated": p.get("calibrated"),
+        m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec"), "calibrated": p.get("calibrated"), "fit": p.get("fit"),
                                                    "tiered": p.get("tiered")}
         if m.get("measured_tok_s"):
             # 這顆在這台實際跑過：直接用實測值，不用估的
@@ -486,7 +509,7 @@ def recommend(state, library, catalog):
         top = [x["repo"] for x in disk][:3]
     return {"capacity": cap, "items": items, "top": top,
             "featured": featured["repo"] if featured else None,
-            "assumptions": {"efficiency": EFFICIENCY, "ctx": CTX, "smooth_toks": SMOOTH_TOKS}}
+            "assumptions": _assumptions(cap)}
 
 
 def _public(e):

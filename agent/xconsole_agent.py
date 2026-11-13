@@ -794,6 +794,7 @@ def chip(machine=None):
     # 依這台實測校正的速度倍數（record_speed 算的）：推薦清單與預估速度都乘上它
     c["speed_factor"] = machine.get("speed_factor")
     c["speed_factor_n"] = machine.get("speed_factor_n") or 0
+    c["speed_fit"] = machine.get("speed_fit")
     return c
 
 
@@ -2217,6 +2218,7 @@ def run_options(slot, raw):
             "profile": {k: prof.get(k) for k in ("active_frac", "layers", "moe", "arch")},
             "measured_tok_s": ((registry().get("speed") or {}).get(os.path.abspath(raw.get("model") or "")) or {}).get("tok_s"),
             "speed_factor": registry()["machine"].get("speed_factor"),
+            "speed_fit": registry()["machine"].get("speed_fit"),
             "cmd": llama_cmd_text(raw) if raw.get("exe") and raw.get("model") else None,
             "extra_args": " ".join(shlex.quote(t) for t in llama_custom_args(raw)),
             "auto_layers_off": bool({t.split("=", 1)[0] for t in llama_custom_args(raw)} & LLAMA_AUTO_LAYERS),
@@ -2262,6 +2264,29 @@ def estimate_decode(prof, size_gib, machine):
     return 1 / t if t > 0 else None
 
 
+def fit_speed(points, bw):
+    """用這台實測過的幾顆模型，擬合兩個數：頻寬效率、每層固定開銷（毫秒）。
+    每個 token 的時間 ＝ 讀的位元組 ÷（效率 × 頻寬）＋ 層數 × 每層開銷。
+    單一倍數分不開這兩項：小模型卡在固定開銷、大模型卡在頻寬，只用小模型校正會把大模型估錯（HP 筆電實測）。
+    要至少兩顆、讀的量差兩倍以上才分得開；不夠回 None，退回單一校正倍數。"""
+    pts = [(r * GIB / (bw * 1e9), lay / 1000, 1 / s) for r, lay, s in points if r and lay and s and bw]
+    if len(pts) < 2 or max(p[0] for p in pts) < 2 * min(p[0] for p in pts):
+        return None
+    sxx = sum(x * x for x, _, _ in pts)
+    sxy = sum(x * y for x, y, _ in pts)
+    syy = sum(y * y for _, y, _ in pts)
+    sxt = sum(x * t for x, _, t in pts)
+    syt = sum(y * t for _, y, t in pts)
+    det = sxx * syy - sxy * sxy
+    a, b = ((sxt * syy - syt * sxy) / det, (syt * sxx - sxt * sxy) / det) if det > 1e-15 else (0.0, -1.0)
+    if a <= 0 or b < 0:                 # 開銷算出負的（量測雜訊）：全部算在頻寬上
+        a, b = sxt / sxx, 0.0
+    if a <= 0:
+        return None
+    return {"eff": round(min(1.5, max(0.1, 1 / a)), 3), "layer_ms": round(min(3.0, b), 3),
+            "n": len(pts), "bw": bw}
+
+
 def record_speed(slot_id, tok_s, n_tokens):
     """一次對話的實測生成速度：記在這顆模型上（模型庫顯示實測值）。
     一般放法（全部放進快速層、沒有搬專家、沒有用硬碟）時，另外跟公式估的比，更新這台的校正倍數。
@@ -2298,6 +2323,16 @@ def record_speed(slot_id, tok_s, n_tokens):
                 m = reg["machine"]
                 m["speed_factor"] = round(f if not m.get("speed_factor") else 0.7 * m["speed_factor"] + 0.3 * f, 3)
                 m["speed_factor_n"] = int(m.get("speed_factor_n") or 0) + 1
+                # 擬合用的點只收一般放法量到的（用硬碟、搬專家的速度不是同一條公式）
+                sp["fit_tok_s"] = round(tok_s if not sp.get("fit_tok_s") else 0.7 * sp["fit_tok_s"] + 0.3 * tok_s, 2)
+                sp["read_gib"] = round(size * (prof.get("active_frac") or 1.0), 3)
+                sp["layers"] = prof.get("layers")
+                fit = fit_speed([(v.get("read_gib"), v.get("layers"), v.get("fit_tok_s")) for v in reg["speed"].values()],
+                                chip(m).get("bandwidth_gbs"))
+                if fit:
+                    m["speed_fit"] = fit
+                else:
+                    m.pop("speed_fit", None)
         save_json(REGISTRY, reg)
 
 

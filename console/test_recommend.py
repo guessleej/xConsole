@@ -283,6 +283,31 @@ def main():
     if os.name != "nt":                    # Windows 靠 ACL（安裝程式限縮資料夾權限），沒有 Unix 的權限位元
         case("清單檔權限 0600", oct(os.stat(os.path.join(d, "c.json")).st_mode & 0o777), "0o600")
 
+    # ---- 這台的實測校正：兩顆以上擬合出效率與每層開銷就用它，不再乘單一倍數
+    # HP 筆電（Ryzen AI 375、89.6 GB/s、統一記憶體）：E2B 實測 38.6、12B 實測 6.9 tok/s，擬合效率 0.83、每層 0.28 毫秒
+    def hp(**chip):
+        s = state("unified_single", 89.6, floors={"ram": 5.7}, unified={"total_gib": 31.8, "gpu_limit_gib": 15.9}, gpus=[])
+        s["chip"].update(chip)
+        return R.capacity(s)
+    fit = {"eff": 0.83, "layer_ms": 0.28, "n": 2, "bw": 89.6}
+    d48 = dict(DENSE, layers=48)
+    p = R.plan_quant(hp(speed_factor=1.0, speed_factor_n=5, speed_fit=fit), d48, q("Q6_K", 9.11))
+    case("有擬合：12B 估的跟 HP 實測 6.9 tok/s 一致", p["tok_s"], 6.9)
+    case("  有擬合就不再乘單一倍數、畫面標擬合值", (p.get("calibrated"), p.get("fit")), (None, {"eff": 0.83, "layer_ms": 0.28}))
+    p = R.plan_quant(hp(speed_factor=1.0, speed_factor_n=5), d48, q("Q6_K", 9.11))
+    case("只有單一倍數（只量過小模型）：12B 估太低，就是要修的問題", p["tok_s"], 5.4)
+    p = R.plan_quant(hp(bandwidth_gbs=120, speed_fit=fit), d48, q("Q6_K", 9.11))
+    case("管理者改了頻寬：舊的擬合不再用，退回預設效率", p.get("fit"), None)
+    big = state("discrete", 1344, floors={"ram": 8, "vram": 2}, ram={"total_gib": 123},
+                gpus=[{"id": "0", "total_gib": 48}, {"id": "1", "total_gib": 48}])
+    big["chip"].update(speed_factor=1.534, speed_factor_n=54)
+    case("流暢上限標題也套校正倍數（中原主機實測 ×1.53）", R.capacity(big)["max_dense_b"] > 130, True)
+    case("執行頁的預估也套擬合", R.decode_speed(9.11, d48, 89.6, fit), 6.9)
+    case("執行頁的預估也套單一倍數", R.decode_speed(9.11, d48, 89.6, None, 1.29), 6.9)
+    rec = R.recommend({"pools": {"memory_model": "unified_single", "floors": {"ram": 5.7}, "unified": {"total_gib": 31.8}, "gpus": []},
+                       "chip": {"bandwidth_gbs": 89.6, "speed_fit": fit}}, {}, [])
+    case("推薦結果的假設寫出擬合值", (rec["assumptions"]["efficiency"], rec["assumptions"]["fitted"]), (0.83, True))
+
     print("\n全部通過" if OK else "\n有項目失敗")
     return 0 if OK else 1
 
