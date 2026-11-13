@@ -4140,9 +4140,11 @@ async function settingsMachines(wrap) {
   const add = el("button", "btn sm primary", "加一台機器");
   add.onclick = openAddMachine;
   c.querySelector(".card-head").append(el("span", "spacer"), add);
-  c.appendChild(el("p", "small muted",
-    "機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"
-    + "主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
+  // 兩句分成兩個文字節點：翻譯是整句比對，拼成一個節點就對不到字典
+  const how = el("p", "small muted");
+  how.append(document.createTextNode("機器怎麼來的：按「加一台機器」產生一行安裝指令，到那台貼上執行，就會自動出現在這裡；單機版安裝時會先把本機放進來。"),
+    document.createTextNode("主控台連各機代理一律走 HTTPS，只接受加入時收到的那張代理憑證，不會退回明文或關掉驗證。"));
+  c.appendChild(how);
   const box = el("div");
   loading(box);
   c.appendChild(box);
@@ -4255,7 +4257,9 @@ function renderSteps(steps) {
     const lbl = { done: "已完成", now: "現在做這步", blocked: "還不能做", skip: "可略過" }[s.state];
     const need = s.state === "blocked"
       ? (s.blocked && s.need ? s.need : `（要先完成第 ${steps.findIndex((x) => !x.done && !x.optional) + 1} 步）`) : "";
-    d.appendChild(el("span", "st", lbl + need));
+    const stEl = el("span", "st", lbl);
+    if (need) stEl.appendChild(document.createTextNode(need));      // 分開放：翻譯才對得到「還不能做」與「（要先完成第 n 步）」
+    d.appendChild(stEl);
     if (s.go && s.state !== "done" && s.state !== "blocked") {
       const b = el("button", "btn sm" + (s.state === "now" ? " primary" : ""), s.go[0]);
       b.onclick = s.go[1];
@@ -4395,7 +4399,7 @@ async function settingsTls(wrap) {
   // ---- 第 3、4 步：上傳、檢查、套用
   const up = card("3. 上傳並檢查　4. 套用", "PFX／P12、PEM、CER、CRT、KEY、P7B 都可以，順序不拘");
   const dz = el("div", "dropzone");
-  dz.innerHTML = "<strong>把憑證檔拖到這裡，或點這裡選檔</strong>可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）";
+  dz.append(el("strong", null, "把憑證檔拖到這裡，或點這裡選檔"), document.createTextNode("可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）"));
   const fi = el("input");
   fi.type = "file"; fi.multiple = true; fi.hidden = true;
   fi.accept = ".pfx,.p12,.pem,.cer,.crt,.key,.p7b,.p7c,.der";
@@ -4610,7 +4614,7 @@ async function settingsReport(wrap) {
   dj.onclick = () => download(`xConsole-使用報告-近${days}天.json`, JSON.stringify(r, null, 1), "application/json");
   box.textContent = "";
   box.appendChild(el("p", "small muted", `${r.period.from} 至 ${r.period.to}（台北時間）`));
-  if (r.period.note) box.appendChild(el("p", "note warn", r.period.note));
+  if (r.period.note) box.appendChild(el("p", "note warn", i18nUi(r.period.note)));
 
   const fmtN = (v) => (v === null || v === undefined) ? "—" : Number(v).toLocaleString(uiLocale());
   const t = r.build_vs_buy.local;

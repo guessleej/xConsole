@@ -20123,5 +20123,475 @@
 "en": "Switching back to the model from before applying failed; check the machine page",
 "ja": "適用前のモデルへの切り戻しに失敗しました。マシンページを確認してください",
 "ko": "적용 전 모델로 되돌리지 못했습니다. 머신 페이지에서 확인하세요"
+},
+"手動組一顆不在清單上的畫圖／影片模型": {
+"en": "Assemble an image/video model that isn't on the list",
+"ja": "リストにない画像／動画モデルを手動で組む",
+"ko": "목록에 없는 이미지/동영상 모델 직접 구성"
+},
+"檔案已刪除": {
+"en": "Files deleted",
+"ja": "ファイル削除済み",
+"ko": "파일 삭제됨"
+},
+"（含投影檔）": {
+"en": " (incl. projector)",
+"ja": "（プロジェクター含む）",
+"ko": " (프로젝터 포함)"
+},
+"上下文以 {0} 計、低於 {1} tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加 {2} 毫秒。標「中國來源」的模型政府案不得使用。": {
+"en": "Context counted as {0}; below {1} tok/s is not smooth. Efficiency is fitted from models measured on this machine, plus {2} ms per layer. Models marked \"China-origin\" may not be used in government projects.",
+"ja": "コンテキストは {0} で計算、{1} tok/s 未満は快適とみなしません。効率はこの機器で実測したモデルから当てはめ、層ごとに {2} ミリ秒を加算。「中国由来」と表示されたモデルは政府案件で使用できません。",
+"ko": "컨텍스트는 {0} 기준, {1} tok/s 미만은 원활하지 않음으로 봅니다. 효율은 이 기기에서 실측한 모델로 맞춘 값이며 층마다 {2}밀리초를 더합니다. \"중국 출처\"로 표시된 모델은 정부 사업에 쓸 수 없습니다."
+},
+"tok/s 不算流暢；效率是這台實測過的模型擬合出來的，每層另加": {
+"en": "tok/s is not smooth; efficiency is fitted from models measured on this machine, plus per layer",
+"ja": "tok/s 未満は快適とみなしません。効率はこの機器の実測から当てはめ、層ごとに加算",
+"ko": "tok/s 미만은 원활하지 않음. 효율은 이 기기 실측으로 맞춘 값, 층마다 추가"
+},
+"毫秒。標「中國來源」的模型政府案不得使用": {
+"en": "ms. Models marked \"China-origin\" may not be used in government projects",
+"ja": "ミリ秒。「中国由来」と表示されたモデルは政府案件で使用できません",
+"ko": "밀리초. \"중국 출처\"로 표시된 모델은 정부 사업에 쓸 수 없습니다"
+},
+"存放在 {0}，剩 {1} GiB。": {
+"en": "Stored in {0}, {1} GiB free.",
+"ja": "保存先 {0}、空き {1} GiB。",
+"ko": "저장 위치 {0}, 남은 공간 {1} GiB."
+},
+"手動組": {
+"en": "Manual",
+"ja": "手動構成",
+"ko": "수동 구성"
+},
+"・手動組": {
+"en": " · manual",
+"ja": "・手動構成",
+"ko": " · 수동 구성"
+},
+"・中國來源": {
+"en": " · China-origin",
+"ja": "・中国由来",
+"ko": " · 중국 출처"
+},
+"大小由機器從 Hugging Face 讀。中國來源的模型照樣可以加入，畫面上會標出來——文字編碼器、VAE 是中國來源也算。": {
+"en": "Sizes are read from Hugging Face by the machine. China-origin models can still be added and are marked on screen; this includes text encoders and VAEs of Chinese origin.",
+"ja": "サイズは機器が Hugging Face から読み取ります。中国由来のモデルも追加でき、画面に表示されます（テキストエンコーダーや VAE が中国由来の場合も含む）。",
+"ko": "크기는 기기가 Hugging Face에서 읽습니다. 중국 출처 모델도 추가할 수 있으며 화면에 표시됩니다(텍스트 인코더, VAE가 중국 출처인 경우 포함)."
+},
+"不在推薦清單上的模型可以在這裡自己組。中國來源的模型（文字編碼器、VAE 也算）照樣可以用，畫面上會標出來；政府案依規定不得使用。": {
+"en": "Models not on the recommended list can be assembled here. China-origin models (including text encoders and VAEs) can still be used and are marked on screen; government projects may not use them.",
+"ja": "推奨リストにないモデルはここで組めます。中国由来のモデル（テキストエンコーダー、VAE を含む）も使用でき、画面に表示されます。政府案件では規定により使用できません。",
+"ko": "추천 목록에 없는 모델은 여기서 직접 구성할 수 있습니다. 중국 출처 모델(텍스트 인코더, VAE 포함)도 사용할 수 있으며 화면에 표시됩니다. 정부 사업에서는 규정상 사용할 수 없습니다."
+},
+"可以一次選多個檔案（例如憑證、私鑰、中繼憑證三個檔）": {
+"en": "You can select several files at once (for example the certificate, private key and intermediate certificate)",
+"ja": "複数のファイルを一度に選べます（例：証明書、秘密鍵、中間証明書の 3 ファイル）",
+"ko": "여러 파일을 한 번에 선택할 수 있습니다(예: 인증서, 개인 키, 중간 인증서 3개 파일)"
+},
+"例：AI 研究中心主機": {
+"en": "e.g. AI Research Center server",
+"ja": "例：AI 研究センターのサーバー",
+"ko": "예: AI 연구센터 서버"
+},
+"1～40 個字；概覽標題、機器清單與報表都用這個名稱": {
+"en": "1–40 characters; used in the overview title, machine list and reports",
+"ja": "1～40 文字。概要のタイトル、機器一覧、レポートで使われます",
+"ko": "1~40자. 개요 제목, 기기 목록, 보고서에 이 이름이 쓰입니다"
+},
+"改機器名稱": {
+"en": "Rename machine",
+"ja": "機器名を変更",
+"ko": "기기 이름 변경"
+},
+"名稱已更新": {
+"en": "Name updated",
+"ja": "名前を更新しました",
+"ko": "이름이 변경되었습니다"
+},
+"改名稱": {
+"en": "Rename",
+"ja": "名前を変更",
+"ko": "이름 변경"
+},
+"依這台實測擬合：頻寬效率 {0}%、每層 {1} 毫秒": {
+"en": "Fitted from this machine's measurements: bandwidth efficiency {0}%, {1} ms per layer",
+"ja": "この機器の実測から当てはめ：帯域効率 {0}%、層ごと {1} ミリ秒",
+"ko": "이 기기 실측으로 맞춤: 대역폭 효율 {0}%, 층마다 {1}밀리초"
+},
+"依這台實測擬合：頻寬效率": {
+"en": "Fitted from this machine's measurements: bandwidth efficiency",
+"ja": "この機器の実測から当てはめ：帯域効率",
+"ko": "이 기기 실측으로 맞춤: 대역폭 효율"
+},
+"%、每層": {
+"en": "%, per layer",
+"ja": "%、層ごと",
+"ko": "%, 층마다"
+},
+"只含 GPU 晶片回報的功耗，不含 CPU、記憶體、硬碟、電源轉換損失與冷氣，整機實際用電會明顯較高。": {
+"en": "Only the power reported by the GPU chips; CPU, memory, disks, power conversion losses and cooling are not included, so the whole machine uses noticeably more.",
+"ja": "GPU チップが報告する消費電力のみで、CPU、メモリ、ディスク、電源変換損失、空調は含みません。機器全体の実際の消費電力はかなり高くなります。",
+"ko": "GPU 칩이 보고한 전력만 포함하며 CPU, 메모리, 디스크, 전원 변환 손실, 냉방은 포함하지 않습니다. 기기 전체의 실제 전력은 훨씬 높습니다."
+},
+"尚未設定雲端參考單價，只報地端處理量，不估算省下的費用。": {
+"en": "No cloud reference price set; only on-premises volume is reported, savings are not estimated.",
+"ja": "クラウド参考単価が未設定のため、オンプレミスの処理量のみ報告し、節約額は見積もりません。",
+"ko": "클라우드 참고 단가가 설정되지 않아 온프레미스 처리량만 보고하며 절감액은 추정하지 않습니다."
+},
+"（未知）": {
+"en": "(unknown)",
+"ja": "（不明）",
+"ko": "(알 수 없음)"
+},
+"電價以每度 NT$ {0} 計算。": {
+"en": "Electricity priced at NT${0} per kWh.",
+"ja": "電気料金は 1 kWh あたり NT$ {0} で計算。",
+"ko": "전기 요금은 kWh당 NT$ {0}로 계산."
+},
+"電價以每度 NT$": {
+"en": "Electricity priced per kWh at NT$",
+"ja": "電気料金 1 kWh あたり NT$",
+"ko": "전기 요금 kWh당 NT$"
+},
+"電價以每度 NT$ ": {
+"en": "Electricity priced per kWh at NT$",
+"ja": "電気料金 1 kWh あたり NT$ ",
+"ko": "전기 요금 kWh당 NT$ "
+},
+"計算": {
+"en": "calculated",
+"ja": "計算",
+"ko": "계산"
+},
+" 計算。": {
+"en": ".",
+"ja": " で計算。",
+"ko": "로 계산."
+},
+"尚未設定電價，不換算金額。": {
+"en": "No electricity price set; no cost is calculated.",
+"ja": "電気料金が未設定のため、金額は換算しません。",
+"ko": "전기 요금이 설정되지 않아 금액은 환산하지 않습니다."
+},
+"（未命名）": {
+"en": "(unnamed)",
+"ja": "（名前なし）",
+"ko": "(이름 없음)"
+},
+"以 {0} 每百萬輸入 token US$ {1}、輸出 US$ {2} 計；重用快取的 token 不計費": {
+"en": "Based on {0} at US${1} per million input tokens and US${2} output; cached tokens are not charged",
+"ja": "{0} の 100 万入力トークンあたり US$ {1}、出力 US$ {2} で計算。キャッシュ再利用分は課金しません",
+"ko": "{0} 기준 입력 토큰 100만 개당 US$ {1}, 출력 US$ {2}로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+"以": {
+"en": "Based on",
+"ja": "基準",
+"ko": "기준"
+},
+"以 ": {
+"en": "Based on ",
+"ja": "基準 ",
+"ko": "기준 "
+},
+"每百萬輸入 token US$": {
+"en": "per million input tokens US$",
+"ja": "100 万入力トークンあたり US$",
+"ko": "입력 토큰 100만 개당 US$"
+},
+" 每百萬輸入 token US$ ": {
+"en": " per million input tokens US$",
+"ja": " 100 万入力トークンあたり US$ ",
+"ko": " 입력 토큰 100만 개당 US$ "
+},
+"輸出 US$": {
+"en": "output US$",
+"ja": "出力 US$",
+"ko": "출력 US$"
+},
+"、輸出 US$ ": {
+"en": ", output US$",
+"ja": "、出力 US$ ",
+"ko": ", 출력 US$ "
+},
+"計；重用快取的 token 不計費": {
+"en": "; cached tokens are not charged",
+"ja": "で計算。キャッシュ再利用分は課金しません",
+"ko": "로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+" 計；重用快取的 token 不計費": {
+"en": "; cached tokens are not charged",
+"ja": " で計算。キャッシュ再利用分は課金しません",
+"ko": "로 계산. 캐시 재사용 토큰은 과금하지 않음"
+},
+"；匯率 {0}": {
+"en": "; exchange rate {0}",
+"ja": "。為替レート {0}",
+"ko": "; 환율 {0}"
+},
+"匯率": {
+"en": "Exchange rate",
+"ja": "為替レート",
+"ko": "환율"
+},
+"；匯率 ": {
+"en": "; exchange rate ",
+"ja": "。為替レート ",
+"ko": "; 환율 "
+},
+"參考模型": {
+"en": "reference model",
+"ja": "参考モデル",
+"ko": "참고 모델"
+},
+"待改善": {
+"en": "To improve",
+"ja": "要改善",
+"ko": "개선 필요"
+},
+"主控台使用暫用自簽憑證": {
+"en": "The console uses a temporary self-signed certificate",
+"ja": "コンソールが一時的な自己署名証明書を使用しています",
+"ko": "콘솔이 임시 자체 서명 인증서를 사용 중"
+},
+"在「設定 → HTTPS 與憑證」產生 CSR 或上傳正式憑證": {
+"en": "Generate a CSR or upload a proper certificate in Settings → HTTPS and certificates",
+"ja": "「設定 → HTTPS と証明書」で CSR を生成するか正式な証明書をアップロード",
+"ko": "\"설정 → HTTPS 및 인증서\"에서 CSR을 생성하거나 정식 인증서를 업로드"
+},
+"主控台憑證剩 {0} 天，{1}（台北時間）到期": {
+"en": "Console certificate expires in {0} days, on {1} (Taipei time)",
+"ja": "コンソール証明書の残り {0} 日、{1}（台北時間）に期限切れ",
+"ko": "콘솔 인증서 {0}일 남음, {1}(타이베이 시간) 만료"
+},
+"主控台憑證剩 ": {
+"en": "Console certificate expires in ",
+"ja": "コンソール証明書の残り ",
+"ko": "콘솔 인증서 남은 기간 "
+},
+"向憑證廠商續約並在網頁上匯入新憑證": {
+"en": "Renew with the certificate vendor and import the new certificate on the web page",
+"ja": "証明書ベンダーで更新し、新しい証明書を Web 画面でインポート",
+"ko": "인증서 업체에서 갱신하고 웹 화면에서 새 인증서를 가져오기"
+},
+"注意": {
+"en": "Attention",
+"ja": "注意",
+"ko": "주의"
+},
+"有 {0} 次強制略過記憶體准入試算": {
+"en": "Memory admission check was force-skipped {0} times",
+"ja": "メモリ受け入れ試算が {0} 回強制スキップされました",
+"ko": "메모리 허용 시산을 {0}회 강제로 건너뜀"
+},
+"次強制略過記憶體准入試算": {
+"en": "times the memory admission check was force-skipped",
+"ja": "回メモリ受け入れ試算を強制スキップ",
+"ko": "회 메모리 허용 시산을 강제로 건너뜀"
+},
+" 次強制略過記憶體准入試算": {
+"en": " times the memory admission check was force-skipped",
+"ja": " 回メモリ受け入れ試算を強制スキップ",
+"ko": "회 메모리 허용 시산을 강제로 건너뜀"
+},
+"確認當時操作者是否知情；強制載入有機會把統一記憶體機拖死": {
+"en": "Confirm the operator knew; forced loading can freeze a unified-memory machine",
+"ja": "操作者が承知していたか確認してください。強制読み込みは統合メモリ機を停止させる恐れがあります",
+"ko": "당시 조작자가 알고 있었는지 확인하세요. 강제 로드는 통합 메모리 기기를 멈추게 할 수 있습니다"
+},
+"登入失敗 {0} 次": {
+"en": "{0} failed logins",
+"ja": "ログイン失敗 {0} 回",
+"ko": "로그인 실패 {0}회"
+},
+"登入失敗": {
+"en": "Failed logins",
+"ja": "ログイン失敗",
+"ko": "로그인 실패"
+},
+"登入失敗 ": {
+"en": "Failed logins ",
+"ja": "ログイン失敗 ",
+"ko": "로그인 실패 "
+},
+"確認是否有人在猜密碼": {
+"en": "Check whether someone is guessing the password",
+"ja": "誰かがパスワードを推測していないか確認してください",
+"ko": "누군가 비밀번호를 추측하고 있는지 확인하세요"
+},
+"本期無異常": {
+"en": "No issues this period",
+"ja": "今期は異常なし",
+"ko": "이번 기간 이상 없음"
+},
+"共 {0} 項待處理": {
+"en": "{0} items to address",
+"ja": "対応待ち {0} 件",
+"ko": "처리 대기 {0}건"
+},
+"項待處理": {
+"en": "items to address",
+"ja": "件の対応待ち",
+"ko": "건 처리 대기"
+},
+" 項待處理": {
+"en": " items to address",
+"ja": " 件の対応待ち",
+"ko": "건 처리 대기"
+},
+"共 ": {
+"en": "",
+"ja": "合計 ",
+"ko": "총 "
+},
+" 次": {
+"en": " times",
+"ja": " 回",
+"ko": "회"
+},
+"{0} 有 {1}% 的取樣連不上": {
+"en": "{0}: {1}% of samples could not connect",
+"ja": "{0}：サンプルの {1}% で接続できませんでした",
+"ko": "{0}: 샘플의 {1}%가 연결되지 않음"
+},
+"% 的取樣連不上": {
+"en": "% of samples could not connect",
+"ja": "% のサンプルで接続できませんでした",
+"ko": "%의 샘플이 연결되지 않음"
+},
+" 有 ": {
+"en": ": ",
+"ja": "：",
+"ko": ": "
+},
+"查網路或代理服務是否中斷": {
+"en": "Check whether the network or the agent service was down",
+"ja": "ネットワークまたはエージェントサービスが中断していないか確認してください",
+"ko": "네트워크나 에이전트 서비스가 중단되었는지 확인하세요"
+},
+"{0} 系統記憶體低於底線 {1} 次": {
+"en": "{0}: system memory fell below the floor {1} times",
+"ja": "{0}：システムメモリが下限を {1} 回下回りました",
+"ko": "{0}: 시스템 메모리가 하한선 아래로 {1}회 떨어짐"
+},
+"系統記憶體低於底線": {
+"en": "system memory below the floor",
+"ja": "システムメモリが下限未満",
+"ko": "시스템 메모리가 하한선 미만"
+},
+" 系統記憶體低於底線 ": {
+"en": ": system memory below the floor ",
+"ja": "：システムメモリが下限未満 ",
+"ko": ": 시스템 메모리가 하한선 미만 "
+},
+"這台曾因系統記憶體耗盡整台卡死；檢查是否有服務長期吃記憶體": {
+"en": "This machine has frozen from running out of system memory; check for services holding memory long-term",
+"ja": "この機器はシステムメモリ枯渇で停止したことがあります。メモリを長期間占有するサービスがないか確認してください",
+"ko": "이 기기는 시스템 메모리 고갈로 멈춘 적이 있습니다. 메모리를 오래 점유하는 서비스가 있는지 확인하세요"
+},
+"{0} 的代理憑證尚未信任，主控台連不上": {
+"en": "The agent certificate of {0} is not trusted yet; the console cannot connect",
+"ja": "{0} のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "{0}의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+"的代理憑證尚未信任，主控台連不上": {
+"en": "agent certificate not trusted yet; the console cannot connect",
+"ja": "のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+" 的代理憑證尚未信任，主控台連不上": {
+"en": ": agent certificate not trusted yet; the console cannot connect",
+"ja": " のエージェント証明書がまだ信頼されておらず、コンソールが接続できません",
+"ko": "의 에이전트 인증서가 아직 신뢰되지 않아 콘솔이 연결할 수 없음"
+},
+"重新執行 deploy_console.sh，或在設定頁匯入該機憑證": {
+"en": "Run deploy_console.sh again, or import that machine's certificate on the settings page",
+"ja": "deploy_console.sh を再実行するか、設定画面でその機器の証明書をインポート",
+"ko": "deploy_console.sh를 다시 실행하거나 설정 화면에서 해당 기기 인증서를 가져오기"
+},
+"{0} 的 {1} 最後狀態為{2}": {
+"en": "{1} on {0} last state: {2}",
+"ja": "{0} の {1} の最終状態：{2}",
+"ko": "{0}의 {1} 마지막 상태: {2}"
+},
+"的": {
+"en": "of",
+"ja": "の",
+"ko": "의"
+},
+" 的 ": {
+"en": " / ",
+"ja": " の ",
+"ko": "의 "
+},
+"最後狀態為": {
+"en": "last state:",
+"ja": "最終状態：",
+"ko": "마지막 상태:"
+},
+" 最後狀態為": {
+"en": " last state:",
+"ja": " の最終状態：",
+"ko": " 마지막 상태:"
+},
+"到「記錄」頁查該服務的記錄": {
+"en": "Check that service's log on the Logs page",
+"ja": "「記録」ページでそのサービスのログを確認",
+"ko": "\"기록\" 페이지에서 해당 서비스의 로그 확인"
+},
+"取樣自 {0} 起才開始收集，本期之前沒有資料": {
+"en": "Sampling started on {0}; there is no data before that in this period",
+"ja": "サンプリングは {0} から開始。それ以前のデータはありません",
+"ko": "샘플링은 {0}부터 시작되어 그 이전 데이터는 없습니다"
+},
+"取樣自": {
+"en": "Sampling started on",
+"ja": "サンプリング開始",
+"ko": "샘플링 시작"
+},
+"取樣自 ": {
+"en": "Sampling started on ",
+"ja": "サンプリング開始 ",
+"ko": "샘플링 시작 "
+},
+"起才開始收集，本期之前沒有資料": {
+"en": "; no data before that in this period",
+"ja": "から。それ以前のデータはありません",
+"ko": "부터 수집, 그 이전 데이터 없음"
+},
+" 起才開始收集，本期之前沒有資料": {
+"en": "; no data before that in this period",
+"ja": " から。それ以前のデータはありません",
+"ko": "부터 수집, 그 이전 데이터 없음"
+},
+"（尚無）": {
+"en": "(none yet)",
+"ja": "（まだなし）",
+"ko": "(아직 없음)"
+},
+"一直停在啟動中": {
+"en": "stuck in starting",
+"ja": "起動中のまま",
+"ko": "계속 시작 중"
+},
+"這台不能操作桌面：{0}": {
+"en": "This machine can't control the desktop: {0}",
+"ja": "この機器ではデスクトップを操作できません：{0}",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: {0}"
+},
+"這台不能操作桌面": {
+"en": "This machine can't control the desktop",
+"ja": "この機器ではデスクトップを操作できません",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다"
+},
+"這台不能操作桌面：": {
+"en": "This machine can't control the desktop: ",
+"ja": "この機器ではデスクトップを操作できません：",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: "
+},
+"檔案不完整": {
+"en": "Files incomplete",
+"ja": "ファイル不足",
+"ko": "파일 일부 없음"
 }
 }
