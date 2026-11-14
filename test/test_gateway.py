@@ -201,6 +201,22 @@ def main():
         check("  被 403 擋下的不算用量", u["只能用別格"]["requests"] == 0, u["只能用別格"])
         check("  最後使用時間有記", next(i for i in lst["items"] if i["name"] == "機器學習（週三）")["last_used"])
 
+        # ---- 舊共用金鑰：自動匯入，原金鑰經加密入口照樣能用；清單只看得到前幾個字元
+        st, lst = admin("GET", "/api/keys")
+        leg = [i for i in lst["items"] if i["source"] == "legacy"]
+        check("舊共用金鑰自動匯入：名稱、只能用原本那一格", len(leg) == 1 and leg[0]["name"] == "舊共用金鑰（主腦）"
+              and leg[0]["slots"] == ["t1/brain"] and leg[0]["prefix"] == ENGINE_KEY[:7] and leg[0]["created_by"] == "自動匯入", leg)
+        check("  清單不含完整的舊金鑰", ENGINE_KEY not in json.dumps(lst))
+        st, d, _ = v1("POST", "chat/completions", chat, bearer(ENGINE_KEY))
+        check("  老師只改網址：原本的金鑰經加密入口打得通", st == 200, d)
+        admin("GET", "/api/keys")
+        check("  再讀一次不會重複匯入", len([i for i in admin("GET", "/api/keys")[1]["items"] if i["source"] == "legacy"]) == 1)
+        st, t = admin("POST", "/api/node/t1/apiinfo/brain/test", {})
+        g = t.get("gateway") or {}
+        check("API 實測多一項加密入口：https 驗過憑證、沒帶金鑰被擋、帶臨時金鑰對話通", st == 200 and g.get("ok")
+              and g.get("url", "").startswith("https://"), g)
+        check("  臨時金鑰不寫資料庫、不記用量", not any(i["name"] == "實測" for i in admin("GET", "/api/keys")[1]["items"]))
+
         n401 = 0
         for _ in range(31):
             st, _, _ = v1("GET", "models", headers={"Authorization": "Bearer xck_" + "B" * 43})
@@ -211,7 +227,7 @@ def main():
         rows = [r for r in aud.get("items", aud if isinstance(aud, list) else []) if r.get("action") == "gateway.auth"]
         check("  稽核只記一筆（每個來源每一輪）", len(rows) == 1, len(rows))
         blob = b"".join(open(f, "rb").read() for f in glob.glob(os.path.join(chome, ".xconsole", "xconsole.db*")))
-        check("資料庫檔（含 WAL）找不到任何完整金鑰", not any(k.encode() in blob for k in (ka, kb, ko, k1)))
+        check("資料庫檔（含 WAL）找不到任何完整金鑰（含舊共用金鑰）", not any(k.encode() in blob for k in (ka, kb, ko, k1, ENGINE_KEY)))
     finally:
         for p in procs:
             p.terminate()

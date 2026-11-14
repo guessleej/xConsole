@@ -790,6 +790,7 @@ def sampler():
                 STORE.audit("系統", "", "tls.expiry_notice", cur.get("subject", ""), True,
                             {"threshold": tag, "daysLeft": cur.get("daysLeft"),
                              "validToTaipei": cur.get("validToTaipei")})
+            import_legacy_keys(force=True)          # 升級後第一輪就把舊共用金鑰匯入加密入口（代理是舊版就跳過，下一輪再試）
             if time.time() - last_prune > 86400:
                 STORE.prune()
                 last_prune = time.time()
@@ -1763,6 +1764,125 @@ def gateway_slots():
         return [r for rows in ex.map(one, nodes) for r in rows]
 
 
+HEX64 = re.compile(r"[0-9a-f]{64}")
+_IMPORT_LOCK, _IMPORT_AT = threading.Lock(), [0.0]
+
+
+def import_legacy_keys(only=None, force=False):
+    """舊的共用金鑰（每格一把、IDE 直連 8080 用的）自動匯入成加密入口的金鑰，老師只要把網址改成加密入口，金鑰不用換。
+    代理只回雜湊；模型只聽 127.0.0.1 的格子、主控台自己換上的內部金鑰都不匯入。最多每分鐘做一次（force 例外）。
+    only＝(機器, 格子) 時只看那一格。回新匯入的金鑰 id。"""
+    with _IMPORT_LOCK:
+        if not force and only is None and time.time() - _IMPORT_AT[0] < 60:
+            return []
+        if only is None:
+            _IMPORT_AT[0] = time.time()
+        internal = set(((fleet().get("gateway") or {}).get("internal") or {}).values())
+        added = []
+        for n in fleet()["nodes"]:
+            if only and n["id"] != only[0]:
+                continue
+            code, reg = call_node(n["id"], "/registry", timeout=15)
+            for s in (reg.get("slots") or []) if code == 200 else []:
+                if not s.get("unit") or (only and s["id"] != only[1]):
+                    continue
+                c, k = call_node(n["id"], f"/apikey/{s['id']}", timeout=15)
+                h = (k or {}).get("hash") or ""
+                if c != 200 or not k.get("set") or not HEX64.fullmatch(h) or k.get("bind") == "127.0.0.1" \
+                        or h in internal or STORE.key_by_hash(h):
+                    continue
+                row = {"id": secrets.token_hex(4), "name": f"舊共用金鑰（{s.get('role') or s['id']}）"[:gateway.NAME_MAX],
+                       "owner": None, "prefix": str(k.get("prefix") or "")[:8], "hash": h, "slots": [f"{n['id']}/{s['id']}"],
+                       "max_inflight": gateway.INFLIGHT_MAX, "created": time.time(), "created_by": "自動匯入", "expires": None,
+                       "revoked": None, "revoked_by": None, "last_used": None, "last_ip": None, "source": "legacy"}
+                STORE.key_insert(row)
+                STORE.audit("", "", "apikey.import", row["id"], True, {"name": row["name"], "slots": row["slots"]})
+                added.append(row["id"])
+        return added
+
+
+def gateway_only(node_id, slot_id, on, force=False):
+    """「只走加密入口」：模型改聽 127.0.0.1，並換上一把只有主控台知道、從不顯示的內部金鑰，然後重啟模型。
+    換內部金鑰的用意：以後就算有人又把區網打開，舊的共用金鑰也已經打不進模型。舊共用金鑰先匯入，經加密入口照樣能用，
+    等管理者確認大家都換了再撤銷。回 (狀態碼, 回應)。"""
+    if on:
+        import_legacy_keys(only=(node_id, slot_id))
+        code, out = call_node(node_id, f"/apiinfo/{slot_id}/settings", "POST", {"lan": False, "key": "new", "force": force},
+                              timeout=2000)
+        k = out.pop("api_key", None)
+        if code == 200 and k:
+            update_fleet(lambda c: c.setdefault("gateway", {}).setdefault("internal", {}).__setitem__(
+                f"{node_id}/{slot_id}", gateway.key_hash(k)))
+        if code == 200:
+            out["message"] = "已改成只走加密入口：模型只聽這台自己，IDE 請改用加密入口的網址與個別金鑰"
+    else:
+        code, out = call_node(node_id, f"/apiinfo/{slot_id}/settings", "POST", {"lan": True, "force": force}, timeout=2000)
+        if code == 200:
+            out["message"] = ("已重新開放區網直連。模型現在用的是只有主控台知道的內部金鑰，要讓 IDE 直連，"
+                              "請在下面產生新金鑰（這把也會自動加進加密入口）")
+    GW_ROUTES.invalidate()
+    return code, out
+
+
+def gateway_selftest(node_id, slot_id):
+    """從主控台這台用一把 2 分鐘的臨時金鑰打一次自己的加密入口：證明 https、金鑰驗證、轉送到這一格都通。
+    憑證照樣驗（自簽就拿自己這張當信任來源），不准略過。臨時金鑰不寫資料庫、不記用量。"""
+    code, info = apiinfo_brief(node_id, slot_id)
+    name = (info or {}).get("model_name")
+    if code != 200 or not name:
+        return {"ok": False, "url": gateway_url(), "detail": (info or {}).get("error") or "讀不到這格的模型名稱"}
+    GW_ROUTES.invalidate()
+    key = gateway.new_key()
+    GW_TEMP[gateway.key_hash(key)] = {"id": "selftest", "name": "實測", "slots": [f"{node_id}/{slot_id}"],
+                                      "max_inflight": 1, "source": "selftest", "expires": time.time() + 120, "revoked": None}
+    host = (hostnames() or ["127.0.0.1"])[0]
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    try:
+        ctx.load_verify_locations(CERTS.p.live_cert)
+    except (OSError, ssl.SSLError):
+        pass
+
+    def call(method, path, body=None, with_key=True):
+        try:
+            raw = socket.create_connection(("127.0.0.1", PORT), timeout=15)
+            conn = http.client.HTTPConnection(host, PORT, timeout=180)
+            conn.sock = ctx.wrap_socket(raw, server_hostname=host.strip("[]"))
+            conn.request(method, "/v1/" + path, body=json.dumps(body).encode() if body is not None else None,
+                         headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if with_key else {})})
+            r = conn.getresponse()
+            data = r.read(1024 * 1024)
+            conn.close()
+            try:
+                return r.status, json.loads(data or b"{}")
+            except ValueError:
+                return r.status, {}
+        except ssl.SSLCertVerificationError as exc:
+            return -1, {"error": {"message": f"憑證驗不過（{exc.verify_message}）"}}
+        except Exception as exc:  # noqa: BLE001
+            return 0, {"error": {"message": type(exc).__name__}}
+
+    t0 = time.time()
+    try:
+        st, models = call("GET", "models")
+        if st != 200:
+            return {"ok": False, "url": gateway_url(), "detail": f"/v1/models 回 {st}：{((models or {}).get('error') or {}).get('message', '')}"}
+        if name not in [m.get("id") for m in models.get("data") or []]:
+            return {"ok": False, "url": gateway_url(), "detail": f"加密入口的模型清單沒有 {name}（模型沒在跑，或有別格同名）"}
+        st, _ = call("POST", "chat/completions", {"model": name, "messages": []}, with_key=False)
+        if st != 401:
+            return {"ok": False, "url": gateway_url(), "detail": f"沒帶金鑰回 {st}，沒有被擋"}
+        st, out = call("POST", "chat/completions", {"model": name, "max_tokens": 8,
+                                                    "messages": [{"role": "user", "content": "請只回答：連線成功"}]})
+        if st != 200:
+            return {"ok": False, "url": gateway_url(), "detail": f"對話回 {st}：{((out or {}).get('error') or {}).get('message', '')}"}
+        return {"ok": True, "url": gateway_url(), "ms": int((time.time() - t0) * 1000),
+                "detail": f"加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（{name}）"}
+    finally:
+        GW_TEMP.pop(gateway.key_hash(key), None)
+
+
+GW_TEMP = {}
 GW_ROUTES = gateway.Routes(gateway_slots)
 GW_MAX = 64 * 1024 * 1024
 GW_QUERY_SECRETS = {"key", "api_key", "apikey", "api-key", "token", "access_token", "auth", "authorization", "x-api-key"}
@@ -2406,7 +2526,7 @@ class Handler(BaseHTTPRequestHandler):
             self._headers_done()
             return self._oai(400, "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）", "invalid_request")
         key = gateway.presented_key(self.headers)
-        row = STORE.key_by_hash(gateway.key_hash(key)) if key else None
+        row = (STORE.key_by_hash(gateway.key_hash(key)) or GW_TEMP.get(gateway.key_hash(key))) if key else None
         if not row or gateway.state(row) != "active":
             if method == "POST" and self._body(MAX_ANON_BODY) is None:
                 return None
@@ -2441,7 +2561,8 @@ class Handler(BaseHTTPRequestHandler):
             self._headers_done()
             return self._oai(405, f"/v1/{sub} 要用 {want}", "method_not_allowed")
         if sub == "models":
-            gateway_touch(row["id"], self.ip)
+            if row.get("source") != "selftest":
+                gateway_touch(row["id"], self.ip)
             rows = [r for r in GW_ROUTES.rows() if r.get("online") and gateway.allows(row, f"{r['node']}/{r['slot']}")]
             names = [r["name"] for r in rows]
             return self._json(200, {"object": "list", "data": [
@@ -2477,8 +2598,9 @@ class Handler(BaseHTTPRequestHandler):
             status, usage = self._gateway_forward(hit, sub, body, injected)
         finally:
             GW_INFLIGHT.release(row["id"])
-            STORE.usage_add(row["id"], gateway.hour(), hit["node"], hit["slot"], status == 200, *usage)
-            gateway_touch(row["id"], self.ip)
+            if row.get("source") != "selftest":
+                STORE.usage_add(row["id"], gateway.hour(), hit["node"], hit["slot"], status == 200, *usage)
+                gateway_touch(row["id"], self.ip)
         return None
 
     def _gateway_forward(self, hit, sub, body, injected):
@@ -3027,6 +3149,7 @@ class Handler(BaseHTTPRequestHandler):
             code, out = chats.load(STORE, chat_unseal, self.user, m.group(1))
             return self._json(code, out)
         if path == "/api/keys":
+            import_legacy_keys()
             return self._json(200, keys_overview())
         if path == "/api/providers":
             return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
@@ -3544,6 +3667,12 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key", "thinking", "lan")
                     if k in body}
+            nm = str(want.get("model_name") or "").strip()
+            clash = [r for r in GW_ROUTES.rows(force=True) if nm and r["name"] == nm
+                     and (r["node"], r["slot"]) != (m.group(1), m.group(2))] if nm else []
+            if clash:
+                return self._json(400, {"error": f"{clash[0]['node']} 的 {clash[0]['slot']} 已經叫 {nm}，"
+                                                 "加密入口會分不出要送哪一格，請換一個名稱"})
             # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
                                   {**want, "force": bool(body.get("force"))}, timeout=2000)
@@ -3552,16 +3681,33 @@ class Handler(BaseHTTPRequestHandler):
                         {"changed": out.get("changed"), "public_url": want.get("public_url"),
                          "key": want.get("key"), "restarted": out.get("restarted"),
                          "reverted": out.get("reverted"), "message": out.get("error")})
+            GW_ROUTES.invalidate()
+            if code == 200 and want.get("key") == "new":
+                threading.Thread(target=import_legacy_keys, kwargs={"only": (m.group(1), m.group(2))}, daemon=True).start()
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/gateway", path)
+        if m:
+            on = body.get("only") is True
+            code, out = gateway_only(m.group(1), m.group(2), on, bool(body.get("force")))
+            self._audit("api.gateway_only", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"only": on, "restarted": out.get("restarted"), "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/test", path)
         if m:
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/test", "POST", {}, timeout=420)
             if code == 200:
-                out["network"] = network_test(m.group(1), m.group(2), str(body.get("key") or ""))
-                out["ok"] = out["ok"] and out["network"]["ok"]
+                _, brief = apiinfo_brief(m.group(1), m.group(2))
+                if (brief or {}).get("bind") == "127.0.0.1":
+                    # 只走加密入口：模型只聽這台自己，直連本來就連不到，不算失敗
+                    out["network"] = {"ok": True, "skipped": True, "url": brief.get("public_url"),
+                                      "detail": "只走加密入口：模型只聽這台自己，不測直連"}
+                else:
+                    out["network"] = network_test(m.group(1), m.group(2), str(body.get("key") or ""))
+                out["gateway"] = gateway_selftest(m.group(1), m.group(2))
+                out["ok"] = out["ok"] and out["network"]["ok"] and out["gateway"]["ok"]
             self._audit("api.test", f"{m.group(1)}/{m.group(2)}", code == 200 and out.get("ok"),
                         {"checks": [(c["name"], c["ok"]) for c in out.get("checks") or []],
-                         "network": (out.get("network") or {}).get("ok")})
+                         "network": (out.get("network") or {}).get("ok"), "gateway": (out.get("gateway") or {}).get("ok")})
             return self._json(code, out)
         # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete|dirs)", path)
