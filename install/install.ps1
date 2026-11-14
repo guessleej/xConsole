@@ -5,10 +5,17 @@
 #   powershell -ExecutionPolicy Bypass -File install\install.ps1 -Uninstall   移除開機自啟（資料保留）
 #   ... install.ps1 -PasswordFile <檔>   自動化安裝：檔案第一行帳號、第二行密碼（用完請刪）
 #
+# 大量部署（只裝節點代理、加入既有的主控台；Intune、SCCM、映像派送都走這條），用系統管理員或 SYSTEM 執行：
+#   powershell -ExecutionPolicy Bypass -File install\install.ps1 -Console <主控台:埠> -Fingerprint <指紋> -JoinCodeFile <回應檔> [-DataDrive D:]
+#   加入碼只收回應檔（權限只給 SYSTEM 與 Administrators，讀完就刪）或標準輸入（-JoinCodeFile -），不收指令列與環境變數。
+#   裝成 SYSTEM 開機自啟，沒有人登入也會跑；-DataDrive 把程式、資料與模型放到那顆磁碟的 xConsole 資料夾。
+#   指紋與指令在主控台「加一台機器 → 大量部署」抄；主控台換成正式憑證後可以不給指紋。
+#
 # 系統管理員身分：裝成開機自動啟動（SYSTEM 帳號，不必有人登入），資料放 C:\ProgramData\xConsole，
 #                 權限只給 SYSTEM 與系統管理員；並在防火牆開 9400（網頁）、9401（代理）、9402（工作站連回）、8090～8289（模型 API）。
 # 一般身分：裝在自己的家目錄，登入後才啟動，防火牆要另外請管理員開。
-param([switch]$Uninstall, [string]$PasswordFile)
+param([switch]$Uninstall, [string]$PasswordFile, [string]$Console, [string]$Fingerprint, [string]$JoinCodeFile,
+      [string]$DataDrive, [string]$JoinCode)
 # 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷。
 # 原生程式看 $LASTEXITCODE，cmdlet 個別加 -ErrorAction Stop
 $ErrorActionPreference = 'Continue'
@@ -19,6 +26,102 @@ $dir = Join-Path $base 'xconsole'
 $st = Join-Path $base '.xconsole'
 function Say($t) { Write-Host "`n== $t ==" }
 function Die($t) { Write-Host "`n安裝停止：$t" -ForegroundColor Red; exit 1 }
+function FindPy {
+  $probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
+  # py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
+  try { $v = & py -3 -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) { return $v.Trim() } } catch {}
+  try { $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) { return $v.Trim() } } catch {}
+  $null
+}
+function WaitAgent($st) {
+  $tok = Join-Path $st 'token'; $crt = Join-Path $st 'agent-cert.pem'
+  for ($i = 0; $i -lt 40; $i++) {
+    Start-Sleep 1
+    if ((Test-Path $tok) -and (Test-Path $crt)) {
+      # 只接受代理自己那一張憑證，不是關掉驗證
+      $script:xcMine = [Convert]::ToBase64String((New-Object Security.Cryptography.X509Certificates.X509Certificate2 $crt).RawData)
+      [Net.ServicePointManager]::ServerCertificateValidationCallback = { param($s, $c) [Convert]::ToBase64String($c.GetRawCertData()) -eq $script:xcMine }
+      try { if ((New-Object Net.WebClient).DownloadString('https://127.0.0.1:9401/healthz') -match 'xconsole-agent') { return $true } } catch {}
+    }
+  }
+  $false
+}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# 放在指令列會留在行程清單與派送紀錄，看得到的人在有效期間內就能拿去加入別的機器
+if ($PSBoundParameters.ContainsKey('JoinCode')) { Die '加入碼不能放在指令列。請改成 -JoinCodeFile <回應檔>（權限只給 SYSTEM 與 Administrators，讀完會刪掉），或 -JoinCodeFile - 從標準輸入給' }
+if (-not $Console -and ($Fingerprint -or $JoinCodeFile -or $DataDrive)) { Die '-Fingerprint、-JoinCodeFile、-DataDrive 要搭配 -Console（大量部署）使用' }
+
+if ($Console) {
+  # ---- 大量部署：只裝節點代理，SYSTEM 開機自啟，裝好直接加入 -Console 那台主控台
+  if (-not $admin) { Die '大量部署要用系統管理員身分（或 SYSTEM，例如 Intune）執行：要裝成開機自啟' }
+  if (-not (Test-Path (Join-Path $SRC 'install\join.py'))) { Die '請在解開的 xConsole 安裝包資料夾裡執行（找不到 install\join.py）' }
+  if (-not $JoinCodeFile) { Die '缺加入碼：請給 -JoinCodeFile <回應檔>，或 -JoinCodeFile - 從標準輸入讀' }
+  if ($JoinCodeFile -eq '-') { $code = [Console]::In.ReadLine() }
+  else {
+    if (-not (Test-Path -LiteralPath $JoinCodeFile -PathType Leaf)) { Die "找不到回應檔 $JoinCodeFile" }
+    $okSid = @('S-1-5-18', 'S-1-5-32-544')
+    $bad = @((Get-Acl -LiteralPath $JoinCodeFile).Access | Where-Object { $_.AccessControlType -eq 'Allow' } | ForEach-Object {
+      $r = $_; try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $r.IdentityReference.Value } } |
+      Where-Object { $okSid -notcontains $_ } | Select-Object -Unique)
+    $code = Get-Content -LiteralPath $JoinCodeFile -TotalCount 1
+    Remove-Item -LiteralPath $JoinCodeFile -Force
+    if ($bad.Count) {
+      Die ("回應檔的權限要只給 SYSTEM 與 Administrators（現在還給了 " + ($bad -join '、') + "）。別人讀得到的加入碼可能已外流，" +
+           "已刪掉這個檔，請在主控台作廢它、重新產生；準備回應檔：icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F")
+    }
+  }
+  if (-not $code) { Die '加入碼是空的' }
+  if ($DataDrive) {
+    if ($DataDrive -notmatch '^[A-Za-z]:\\?$') { Die "-DataDrive 要是磁碟代號，例：D:" }
+    $drv = $DataDrive.Substring(0, 2) + '\'
+    if (-not (Test-Path $drv)) { Die "找不到磁碟 $drv" }
+    $base = Join-Path $drv 'xConsole'
+  }
+  $dir = Join-Path $base 'xconsole'; $st = Join-Path $base '.xconsole'
+
+  Say '1/5 檢查這台'
+  $py = FindPy
+  if (-not $py) { Die '這台沒有 Python 3.9 以上。請先派送 Python（例：winget install -e --id Python.Python.3.12 --scope machine），再跑一次' }
+  Stop-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue
+
+  Say "2/5 複製代理到 $dir"
+  New-Item -ItemType Directory -Force -Path $st, $dir | Out-Null
+  # 權杖與私鑰放在這裡：只留給 SYSTEM 與系統管理員（ProgramData 與其他磁碟的根目錄預設一般使用者讀得到）
+  icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+  Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'xconsole_agent.py')
+  Copy-Item -Force (Join-Path $SRC 'install\join.py') (Join-Path $dir 'join.py')
+
+  Say '3/5 準備 Python 環境（cryptography）'
+  $vpy = Join-Path $dir '.venv\Scripts\python.exe'; $vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
+  if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了 Python 虛擬環境' } }
+  & $vpy -m pip install -q --disable-pip-version-check 'cryptography>=42'
+  if ($LASTEXITCODE) { Die '裝不了 cryptography；這台要能連 pypi.org，或請 IT 先放行' }
+
+  Say '4/5 開機自啟（SYSTEM）並啟動'
+  $agent = Join-Path $dir 'xconsole_agent.py'
+  Unregister-ScheduledTask -TaskName 'xConsole Agent' -Confirm:$false -ErrorAction SilentlyContinue
+  $act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $agent + '" --home "' + $base + '"') -WorkingDirectory $dir
+  $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+  $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+  Register-ScheduledTask -TaskName 'xConsole Agent' -Action $act -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $pri -Settings $set -ErrorAction Stop | Out-Null
+  foreach ($r in @(@('xConsole 節點代理', '9401'), @('xConsole 模型 API', '8090-8289'))) {
+    Get-NetFirewallRule -DisplayName $r[0] -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    New-NetFirewallRule -DisplayName $r[0] -Direction Inbound -Protocol TCP -LocalPort $r[1] -Action Allow -Profile Domain,Private | Out-Null
+  }
+  Start-ScheduledTask -TaskName 'xConsole Agent'
+  if (-not (WaitAgent $st)) { Die "節點代理沒有起來，請看 $st\agent.log，或在「工作排程器」查看 xConsole Agent 的最後執行結果" }
+
+  Say "5/5 加入主控台 $Console"
+  # Windows PowerShell 5.1 傳空字串給原生程式會整個漏掉，沒給指紋就不帶這個參數
+  $ja = @((Join-Path $dir 'join.py'), '--console', $Console, '--home', $base)
+  if ($Fingerprint) { $ja += @('--fingerprint', $Fingerprint) }
+  # 加入碼經由管線給 join.py 的標準輸入，不出現在行程的命令列
+  $code | & $vpy @ja
+  if ($LASTEXITCODE) { Die '加入主控台失敗（原因見上一行）。代理已經裝好在跑，在主控台重新產生加入碼後，用同一個指令再跑一次即可' }
+  Write-Host '完成：這台會一直開機自動啟動，沒有人登入也會跑。回到主控台就看得到它。'
+  exit 0
+}
 
 if ($Uninstall) {
   foreach ($t in 'xConsole', 'xConsole Agent', 'xConsole Desktop') {
@@ -34,11 +137,7 @@ if ($Uninstall) {
 Say '1/6 檢查這台'
 if (-not (Test-Path (Join-Path $SRC 'console\xconsole_server.py'))) { Die '請在解開的 xConsole 安裝包資料夾裡執行（找不到 console\）' }
 if (-not $admin) { Write-Host '提醒：不是用系統管理員身分執行，會裝成「登入後才啟動」，防火牆也不會開。' -ForegroundColor Yellow }
-$py = $null
-$probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
-# py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
-try { $v = & py -3 -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) { $py = $v.Trim() } } catch {}
-if (-not $py) { try { $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) { $py = $v.Trim() } } catch {} }
+$py = FindPy
 if (-not $py) {
   $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
   if ($ans -match '^(n|N)') { Die '請先安裝 Python 3（https://www.python.org），再執行一次' }
@@ -112,18 +211,7 @@ function Task($name, $script, $wd) {
   Start-ScheduledTask -TaskName $name
 }
 Task 'xConsole Agent' (Join-Path $dir 'xconsole_agent.py') $dir
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$tok = Join-Path $st 'token'; $crt = Join-Path $st 'agent-cert.pem'; $up = $false
-for ($i = 0; $i -lt 40 -and -not $up; $i++) {
-  Start-Sleep 1
-  if ((Test-Path $tok) -and (Test-Path $crt)) {
-    # 只接受代理自己那一張憑證，不是關掉驗證
-    $mine = [Convert]::ToBase64String((New-Object Security.Cryptography.X509Certificates.X509Certificate2 $crt).RawData)
-    [Net.ServicePointManager]::ServerCertificateValidationCallback = { param($s, $c) [Convert]::ToBase64String($c.GetRawCertData()) -eq $mine }
-    try { $up = (New-Object Net.WebClient).DownloadString('https://127.0.0.1:9401/healthz') -match 'xconsole-agent' } catch {}
-  }
-}
-if (-not $up) { Die "節點代理沒有起來，請看 $st\agent.log，或在「工作排程器」查看 xConsole Agent 的最後執行結果" }
+if (-not (WaitAgent $st)) { Die "節點代理沒有起來，請看 $st\agent.log，或在「工作排程器」查看 xConsole Agent 的最後執行結果" }
 & $vpy (Join-Path $SRC 'install\setup_local.py') --home $base
 Task 'xConsole' (Join-Path $dir 'xconsole_server.py') $dir
 if ($admin) {

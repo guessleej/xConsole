@@ -5692,6 +5692,58 @@
 "pattern": false
 },
 {
+"zh": "用 Intune、SCCM、Jamf、Ansible 或映像派送，不必到每台貼指令",
+"pattern": false
+},
+{
+"zh": "把 xConsole 安裝包派送到每台並解開（裡面有 install 資料夾）",
+"pattern": false
+},
+{
+"zh": "把下面的加入碼寫進回應檔，權限只給系統管理員：Windows 只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600",
+"pattern": false
+},
+{
+"zh": "用系統管理員（Windows 可用 SYSTEM）或 root 在安裝包資料夾裡執行下面的指令；安裝程式讀完回應檔就刪掉",
+"pattern": false
+},
+{
+"zh": "加入碼（寫進回應檔）",
+"pattern": false
+},
+{
+"zh": "Windows 指令",
+"pattern": false
+},
+{
+"zh": "Windows 回應檔權限",
+"pattern": false
+},
+{
+"zh": "Linux／macOS 指令",
+"pattern": false
+},
+{
+"zh": "加入碼不放在指令列也不放環境變數：會留在行程清單與派送紀錄。安裝程式看到 -JoinCode 參數一律拒絕；也可以用標準輸入給（回應檔寫成 -）",
+"pattern": false
+},
+{
+"zh": "裝成開機自動啟動，沒有人登入也會跑：Windows 是 SYSTEM 排程；Linux 建專用帳號 xconsole；macOS 建隱藏帳號 _xconsole、裝成 LaunchDaemon",
+"pattern": false
+},
+{
+"zh": "Windows 可以加 -DataDrive D: 把程式、資料與模型放到 D 槽；Linux 與 macOS 用 --data-dir",
+"pattern": false
+},
+{
+"zh": "指令裡的指紋是主控台目前憑證的 SHA-256，安裝程式只接受這一張；主控台換成正式憑證後指紋會變，請重新抄，或拿掉指紋改用一般驗證",
+"pattern": false
+},
+{
+"zh": "macOS 的背景服務用不到 Metal 時，模型改用 CPU 跑，機器頁的記憶體區會標出來",
+"pattern": false
+},
+{
 "zh": "到那台機器上，用一般帳號（不要用 root）開終端機貼上執行",
 "pattern": false
 },
@@ -5721,6 +5773,10 @@
 },
 {
 "zh": "最後把代理的憑證與權杖送回主控台；下載時釘住主控台憑證的公鑰，不是關掉驗證",
+"pattern": false
+},
+{
+"zh": "大量部署",
 "pattern": false
 },
 {
@@ -8852,7 +8908,7 @@
 "pattern": false
 },
 {
-"zh": "PY\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"zh": "' <<<\"$CODE\" | curl -sSk -m 150 --pinnedpubkey \"$PIN\" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{http_code}' \"$C/api/join\"\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
 "pattern": false
 },
 {
@@ -8860,8 +8916,8 @@
 "pattern": false
 },
 {
-"zh": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"代理沒有起來，請看記錄：$LOGHINT\"; exit 1; }\necho \"== 4/4 加入主控台 ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -",
-"pattern": false
+"zh": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"代理沒有起來，請看記錄：$LOGHINT\"; exit 1; }\necho \"== 4/4 加入主控台 ==\"\nRESP=$(XC_LINGER=\"$LINGER\" \"$PY\" -c '{10}'",
+"pattern": true
 },
 {
 "zh": "# xConsole 節點代理安裝（Windows）：由主控台",
@@ -13449,6 +13505,10 @@
 },
 {
 "zh": "有欄位正在使用這顆，先換成別的模型再刪",
+"pattern": false
+},
+{
+"zh": "這個背景服務拿不到 Metal（GPU），模型改用 CPU 跑，速度會慢很多",
 "pattern": false
 },
 {

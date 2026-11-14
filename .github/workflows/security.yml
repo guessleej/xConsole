@@ -41,6 +41,8 @@ jobs:
         run: cd console && python test_groups.py
       - name: 群組加入碼（可用次數、有效時間、名稱樣板、限定網段、作廢、主控台重啟後仍有效）
         run: cd console && python test_joincodes.py
+      - name: 靜默安裝（加入碼只收標準輸入或回應檔、釘主控台憑證、-JoinCode 一律拒絕）
+        run: python test/test_silent_install.py
       - name: 服務使用報告
         run: cd console && python test_usage_report.py
       - name: 網頁換憑證端對端
