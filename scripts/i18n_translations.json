@@ -21713,5 +21713,35 @@
 "en": " is not running right now",
 "ja": " は現在動いていません",
 "ko": " 지금 실행 중이 아님"
+},
+"現在直連不用金鑰，加密入口一定要金鑰：關掉之後，還沒拿到個別金鑰的人會立刻連不上。先確認每個人都已經換成加密入口的網址與個別金鑰。": {
+"en": "Direct access currently needs no key, but the encrypted gateway always does: once it is off, anyone without a personal key loses access immediately. First make sure everyone has switched to the gateway URL and a personal key.",
+"ja": "現在の直接接続はキー不要ですが、暗号化ゲートウェイには必ずキーが必要です。オフにすると、個別キーをまだ持っていない人はすぐに接続できなくなります。先に全員がゲートウェイの URL と個別キーに切り替えたことを確認してください。",
+"ko": "지금 직접 연결은 키가 필요 없지만 암호화 게이트웨이는 항상 키가 필요합니다. 끄면 개인 키를 아직 받지 않은 사람은 즉시 연결할 수 없게 됩니다. 먼저 모두 게이트웨이 URL과 개인 키로 바꿨는지 확인하세요."
+},
+"現在直連不用金鑰，加密入口一定要金鑰，而且還沒有任何一把能用這一格。請先在「API 串接」頁產生金鑰發給要用的人，再回來關直連。": {
+"en": "Direct access currently needs no key, but the encrypted gateway always does, and no key can use this slot yet. Create keys on the API page and hand them out first, then come back to turn off direct access.",
+"ja": "現在の直接接続はキー不要ですが、暗号化ゲートウェイには必ずキーが必要で、このスロットを使えるキーはまだありません。先に「API 連携」ページでキーを作成して配ってから、直接接続をオフにしてください。",
+"ko": "지금 직접 연결은 키가 필요 없지만 암호화 게이트웨이는 항상 키가 필요하며, 이 슬롯을 쓸 수 있는 키가 아직 없습니다. 먼저 'API 연동' 페이지에서 키를 만들어 나눠 준 뒤 직접 연결을 끄세요."
+},
+"還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有 {0} 把能用這一格）。": {
+"en": "Tools still using the direct URL will lose access; they must switch to the gateway URL and a personal key ({0} key(s) can use this slot now).",
+"ja": "直接接続の URL を使っているツールは接続できなくなります。ゲートウェイの URL と個別キーに切り替えてください（現在このスロットを使えるキーは {0} 個）。",
+"ko": "직접 연결 URL을 쓰는 도구는 연결할 수 없게 됩니다. 게이트웨이 URL과 개인 키로 바꿔야 합니다(지금 이 슬롯을 쓸 수 있는 키 {0}개)."
+},
+"還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有": {
+"en": "Tools still using the direct URL will lose access; they must switch to the gateway URL and a personal key (keys that can use this slot now:",
+"ja": "直接接続の URL を使っているツールは接続できなくなります。ゲートウェイの URL と個別キーに切り替えてください（現在このスロットを使えるキー：",
+"ko": "직접 연결 URL을 쓰는 도구는 연결할 수 없게 됩니다. 게이트웨이 URL과 개인 키로 바꿔야 합니다(지금 이 슬롯을 쓸 수 있는 키:"
+},
+"把能用這一格": {
+"en": "can use this slot",
+"ja": "個",
+"ko": "개"
+},
+"「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口成功送到模型的量，包含網頁對話與 IDE 直連 8080；只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。加密入口的用量以小時記，本期起點所在的那一小時整段算進來。": {
+"en": "\"Not via the gateway\" = the engine log total minus what the gateway successfully delivered to the model, covering web chat and IDEs connecting directly to 8080; only llama.cpp slots have engine logs to count, so Strata slots show only the gateway part. Gateway usage is recorded per hour, and the whole hour containing the start of the period is included.",
+"ja": "「ゲートウェイを通っていない」＝エンジンログの合計から、ゲートウェイがモデルに正常に届けた量を引いたもので、Web の会話と 8080 に直接接続した IDE を含みます。エンジンログがあるのは llama.cpp のスロットだけで、Strata のスロットはゲートウェイ分だけ数えられます。ゲートウェイの使用量は 1 時間単位で記録し、期間の開始時刻を含む 1 時間はまるごと含めます。",
+"ko": "'게이트웨이를 거치지 않음' = 엔진 로그 합계에서 게이트웨이가 모델에 정상적으로 전달한 양을 뺀 값으로, 웹 대화와 8080에 직접 연결한 IDE를 포함합니다. 엔진 로그가 있는 것은 llama.cpp 슬롯뿐이라 Strata 슬롯은 게이트웨이 부분만 셉니다. 게이트웨이 사용량은 시간 단위로 기록하며, 기간 시작 시각이 속한 1시간은 통째로 포함합니다."
 }
 }
