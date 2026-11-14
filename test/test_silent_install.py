@@ -104,10 +104,10 @@ def installers():
     fn = body[body.index("perm_ok() {"):body.index("managed() {")]
     f = os.path.join(W, "code.txt")
     open(f, "w").write("x" * 32)
-    os.chmod(f, 0o644)
+    os.chmod(f, 0o640)          # 群組讀得到就不合格；不用 644，免得測試本身留下所有人都讀得到的檔
     osn = "Darwin" if sys.platform == "darwin" else "Linux"
     r = subprocess.run(["bash", "-c", f"OSN={osn}\n{fn}\nperm_ok \"$1\" && echo ok || echo bad", "_", f], capture_output=True, text=True)
-    check("回應檔 644：判定不合格", r.stdout.strip() == "bad", r)
+    check("回應檔 640（群組讀得到）：判定不合格", r.stdout.strip() == "bad", r)
     os.chmod(f, 0o600)
     r = subprocess.run(["bash", "-c", f"OSN={osn}\n{fn}\nperm_ok \"$1\" && echo ok || echo bad", "_", f], capture_output=True, text=True)
     want = "ok" if os.geteuid() == 0 else "bad"

@@ -44,7 +44,7 @@ def write_code(path, code, ok=True):
         else:
             sh(["icacls", path, "/grant", "*S-1-5-32-545:R"])
     else:
-        sh(["sudo", "sh", "-c", f"umask 077; cat > '{path}'; chmod {'600' if ok else '644'} '{path}'"], input=code + "\n")
+        sh(["sudo", "sh", "-c", f"umask 077; cat > '{path}'; chmod {'600' if ok else '640'} '{path}'"], input=code + "\n")
 
 
 def install(host, fp, path, extra=()):
