@@ -471,9 +471,14 @@ def build_docx(r, figs, out, org, preparer, toc_pages=None):
                   + (f"目前仍有效的舊共用金鑰：{'、'.join(G['legacy_active'])}。共用金鑰外流時只能全部一起換，"
                      "建議替每位老師或每門課發個別金鑰後撤銷。" if G.get("legacy_active") else "")
                   + G.get("assumption", ""))
-        rows = [[x["name"] + ("（舊共用）" if x["legacy"] else ""), n(x["requests"]), n(x["errors"]), n(x["prompt"]), n(x["generated"])]
-                for x in G["by_key"]]
-        table(doc, ["金鑰名稱", "請求數", "失敗", "輸入 token", "輸出 token"], rows, [6.0, 2.4, 1.8, 3.2, 3.2],
+        # 名稱可以重複、也可以改，金鑰開頭才分得出是哪一把；超過 30 把時其餘合成一列，總數照樣對得上
+        top, rest = G["by_key"][:30], G["by_key"][30:]
+        rows = [[x["name"] + ("（舊共用）" if x["legacy"] else ""), f"{x.get('prefix') or '—'}…", n(x["requests"]), n(x["errors"]),
+                 n(x["prompt"]), n(x["generated"])] for x in top]
+        if rest:
+            rows.append([f"其餘 {len(rest)} 把", "—", n(sum(x["requests"] for x in rest)), n(sum(x["errors"] for x in rest)),
+                         n(sum(x["prompt"] for x in rest)), n(sum(x["generated"] for x in rest))])
+        table(doc, ["金鑰名稱", "金鑰開頭", "請求數", "失敗", "輸入 token", "輸出 token"], rows, [4.4, 2.6, 2.2, 1.6, 3.0, 3.0],
               caption="表 3-2　加密入口依金鑰的本期用量")
     elif G:
         body(doc, "本期還沒有經過加密入口的請求。老師在 IDE 改用主控台的 https 網址與個別金鑰之後，這裡會依金鑰列出用量。")
