@@ -84,6 +84,14 @@
 "pattern": false
 },
 {
+"zh": "API 金鑰",
+"pattern": false
+},
+{
+"zh": "我的帳號",
+"pattern": false
+},
+{
 "zh": "這台",
 "pattern": false
 },
@@ -2348,6 +2356,10 @@
 "pattern": false
 },
 {
+"zh": "請找管理員安裝。",
+"pattern": false
+},
+{
 "zh": "・手動組",
 "pattern": false
 },
@@ -2948,10 +2960,6 @@
 "pattern": true
 },
 {
-"zh": "API 金鑰",
-"pattern": false
-},
-{
 "zh": "上下文長度   {0}",
 "pattern": true
 },
@@ -3092,11 +3100,23 @@
 "pattern": false
 },
 {
+"zh": "我的 API 金鑰",
+"pattern": false
+},
+{
+"zh": "IDE 填這個 https 網址與你自己的金鑰；金鑰外流就撤銷再產生一把，不影響別人",
+"pattern": false
+},
+{
 "zh": "網址（Base URL）",
 "pattern": false
 },
 {
-"zh": "模型名稱照下面各格的填。金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。",
+"zh": "模型名稱照下面各格的填。",
+"pattern": false
+},
+{
+"zh": "金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。",
 "pattern": false
 },
 {
@@ -3108,7 +3128,23 @@
 "pattern": false
 },
 {
+"zh": "每個人最多 {0} 把有效的金鑰",
+"pattern": true
+},
+{
+"zh": "每個人最多",
+"pattern": false
+},
+{
+"zh": "把有效的金鑰",
+"pattern": false
+},
+{
 "zh": "還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。",
+"pattern": false
+},
+{
+"zh": "你還沒有金鑰。按「產生金鑰」產生一把，貼到 IDE 的 API 金鑰欄。",
 "pattern": false
 },
 {
@@ -3180,7 +3216,15 @@
 "pattern": false
 },
 {
+"zh": "例：我的筆電 VS Code",
+"pattern": false
+},
+{
 "zh": "撤銷時靠這個認是誰的",
+"pattern": false
+},
+{
+"zh": "撤銷時靠這個認是哪一把",
 "pattern": false
 },
 {
@@ -4145,6 +4189,10 @@
 },
 {
 "zh": "使用報告",
+"pattern": false
+},
+{
+"zh": "使用者帳號",
 "pattern": false
 },
 {
@@ -5680,11 +5728,15 @@
 "pattern": false
 },
 {
+"zh": "目前的密碼（管理員給的一次性密碼）",
+"pattern": false
+},
+{
 "zh": "目前的密碼",
 "pattern": false
 },
 {
-"zh": "新密碼（至少 8 碼）",
+"zh": "新密碼（至少 12 碼）",
 "pattern": false
 },
 {
@@ -5777,6 +5829,270 @@
 },
 {
 "zh": "還沒有紀錄",
+"pattern": false
+},
+{
+"zh": "歡迎，{0}",
+"pattern": true
+},
+{
+"zh": "歡迎",
+"pattern": false
+},
+{
+"zh": "第一次登入請先換一組自己的密碼",
+"pattern": false
+},
+{
+"zh": "管理員給你的是一次性密碼。換好之後會回到登入頁，用新密碼再登入一次。",
+"pattern": false
+},
+{
+"zh": "在 IDE 裡用這台的模型",
+"pattern": false
+},
+{
+"zh": "GitHub Copilot、Continue、Cline 這類工具選「OpenAI 相容」，填網址、金鑰與模型名稱",
+"pattern": false
+},
+{
+"zh": "現在可以用的模型名稱：{0}",
+"pattern": true
+},
+{
+"zh": "現在可以用的模型名稱",
+"pattern": false
+},
+{
+"zh": "現在沒有正在跑的模型，請找管理員。",
+"pattern": false
+},
+{
+"zh": "帳號：{0}",
+"pattern": true
+},
+{
+"zh": "你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。",
+"pattern": false
+},
+{
+"zh": "管理員",
+"pattern": false
+},
+{
+"zh": "使用者",
+"pattern": false
+},
+{
+"zh": "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰",
+"pattern": false
+},
+{
+"zh": "新增帳號",
+"pattern": false
+},
+{
+"zh": "批次匯入",
+"pattern": false
+},
+{
+"zh": "角色",
+"pattern": false
+},
+{
+"zh": "上次登入",
+"pattern": false
+},
+{
+"zh": "停用",
+"pattern": false
+},
+{
+"zh": "等他第一次登入改密碼",
+"pattern": false
+},
+{
+"zh": "還沒登入過",
+"pattern": false
+},
+{
+"zh": "重設密碼",
+"pattern": false
+},
+{
+"zh": "重設 {0} 的密碼",
+"pattern": true
+},
+{
+"zh": "重設",
+"pattern": false
+},
+{
+"zh": "的密碼",
+"pattern": false
+},
+{
+"zh": "會產生一組新的一次性密碼，他現在的登入會被登出，下次登入要先改密碼。",
+"pattern": false
+},
+{
+"zh": "啟用",
+"pattern": false
+},
+{
+"zh": "已啟用",
+"pattern": false
+},
+{
+"zh": "已停用，他現在的登入已失效",
+"pattern": false
+},
+{
+"zh": "刪除 {0}（{1}）會一起刪掉他的對話紀錄與附圖，撤銷他的 API 金鑰，不能復原。",
+"pattern": true
+},
+{
+"zh": "會一起刪掉他的對話紀錄與附圖，撤銷他的 API 金鑰，不能復原",
+"pattern": false
+},
+{
+"zh": "他的 Agent 工作資料夾不會刪，改歸你管理。只是暫時不讓他用的話，按「停用」就好。",
+"pattern": false
+},
+{
+"zh": "刪除帳號",
+"pattern": false
+},
+{
+"zh": "已刪除，撤銷了 {0} 把金鑰",
+"pattern": true
+},
+{
+"zh": "已刪除，撤銷了",
+"pattern": false
+},
+{
+"zh": "把金鑰",
+"pattern": false
+},
+{
+"zh": "新密碼至少 {0} 碼。最後一位管理員不能被停用、降級或刪除；也不能停用或刪除自己。",
+"pattern": true
+},
+{
+"zh": "新密碼至少",
+"pattern": false
+},
+{
+"zh": "碼。最後一位管理員不能被停用、降級或刪除；也不能停用或刪除自己",
+"pattern": false
+},
+{
+"zh": "例：s1101、t0001@cloudinfo.com.tw",
+"pattern": false
+},
+{
+"zh": "學號、員工編號或 email；建好之後不能改",
+"pattern": false
+},
+{
+"zh": "例：王小明",
+"pattern": false
+},
+{
+"zh": "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）",
+"pattern": false
+},
+{
+"zh": "管理員（全部）",
+"pattern": false
+},
+{
+"zh": "修改 {0}",
+"pattern": true
+},
+{
+"zh": "新增",
+"pattern": false
+},
+{
+"zh": "已儲存；角色改了，他要重新登入",
+"pattern": false
+},
+{
+"zh": "一行一個帳號，格式：帳號,顯示名稱,角色。角色填 admin 是管理員，不填或填 user 是使用者。一次最多 500 個。",
+"pattern": false
+},
+{
+"zh": "s1101,王小明\ns1102,李小華\nt0001,陳老師,admin",
+"pattern": false
+},
+{
+"zh": "批次匯入帳號",
+"pattern": false
+},
+{
+"zh": "沒有讀到任何一行",
+"pattern": false
+},
+{
+"zh": "沒有建立任何帳號：{0}",
+"pattern": true
+},
+{
+"zh": "沒有建立任何帳號",
+"pattern": false
+},
+{
+"zh": "這些一次性密碼只顯示這一次，主控台不會再顯示。請現在下載或抄下來交給本人；他第一次登入要先改密碼。",
+"pattern": false
+},
+{
+"zh": "有 {0} 行沒建立：",
+"pattern": true
+},
+{
+"zh": "行沒建立",
+"pattern": false
+},
+{
+"zh": "第 {0} 行 {1}：{2}",
+"pattern": true
+},
+{
+"zh": "行",
+"pattern": false
+},
+{
+"zh": "下載成 CSV",
+"pattern": false
+},
+{
+"zh": "xconsole-帳號-{0}.csv",
+"pattern": true
+},
+{
+"zh": "xconsole-帳號-",
+"pattern": false
+},
+{
+"zh": "ufeff帳號,顯示名稱,一次性密碼\n",
+"pattern": false
+},
+{
+"zh": "這個檔案裡有密碼：發完就刪掉，不要寄到群組或放在共用雲端。",
+"pattern": false
+},
+{
+"zh": "建立了 {0} 個帳號",
+"pattern": true
+},
+{
+"zh": "建立了",
+"pattern": false
+},
+{
+"zh": "一次性密碼",
 "pattern": false
 },
 {
@@ -6560,10 +6876,6 @@
 "pattern": false
 },
 {
-"zh": "角色",
-"pattern": false
-},
-{
 "zh": "等級",
 "pattern": false
 },
@@ -6634,10 +6946,6 @@
 {
 "zh": "移除 {0}・{1}",
 "pattern": true
-},
-{
-"zh": "新增",
-"pattern": false
 },
 {
 "zh": "已新增欄位",
@@ -7732,6 +8040,10 @@
 "pattern": false
 },
 {
+"zh": "管理員還沒在這台打開 Agent。需要用的話請找管理員。",
+"pattern": false
+},
+{
 "zh": "Agent 會在這台機器上建檔、跑指令。為了安全，每台預設關閉，要管理者在「這台的設定」打開；",
 "pattern": false
 },
@@ -7829,6 +8141,10 @@
 },
 {
 "zh": "檔案只能動工作資料夾裡的；每條指令都會先問你",
+"pattern": false
+},
+{
+"zh": "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方 Agent 會寫給你自己跑",
 "pattern": false
 },
 {
@@ -8393,10 +8709,6 @@
 },
 {
 "zh": "對話太長，正在把較早的部分整理成摘要…",
-"pattern": false
-},
-{
-"zh": "使用者",
 "pattern": false
 },
 {
@@ -9220,6 +9532,14 @@
 "pattern": false
 },
 {
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。",
+"pattern": true
+},
+{
+"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結",
+"pattern": false
+},
+{
 "zh": "」的路徑；指令在這個資料夾裡用 ",
 "pattern": false
 },
@@ -9448,6 +9768,14 @@
 "pattern": false
 },
 {
+"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。",
+"pattern": false
+},
+{
+"zh": "這個帳號不能執行指令；只能讀寫工作資料夾裡的檔案",
+"pattern": false
+},
+{
 "zh": "沒有 ",
 "pattern": false
 },
@@ -9469,6 +9797,10 @@
 },
 {
 "zh": "這筆第三方 API 沒有設預設模型，請指定模型",
+"pattern": false
+},
+{
+"zh": "已把原本的管理員帳號搬進帳號表（密碼不變）",
 "pattern": false
 },
 {
@@ -9501,6 +9833,50 @@
 },
 {
 "zh": "已設定帳號",
+"pattern": false
+},
+{
+"zh": "帳號要 3～64 個字，英數字開頭，只能用英數字與 . _ @ -（學號、員工編號或 email 都可以）",
+"pattern": false
+},
+{
+"zh": "顯示名稱要 1～40 個字",
+"pattern": false
+},
+{
+"zh": "角色只能是管理員（admin）或使用者（user）",
+"pattern": false
+},
+{
+"zh": "disabled 要是 true 或 false",
+"pattern": false
+},
+{
+"zh": "帳號 {0} 已經有了",
+"pattern": true
+},
+{
+"zh": "已經有了",
+"pattern": false
+},
+{
+"zh": "沒有這個帳號",
+"pattern": false
+},
+{
+"zh": "不能停用或降級自己；請另一位管理員來做",
+"pattern": false
+},
+{
+"zh": "這是最後一位管理員，不能停用或降級",
+"pattern": false
+},
+{
+"zh": "不能刪除自己",
+"pattern": false
+},
+{
+"zh": "這是最後一位管理員，不能刪除",
 "pattern": false
 },
 {
@@ -9968,6 +10344,14 @@
 "pattern": false
 },
 {
+"zh": "帳號 ",
+"pattern": false
+},
+{
+"zh": " 已經有了",
+"pattern": false
+},
+{
 "zh": "讀不到設定（",
 "pattern": false
 },
@@ -10177,6 +10561,14 @@
 },
 {
 "zh": "還沒有上傳 Logo",
+"pattern": false
+},
+{
+"zh": "請先改密碼（管理員給的是一次性密碼）",
+"pattern": false
+},
+{
+"zh": "這個功能只有管理員能用",
 "pattern": false
 },
 {
@@ -10400,6 +10792,10 @@
 "pattern": true
 },
 {
+"zh": "有人正在用 Agent，這台一次只跑一件；請稍後再試",
+"pattern": false
+},
+{
 "zh": "上傳的請求格式不對",
 "pattern": false
 },
@@ -10460,6 +10856,14 @@
 "pattern": false
 },
 {
+"zh": "只有管理員能管理帳號",
+"pattern": false
+},
+{
+"zh": "沒有這件產出",
+"pattern": false
+},
+{
 "zh": "目前沒有待配對的 CSR",
 "pattern": false
 },
@@ -10501,6 +10905,10 @@
 },
 {
 "zh": "加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1",
+"pattern": false
+},
+{
+"zh": "沒有這個工作資料夾",
 "pattern": false
 },
 {
@@ -10580,7 +10988,15 @@
 "pattern": false
 },
 {
-"zh": "新密碼至少 8 碼",
+"zh": "新密碼至少 {0} 碼",
+"pattern": true
+},
+{
+"zh": "碼",
+"pattern": false
+},
+{
+"zh": "新密碼不能跟目前的一樣",
 "pattern": false
 },
 {
@@ -10692,6 +11108,18 @@
 "pattern": false
 },
 {
+"zh": "一次匯入 1～500 個帳號",
+"pattern": false
+},
+{
+"zh": "每個人最多 {0} 把有效的金鑰；請先撤銷用不到的",
+"pattern": true
+},
+{
+"zh": "把有效的金鑰；請先撤銷用不到的",
+"pattern": false
+},
+{
 "zh": "這一版沒有這個系統的安裝檔",
 "pattern": false
 },
@@ -10760,6 +11188,14 @@
 "pattern": false
 },
 {
+"zh": "新密碼至少 ",
+"pattern": false
+},
+{
+"zh": " 碼",
+"pattern": false
+},
+{
 "zh": "「{0}」不是數字",
 "pattern": true
 },
@@ -10797,6 +11233,14 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址。",
+"pattern": false
+},
+{
+"zh": "每個人最多 ",
+"pattern": false
+},
+{
+"zh": " 把有效的金鑰；請先撤銷用不到的",
 "pattern": false
 },
 {
@@ -11817,6 +12261,10 @@
 },
 {
 "zh": "只含 GPU 晶片回報的功耗，不含 CPU、記憶體、硬碟、電源轉換損失與冷氣，整機實際用電會明顯較高。",
+"pattern": false
+},
+{
+"zh": "（管理員發的金鑰）",
 "pattern": false
 },
 {
@@ -13590,10 +14038,6 @@
 {
 "zh": "沒有這個工作資料夾：{0}",
 "pattern": true
-},
-{
-"zh": "沒有這個工作資料夾",
-"pattern": false
 },
 {
 "zh": "路徑要是資料夾裡的相對路徑，不能有 .. 或以 / 開頭",

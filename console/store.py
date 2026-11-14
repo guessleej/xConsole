@@ -80,6 +80,11 @@ class Store:
           key_id TEXT, hour TEXT, node TEXT, slot TEXT, requests INTEGER, errors INTEGER,
           prompt_tokens INTEGER, completion_tokens INTEGER, PRIMARY KEY(key_id, hour, node, slot));
         CREATE INDEX IF NOT EXISTS api_usage_hour ON api_usage(hour);
+        CREATE TABLE IF NOT EXISTS users(
+          username TEXT PRIMARY KEY, display TEXT, role TEXT, source TEXT, salt TEXT, hash TEXT, algo TEXT,
+          must_change INTEGER, disabled INTEGER, created REAL, pw_changed REAL, last_login REAL);
+        CREATE TABLE IF NOT EXISTS agent_folders(
+          node TEXT, folder TEXT, owner TEXT, created REAL, PRIMARY KEY(node, folder));
         """)
 
     # ---- 稽核
@@ -138,11 +143,14 @@ class Store:
             else:
                 self.db.execute("DELETE FROM sessions WHERE user=?", (user,))
 
-    def failed_logins(self, since, ip=None):
+    def failed_logins(self, since, ip=None, user=None):
         q, a = "SELECT COUNT(*) FROM audit WHERE action='auth.login' AND ok=0 AND ts>=?", [since]
         if ip is not None:
             q += " AND ip=?"
             a.append(ip)
+        if user is not None:
+            q += " AND target=?"
+            a.append(user)
         with self.lock:
             return self.db.execute(q, a).fetchone()[0]
 
@@ -265,6 +273,70 @@ class Store:
             for (bid,) in self.db.execute("SELECT id FROM chat_blobs WHERE chat=? AND user=?", (chat, user)).fetchall():
                 if bid not in keep:
                     self.db.execute("DELETE FROM chat_blobs WHERE id=?", (bid,))
+
+    # ---- 帳號：密碼只存 PBKDF2 雜湊；角色每個請求重新查，降級或停用馬上生效
+    USER_COLS = ("username", "display", "role", "source", "salt", "hash", "algo", "must_change", "disabled",
+                 "created", "pw_changed", "last_login")
+
+    def user_get(self, username):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.USER_COLS) + " FROM users WHERE username=?", (username,)).fetchone()
+        return dict(zip(self.USER_COLS, r)) if r else None
+
+    def user_list(self):
+        with self.lock:
+            rows = self.db.execute("SELECT " + ",".join(self.USER_COLS) + " FROM users ORDER BY role, username").fetchall()
+        return [dict(zip(self.USER_COLS, r)) for r in rows]
+
+    def user_count(self):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+    def admin_count(self):
+        """還能登入的管理員有幾位：最後一位不能被刪、停用或降級。"""
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM users WHERE role='admin' AND COALESCE(disabled,0)=0").fetchone()[0]
+
+    def user_insert(self, row):
+        with self.lock:
+            self.db.execute("INSERT INTO users(" + ",".join(self.USER_COLS) + ") VALUES(" + ",".join("?" * len(self.USER_COLS)) + ")",
+                            tuple(row.get(k) for k in self.USER_COLS))
+
+    def user_update(self, username, fields):
+        cols = [k for k in fields if k in self.USER_COLS and k != "username"]
+        if not cols:
+            return False
+        with self.lock:
+            return self.db.execute("UPDATE users SET " + ",".join(f"{k}=?" for k in cols) + " WHERE username=?",
+                                   (*[fields[k] for k in cols], username)).rowcount > 0
+
+    def user_delete(self, username):
+        """刪帳號連同他的對話、附圖與登入票證；金鑰與 Agent 資料夾由呼叫端處理（撤銷、改歸管理員）。"""
+        with self.lock:
+            n = self.db.execute("DELETE FROM users WHERE username=?", (username,)).rowcount
+            self.db.execute("DELETE FROM chats WHERE user=?", (username,))
+            self.db.execute("DELETE FROM chat_blobs WHERE user=?", (username,))
+            self.db.execute("DELETE FROM sessions WHERE user=?", (username,))
+        return n > 0
+
+    # ---- Agent 資料夾的擁有者（資料夾本身在代理那台；這裡只記是誰建的）
+    def folder_owner(self, node, folder):
+        with self.lock:
+            r = self.db.execute("SELECT owner FROM agent_folders WHERE node=? AND folder=?", (node, folder)).fetchone()
+        return r[0] if r else None
+
+    def folder_set(self, node, folder, owner):
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO agent_folders(node,folder,owner,created) VALUES(?,?,?,?)",
+                            (node, folder, owner, time.time()))
+
+    def folders_of(self, owner):
+        with self.lock:
+            return {(r[0], r[1]) for r in self.db.execute("SELECT node, folder FROM agent_folders WHERE owner=?", (owner,))}
+
+    def folders_reassign(self, owner, to):
+        with self.lock:
+            self.db.execute("UPDATE agent_folders SET owner=? WHERE owner=?", (to, owner))
 
     # ---- 加密入口的金鑰：只存 SHA-256 與前 8 個字元（明文只在產生當下回一次，這裡碰不到）
     KEY_COLS = ("id", "name", "owner", "prefix", "hash", "slots", "max_inflight", "created", "created_by",

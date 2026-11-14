@@ -88,10 +88,40 @@ NODE_REPLY_MAX = 32 * 1024 * 1024
 NODE_DEADLINE = 300             # 跟代理的一次呼叫，連同讀完回應的總時限（秒）
 PBKDF2_ROUNDS = 200_000
 # 登入節流：伺服器是多執行緒的，只在每次失敗後睡一秒擋不住並行猜測。
-# 同一來源 15 分鐘內錯 5 次就先擋；全部來源加起來錯 50 次也擋（分散猜測）。
+# 同一來源、同一帳號 15 分鐘內錯 5 次就擋這個組合；同一來源不分帳號錯 30 次才擋整個來源。
+# 一間教室常在同一個 NAT 後面：一個學生打錯密碼不能連累全班。
 # 不鎖帳號：鎖帳號等於讓內網任何人都能把管理者鎖在門外。
 LOGIN_WINDOW = 900
-LOGIN_MAX_PER_IP = 5
+LOGIN_MAX_PER_ACCOUNT = 5
+LOGIN_MAX_PER_IP = 30
+PW_MIN = 12                       # 新設的密碼至少 12 碼（OWASP ASVS L2 2.1.1）；舊的 8 碼密碼下次改時才套用
+USER_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]{2,63}")
+MUST_CHANGE_OK = {"/api/me", "/api/account/password", "/api/logout", "/api/branding"}
+# 使用者（非管理員）能用的路由：對話、Agent、畫圖影片、自己的金鑰與密碼。沒列在這裡的一律只有管理員能用：
+# 新加的路由忘了列，結果是使用者用不到，而不是不小心開放出去（console/test_roles.py 逐條檢查每一條路由都有歸屬）。
+USER_ROUTES = [
+    ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers)"),
+    ("GET", r"/api/chats/(blob/[0-9a-f]{16}|[0-9a-f]{12})"),
+    ("GET", r"/api/agent/tasks/[0-9a-f]{12}"),
+    ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend)"),
+    ("GET", r"/api/node/[\w.-]+/sd/jobs(/[0-9a-f]{8}(/output(/[0-3])?|/init)?)?"),
+    ("POST", r"/api/(logout|account/password|chats/save|chats/delete-all|extract|preview|agent/tasks|keys/create)"),
+    ("POST", r"/api/chats/[0-9a-f]{12}/(rename|delete)"),
+    ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop)"),
+    ("POST", r"/api/node/[\w.-]+/chat/[\w.-]+"),
+    ("POST", r"/api/node/[\w.-]+/agent/(folders/create|fs/list|fs/read)"),
+    ("POST", r"/api/node/[\w.-]+/sd/(generate|admit)"),
+    ("POST", r"/api/node/[\w.-]+/sd/jobs/[0-9a-f]{8}/(cancel|delete)"),
+    ("POST", r"/api/keys/[0-9a-f]{8}/(update|revoke)"),
+]
+_USER_ROUTES = [(m, re.compile(rx)) for m, rx in USER_ROUTES]
+UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload")
+USER_KEYS_MAX = 3                  # 使用者自己能產生的有效金鑰上限（管理員發的不算）
+
+
+def user_may(method, path):
+    return any(m == method and rx.fullmatch(path) for m, rx in _USER_ROUTES)
+ROLES = ("admin", "user")
 _LOGIN_LOCK = threading.Lock()
 _THROTTLE_LOGGED = {}
 
@@ -330,33 +360,159 @@ def _hash(password, salt):
     return base64.b64encode(hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PBKDF2_ROUNDS)).decode()
 
 
-def set_credentials(username, password):
+def _pw_fields(password):
     salt = secrets.token_bytes(16)
-
-    def fn(cfg):
-        cfg["auth"] = {"username": username, "salt": base64.b64encode(salt).decode(),
-                       "hash": _hash(password, salt), "algo": "pbkdf2-sha256-200k",
-                       "changed_at": int(time.time())}
-        cfg.pop("session_secret", None)                    # 舊版無狀態票證用的，已不需要
-    update_fleet(fn)
-    STORE.session_end_all()                                  # 換密碼讓既有登入全部失效
+    return {"salt": base64.b64encode(salt).decode(), "hash": _hash(password, salt), "algo": "pbkdf2-sha256-200k",
+            "pw_changed": time.time()}
 
 
-def check_credentials(username, password):
+def set_credentials(username, password, role="admin", must_change=False):
+    """設密碼；帳號不存在就建（安裝程式、桌面版第一次開、管理員新增帳號都走這裡）。
+    原本那位管理員（fleet.json 的 auth）同步寫一份：退回只有單一帳號的舊版時才登得進去。換密碼讓這個人的登入全部失效。"""
+    pw = _pw_fields(password)
+    if STORE.user_get(username):
+        STORE.user_update(username, {**pw, "must_change": 1 if must_change else 0})
+    else:
+        STORE.user_insert({"username": username, "display": username, "role": role, "source": "local", **pw,
+                           "must_change": 1 if must_change else 0, "disabled": 0, "created": time.time()})
+    a = fleet().get("auth") or {}
+    if not a.get("hash") or a.get("username", "admin") == username:
+        def fn(cfg):
+            cfg["auth"] = {"username": username, "salt": pw["salt"], "hash": pw["hash"], "algo": pw["algo"],
+                           "changed_at": int(time.time())}
+            cfg.pop("session_secret", None)                # 舊版無狀態票證用的，已不需要
+        update_fleet(fn)
+    STORE.session_end_all(username)
+
+
+def migrate_users():
+    """只有單一帳號的舊版升上來：把 fleet.json 的帳密搬進帳號表成為管理員，雜湊原樣複製，密碼不變。"""
+    if STORE.user_count():
+        return False
     a = fleet().get("auth") or {}
     if not a.get("hash"):
         return False
-    want_user = a.get("username", "admin")
-    # 帳號與密碼都算一遍再比，免得帳號錯時回得特別快，被拿來猜帳號
-    user_ok = hmac.compare_digest(username.encode(), want_user.encode())
-    pw_ok = hmac.compare_digest(_hash(password, base64.b64decode(a["salt"])), a["hash"])
-    return user_ok and pw_ok
+    STORE.user_insert({"username": a.get("username", "admin"), "display": a.get("username", "admin"), "role": "admin",
+                       "source": "local", "salt": a["salt"], "hash": a["hash"], "algo": a.get("algo", "pbkdf2-sha256-200k"),
+                       "must_change": 0, "disabled": 0, "created": time.time(), "pw_changed": a.get("changed_at")})
+    return True
+
+
+_DUMMY = {}
+
+
+def check_credentials(username, password):
+    if not STORE.user_count():
+        migrate_users()
+    row = STORE.user_get(username)
+    if not _DUMMY:
+        _DUMMY.update(_pw_fields(secrets.token_urlsafe(16)))
+    # 帳號不存在也算一次雜湊再比：不讓「帳號錯」回得特別快，被拿來猜有哪些帳號
+    ref = row if row and row.get("hash") else _DUMMY
+    ok = hmac.compare_digest(_hash(password, base64.b64decode(ref["salt"])), ref["hash"])
+    return bool(row) and ok and not row.get("disabled")
 
 
 def session_user(sid):
-    """票證記在伺服器端：登出、換密碼、到期都會讓它失效。
+    """票證記在伺服器端：登出、換密碼、到期都會讓它失效。帳號被停用或刪掉，票證當下就不算數。
     （以前是無狀態的簽章票證，登出只是清掉瀏覽器 cookie，被偷走的票證 12 小時內照樣能用。）"""
-    return STORE.session_user(sid)
+    u = STORE.session_user(sid)
+    if not u:
+        return None
+    row = STORE.user_get(u)
+    if row is None and not STORE.user_count():
+        migrate_users()
+        row = STORE.user_get(u)
+    return u if row and not row.get("disabled") else None
+
+
+def user_public(r):
+    return {k: r.get(k) for k in ("username", "display", "role", "must_change", "disabled", "created", "pw_changed", "last_login")}
+
+
+def one_time_password():
+    """一次性密碼：16 個英數字，去掉容易看錯的 0O1lI。"""
+    abc = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    return "".join(secrets.choice(abc) for _ in range(16))
+
+
+def user_fields(body, partial=False):
+    out = {}
+    if not partial:
+        u = str(body.get("username") or "").strip()
+        if not USER_RX.fullmatch(u):
+            return None, "帳號要 3～64 個字，英數字開頭，只能用英數字與 . _ @ -（學號、員工編號或 email 都可以）"
+        out["username"] = u
+    if not partial or "display" in body:
+        d = str(body.get("display") or "").strip() or out.get("username", "")
+        if not 1 <= len(d) <= 40 or any(ord(c) < 32 for c in d):
+            return None, "顯示名稱要 1～40 個字"
+        out["display"] = d
+    if not partial or "role" in body:
+        r = body.get("role", "user")
+        if r not in ROLES:
+            return None, "角色只能是管理員（admin）或使用者（user）"
+        out["role"] = r
+    if partial and "disabled" in body:
+        if not isinstance(body["disabled"], bool):
+            return None, "disabled 要是 true 或 false"
+        out["disabled"] = 1 if body["disabled"] else 0
+    return out, None
+
+
+def user_create(body, by):
+    f, err = user_fields(body)
+    if err:
+        return 400, {"error": err}
+    if STORE.user_get(f["username"]):
+        return 409, {"error": f"帳號 {f['username']} 已經有了"}
+    pw = one_time_password()
+    set_credentials(f["username"], pw, role=f["role"], must_change=True)
+    STORE.user_update(f["username"], {"display": f["display"]})
+    return 200, {"ok": True, "user": user_public(STORE.user_get(f["username"])), "password": pw}
+
+
+def user_change(username, body, me):
+    """改顯示名稱、角色、停用。最後一位管理員不能被降級或停用；不能停用或降級自己（免得把自己關在門外）。"""
+    cur = STORE.user_get(username)
+    if not cur:
+        return 404, {"error": "沒有這個帳號"}
+    f, err = user_fields(body, partial=True)
+    if err:
+        return 400, {"error": err}
+    losing_admin = cur["role"] == "admin" and not cur.get("disabled") and (f.get("role") == "user" or f.get("disabled") == 1)
+    if losing_admin and username == me:
+        return 409, {"error": "不能停用或降級自己；請另一位管理員來做"}
+    if losing_admin and STORE.admin_count() <= 1:
+        return 409, {"error": "這是最後一位管理員，不能停用或降級"}
+    STORE.user_update(username, f)
+    if f.get("disabled") == 1 or f.get("role") == "user":
+        STORE.session_end_all(username)              # 停用或降級：現有的登入馬上失效
+    return 200, {"ok": True, "user": user_public(STORE.user_get(username))}
+
+
+def user_reset(username):
+    if not STORE.user_get(username):
+        return 404, {"error": "沒有這個帳號"}
+    pw = one_time_password()
+    set_credentials(username, pw, must_change=True)
+    return 200, {"ok": True, "password": pw, "user": user_public(STORE.user_get(username))}
+
+
+def user_remove(username, me):
+    cur = STORE.user_get(username)
+    if not cur:
+        return 404, {"error": "沒有這個帳號"}
+    if username == me:
+        return 409, {"error": "不能刪除自己"}
+    if cur["role"] == "admin" and not cur.get("disabled") and STORE.admin_count() <= 1:
+        return 409, {"error": "這是最後一位管理員，不能刪除"}
+    revoked = [k["id"] for k in STORE.key_list(owner=username) if gateway.state(k) == "active"]
+    for kid in revoked:
+        STORE.key_revoke(kid, me)
+    STORE.folders_reassign(username, me)             # Agent 資料夾裡的檔案不刪，改歸做這件事的管理員
+    STORE.user_delete(username)
+    return 200, {"ok": True, "revoked_keys": len(revoked)}
 
 
 # ---------------------------------------------------------------- API 串接：從主控台經網路打一次
@@ -1698,6 +1854,7 @@ def keys_overview(owner=None):
     zero = {"requests": 0, "errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
     return {"items": [gateway.public(r, use.get(r["id"], zero)) for r in STORE.key_list(owner)],
             "url": gateway_url(), "url_custom": bool((fleet().get("gateway") or {}).get("public_url")),
+            "models": sorted({r["name"] for r in GW_ROUTES.rows() if r.get("online")}),
             "limits": {"name": gateway.NAME_MAX, "inflight": gateway.INFLIGHT_MAX, "default_inflight": gateway.DEFAULT_INFLIGHT}}
 
 
@@ -2001,8 +2158,13 @@ AGENT_TOOLS = [
 TOOLS_UNSUPPORTED_RX = re.compile(r"tool|function|jinja", re.I)
 
 
-def agent_system_prompt(folder, osname):
+def agent_system_prompt(folder, osname, can_exec=True):
     shell = {"windows": "Windows PowerShell", "darwin": "macOS 的 zsh", "linux": "Linux 的 bash"}.get(osname, "shell")
+    if not can_exec:
+        return ("你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。"
+                f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑。這個帳號不能執行指令，只能讀寫檔案。"
+                "做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，"
+                "用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。")
     return ("你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。"
             f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑；指令在這個資料夾裡用 {shell} 執行。"
             "做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，"
@@ -2019,6 +2181,7 @@ class AgentTask:
         self.pending, self.decision, self.always, self.stop = None, None, False, False
         self.steps, self.created, self.updated = 0, time.time(), time.time()
         self.deadline = self.created + AGENT_MAX_SEC
+        self.can_exec = True
         self.event = threading.Event()
         self.lock = threading.Lock()
 
@@ -2126,6 +2289,8 @@ def agent_tool(t, name, args):
                 t.files[out["path"]] = "modified"
         _tree_snapshot(t)
         return {"ok": True, "path": out["path"], "size": out["size"], "created": out.get("created")}
+    if name == "run_command" and not t.can_exec:
+        return {"error": "這個帳號不能執行指令；只能讀寫工作資料夾裡的檔案"}
     if name == "run_command":
         cmd = str(args.get("command") or "").strip()
         try:
@@ -2170,7 +2335,7 @@ def agent_tool(t, name, args):
 
 def agent_run(t):
     """背景執行緒：一步＝呼叫模型一次。上限 40 步、30 分鐘。"""
-    convo = [{"role": "system", "content": agent_system_prompt(t.folder, t.model.get("os"))},
+    convo = [{"role": "system", "content": agent_system_prompt(t.folder, t.model.get("os"), t.can_exec)},
              {"role": "user", "content": t.prompt}]
     used_tools, bare = False, 0
 
@@ -2194,7 +2359,8 @@ def agent_run(t):
             if time.time() > t.deadline:
                 return end("failed", "已超過 30 分鐘上限，任務停止")
             t.steps += 1
-            code, out = agent_model_call(t, {"messages": convo, "tools": AGENT_TOOLS, "stream": False,
+            tools = AGENT_TOOLS if t.can_exec else [x for x in AGENT_TOOLS if x["function"]["name"] != "run_command"]
+            code, out = agent_model_call(t, {"messages": convo, "tools": tools, "stream": False,
                                              "max_tokens": 4096, "temperature": 0.2})
             if t.stop:
                 return end("stopped")
@@ -2314,8 +2480,8 @@ def computer_start(user, ip, body, audit):
     return computer.start(user, ip, node, model, body.get("goal"), label, cn, mc, audit)
 
 
-def agent_start(user, ip, body):
-    """回 (狀態碼, 回應)。"""
+def agent_start(user, ip, body, can_exec=True):
+    """回 (狀態碼, 回應)。can_exec＝能不能用 run_command：一般使用者不能（服務帳號的命令列讀得到整台的金鑰與憑證）。"""
     node = str(body.get("node") or "")
     folder = str(body.get("folder") or "")
     prompt = str(body.get("prompt") or "").strip()
@@ -2353,8 +2519,11 @@ def agent_start(user, ip, body):
     with _AGENT_LOCK:
         busy = next((x for x in AGENT_TASKS.values() if x.state in ("running", "waiting_approval")), None)
         if busy:
+            if busy.user != user and not can_exec:
+                return 409, {"error": "有人正在用 Agent，這台一次只跑一件；請稍後再試"}
             return 409, {"error": "已經有一個 Agent 任務在進行，請等它做完或按停止", "task": busy.id}
         t = AgentTask(user, ip, node, folder, model, prompt, label)
+        t.can_exec = can_exec
         AGENT_TASKS[t.id] = t
         for k in sorted(AGENT_TASKS, key=lambda k: AGENT_TASKS[k].created)[:-AGENT_KEEP]:
             if AGENT_TASKS[k].state not in ("running", "waiting_approval"):
@@ -2457,8 +2626,47 @@ class Handler(BaseHTTPRequestHandler):
         return self._user_cache
 
     @property
+    def who(self):
+        """登入者的帳號資料（角色、要不要先改密碼）。每個請求重新查：降級、停用、重設密碼馬上生效。"""
+        if not hasattr(self, "_who_cache"):
+            self._who_cache = STORE.user_get(self.user) if self.user else None
+        return self._who_cache
+
+    @property
+    def is_admin(self):
+        return bool(self.who and self.who.get("role") == "admin")
+
+    @property
     def ip(self):
         return self.client_address[0] if self.client_address else ""
+
+    def _gate(self, method, path, drain=False):
+        """登入之後的第二道門：要先改密碼的人只能改密碼、看自己是誰、登出。回 True＝已經回應了，呼叫端直接結束。"""
+        w = self.who
+        if w and w.get("must_change") and path not in MUST_CHANGE_OK:
+            if drain:
+                self._body(MAX_ANON_BODY)
+                self._headers_done()
+            self._json(403, {"error": "請先改密碼（管理員給的是一次性密碼）", "must_change": True})
+            return True
+        if w and not self.is_admin and not user_may(method, path):
+            if drain:
+                self._body(MAX_ANON_BODY)
+                self._headers_done()
+            self._json(403, {"error": "這個功能只有管理員能用", "admin_only": True})
+            return True
+        return False
+
+    def _mine_folder(self, node_id, folder):
+        """非管理員只能碰自己建的 Agent 資料夾（升級前建的、管理員連結的外部資料夾都沒有擁有者＝只有管理員能用）。"""
+        return self.is_admin or STORE.folder_owner(node_id, str(folder or "")) == self.user
+
+    def _sd_job_mine(self, node_id, jid):
+        if self.is_admin:
+            return True
+        code, out = call_node(node_id, "/sd/jobs", timeout=60)
+        items = (out.get("jobs") if isinstance(out, dict) else None) or []
+        return code == 200 and any(j.get("id") == jid and j.get("by") == self.user for j in items if isinstance(j, dict))
 
     def _need_auth(self):
         if self.user:
@@ -2964,6 +3172,7 @@ class Handler(BaseHTTPRequestHandler):
         # 一定要清掉，否則登入前查到的「沒人」會跟到登入後，登出後查到的「有人」也會留著
         # （實際踩到：登入成功後 /api/me 仍回 401，畫面卡在登入頁）
         self.__dict__.pop("_user_cache", None)
+        self.__dict__.pop("_who_cache", None)
         # 請求列、標頭（POST 連同本文）要在 15 秒內送完，閒置的 keep-alive 也 15 秒就關：
         # 以前每次 recv 各等 120 秒，每 100 秒送一個位元組就能無限期佔住一條連線，8 個來源就能佔滿上限（資安審查）
         self._hdr_timer = threading.Timer(HEADER_DEADLINE, self._abort_slow)
@@ -3083,10 +3292,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._static(path)
         if self._need_auth():
             return None
+        if self._gate("GET", path):
+            return None
 
         if path == "/api/me":
             cur = CERTS.current() or {}
-            return self._json(200, {"user": self.user, "app_window": bool(getattr(self, "loopback", False)),
+            w = self.who or {}
+            return self._json(200, {"user": self.user, "role": w.get("role") or "admin", "display": w.get("display") or self.user,
+                                    "must_change": bool(w.get("must_change")),
+                                    "app_window": bool(getattr(self, "loopback", False)),
                                     "lan_access": bool(fleet().get("lan_access")) if DESKTOP else True, "tls": {
                 "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
                 "validToTaipei": cur.get("validToTaipei"), "selfSigned": cur.get("selfSigned")}})
@@ -3150,10 +3364,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/browse?path=" + urllib.parse.quote(q[:1000]), timeout=30))
         m = re.fullmatch(r"/api/node/([\w.-]+)/agent/folders", path)
         if m:
-            return self._json(*call_node(m.group(1), "/agent/folders", timeout=30))
+            code, out = call_node(m.group(1), "/agent/folders", timeout=30)
+            if code == 200 and isinstance(out.get("folders"), list):
+                for f in out["folders"]:
+                    f["owner"] = STORE.folder_owner(m.group(1), f.get("name"))
+                if not self.is_admin:
+                    out["folders"] = [f for f in out["folders"] if f["owner"] == self.user]
+            return self._json(code, out)
         if path == "/api/agent/tasks":
             with _AGENT_LOCK:
-                rows = sorted(AGENT_TASKS.values(), key=lambda x: -x.created)
+                rows = sorted((t for t in AGENT_TASKS.values() if self.is_admin or t.user == self.user), key=lambda x: -x.created)
             return self._json(200, {"items": [t.public(full=False) for t in rows],
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
         if path == "/api/update":
@@ -3171,6 +3391,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})", path)
         if m:
             t = AGENT_TASKS.get(m.group(1))
+            if t and not self.is_admin and t.user != self.user:
+                t = None                                         # 別人的任務當作不存在
             return self._json(200, t.public()) if t else self._json(404, {"error": "沒有這個任務"})
         # ---- 對話紀錄（存在主控台、加密落地；每個人只看得到自己的）
         if path == "/api/chats":
@@ -3186,10 +3408,19 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, out = chats.load(STORE, chat_unseal, self.user, m.group(1))
             return self._json(code, out)
+        if path == "/api/users":
+            if not self.is_admin:
+                return self._json(403, {"error": "只有管理員能管理帳號"})
+            return self._json(200, {"items": [user_public(r) for r in STORE.user_list()], "me": self.user,
+                                    "pw_min": PW_MIN, "roles": list(ROLES)})
         if path == "/api/keys":
+            if not self.is_admin:
+                return self._json(200, {**keys_overview(owner=self.user), "max_own": USER_KEYS_MAX})
             import_legacy_keys()
             return self._json(200, keys_overview())
         if path == "/api/providers":
+            if not self.is_admin:                    # 第三方 API 用的是單位付費的金鑰：只有管理員能用
+                return self._json(200, {"items": [], "presets": []})
             return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
                                     "presets": PROVIDER_PRESETS})
         m = re.fullmatch(r"/api/node/([\w.-]+)/recommend", path)
@@ -3219,7 +3450,12 @@ class Handler(BaseHTTPRequestHandler):
                                     "samplers": recommend.SD_SAMPLERS})
         m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output(?:/[0-3])?|/init)?)?", path)
         if m:
-            return self._json(*call_node(m.group(1), "/sd/jobs" + (m.group(2) or ""), timeout=60))
+            if m.group(2) and not self._sd_job_mine(m.group(1), m.group(2)[1:9]):
+                return self._json(404, {"error": "沒有這件產出"})
+            code, out = call_node(m.group(1), "/sd/jobs" + (m.group(2) or ""), timeout=60)
+            if code == 200 and not m.group(2) and not self.is_admin and isinstance(out, dict):
+                out = {**out, "jobs": [j for j in out.get("jobs") or [] if isinstance(j, dict) and j.get("by") == self.user]}
+            return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
@@ -3284,6 +3520,10 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        if UPLOAD_RX.fullmatch(path) and self.user and not self.is_admin:
+            self._headers_done()
+            self.close_connection = True            # 本文是大檔，不讀完：直接關連線
+            return self._json(403, {"error": "這個功能只有管理員能用", "admin_only": True})
         if path == "/v1" or path.startswith("/v1/"):
             return self._gateway("POST")
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
@@ -3311,6 +3551,8 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             self._headers_done()
             return self._json(401, {"error": "請先登入"})
+        if not anon and self._gate("POST", path, drain=True):
+            return None
         body = self._body(MAX_ANON_BODY if anon else EXTRACT_BODY if path == "/api/extract"
                           else CHAT_BODY if path == "/api/chats/save" else MAX_BODY)
         self._headers_done()             # 本文讀完才停計時：後面像換模型這種要等好幾分鐘的處理不受影響
@@ -3326,21 +3568,27 @@ class Handler(BaseHTTPRequestHandler):
             # 不再做「全部來源加起來錯 50 次就全部封鎖」：內網任何人都能藉此把管理者鎖在門外（資安審查）
             with _LOGIN_LOCK:
                 since = time.time() - LOGIN_WINDOW
-                if STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP:
-                    if time.time() - _THROTTLE_LOGGED.get(self.ip, 0) > 60:     # 被擋的請求每個來源每分鐘只記一筆，免得灌爆稽核表
-                        _THROTTLE_LOGGED[self.ip] = time.time()
+                if STORE.failed_logins(since, self.ip, user) >= LOGIN_MAX_PER_ACCOUNT \
+                        or STORE.failed_logins(since, self.ip) >= LOGIN_MAX_PER_IP:
+                    tk = (self.ip, user)
+                    if time.time() - _THROTTLE_LOGGED.get(tk, 0) > 60:     # 被擋的請求每個來源每分鐘只記一筆，免得灌爆稽核表
+                        _THROTTLE_LOGGED[tk] = time.time()
                         STORE.audit(user, self.ip, "auth.throttled", user, False)
                     return self._json(429, {"error": "登入失敗次數過多，請 15 分鐘後再試"})
                 if not check_credentials(user, str(body.get("password") or "")):
                     STORE.audit(user, self.ip, "auth.login", user, False)
                     time.sleep(1.0)
-                    left = max(0, LOGIN_MAX_PER_IP - STORE.failed_logins(since, self.ip))
+                    left = max(0, min(LOGIN_MAX_PER_ACCOUNT - STORE.failed_logins(since, self.ip, user),
+                                      LOGIN_MAX_PER_IP - STORE.failed_logins(since, self.ip)))
                     return self._json(401, {"error": "帳號或密碼不對", "remaining": left})
             STORE.audit(user, self.ip, "auth.login", user, True)
+            STORE.user_update(user, {"last_login": time.time()})
             sid = STORE.session_new(user, self.ip, SESSION_HOURS)
             cookie = (f"xconsole={sid}; Path=/; HttpOnly; SameSite=Strict; "
                       f"Max-Age={SESSION_HOURS * 3600}; Secure")
-            return self._json(200, {"ok": True, "user": user}, cookie=cookie)
+            row = STORE.user_get(user) or {}
+            return self._json(200, {"ok": True, "user": user, "role": row.get("role"), "must_change": bool(row.get("must_change"))},
+                              cookie=cookie)
         if path == "/api/desktop/enter":
             # 應用程式開視窗時把鑰匙放在網址的 # 後面（不會送到伺服器、不進記錄），頁面讀到再送來這裡換登入
             key = str(body.get("key") or "")
@@ -3531,13 +3779,54 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 return self._json(400, {"error": err})
             return self._json(200, {"url": f"/preview/{pid}", "id": pid, "expires_at": time.time() + PREVIEW_TTL})
+        # ---- 帳號管理（管理員）
+        if path.startswith("/api/users"):
+            if not self.is_admin:
+                return self._json(403, {"error": "只有管理員能管理帳號"})
+            if path == "/api/users/create":
+                code, out = user_create(body, self.user)
+                self._audit("user.create", (out.get("user") or {}).get("username", str(body.get("username") or "")[:64]),
+                            code == 200, {"role": body.get("role"), "message": out.get("error")})
+                return self._json(code, out)
+            if path == "/api/users/import":
+                rows = body.get("rows")
+                if not isinstance(rows, list) or not 1 <= len(rows) <= 500:
+                    return self._json(400, {"error": "一次匯入 1～500 個帳號"})
+                done, errors = [], []
+                for i, r in enumerate(rows, 1):
+                    code, out = user_create(r if isinstance(r, dict) else {}, self.user)
+                    if code == 200:
+                        done.append({"username": out["user"]["username"], "display": out["user"]["display"],
+                                     "role": out["user"]["role"], "password": out["password"]})
+                    else:
+                        errors.append({"row": i, "username": str((r or {}).get("username") or "")[:64] if isinstance(r, dict) else "",
+                                       "error": out["error"]})
+                self._audit("user.import", "", bool(done), {"created": len(done), "failed": len(errors)})
+                return self._json(200, {"ok": True, "created": done, "errors": errors})
+            m = re.fullmatch(r"/api/users/([A-Za-z0-9._@-]{3,64})/(update|reset|delete)", path)
+            if m:
+                u, act = m.groups()
+                code, out = (user_change(u, body, self.user) if act == "update" else user_reset(u) if act == "reset"
+                             else user_remove(u, self.user))
+                self._audit("user." + act, u, code == 200,
+                            {k: body.get(k) for k in ("role", "disabled", "display") if k in body} | {"message": out.get("error")})
+                return self._json(code, out)
+            return self._json(404, {"error": "找不到"})
         # ---- 加密入口的金鑰
         if path == "/api/keys/create":
-            code, out, det = key_create(body, self.user)
+            owner = None
+            if not self.is_admin:
+                owner = self.user
+                mine = [k for k in STORE.key_list(owner=self.user) if gateway.state(k) == "active"]
+                if len(mine) >= USER_KEYS_MAX:
+                    return self._json(409, {"error": f"每個人最多 {USER_KEYS_MAX} 把有效的金鑰；請先撤銷用不到的"})
+            code, out, det = key_create(body, self.user, owner=owner)
             self._audit("apikey.create", (det or {}).get("id", ""), code == 200, det or {"message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/keys/([0-9a-f]{8})/(update|revoke)", path)
         if m:
+            if not self.is_admin and (STORE.key_get(m.group(1)) or {}).get("owner") != self.user:
+                return self._json(404, {"error": "沒有這把金鑰"})            # 別人的金鑰當作不存在
             code, out, det = key_update(m.group(1), body) if m.group(2) == "update" else key_revoke(m.group(1), self.user)
             self._audit("apikey." + m.group(2), m.group(1), code == 200, det or {"message": out.get("error")})
             return self._json(code, out)
@@ -3586,13 +3875,19 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             node_id, act = m.groups()
             want = {k: body.get(k) for k in ("name", "folder", "path") if k in body}
+            if act.startswith("fs/") and not self._mine_folder(node_id, body.get("folder")):
+                return self._json(404, {"error": "沒有這個工作資料夾"})
             code, out = call_node(node_id, f"/agent/{act}", "POST", want, timeout=60)
+            if act == "folders/create" and code == 200:
+                STORE.folder_set(node_id, out.get("name") or str(body.get("name") or ""), self.user)
             if act.startswith("folders/"):
                 self._audit("agent." + act.replace("folders/", "folder_"), f"{node_id}/{body.get('name') or body.get('path')}",
                             code == 200, {"message": out.get("error"), "path": out.get("path")})
             return self._json(code, out)
         if path == "/api/agent/tasks":
-            code, out = agent_start(self.user, self.ip, body)
+            if not self._mine_folder(str(body.get("node") or ""), body.get("folder")):
+                return self._json(404, {"error": "沒有這個工作資料夾"})
+            code, out = agent_start(self.user, self.ip, body, can_exec=self.is_admin)
             self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
@@ -3662,7 +3957,7 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})/(approve|stop)", path)
         if m:
             t = AGENT_TASKS.get(m.group(1))
-            if not t:
+            if not t or (not self.is_admin and t.user != self.user):
                 return self._json(404, {"error": "沒有這個任務"})
             if m.group(2) == "stop":
                 return self._json(200, agent_stop(t, self._audit))
@@ -3811,7 +4106,12 @@ class Handler(BaseHTTPRequestHandler):
             keys = {"delete": ("id",), "admit": ("model", "width", "height", "frames"),
                     "generate": ("model", "prompt", "negative", "width", "height", "steps", "cfg", "sampler", "seed", "frames", "fps",
                                  "count", "strength", "init_image")}[act]
-            code, out = call_node(node_id, f"/sd/{act}", "POST", {k: body.get(k) for k in keys}, timeout=120)
+            if act == "delete" and not self.is_admin:
+                return self._json(403, {"error": "這個功能只有管理員能用", "admin_only": True})
+            want = {k: body.get(k) for k in keys}
+            if act == "generate":
+                want["by"] = self.user                           # 產出記在誰名下：清單只給本人與管理員看
+            code, out = call_node(node_id, f"/sd/{act}", "POST", want, timeout=120)
             if act != "admit":
                 self._audit(f"sd.{act}", f"{node_id}/{body.get('id') or body.get('model')}", code == 200,
                             {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}",
@@ -3820,6 +4120,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)
         if m:
+            if not self._sd_job_mine(m.group(1), m.group(2)):
+                return self._json(404, {"error": "沒有這件產出"})
             code, out = call_node(m.group(1), f"/sd/jobs/{m.group(2)}/{m.group(3)}", "POST", {})
             self._audit(f"sd.job.{m.group(3)}", f"{m.group(1)}/{m.group(2)}", code == 200, {"message": out.get("error")})
             return self._json(code, out)
@@ -4075,9 +4377,11 @@ class Handler(BaseHTTPRequestHandler):
                 time.sleep(1.0)
                 self._audit("account.password", user, False, {"reason": "舊密碼不對"})
                 return self._json(403, {"error": "目前的密碼不對"})
-            if len(new) < 8:
-                return self._json(400, {"error": "新密碼至少 8 碼"})
-            set_credentials(user, new)             # 內含作廢所有登入
+            if len(new) < PW_MIN:
+                return self._json(400, {"error": f"新密碼至少 {PW_MIN} 碼"})
+            if new == old:
+                return self._json(400, {"error": "新密碼不能跟目前的一樣"})
+            set_credentials(user, new)             # 內含作廢這個人的所有登入，也清掉「要先改密碼」
             update_fleet(lambda c: c.pop("desktop_pw_unset", None))
             self._audit("account.password", user, True, {"first": bool(first)})
             if getattr(self, "loopback", False):
@@ -4250,6 +4554,8 @@ def main():
             threading.Thread(target=_watch_parent, args=(PARENT_PID,), daemon=True).start()
     elif not (cfg.get("auth") or {}).get("hash"):
         print("還沒設帳密。先跑：python3 xconsole_server.py --set-credentials", flush=True)
+    if migrate_users():
+        print("已把原本的管理員帳號搬進帳號表（密碼不變）", flush=True)
     moved = migrate_tokens()
     if groups.ensure(fleet()):
         update_fleet(groups.ensure)          # 舊版只有群組名稱：補上群組物件（版本號從 1 起）
