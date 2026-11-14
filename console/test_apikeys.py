@@ -239,6 +239,8 @@ def main():
     first = sk.recv(64)
     sk.close()
     check("  GET 宣稱有本文但不送：馬上回 400，不等本文", first.startswith(b"HTTP/1.1 400") and time.time() - t0 < 3, first)
+    st, o = req("POST", "/api/node/n1/apiinfo/b9/settings", {"model_name": "m1"})
+    check("API 設定改成別格已經在用的模型名稱 → 400（不送到代理）", st == 400 and "m1" in o.get("error", ""), (st, o))
 
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1
