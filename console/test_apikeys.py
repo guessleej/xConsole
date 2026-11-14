@@ -179,7 +179,7 @@ def main():
         return resp.status, json.loads(resp.read() or b"{}")
     st, o = v1("/v1/chat/completions", {"model": "m1", "messages": [{"role": "user", "content": "hi"}]})
     check("代理是舊版 → 502 並說要更新代理", st == 502 and "更新代理" in o["error"]["message"], (st, o))
-    u = x.STORE.usage_by_key(gateway.day())[out2["item"]["id"]]
+    u = x.STORE.usage_by_key(gateway.hour())[out2["item"]["id"]]
     check("  記成一次錯誤", u["errors"] == 2 and u["requests"] == 3, u)
     st, o = v1("/v1/chat/completions", {"model": "dup", "messages": [{"role": "user", "content": "hi"}]})
     check("兩格同名 → 409，請管理員改名", st == 409 and o["error"]["type"] == "model_name_conflict", (st, o))
