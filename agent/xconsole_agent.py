@@ -4470,8 +4470,8 @@ RELAY_PATHS = {"models": ("GET", "/v1/models"), "chat/completions": ("POST", "/v
                "completions": ("POST", "/v1/completions"), "embeddings": ("POST", "/v1/embeddings")}
 RELAY_STRATA = {"messages": ("POST", "/v1/messages"), "responses": ("POST", "/v1/responses")}
 RELAY_MAX = 64 * 1024 * 1024
-# 跟主控台 console/gateway.py 的 HASH_TAG 一致：匯入舊金鑰時兩邊算的雜湊要對得上
-KEY_HASH_TAG = b"xconsole-api-key-v1"
+# 跟主控台 console/gateway.py 的 key_hash 一致（PBKDF2-SHA256、同一個用途標記與次數）：匯入舊金鑰時兩邊算的雜湊要對得上
+KEY_HASH_TAG, KEY_HASH_ROUNDS = b"xconsole-api-key-v1", 10000
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -4505,7 +4505,7 @@ def apikey_info(slot_id):
     if not slot or not slot.get("unit"):
         return 404, {"error": "沒有這個欄位"}
     raw, port, key = _api_parts(slot)
-    return 200, {"set": bool(key), "hash": hmac.new(KEY_HASH_TAG, key.encode(), hashlib.sha256).hexdigest() if key else None,
+    return 200, {"set": bool(key), "hash": hashlib.pbkdf2_hmac("sha256", key.encode(), KEY_HASH_TAG, KEY_HASH_ROUNDS).hex() if key else None,
                  "length": len(key),
                  "prefix": key[:7] if key else None, "bind": (raw or {}).get("host") or "0.0.0.0", "port": port}
 
