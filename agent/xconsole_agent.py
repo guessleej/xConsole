@@ -4463,6 +4463,35 @@ CHAT_SAMPLING = {
 }
 
 
+# 主控台加密入口（/v1）轉來的請求：只開這幾條，Strata 另外講 Anthropic 與 Responses 兩種格式
+RELAY_PATHS = {"models": "GET", "chat/completions": "POST", "completions": "POST", "embeddings": "POST"}
+RELAY_STRATA = {"messages": "POST", "responses": "POST"}
+
+
+def relay_target(slot_id, sub, method):
+    """回 (埠, 金鑰, None) 或 (None, None, (錯誤碼, 訊息))。路徑白名單在主控台檢查過，這裡再擋一次。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return None, None, (404, "沒有這個欄位")
+    allowed = dict(RELAY_PATHS, **(RELAY_STRATA if slot.get("kind") == "strata" else {}))
+    if allowed.get(sub) != method:
+        return None, None, (404, "這個欄位沒有這條 API")
+    _, port, key = _api_parts(slot)
+    if not port:
+        return None, None, (400, "這個欄位沒有 API 埠")
+    return int(port), key, None
+
+
+def apikey_info(slot_id):
+    """主控台匯入舊共用金鑰用：只回雜湊與前 7 個字元，不回金鑰本身。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, {"error": "沒有這個欄位"}
+    raw, port, key = _api_parts(slot)
+    return 200, {"set": bool(key), "hash": hashlib.sha256(key.encode()).hexdigest() if key else None,
+                 "prefix": key[:7] if key else None, "bind": (raw or {}).get("host") or "0.0.0.0", "port": port}
+
+
 def chat_request(slot_id, body):
     """檢查並組好要送給模型的請求。回 (錯誤碼, 錯誤訊息) 或 (埠, 金鑰, 請求本文)。"""
     slot = _slot(slot_id)
@@ -8273,6 +8302,60 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         return None
 
+    def _relay(self, slot_id, body):
+        """加密入口：把 IDE 的請求原樣送給模型（換上模型自己的金鑰），狀態碼與回應原樣送回；串流一行一行轉。"""
+        sub, method = str(body.get("path") or ""), str(body.get("method") or "POST")
+        port, key, err = relay_target(slot_id, sub, method)
+        if err:
+            return self._send(err[0], {"error": err[1]})
+        data = json.dumps(body.get("body") or {}).encode() if method == "POST" else None
+        hreq = urllib.request.Request(f"http://127.0.0.1:{port}/v1/{sub}", data=data, method=method,
+                                      headers={"Content-Type": "application/json",
+                                               **({"Authorization": f"Bearer {key}"} if key else {})})
+        try:
+            resp = LOCAL.open(hreq, timeout=600)
+        except urllib.error.HTTPError as exc:
+            resp = exc
+        except Exception as exc:  # noqa: BLE001
+            return self._send(502, {"error": f"連不到模型服務：{str(exc)[:120]}"})
+        with resp:
+            ctype = resp.headers.get("Content-Type") or "application/json"
+            stream = "event-stream" in ctype
+            self.send_response(resp.status if hasattr(resp, "status") else resp.code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-store")
+            if stream:
+                self.send_header("Connection", "close")
+                self.close_connection = True
+                self.end_headers()
+                timing = None
+                try:
+                    for line in resp:
+                        self.wfile.write(line)
+                        self.wfile.flush()
+                        if b'"timings"' in line:
+                            try:
+                                timing = json.loads(line.decode("utf-8", "replace").split("data:", 1)[1]).get("timings") or timing
+                            except Exception:  # noqa: BLE001
+                                pass
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+            else:
+                raw = resp.read(64 * 1024 * 1024)
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+                try:
+                    timing = json.loads(raw).get("timings") if raw[:1] == b"{" else None
+                except ValueError:
+                    timing = None
+        if timing:
+            try:
+                record_speed(slot_id, timing.get("predicted_per_second"), timing.get("predicted_n"))
+            except Exception:  # noqa: BLE001  # 記速度失敗不影響請求
+                pass
+        return None
+
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -8298,6 +8381,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body)
         if path == "/counters":
             return self._send(200, counters())
+        m = re.fullmatch(r"/apikey/([\w.-]+)", path)
+        if m:
+            return self._send(*apikey_info(m.group(1)))
         if path == "/library":
             return self._send(200, library())
         if path == "/machine":
@@ -8383,6 +8469,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/chat/([\w.-]+)", path)
         if m:
             return self._chat(m.group(1), body)
+        m = re.fullmatch(r"/relay/([\w.-]+)", path)
+        if m:
+            return self._relay(m.group(1), body)
         force = bool(body.get("force"))
         m = re.fullmatch(r"/slot/([\w.-]+)/(start|stop|restart)", path)
         if m:

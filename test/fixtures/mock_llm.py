@@ -6,6 +6,7 @@
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 if sys.argv[1].startswith("-"):
@@ -67,12 +68,35 @@ class H(BaseHTTPRequestHandler):
         req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         if req.get("model") != NAME:
             return self._send(404, {"error": f"model {req.get('model')} not found"})
+        if "slow" in json.dumps(req.get("messages") or req.get("input") or ""):   # 測同時請求上限用：卡住一下
+            time.sleep(1.5)
+        path = self.path.split("?")[0].rstrip("/")
+        usage = {"prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9}
+        if path == "/v1/embeddings":
+            return self._send(200, {"data": [{"embedding": [0.1, 0.2]}], "usage": {"prompt_tokens": 3, "total_tokens": 3}})
+        if path == "/v1/messages":                    # Anthropic 格式（Strata 講得通）
+            return self._send(200, {"content": [{"type": "text", "text": "連線成功"}], "usage": {"input_tokens": 7, "output_tokens": 2}})
+        if req.get("stream"):
+            # 跟 llama.cpp 一樣：最後一段內容附 timings；要了 include_usage 才多送一段 choices 為空的用量
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for i, t in enumerate(("連線", "成功")):
+                chunk = {"choices": [{"index": 0, "delta": {"content": t}}]}
+                if i == 1:
+                    chunk["timings"] = {"predicted_per_second": 42.0, "predicted_n": 2}
+                self.wfile.write(f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode())
+                self.wfile.flush()
+            if (req.get("stream_options") or {}).get("include_usage"):
+                self.wfile.write(f"data: {json.dumps({'choices': [], 'usage': usage})}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+            return
         if req.get("tools"):
             msg = {"role": "assistant", "content": None, "tool_calls": [
                 {"id": "c1", "type": "function", "function": {"name": "get_time", "arguments": '{"city":"台北"}'}}]}
         else:
             msg = {"role": "assistant", "content": "連線成功"}
-        self._send(200, {"choices": [{"message": msg}], "usage": {"total_tokens": 12}})
+        self._send(200, {"choices": [{"message": msg}], "usage": usage})
 
 
 ThreadingHTTPServer(("0.0.0.0", int(cfg["port"])), H).serve_forever()
