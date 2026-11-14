@@ -61,6 +61,8 @@ jobs:
         run: cd console && python test_extract.py
       - name: 對話紀錄（加密落地、別人的看不到、搜尋、附圖 blob、取樣參數只送支援的）
         run: cd console && python test_chats.py
+      - name: 加密入口金鑰（產生、撤銷、只存雜湊、用量）
+        run: cd console && python test_apikeys.py
       - name: 操作電腦與 Hugging Face 令牌（每步允許、拒絕、這次都允許、步數上限、令牌加密與自動帶上）
         run: cd console && python test_computer.py
       - name: 對齊 LocModel（自訂啟動引數白名單、MoE 依張量分層、內顯、手動指定顯示卡、鏡像不送令牌、連結資料夾、實測校正）
