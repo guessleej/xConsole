@@ -85,7 +85,12 @@ check("照動線排：概覽第一，模型在執行前面，執行在對話前�
       and keys.index("models") < keys.index("run") < keys.index("chat"), str(keys))
 check("設定排在最後", keys[-1:] == ["settings"], str(keys))
 check("頂層不再逐一列出群組（群組一多就塞爆頂列）", "group:" not in (nv.group(1) if nv else ""))
-check("renderNav() 用的是 NAV", bool(re.search(r"function renderNav\(\)\s*\{.*?const items = NAV;", JS, re.S)))
+check("renderNav() 用的是 NAV（一般使用者用 USER_NAV）",
+      bool(re.search(r"function renderNav\(\)\s*\{.*?const items = isAdmin\(\) \? NAV : USER_NAV;", JS, re.S)))
+un = re.search(r"const USER_NAV = \[(.*?)\];", JS, re.S)
+ukeys = re.findall(r'\["(\w+)",', un.group(1)) if un else []
+check("使用者的導覽最多八格、從對話開始", 0 < len(ukeys) <= 8 and ukeys[:1] == ["chat"], str(ukeys))
+check("使用者的導覽沒有管理員的頁（模型、執行、設定、概覽）", not set(ukeys) & {"models", "run", "settings", "home"}, str(ukeys))
 
 # ---- 4b. 登入失敗要看得出來（2026-11-12 使用者密碼打錯，畫面只有灰色小字「請先登入」，以為沒反應）
 lf = re.search(r'\$\("#login-form"\)\.addEventListener\("submit".*?\n\}\);', JS, re.S)
