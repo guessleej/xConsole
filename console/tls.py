@@ -850,7 +850,7 @@ class TLSServer(ThreadingHTTPServer):
                         del d[k]
         threading.Thread(target=run, daemon=True).start()
 
-    def promote(self, node):
+    def promote(self, node, limit=None):
         """這條連線已驗過是某台代理：不再算進來源的 64 條，改算進那台的 MAX_PER_NODE 條。
         回 False 表示那台開太多條，或這條連線先前已驗成別台。"""
         slot = getattr(threading.current_thread(), "xc_slot", None)
@@ -859,7 +859,7 @@ class TLSServer(ThreadingHTTPServer):
         with self._conn_lock:
             if slot["node"]:
                 return slot["node"] == node
-            if self._per_node.get(node, 0) >= self.MAX_PER_NODE:
+            if self._per_node.get(node, 0) >= (limit or self.MAX_PER_NODE):
                 return False
             ip = slot["ip"]
             self._per_ip[ip] -= 1

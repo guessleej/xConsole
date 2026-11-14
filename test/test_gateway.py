@@ -175,6 +175,15 @@ def main():
             t.join()
         check("同時上限 1：第二個請求 → 429", sorted(res) == [200, 429], res)
 
+        _, big = admin("POST", "/api/keys/create", {"name": "同時十二個", "max_inflight": 12})
+        res2 = []
+        ts = [threading.Thread(target=lambda: res2.append(v1("POST", "chat/completions", slow, bearer(big["key"]))[0])) for _ in range(10)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
+        check("同時上限 12：10 個並行請求都通過（連線數上限跟著金鑰的同時上限走，不卡在 8 條）", res2 == [200] * 10, res2)
+
         st, d = admin("POST", f"/api/keys/{a['item']['id']}/revoke", {})
         st, d, _ = v1("POST", "chat/completions", chat, bearer(ka))
         check("撤銷王老師的金鑰 → 下一個請求就 401，不必重啟", st == 401 and "撤銷" in d["error"]["message"], d)
