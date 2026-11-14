@@ -913,7 +913,10 @@ pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size:
   padding: 2px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
 }
 /* 手機上表格在自己的框裡橫向捲，不把整頁撐寬 */
-@media (max-width: 600px) { .api-table { display: block; overflow-x: auto; } }
+@media (max-width: 600px) {
+  .api-table { display: block; overflow-x: auto; }
+  .api-table th, .api-table td { white-space: nowrap; }   /* 表格自己左右捲，欄位不要擠成一字一行 */
+}
 
 .rec-for { align-items: center; margin-bottom: 12px; }
 /* 推薦清單照 LocModel：上面一排圓角篩選，下面一個圓角容器、一列一顆、列間細分隔。

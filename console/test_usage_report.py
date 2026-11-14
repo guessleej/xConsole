@@ -66,6 +66,16 @@ def main():
     st.audit("admin", "192.168.9.188", "slot.start", "26/brain2", True, {"force": True, "blocked": False})
     st.audit("admin", "192.168.9.188", "tls.apply", "x", True, {"password": "不能出現", "fingerprint256": "AA:BB"})
 
+    import gateway  # noqa: E402
+    base = {"owner": None, "slots": "*", "max_inflight": 2, "created": now, "created_by": "admin", "expires": None,
+            "revoked": None, "revoked_by": None, "last_ip": None}
+    st.key_insert({**base, "id": "aaaa0001", "name": "王老師", "prefix": "xck_abcd", "hash": "a" * 64, "source": "new", "last_used": now})
+    st.key_insert({**base, "id": "aaaa0002", "name": "舊共用金鑰（主腦）", "prefix": "xc-abcd", "hash": "b" * 64,
+                   "source": "legacy", "last_used": now - 3600})
+    for _ in range(30):
+        st.usage_add("aaaa0001", gateway.day(now), "26", "brain", True, 100, 10)
+    st.usage_add("aaaa0002", gateway.day(now), "26", "brain", False, 0, 0)
+
     cfg = {"nodes": [{"id": "26", "name": ".26", "host": "h"}, {"id": "20", "name": ".20", "host": "h"}],
            "report": {"price_ntd_per_kwh": 4.0}}
     r = report.build(st, cm, cfg, days=1, now=now)
@@ -95,6 +105,12 @@ def main():
     check("沒設雲端參考單價 → 不估算並寫明", r["build_vs_buy"]["cloud_equivalent"] is None
           and "尚未設定" in r["build_vs_buy"]["assumption"])
 
+    g = r["build_vs_buy"]["gateway"]
+    check("加密入口依金鑰：請求多的排前面、名稱與舊共用標記", [x["name"] for x in g["by_key"]] == ["王老師", "舊共用金鑰（主腦）"]
+          and g["by_key"][0]["requests"] == 30 and g["by_key"][0]["prompt"] == 3000 and g["by_key"][1]["legacy"], g["by_key"])
+    check("  沒經過加密入口＝引擎總量減加密入口", g["not_via_gateway"]["requests"] == want_req - 31, g["not_via_gateway"])
+    check("  仍有效的舊共用金鑰列出來", g["legacy_active"] == ["舊共用金鑰（主腦）"], g["legacy_active"])
+
     # ---- 4 設備
     n26 = next(x for x in r["assets"]["nodes"] if x["node"] == ".26")
     n20 = next(x for x in r["assets"]["nodes"] if x["node"] == ".20")
@@ -112,6 +128,7 @@ def main():
     check("健康：列出低於底線", "低於底線" in whats)
     check("健康：列出強制略過准入", "強制略過" in whats)
     check("健康：列出卡在啟動中的服務", "啟動中" in whats)
+    check("健康：近 7 天還有人用舊共用金鑰", "舊共用金鑰" in whats)
     check("健康：沒信任的代理列為緊急", any(x["level"] == "緊急" and "尚未信任" in x["what"] for x in r["health"]["items"]))
 
     # ---- 稽核不落地機密
