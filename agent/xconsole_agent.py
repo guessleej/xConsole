@@ -2410,9 +2410,9 @@ def api_settings(slot_id, body, force=False):
                     errors.append("單次輸出上限要在 256～131,072 之間，而且要小於上下文長度")
                 elif mt != raw.get("max_tokens"):
                     want["max_tokens"] = mt
-        if "thinking" in body or "lan" in body:
+        if "thinking" in body:
             if slot.get("kind") != "llama":
-                errors.append("思考模式與區網存取只有 llama.cpp 的欄位能在這裡改")
+                errors.append("思考模式只有 llama.cpp 的欄位能在這裡改")
             else:
                 th = body.get("thinking")
                 if th is not None:
@@ -2420,10 +2420,11 @@ def api_settings(slot_id, body, force=False):
                         errors.append("思考模式只能是 on、off、auto")
                     elif th != (raw.get("reasoning") or "auto"):
                         want["thinking"] = th
-                if "lan" in body:
-                    host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
-                    if host != (raw.get("host") or "0.0.0.0"):
-                        want["lan"] = host
+        if "lan" in body:
+            # 區網存取：關掉＝模型只聽 127.0.0.1，外面只能經主控台的加密入口（/v1）連。Strata 的設定檔一樣有 host
+            host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
+            if host != (raw.get("host") or "0.0.0.0"):
+                want["lan"] = host
         if "extra_args" in body:
             if slot.get("kind") != "llama":
                 errors.append("自訂啟動引數只有 llama.cpp 的欄位能設")
@@ -2457,7 +2458,9 @@ def api_settings(slot_id, body, force=False):
     old = dict(raw)
     new = dict(raw)
     for k, v in want.items():
-        if k == "max_context":
+        if k == "lan":
+            new["host"] = v
+        elif k == "max_context":
             args = list(new.get("args") or [])
             if "--max-context" in args:
                 args[args.index("--max-context") + 1] = str(v)
@@ -4461,6 +4464,52 @@ CHAT_SAMPLING = {
     "repeat_penalty": (float, 0.5, 2), "presence_penalty": (float, -2, 2), "max_tokens": (int, 1, 131072),
     "seed": (int, -1, 2 ** 31 - 1),
 }
+
+
+# 主控台加密入口（/v1）轉來的請求：只開這幾條，Strata 另外講 Anthropic 與 Responses 兩種格式。
+# 值是 (方法, 實際送出的路徑)：送出去的網址只用這裡的常數組，不用請求帶來的字串
+RELAY_PATHS = {"models": ("GET", "/v1/models"), "chat/completions": ("POST", "/v1/chat/completions"),
+               "completions": ("POST", "/v1/completions"), "embeddings": ("POST", "/v1/embeddings")}
+RELAY_STRATA = {"messages": ("POST", "/v1/messages"), "responses": ("POST", "/v1/responses")}
+RELAY_MAX = 64 * 1024 * 1024
+# 跟主控台 console/gateway.py 的 key_hash 一致（PBKDF2-SHA256、同一個用途標記與次數）：匯入舊金鑰時兩邊算的雜湊要對得上
+KEY_HASH_TAG, KEY_HASH_ROUNDS = b"xconsole-api-key-v1", 10000
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """轉送不跟轉址：跟過去就跳出白名單，模型的金鑰也會跟著標頭送到別的主機。轉址原樣回給主控台。"""
+
+    def redirect_request(self, *a, **k):
+        return None
+
+
+RELAY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+
+
+def relay_target(slot_id, sub, method):
+    """回 (網址, 金鑰, None) 或 (None, None, (錯誤碼, 訊息))。路徑白名單在主控台檢查過，這裡再擋一次。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return None, None, (404, "沒有這個欄位")
+    allowed = dict(RELAY_PATHS, **(RELAY_STRATA if slot.get("kind") == "strata" else {}))
+    hit = allowed.get(sub)
+    if not hit or hit[0] != method:
+        return None, None, (404, "這個欄位沒有這條 API")
+    _, port, key = _api_parts(slot)
+    if not port:
+        return None, None, (400, "這個欄位沒有 API 埠")
+    return f"http://127.0.0.1:{int(port)}{hit[1]}", key, None
+
+
+def apikey_info(slot_id):
+    """主控台匯入舊共用金鑰用：只回雜湊與前 7 個字元，不回金鑰本身。"""
+    slot = _slot(slot_id)
+    if not slot or not slot.get("unit"):
+        return 404, {"error": "沒有這個欄位"}
+    raw, port, key = _api_parts(slot)
+    return 200, {"set": bool(key), "hash": hashlib.pbkdf2_hmac("sha256", key.encode(), KEY_HASH_TAG, KEY_HASH_ROUNDS).hex() if key else None,
+                 "length": len(key),
+                 "prefix": key[:7] if key else None, "bind": (raw or {}).get("host") or "0.0.0.0", "port": port}
 
 
 def chat_request(slot_id, body):
@@ -8273,6 +8322,68 @@ class Handler(BaseHTTPRequestHandler):
                     pass
         return None
 
+    def _relay(self, slot_id, body):
+        """加密入口：把 IDE 的請求原樣送給模型（換上模型自己的金鑰），狀態碼與回應原樣送回；串流一行一行轉。"""
+        sub, method = str(body.get("path") or ""), str(body.get("method") or "POST")
+        url, key, err = relay_target(slot_id, sub, method)
+        if err:
+            return self._send(err[0], {"error": err[1]})
+        data = json.dumps(body.get("body") or {}).encode() if method == "POST" else None
+        hreq = urllib.request.Request(url, data=data, method=method,
+                                      headers={"Content-Type": "application/json",
+                                               **({"Authorization": f"Bearer {key}"} if key else {})})
+        try:
+            resp = RELAY_OPENER.open(hreq, timeout=600)
+        except urllib.error.HTTPError as exc:
+            resp = exc
+        except Exception as exc:  # noqa: BLE001
+            return self._send(502, {"error": f"連不到模型服務：{str(exc)[:120]}"})
+        timing = None
+        with resp:
+            ctype = resp.headers.get("Content-Type") or "application/json"
+            status = resp.status if hasattr(resp, "status") else resp.code
+            if "event-stream" not in ctype:
+                raw = resp.read(RELAY_MAX + 1)
+                if len(raw) > RELAY_MAX:
+                    # 截斷的 JSON 帶著 200 回去，客戶端只會拿到壞掉的內容：先讀完再決定，太大就明講
+                    return self._send(502, {"error": "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）"})
+                self.send_response(status)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "no-store")
+                if resp.headers.get("Location") and 300 <= status < 400:
+                    self.send_header("Location", resp.headers["Location"])
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+                try:
+                    timing = json.loads(raw).get("timings") if raw[:1] == b"{" else None
+                except ValueError:
+                    timing = None
+            else:
+                self.send_response(status)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Connection", "close")
+                self.close_connection = True
+                self.end_headers()
+                try:
+                    for line in resp:
+                        self.wfile.write(line)
+                        self.wfile.flush()
+                        if b'"timings"' in line:
+                            try:
+                                timing = json.loads(line.decode("utf-8", "replace").split("data:", 1)[1]).get("timings") or timing
+                            except Exception:  # noqa: BLE001
+                                pass
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+        if timing:
+            try:
+                record_speed(slot_id, timing.get("predicted_per_second"), timing.get("predicted_n"))
+            except Exception:  # noqa: BLE001  # 記速度失敗不影響請求
+                pass
+        return None
+
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -8298,6 +8409,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body)
         if path == "/counters":
             return self._send(200, counters())
+        m = re.fullmatch(r"/apikey/([\w.-]+)", path)
+        if m:
+            return self._send(*apikey_info(m.group(1)))
         if path == "/library":
             return self._send(200, library())
         if path == "/machine":
@@ -8383,6 +8497,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/chat/([\w.-]+)", path)
         if m:
             return self._chat(m.group(1), body)
+        m = re.fullmatch(r"/relay/([\w.-]+)", path)
+        if m:
+            return self._relay(m.group(1), body)
         force = bool(body.get("force"))
         m = re.fullmatch(r"/slot/([\w.-]+)/(start|stop|restart)", path)
         if m:

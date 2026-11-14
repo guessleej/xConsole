@@ -20858,5 +20858,890 @@
 "en": "This machine can't control the desktop: the desktop helper isn't running; sign in to this machine's desktop with the account you want to control",
 "ja": "この機器ではデスクトップを操作できません：デスクトップヘルパーが動いていません。操作したいアカウントでこの機器のデスクトップにログインしてください",
 "ko": "이 기기는 데스크톱을 조작할 수 없습니다: 데스크톱 도우미가 실행 중이 아닙니다. 조작할 계정으로 이 기기의 데스크톱에 로그인하세요"
+},
+"從這台本機、主控台經網路、加密入口各打一次，連工具呼叫一起驗，確認 IDE 真的連得上": {
+"en": "Test once from this machine, once from the console over the network, and once through the encrypted gateway, including tool calls, to confirm the IDE can really connect",
+"ja": "このマシン、コンソールからネットワーク経由、暗号化ゲートウェイ経由でそれぞれ一度ずつ、ツール呼び出しも含めて試し、IDE が本当に接続できるか確認します",
+"ko": "이 머신, 콘솔에서 네트워크 경유, 암호화 게이트웨이 경유로 각각 한 번씩 도구 호출까지 시험해 IDE가 실제로 연결되는지 확인합니다"
+},
+"關掉明文直連": {
+"en": "Turn off plaintext direct access",
+"ja": "平文の直接接続をオフにする",
+"ko": "평문 직접 연결 끄기"
+},
+"老師都改用加密入口之後再關；關掉之後金鑰與對話不再以明文在網路上傳": {
+"en": "Turn it off after every teacher has switched to the encrypted gateway; afterwards keys and conversations no longer travel the network in plaintext",
+"ja": "先生全員が暗号化ゲートウェイに切り替えてからオフにします。オフにすると、キーと会話が平文でネットワークを流れなくなります",
+"ko": "모든 교사가 암호화 게이트웨이로 바꾼 뒤에 끄세요. 끄면 키와 대화가 더 이상 평문으로 네트워크에 전송되지 않습니다"
+},
+"已撤銷": {
+"en": "Revoked",
+"ja": "失効済み",
+"ko": "폐기됨"
+},
+"加密入口與金鑰": {
+"en": "Encrypted gateway and keys",
+"ja": "暗号化ゲートウェイとキー",
+"ko": "암호화 게이트웨이와 키"
+},
+"IDE 填這個 https 網址，每位老師或每門課各用一把金鑰；撤銷一把，其他人不受影響": {
+"en": "Put this https URL in the IDE; each teacher or course gets its own key, and revoking one does not affect anyone else",
+"ja": "IDE にはこの https の URL を入力します。先生や授業ごとに 1 つずつキーを使い、1 つを失効させても他の人には影響しません",
+"ko": "IDE에는 이 https URL을 입력합니다. 교사나 강의마다 키를 하나씩 쓰며, 하나를 폐기해도 다른 사람에게는 영향이 없습니다"
+},
+"模型名稱照下面各格的填。金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。": {
+"en": "Use the model names listed for each slot below. A key is shown only once when it is created and the console keeps only its hash; if it is lost, revoke it and create a new one.",
+"ja": "モデル名は下の各スロットに表示されているものを入力します。キーは作成時に一度だけ表示され、コンソールにはハッシュしか残りません。忘れたら失効させて新しく作成してください。",
+"ko": "모델 이름은 아래 각 슬롯에 표시된 것을 입력합니다. 키는 생성할 때 한 번만 표시되며 콘솔에는 해시만 남습니다. 잊어버렸으면 폐기하고 새로 만드세요."
+},
+"還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。": {
+"en": "No keys yet. Click \"Create key\" to issue one for each teacher or course.",
+"ja": "まだキーがありません。「キーを作成」を押して、先生や授業ごとに 1 つずつ発行してください。",
+"ko": "아직 키가 없습니다. '키 생성'을 눌러 교사나 강의마다 하나씩 발급하세요."
+},
+"金鑰開頭": {
+"en": "Key prefix",
+"ja": "キーの先頭",
+"ko": "키 앞부분"
+},
+"能用的模型": {
+"en": "Allowed models",
+"ja": "使えるモデル",
+"ko": "사용 가능한 모델"
+},
+"同時上限": {
+"en": "Concurrency limit",
+"ja": "同時実行の上限",
+"ko": "동시 요청 상한"
+},
+"本月請求": {
+"en": "Requests this month",
+"ja": "今月のリクエスト",
+"ko": "이번 달 요청"
+},
+"本月 token（輸入／輸出）": {
+"en": "Tokens this month (input / output)",
+"ja": "今月のトークン（入力／出力）",
+"ko": "이번 달 토큰(입력/출력)"
+},
+"最後使用": {
+"en": "Last used",
+"ja": "最終使用",
+"ko": "마지막 사용"
+},
+"還沒用過": {
+"en": "Never used",
+"ja": "未使用",
+"ko": "아직 사용 안 함"
+},
+"（{0} 到期）": {
+"en": " (expires {0})",
+"ja": "（{0} に期限切れ）",
+"ko": " ({0} 만료)"
+},
+"撤銷": {
+"en": "Revoke",
+"ja": "失効",
+"ko": "폐기"
+},
+"撤銷「{0}」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響。": {
+"en": "After \"{0}\" is revoked, tools using this key lose access immediately. This cannot be undone; other keys are not affected.",
+"ja": "「{0}」を失効させると、このキーを使うツールはすぐに接続できなくなります。元に戻せません。他のキーには影響しません。",
+"ko": "'{0}'을(를) 폐기하면 이 키를 쓰는 도구는 즉시 연결할 수 없게 되며 되돌릴 수 없습니다. 다른 키에는 영향이 없습니다."
+},
+"撤銷「": {
+"en": "Revoke \"",
+"ja": "「",
+"ko": "'"
+},
+"」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響": {
+"en": "\": tools using this key lose access immediately. This cannot be undone; other keys are not affected",
+"ja": "」を失効させると、このキーを使うツールはすぐに接続できなくなります。元に戻せません。他のキーには影響しません",
+"ko": "'을(를) 폐기하면 이 키를 쓰는 도구는 즉시 연결할 수 없게 되며 되돌릴 수 없습니다. 다른 키에는 영향이 없습니다"
+},
+"這是升級時自動匯入的舊共用金鑰。撤銷前先確認最後使用時間：還有人在用，就先發新金鑰給他。": {
+"en": "This is the old shared key imported automatically during the upgrade. Check the last-used time before revoking it: if someone still uses it, issue them a new key first.",
+"ja": "これはアップグレード時に自動で取り込まれた旧共有キーです。失効させる前に最終使用時刻を確認し、まだ使っている人がいれば先に新しいキーを渡してください。",
+"ko": "업그레이드 때 자동으로 가져온 이전 공용 키입니다. 폐기하기 전에 마지막 사용 시간을 확인하고, 아직 쓰는 사람이 있으면 먼저 새 키를 발급하세요."
+},
+"撤銷金鑰": {
+"en": "Revoke key",
+"ja": "キーを失効",
+"ko": "키 폐기"
+},
+"例：資工系 王老師、機器學習（週三）": {
+"en": "e.g. CS Dept. Prof. Wang, Machine Learning (Wed)",
+"ja": "例：情報工学科 王先生、機械学習（水曜）",
+"ko": "예: 컴퓨터공학과 왕 교수, 머신러닝(수요일)"
+},
+"撤銷時靠這個認是誰的": {
+"en": "Used to tell whose key it is when revoking",
+"ja": "失効させるとき、誰のキーかをこれで見分けます",
+"ko": "폐기할 때 누구의 키인지 이것으로 구분합니다"
+},
+"全部模型（之後新開的也能用）": {
+"en": "All models (including ones started later)",
+"ja": "すべてのモデル（後から起動したものも含む）",
+"ko": "모든 모델(나중에 시작한 것도 포함)"
+},
+"同時進行的請求上限": {
+"en": "Concurrent request limit",
+"ja": "同時実行リクエストの上限",
+"ko": "동시 진행 요청 상한"
+},
+"一個人同時最多送幾個請求，免得把整台佔滿；一般 2 就夠": {
+"en": "How many requests one person may have in flight at once, so nobody takes over the whole machine; 2 is usually enough",
+"ja": "1 人が同時に送れるリクエスト数の上限で、マシン全体を独占させないためのものです。通常は 2 で十分です",
+"ko": "한 사람이 동시에 보낼 수 있는 요청 수로, 머신 전체를 독점하지 않도록 합니다. 보통 2면 충분합니다"
+},
+"留空＝不改": {
+"en": "Leave blank = no change",
+"ja": "空欄＝変更しない",
+"ko": "비워 두면 변경 안 함"
+},
+"有效天數": {
+"en": "Valid for (days)",
+"ja": "有効日数",
+"ko": "유효 일수"
+},
+"從現在起算；0＝不到期；留空＝不改": {
+"en": "Counted from now; 0 = never expires; blank = no change",
+"ja": "今から数えます。0＝期限なし、空欄＝変更しない",
+"ko": "지금부터 계산합니다. 0 = 만료 없음, 비우면 변경 안 함"
+},
+"0＝不到期；給一學期用可以填 150": {
+"en": "0 = never expires; for one semester, enter 150",
+"ja": "0＝期限なし。1 学期分なら 150 を入力",
+"ko": "0 = 만료 없음. 한 학기용이면 150 입력"
+},
+"修改金鑰：{0}": {
+"en": "Edit key: {0}",
+"ja": "キーを編集：{0}",
+"ko": "키 수정: {0}"
+},
+"修改金鑰": {
+"en": "Edit key",
+"ja": "キーを編集",
+"ko": "키 수정"
+},
+"這把金鑰只顯示這一次。關掉之後主控台不會再顯示它，請現在交給使用的人。": {
+"en": "This key is shown only this once. The console will not show it again after you close this, so hand it to its user now.",
+"ja": "このキーは今回だけ表示されます。閉じるとコンソールは二度と表示しないので、今すぐ使う人に渡してください。",
+"ko": "이 키는 이번 한 번만 표시됩니다. 닫으면 콘솔에서 다시 보여 주지 않으니 지금 사용할 사람에게 전달하세요."
+},
+"在這個分頁重新整理之前，各格 API 串接頁的設定範例會直接帶入這把金鑰。": {
+"en": "Until this tab is reloaded, the setup examples on each slot's API page will fill in this key.",
+"ja": "このタブを再読み込みするまで、各スロットの API 連携ページの設定例にこのキーが入ります。",
+"ko": "이 탭을 새로 고치기 전까지 각 슬롯의 API 연동 페이지 설정 예시에 이 키가 채워집니다."
+},
+"新的金鑰": {
+"en": "New key",
+"ja": "新しいキー",
+"ko": "새 키"
+},
+"加密入口網址": {
+"en": "Encrypted gateway URL",
+"ja": "暗号化ゲートウェイの URL",
+"ko": "암호화 게이트웨이 URL"
+},
+"留空＝主控台憑證上的第一個名稱加 9400 埠。前面另有反向代理（例如走 443）時改成那個，要 https:// 開頭、/v1 結尾": {
+"en": "Blank = the first name on the console certificate with port 9400. If a reverse proxy sits in front (e.g. on 443), enter that instead; it must start with https:// and end with /v1",
+"ja": "空欄＝コンソール証明書の最初の名前とポート 9400。前にリバースプロキシ（例：443）がある場合はそちらを入力します。https:// で始まり /v1 で終わる必要があります",
+"ko": "비우면 콘솔 인증서의 첫 번째 이름과 9400 포트를 씁니다. 앞에 리버스 프록시(예: 443)가 있으면 그 주소를 입력하세요. https://로 시작하고 /v1로 끝나야 합니다"
+},
+"各格的 API": {
+"en": "API of each slot",
+"ja": "各スロットの API",
+"ko": "슬롯별 API"
+},
+"每一格的模型名稱、上下文與直連網址；改設定、實測、看工具設定範例按右邊的按鈕": {
+"en": "Model name, context and direct URL of each slot; use the button on the right to change settings, run tests or see tool setup examples",
+"ja": "各スロットのモデル名、コンテキスト、直接接続の URL です。設定変更、テスト、ツールの設定例は右のボタンから",
+"ko": "슬롯별 모델 이름, 컨텍스트, 직접 연결 URL입니다. 설정 변경, 테스트, 도구 설정 예시는 오른쪽 버튼을 누르세요"
+},
+"直連網址": {
+"en": "Direct URL",
+"ja": "直接接続の URL",
+"ko": "직접 연결 URL"
+},
+"直連金鑰": {
+"en": "Direct-access key",
+"ja": "直接接続のキー",
+"ko": "직접 연결 키"
+},
+"已關閉（只走加密入口）": {
+"en": "Off (encrypted gateway only)",
+"ja": "オフ（暗号化ゲートウェイのみ）",
+"ko": "꺼짐(암호화 게이트웨이만)"
+},
+"直連網址是 http：金鑰與對話內容會以明文在網路上傳。老師都改用上面的加密入口之後，": {
+"en": "Direct URLs use http: keys and conversations travel the network in plaintext. Once every teacher uses the encrypted gateway above, ",
+"ja": "直接接続の URL は http なので、キーと会話は平文でネットワークを流れます。先生全員が上の暗号化ゲートウェイに切り替えたら、",
+"ko": "직접 연결 URL은 http라서 키와 대화가 평문으로 네트워크에 전송됩니다. 모든 교사가 위의 암호화 게이트웨이로 바꾸면 "
+},
+"可以到各格的頁面把直連關掉（只走加密入口）。": {
+"en": "you can turn direct access off on each slot's page (encrypted gateway only).",
+"ja": "各スロットのページで直接接続をオフ（暗号化ゲートウェイのみ）にできます。",
+"ko": "각 슬롯 페이지에서 직접 연결을 끌 수 있습니다(암호화 게이트웨이만)."
+},
+"加密入口網址（建議）": {
+"en": "Encrypted gateway URL (recommended)",
+"ja": "暗号化ゲートウェイの URL（推奨）",
+"ko": "암호화 게이트웨이 URL(권장)"
+},
+"已關閉（只聽這台自己）": {
+"en": "Off (listens on this machine only)",
+"ja": "オフ（このマシンのみで待ち受け）",
+"ko": "꺼짐(이 머신에서만 수신)"
+},
+"加密入口的金鑰": {
+"en": "Gateway key",
+"ja": "ゲートウェイのキー",
+"ko": "게이트웨이 키"
+},
+"每人一把，在「API 串接」頁產生": {
+"en": "One per person, created on the API page",
+"ja": "1 人 1 つ、「API 連携」ページで作成",
+"ko": "1인당 하나, 'API 연동' 페이지에서 생성"
+},
+"主控台內部使用，不顯示": {
+"en": "Used internally by the console, not shown",
+"ja": "コンソール内部用のため表示しません",
+"ko": "콘솔 내부용이라 표시하지 않음"
+},
+"明文直連": {
+"en": "Plaintext direct access",
+"ja": "平文の直接接続",
+"ko": "평문 직접 연결"
+},
+"已關閉：模型只聽這台自己，外面只能經加密入口連": {
+"en": "Off: the model listens on this machine only; others can connect only through the encrypted gateway",
+"ja": "オフ：モデルはこのマシンのみで待ち受け、外部からは暗号化ゲートウェイ経由でしか接続できません",
+"ko": "꺼짐: 모델이 이 머신에서만 수신하며 외부에서는 암호화 게이트웨이로만 연결할 수 있습니다"
+},
+"開著：別台電腦可以用 {0} 直接連（http，明文）": {
+"en": "On: other computers can connect directly at {0} (http, plaintext)",
+"ja": "オン：他のコンピューターから {0} で直接接続できます（http、平文）",
+"ko": "켜짐: 다른 컴퓨터가 {0}(으)로 직접 연결할 수 있습니다(http, 평문)"
+},
+"開著：別台電腦可以用": {
+"en": "On: other computers can connect directly at",
+"ja": "オン：他のコンピューターから",
+"ko": "켜짐: 다른 컴퓨터가"
+},
+"直接連（http，明文": {
+"en": "(http, plaintext",
+"ja": "で直接接続できます（http、平文",
+"ko": "(으)로 직접 연결할 수 있습니다(http, 평문"
+},
+"要讓 IDE 再直連，按下面重新開放，再到「設定」產生一把直連金鑰（模型現在用的是只有主控台知道的內部金鑰）。": {
+"en": "To let IDEs connect directly again, reopen it below and then create a direct-access key under Settings (the model now uses an internal key known only to the console).",
+"ja": "IDE から再び直接接続させるには、下で再開してから「設定」で直接接続のキーを作成してください（モデルは現在、コンソールだけが知る内部キーを使っています）。",
+"ko": "IDE가 다시 직접 연결하게 하려면 아래에서 다시 열고 '설정'에서 직접 연결 키를 만드세요(모델은 지금 콘솔만 아는 내부 키를 쓰고 있습니다)."
+},
+"老師都改用加密入口之後再關。關的時候會把現在的直連金鑰先加進加密入口（經加密入口照樣能用，等你確認大家都換了再撤銷），": {
+"en": "Turn it off after every teacher uses the encrypted gateway. Turning it off first adds the current direct-access key to the gateway (it keeps working there until you confirm everyone has switched and revoke it), ",
+"ja": "先生全員が暗号化ゲートウェイを使うようになってからオフにします。オフにすると、まず現在の直接接続キーをゲートウェイに追加し（全員の切り替えを確認して失効させるまで、ゲートウェイ経由で使えます）、",
+"ko": "모든 교사가 암호화 게이트웨이를 쓰게 된 뒤에 끄세요. 끄면 먼저 지금의 직접 연결 키를 게이트웨이에 추가하고(모두 바꾼 것을 확인해 폐기할 때까지 게이트웨이로는 계속 쓸 수 있음), "
+},
+"再讓模型改聽這台自己並換上一把內部金鑰，然後重啟模型。": {
+"en": "then makes the model listen on this machine only with a new internal key, and restarts the model.",
+"ja": "次にモデルをこのマシンのみで待ち受けるようにして内部キーに替え、モデルを再起動します。",
+"ko": "그다음 모델이 이 머신에서만 수신하도록 하고 내부 키로 바꾼 뒤 모델을 다시 시작합니다."
+},
+"重新開放直連": {
+"en": "Reopen direct access",
+"ja": "直接接続を再開",
+"ko": "직접 연결 다시 열기"
+},
+"改成只走加密入口": {
+"en": "Switch to encrypted gateway only",
+"ja": "暗号化ゲートウェイのみにする",
+"ko": "암호화 게이트웨이만 쓰도록 변경"
+},
+"會重啟這個模型，重啟期間 API 中斷約一到兩分鐘；套用後實際打一次，打不通就自動換回。": {
+"en": "This restarts the model; its API is down for about one to two minutes. After applying, one real request is made and the change is rolled back if it fails.",
+"ja": "このモデルを再起動します。再起動中の 1～2 分ほど API が止まります。適用後に実際に 1 回呼び出し、通らなければ自動で元に戻します。",
+"ko": "이 모델을 다시 시작합니다. 재시작하는 동안 API가 1~2분 정도 끊깁니다. 적용 후 실제로 한 번 호출해 보고 실패하면 자동으로 되돌립니다."
+},
+"這是標記為關鍵的服務，請排在不上課的時段。": {
+"en": "This service is marked critical; schedule it outside class hours.",
+"ja": "これは重要とマークされたサービスです。授業のない時間帯に行ってください。",
+"ko": "중요로 표시된 서비스입니다. 수업이 없는 시간에 진행하세요."
+},
+"還在用直連網址的工具會連不上，要改成加密入口的網址（金鑰可以先不換）。": {
+"en": "Tools still using the direct URL will lose access and must switch to the gateway URL (the key can stay the same for now).",
+"ja": "直接接続の URL を使っているツールは接続できなくなるので、ゲートウェイの URL に変更してください（キーはそのままで構いません）。",
+"ko": "직접 연결 URL을 쓰는 도구는 연결할 수 없게 되므로 게이트웨이 URL로 바꿔야 합니다(키는 당분간 그대로 써도 됩니다)."
+},
+"在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打直連網址，最後用一把臨時金鑰打一次加密入口。": {
+"en": "Calls the model list, a chat and a tool call on this machine, then the direct URL from the console over the network, and finally the encrypted gateway with a temporary key.",
+"ja": "このマシンでモデル一覧・通常の会話・ツール呼び出しを試し、次にコンソールからネットワーク経由で直接接続の URL を、最後に一時キーで暗号化ゲートウェイを試します。",
+"ko": "이 머신에서 모델 목록, 일반 대화, 도구 호출을 시험하고, 콘솔에서 네트워크로 직접 연결 URL을 호출한 뒤, 마지막으로 임시 키로 암호화 게이트웨이를 한 번 호출합니다."
+},
+"從主控台經網路連直連網址": {
+"en": "Direct URL from the console over the network",
+"ja": "コンソールからネットワーク経由で直接接続の URL",
+"ko": "콘솔에서 네트워크로 직접 연결 URL"
+},
+"經加密入口（https）": {
+"en": "Through the encrypted gateway (https)",
+"ja": "暗号化ゲートウェイ経由（https）",
+"ko": "암호화 게이트웨이 경유(https)"
+},
+"略過": {
+"en": "Skipped",
+"ja": "スキップ",
+"ko": "건너뜀"
+},
+"加密入口（建議）": {
+"en": "Encrypted gateway (recommended)",
+"ja": "暗号化ゲートウェイ（推奨）",
+"ko": "암호화 게이트웨이(권장)"
+},
+"直連": {
+"en": "Direct",
+"ja": "直接接続",
+"ko": "직접 연결"
+},
+"金鑰欄要填個別金鑰：在「API 串接」頁按「產生金鑰」，這個分頁裡的範例就會直接帶入。": {
+"en": "The key field takes a personal key: click \"Create key\" on the API page and the examples in this tab will fill it in.",
+"ja": "キーの欄には個別のキーを入力します。「API 連携」ページで「キーを作成」を押すと、このタブの例にそのキーが入ります。",
+"ko": "키 칸에는 개인 키를 넣습니다. 'API 연동' 페이지에서 '키 생성'을 누르면 이 탭의 예시에 바로 채워집니다."
+},
+"這些機器不在納管清單裡：{0}": {
+"en": "These machines are not managed by this console: {0}",
+"ja": "次のマシンは管理対象にありません：{0}",
+"ko": "다음 머신은 관리 목록에 없습니다: {0}"
+},
+"這些機器不在納管清單裡": {
+"en": "These machines are not managed by this console",
+"ja": "次のマシンは管理対象にありません",
+"ko": "다음 머신은 관리 목록에 없습니다"
+},
+"這些機器不在納管清單裡：": {
+"en": "These machines are not managed by this console: ",
+"ja": "次のマシンは管理対象にありません：",
+"ko": "다음 머신은 관리 목록에 없습니다: "
+},
+"已改成只走加密入口：模型只聽這台自己，IDE 請改用加密入口的網址與個別金鑰": {
+"en": "Switched to encrypted gateway only: the model listens on this machine only. IDEs should use the gateway URL and personal keys",
+"ja": "暗号化ゲートウェイのみに切り替えました。モデルはこのマシンのみで待ち受けます。IDE はゲートウェイの URL と個別キーを使ってください",
+"ko": "암호화 게이트웨이만 쓰도록 바꿨습니다. 모델은 이 머신에서만 수신합니다. IDE는 게이트웨이 URL과 개인 키를 쓰세요"
+},
+"已重新開放區網直連。模型現在用的是只有主控台知道的內部金鑰，要讓 IDE 直連，請在下面產生新金鑰（這把也會自動加進加密入口）": {
+"en": "LAN direct access is open again. The model uses an internal key known only to the console; to let IDEs connect directly, create a new key below (it is also added to the encrypted gateway automatically)",
+"ja": "LAN からの直接接続を再開しました。モデルはコンソールだけが知る内部キーを使っています。IDE から直接接続させるには、下で新しいキーを作成してください（このキーは暗号化ゲートウェイにも自動で追加されます）",
+"ko": "LAN 직접 연결을 다시 열었습니다. 모델은 콘솔만 아는 내부 키를 쓰고 있습니다. IDE가 직접 연결하게 하려면 아래에서 새 키를 만드세요(이 키는 암호화 게이트웨이에도 자동으로 추가됩니다)"
+},
+"加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（{0}）": {
+"en": "Gateway OK: https certificate verified, request without key blocked, chat with key returned 200 ({0})",
+"ja": "ゲートウェイ正常：https 証明書を検証済み、キーなしは拒否、キー付きの会話は 200（{0}）",
+"ko": "게이트웨이 정상: https 인증서 검증됨, 키 없는 요청 차단, 키를 넣은 대화 200({0})"
+},
+"加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200": {
+"en": "Gateway OK: https certificate verified, request without key blocked, chat with key returned 200",
+"ja": "ゲートウェイ正常：https 証明書を検証済み、キーなしは拒否、キー付きの会話は 200",
+"ko": "게이트웨이 정상: https 인증서 검증됨, 키 없는 요청 차단, 키를 넣은 대화 200"
+},
+"沒有這把金鑰": {
+"en": "No such key",
+"ja": "そのキーはありません",
+"ko": "해당 키가 없습니다"
+},
+"這把金鑰已撤銷，不能再改；要用請產生一把新的": {
+"en": "This key has been revoked and can no longer be edited; create a new one instead",
+"ja": "このキーは失効済みのため変更できません。新しく作成してください",
+"ko": "이 키는 폐기되어 더 이상 수정할 수 없습니다. 새 키를 만드세요"
+},
+"這把金鑰已經撤銷了": {
+"en": "This key has already been revoked",
+"ja": "このキーはすでに失効しています",
+"ko": "이 키는 이미 폐기되었습니다"
+},
+"讀不到這格的模型名稱": {
+"en": "Could not read this slot's model name",
+"ja": "このスロットのモデル名を読み取れません",
+"ko": "이 슬롯의 모델 이름을 읽을 수 없습니다"
+},
+"/v1/models 回 {0}：{1}": {
+"en": "/v1/models returned {0}: {1}",
+"ja": "/v1/models が {0} を返しました：{1}",
+"ko": "/v1/models가 {0}을(를) 반환: {1}"
+},
+"加密入口的模型清單沒有 {0}（模型沒在跑，或有別格同名）": {
+"en": "{0} is not in the gateway's model list (the model is not running, or another slot has the same name)",
+"ja": "ゲートウェイのモデル一覧に {0} がありません（モデルが動いていないか、同名のスロットがあります）",
+"ko": "게이트웨이 모델 목록에 {0}이(가) 없습니다(모델이 실행 중이 아니거나 같은 이름의 슬롯이 있음)"
+},
+"加密入口的模型清單沒有": {
+"en": "Not in the gateway's model list:",
+"ja": "ゲートウェイのモデル一覧にありません：",
+"ko": "게이트웨이 모델 목록에 없음:"
+},
+"模型沒在跑，或有別格同名": {
+"en": "the model is not running, or another slot has the same name",
+"ja": "モデルが動いていないか、同名のスロットがあります",
+"ko": "모델이 실행 중이 아니거나 같은 이름의 슬롯이 있음"
+},
+"沒帶金鑰回 {0}，沒有被擋": {
+"en": "Request without key returned {0} and was not blocked",
+"ja": "キーなしで {0} が返り、拒否されませんでした",
+"ko": "키 없이 {0}이(가) 반환되어 차단되지 않았습니다"
+},
+"沒帶金鑰回": {
+"en": "Without key returned",
+"ja": "キーなしの応答",
+"ko": "키 없이 반환"
+},
+"對話回 {0}：{1}": {
+"en": "Chat returned {0}: {1}",
+"ja": "会話が {0} を返しました：{1}",
+"ko": "대화가 {0} 반환: {1}"
+},
+"對話回": {
+"en": "Chat returned",
+"ja": "会話の応答",
+"ko": "대화 응답"
+},
+"加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（": {
+"en": "Gateway OK: https certificate verified, request without key blocked, chat with key returned 200 (",
+"ja": "ゲートウェイ正常：https 証明書を検証済み、キーなしは拒否、キー付きの会話は 200（",
+"ko": "게이트웨이 정상: https 인증서 검증됨, 키 없는 요청 차단, 키를 넣은 대화 200("
+},
+"金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）": {
+"en": "Keys may not be put in the URL; send them in the Authorization header (Bearer)",
+"ja": "キーを URL に入れることはできません。Authorization ヘッダー（Bearer）で送ってください",
+"ko": "키는 URL에 넣을 수 없습니다. Authorization 헤더(Bearer)로 보내세요"
+},
+"沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>": {
+"en": "No key: put Bearer <key> in the Authorization header",
+"ja": "キーがありません：Authorization ヘッダーに Bearer <キー> を入れてください",
+"ko": "키가 없습니다: Authorization 헤더에 Bearer <키>를 넣으세요"
+},
+"這把金鑰同時開的連線太多": {
+"en": "Too many open connections for this key",
+"ja": "このキーで同時に開いている接続が多すぎます",
+"ko": "이 키로 동시에 연 연결이 너무 많습니다"
+},
+"加密入口沒有 /v1/{0}": {
+"en": "The gateway has no /v1/{0}",
+"ja": "ゲートウェイに /v1/{0} はありません",
+"ko": "게이트웨이에 /v1/{0}이(가) 없습니다"
+},
+"加密入口沒有 /v1/": {
+"en": "The gateway has no /v1/",
+"ja": "ゲートウェイにない：/v1/",
+"ko": "게이트웨이에 없음: /v1/"
+},
+"/v1/{0} 要用 {1}": {
+"en": "/v1/{0} requires {1}",
+"ja": "/v1/{0} は {1} を使います",
+"ko": "/v1/{0}은(는) {1}을(를) 써야 합니다"
+},
+"要用": {
+"en": "requires",
+"ja": "が必要：",
+"ko": "필요:"
+},
+"請求內容太大（上限 16 MB）": {
+"en": "Request body too large (16 MB max)",
+"ja": "リクエストが大きすぎます（上限 16 MB）",
+"ko": "요청 본문이 너무 큽니다(최대 16 MB)"
+},
+"本文要是 JSON 物件，並帶 model": {
+"en": "The body must be a JSON object with model",
+"ja": "本文は model を含む JSON オブジェクトにしてください",
+"ko": "본문은 model이 있는 JSON 객체여야 합니다"
+},
+"這把金鑰沒有被授權用 {0}": {
+"en": "This key is not allowed to use {0}",
+"ja": "このキーには {0} を使う権限がありません",
+"ko": "이 키는 {0}을(를) 쓸 권한이 없습니다"
+},
+"這把金鑰沒有被授權用": {
+"en": "This key is not allowed to use",
+"ja": "このキーには使う権限がありません：",
+"ko": "이 키에 권한이 없음:"
+},
+"{0} 不支援 /v1/{1}，請用 /v1/chat/completions": {
+"en": "{0} does not support /v1/{1}; use /v1/chat/completions",
+"ja": "{0} は /v1/{1} に対応していません。/v1/chat/completions を使ってください",
+"ko": "{0}은(는) /v1/{1}을(를) 지원하지 않습니다. /v1/chat/completions를 쓰세요"
+},
+"不支援 /v1/": {
+"en": "does not support /v1/",
+"ja": "は対応していません：/v1/",
+"ko": "지원 안 함: /v1/"
+},
+"請用 /v1/chat/completions": {
+"en": "use /v1/chat/completions",
+"ja": "/v1/chat/completions を使ってください",
+"ko": "/v1/chat/completions를 쓰세요"
+},
+"這把金鑰同時進行中的請求已達上限（{0}），請等前一個回完": {
+"en": "This key has reached its concurrent request limit ({0}); wait for the previous one to finish",
+"ja": "このキーの同時実行リクエストが上限（{0}）に達しました。前のリクエストが終わるまで待ってください",
+"ko": "이 키의 동시 진행 요청이 상한({0})에 도달했습니다. 앞의 요청이 끝날 때까지 기다리세요"
+},
+"這把金鑰同時進行中的請求已達上限": {
+"en": "This key has reached its concurrent request limit",
+"ja": "このキーの同時実行リクエストが上限に達しました",
+"ko": "이 키의 동시 진행 요청이 상한에 도달했습니다"
+},
+"請等前一個回完": {
+"en": "wait for the previous one to finish",
+"ja": "前のリクエストが終わるまで待ってください",
+"ko": "앞의 요청이 끝날 때까지 기다리세요"
+},
+"自動匯入": {
+"en": "Imported automatically",
+"ja": "自動取り込み",
+"ko": "자동 가져오기"
+},
+"加密入口的模型清單沒有 ": {
+"en": "Not in the gateway's model list: ",
+"ja": "ゲートウェイのモデル一覧にありません：",
+"ko": "게이트웨이 모델 목록에 없음: "
+},
+"（模型沒在跑，或有別格同名）": {
+"en": " (the model is not running, or another slot has the same name)",
+"ja": "（モデルが動いていないか、同名のスロットがあります）",
+"ko": "(모델이 실행 중이 아니거나 같은 이름의 슬롯이 있음)"
+},
+"沒帶金鑰回 ": {
+"en": "Without key returned ",
+"ja": "キーなしの応答 ",
+"ko": "키 없이 반환 "
+},
+"對話回 ": {
+"en": "Chat returned ",
+"ja": "会話の応答 ",
+"ko": "대화 응답 "
+},
+"金鑰錯太多次，請 15 分鐘後再試": {
+"en": "Too many wrong keys; try again in 15 minutes",
+"ja": "キーの誤りが多すぎます。15 分後にもう一度お試しください",
+"ko": "잘못된 키가 너무 많습니다. 15분 후 다시 시도하세요"
+},
+"金鑰不對": {
+"en": "Wrong key",
+"ja": "キーが正しくありません",
+"ko": "키가 올바르지 않습니다"
+},
+" 要用 ": {
+"en": " requires ",
+"ja": " で使うのは ",
+"ko": " 필요: "
+},
+"這把金鑰沒有被授權用 ": {
+"en": "This key is not allowed to use ",
+"ja": "このキーには使う権限がありません：",
+"ko": "이 키에 권한이 없음: "
+},
+" 不支援 /v1/": {
+"en": " does not support /v1/",
+"ja": " は対応していません：/v1/",
+"ko": " 지원 안 함: /v1/"
+},
+"，請用 /v1/chat/completions": {
+"en": "; use /v1/chat/completions",
+"ja": "。/v1/chat/completions を使ってください",
+"ko": ". /v1/chat/completions를 쓰세요"
+},
+"這把金鑰同時進行中的請求已達上限（": {
+"en": "This key has reached its concurrent request limit (",
+"ja": "このキーの同時実行リクエストが上限（",
+"ko": "이 키의 동시 진행 요청이 상한("
+},
+"），請等前一個回完": {
+"en": "); wait for the previous one to finish",
+"ja": "）に達しました。前のリクエストが終わるまで待ってください",
+"ko": ")에 도달했습니다. 앞의 요청이 끝날 때까지 기다리세요"
+},
+"舊共用金鑰（{0}）": {
+"en": "Old shared key ({0})",
+"ja": "旧共有キー（{0}）",
+"ko": "이전 공용 키({0})"
+},
+"舊共用金鑰": {
+"en": "Old shared key",
+"ja": "旧共有キー",
+"ko": "이전 공용 키"
+},
+"這把金鑰已撤銷": {
+"en": "This key has been revoked",
+"ja": "このキーは失効しています",
+"ko": "이 키는 폐기되었습니다"
+},
+"這把金鑰已過期": {
+"en": "This key has expired",
+"ja": "このキーは期限切れです",
+"ko": "이 키는 만료되었습니다"
+},
+"這台的代理是舊版，還不支援加密入口；請到「設定 › 版本與更新」更新代理": {
+"en": "This machine's agent is too old for the encrypted gateway; update it under Settings › Version and updates",
+"ja": "このマシンのエージェントは旧版で、暗号化ゲートウェイに対応していません。「設定 › バージョンと更新」でエージェントを更新してください",
+"ko": "이 머신의 에이전트는 이전 버전이라 암호화 게이트웨이를 지원하지 않습니다. '설정 › 버전 및 업데이트'에서 에이전트를 업데이트하세요"
+},
+"加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1": {
+"en": "The gateway URL must start with https:// and end with /v1, e.g. https://ai.example.edu.tw/v1",
+"ja": "ゲートウェイの URL は https:// で始まり /v1 で終わる必要があります。例：https://ai.example.edu.tw/v1",
+"ko": "게이트웨이 URL은 https://로 시작하고 /v1로 끝나야 합니다. 예: https://ai.example.edu.tw/v1"
+},
+"{0} 的 {1} 已經叫 {2}，加密入口會分不出要送哪一格，請換一個名稱": {
+"en": "{1} on {0} is already called {2}; the gateway could not tell which slot to use, so choose another name",
+"ja": "{0} の {1} がすでに {2} という名前です。ゲートウェイがどちらに送るか判別できないので、別の名前にしてください",
+"ko": "{0}의 {1}이(가) 이미 {2}(이)라는 이름입니다. 게이트웨이가 어느 슬롯으로 보낼지 구분할 수 없으니 다른 이름을 쓰세요"
+},
+"已經叫": {
+"en": "is already called",
+"ja": "はすでにこの名前です：",
+"ko": "이미 이 이름:"
+},
+"加密入口會分不出要送哪一格，請換一個名稱": {
+"en": "the gateway could not tell which slot to use, so choose another name",
+"ja": "ゲートウェイがどちらに送るか判別できないので、別の名前にしてください",
+"ko": "게이트웨이가 어느 슬롯으로 보낼지 구분할 수 없으니 다른 이름을 쓰세요"
+},
+"只走加密入口：模型只聽這台自己，不測直連": {
+"en": "Encrypted gateway only: the model listens on this machine only, so direct access is not tested",
+"ja": "暗号化ゲートウェイのみ：モデルはこのマシンのみで待ち受けるため、直接接続はテストしません",
+"ko": "암호화 게이트웨이만: 모델이 이 머신에서만 수신하므로 직접 연결은 시험하지 않습니다"
+},
+"舊共用金鑰（": {
+"en": "Old shared key (",
+"ja": "旧共有キー（",
+"ko": "이전 공용 키("
+},
+"憑證驗不過（{0}）": {
+"en": "Certificate verification failed ({0})",
+"ja": "証明書を検証できません（{0}）",
+"ko": "인증서 검증 실패({0})"
+},
+"憑證驗不過": {
+"en": "Certificate verification failed",
+"ja": "証明書を検証できません",
+"ko": "인증서 검증 실패"
+},
+"沒帶金鑰": {
+"en": "No key",
+"ja": "キーなし",
+"ko": "키 없음"
+},
+" 已經叫 ": {
+"en": " is already called ",
+"ja": " はすでにこの名前です：",
+"ko": " 이미 이 이름: "
+},
+"，加密入口會分不出要送哪一格，請換一個名稱": {
+"en": "; the gateway could not tell which slot to use, so choose another name",
+"ja": "。ゲートウェイがどちらに送るか判別できないので、別の名前にしてください",
+"ko": ". 게이트웨이가 어느 슬롯으로 보낼지 구분할 수 없으니 다른 이름을 쓰세요"
+},
+"憑證驗不過（": {
+"en": "Certificate verification failed (",
+"ja": "証明書を検証できません（",
+"ko": "인증서 검증 실패("
+},
+"「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口算到的量，包含網頁對話與 IDE 直連 8080；只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。": {
+"en": "\"Not via the gateway\" = the engine log total minus what the gateway counted, covering web chat and IDEs connecting directly to 8080; only llama.cpp slots have engine logs to count, so Strata slots show only the gateway part.",
+"ja": "「ゲートウェイを通っていない」＝エンジンログの合計からゲートウェイで数えた量を引いたもので、Web の会話と 8080 に直接接続した IDE を含みます。エンジンログがあるのは llama.cpp のスロットだけで、Strata のスロットはゲートウェイ分だけ数えられます。",
+"ko": "'게이트웨이를 거치지 않음' = 엔진 로그 합계에서 게이트웨이가 센 양을 뺀 값으로, 웹 대화와 8080에 직접 연결한 IDE를 포함합니다. 엔진 로그가 있는 것은 llama.cpp 슬롯뿐이라 Strata 슬롯은 게이트웨이 부분만 셉니다."
+},
+"近 7 天還有人用舊共用金鑰（{0}）": {
+"en": "Someone used an old shared key in the last 7 days ({0})",
+"ja": "直近 7 日間に旧共有キーを使った人がいます（{0}）",
+"ko": "최근 7일 안에 이전 공용 키를 쓴 사람이 있습니다({0})"
+},
+"近 7 天還有人用舊共用金鑰": {
+"en": "Someone used an old shared key in the last 7 days",
+"ja": "直近 7 日間に旧共有キーを使った人がいます",
+"ko": "최근 7일 안에 이전 공용 키를 쓴 사람이 있습니다"
+},
+"全校共用一把，外流只能一起換：在「API 串接」替每位老師發個別金鑰，確認沒人用了再撤銷": {
+"en": "One key is shared by everyone, so a leak means replacing it for all: issue personal keys on the API page and revoke the shared one once nobody uses it",
+"ja": "全員で 1 つを共有しているため、漏れたら全員で交換するしかありません。「API 連携」で先生ごとに個別キーを発行し、誰も使わなくなったら失効させてください",
+"ko": "모두 키 하나를 공유하므로 유출되면 전원이 함께 바꿔야 합니다. 'API 연동'에서 교사마다 개인 키를 발급하고 아무도 쓰지 않게 되면 폐기하세요"
+},
+"（已刪除的金鑰）": {
+"en": "(deleted key)",
+"ja": "（削除されたキー）",
+"ko": "(삭제된 키)"
+},
+"近 7 天還有人用舊共用金鑰（": {
+"en": "Someone used an old shared key in the last 7 days (",
+"ja": "直近 7 日間に旧共有キーを使った人がいます（",
+"ko": "최근 7일 안에 이전 공용 키를 쓴 사람이 있습니다("
+},
+"名稱要 1～{0} 個字，例如「資工系 王老師」或「機器學習（週三）」": {
+"en": "The name must be 1 to {0} characters, e.g. \"CS Dept. Prof. Wang\" or \"Machine Learning (Wed)\"",
+"ja": "名前は 1～{0} 文字で入力してください。例：「情報工学科 王先生」「機械学習（水曜）」",
+"ko": "이름은 1~{0}자로 입력하세요. 예: '컴퓨터공학과 왕 교수', '머신러닝(수요일)'"
+},
+"名稱要 1～": {
+"en": "The name must be 1 to ",
+"ja": "名前は 1～",
+"ko": "이름은 1~"
+},
+"個字，例如「資工系 王老師」或「機器學習（週三）」": {
+"en": " characters, e.g. \"CS Dept. Prof. Wang\" or \"Machine Learning (Wed)\"",
+"ja": " 文字で入力してください。例：「情報工学科 王先生」「機械学習（水曜）」",
+"ko": "자로 입력하세요. 예: '컴퓨터공학과 왕 교수', '머신러닝(수요일)'"
+},
+"同時進行的請求上限要是 1～{0}": {
+"en": "The concurrent request limit must be 1 to {0}",
+"ja": "同時実行リクエストの上限は 1～{0} にしてください",
+"ko": "동시 진행 요청 상한은 1~{0}이어야 합니다"
+},
+"同時進行的請求上限要是 1～": {
+"en": "The concurrent request limit must be 1 to ",
+"ja": "同時実行リクエストの上限は 1～",
+"ko": "동시 진행 요청 상한은 1~"
+},
+"有效天數要是 0（不到期）～{0}": {
+"en": "Valid days must be 0 (never expires) to {0}",
+"ja": "有効日数は 0（期限なし）～{0} にしてください",
+"ko": "유효 일수는 0(만료 없음)~{0}이어야 합니다"
+},
+"有效天數要是 0（不到期）～": {
+"en": "Valid days must be 0 (never expires) to ",
+"ja": "有効日数は 0（期限なし）～",
+"ko": "유효 일수는 0(만료 없음)~"
+},
+" 個字，例如「資工系 王老師」或「機器學習（週三）」": {
+"en": " characters, e.g. \"CS Dept. Prof. Wang\" or \"Machine Learning (Wed)\"",
+"ja": " 文字で入力してください。例：「情報工学科 王先生」「機械学習（水曜）」",
+"ko": "자로 입력하세요. 예: '컴퓨터공학과 왕 교수', '머신러닝(수요일)'"
+},
+"能用的模型要選「全部」或至少選一格": {
+"en": "Allowed models must be \"All\" or at least one slot",
+"ja": "使えるモデルは「すべて」か、少なくとも 1 つのスロットを選んでください",
+"ko": "사용 가능한 모델은 '전체' 또는 슬롯을 하나 이상 골라야 합니다"
+},
+"沒有叫 {0} 的模型；可用的模型請看 /v1/models": {
+"en": "No model named {0}; see /v1/models for available models",
+"ja": "{0} という名前のモデルはありません。使えるモデルは /v1/models を見てください",
+"ko": "{0}(이)라는 모델이 없습니다. 쓸 수 있는 모델은 /v1/models를 보세요"
+},
+"沒有叫": {
+"en": "No model named",
+"ja": "この名前のモデルはありません：",
+"ko": "이 이름의 모델 없음:"
+},
+"的模型；可用的模型請看 /v1/models": {
+"en": "; see /v1/models for available models",
+"ja": "。使えるモデルは /v1/models を見てください",
+"ko": ". 쓸 수 있는 모델은 /v1/models를 보세요"
+},
+"有 {0} 格都叫 {1}，請管理員到「執行 › API 串接」把其中一格改名": {
+"en": "{0} slots are all called {1}; ask the administrator to rename one under Run › API",
+"ja": "{0} 個のスロットがどれも {1} という名前です。管理者に「実行 › API 連携」でどれかの名前を変えてもらってください",
+"ko": "슬롯 {0}개가 모두 {1}(이)라는 이름입니다. 관리자에게 '실행 › API 연동'에서 하나의 이름을 바꿔 달라고 하세요"
+},
+"格都叫": {
+"en": "slots are all called",
+"ja": "個のスロットが同じ名前：",
+"ko": "개 슬롯이 같은 이름:"
+},
+"請管理員到「執行 › API 串接」把其中一格改名": {
+"en": "ask the administrator to rename one under Run › API",
+"ja": "管理者に「実行 › API 連携」でどれかの名前を変えてもらってください",
+"ko": "관리자에게 '실행 › API 연동'에서 하나의 이름을 바꿔 달라고 하세요"
+},
+"沒有叫 ": {
+"en": "No model named ",
+"ja": "この名前のモデルはありません：",
+"ko": "이 이름의 모델 없음: "
+},
+" 的模型；可用的模型請看 /v1/models": {
+"en": "; see /v1/models for available models",
+"ja": "。使えるモデルは /v1/models を見てください",
+"ko": ". 쓸 수 있는 모델은 /v1/models를 보세요"
+},
+" 格都叫 ": {
+"en": " slots are all called ",
+"ja": " 個のスロットが同じ名前：",
+"ko": "개 슬롯이 같은 이름: "
+},
+"，請管理員到「執行 › API 串接」把其中一格改名": {
+"en": "; ask the administrator to rename one under Run › API",
+"ja": "。管理者に「実行 › API 連携」でどれかの名前を変えてもらってください",
+"ko": ". 관리자에게 '실행 › API 연동'에서 하나의 이름을 바꿔 달라고 하세요"
+},
+"這個欄位沒有這條 API": {
+"en": "This slot does not have that API",
+"ja": "このスロットにその API はありません",
+"ko": "이 슬롯에는 해당 API가 없습니다"
+},
+"思考模式只有 llama.cpp 的欄位能在這裡改": {
+"en": "Thinking mode can only be changed here for llama.cpp slots",
+"ja": "思考モードをここで変更できるのは llama.cpp のスロットだけです",
+"ko": "사고 모드는 llama.cpp 슬롯에서만 여기서 바꿀 수 있습니다"
+},
+"stream_options 要是 JSON 物件": {
+"en": "stream_options must be a JSON object",
+"ja": "stream_options は JSON オブジェクトにしてください",
+"ko": "stream_options는 JSON 객체여야 합니다"
+},
+"模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）": {
+"en": "The model's response exceeds 64 MB and was not relayed; send less at a time (e.g. split embeddings into batches)",
+"ja": "モデルの応答が 64 MB を超えたため転送しませんでした。1 回の量を減らしてください（例：embeddings を分けて送る）",
+"ko": "모델 응답이 64 MB를 넘어 전달하지 않았습니다. 한 번에 보내는 양을 줄이세요(예: embeddings를 나눠 보내기)"
+},
+"only 要是 true 或 false": {
+"en": "only must be true or false",
+"ja": "only は true か false にしてください",
+"ko": "only는 true 또는 false여야 합니다"
+},
+"這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰": {
+"en": "This slot's direct-access key is shorter than 16 characters and cannot be used with the gateway; create a new key on the API page",
+"ja": "このスロットの直接接続キーは 16 文字未満のため、ゲートウェイでは使えません。「API 連携」ページでキーを作り直してください",
+"ko": "이 슬롯의 직접 연결 키는 16자보다 짧아 게이트웨이에서 쓸 수 없습니다. 'API 연동' 페이지에서 키를 다시 만드세요"
+},
+"{0} 現在沒有在跑": {
+"en": "{0} is not running right now",
+"ja": "{0} は現在動いていません",
+"ko": "{0}은(는) 지금 실행 중이 아닙니다"
+},
+"現在沒有在跑": {
+"en": "is not running right now",
+"ja": "は現在動いていません",
+"ko": "지금 실행 중이 아님"
+},
+" 現在沒有在跑": {
+"en": " is not running right now",
+"ja": " は現在動いていません",
+"ko": " 지금 실행 중이 아님"
+},
+"現在直連不用金鑰，加密入口一定要金鑰：關掉之後，還沒拿到個別金鑰的人會立刻連不上。先確認每個人都已經換成加密入口的網址與個別金鑰。": {
+"en": "Direct access currently needs no key, but the encrypted gateway always does: once it is off, anyone without a personal key loses access immediately. First make sure everyone has switched to the gateway URL and a personal key.",
+"ja": "現在の直接接続はキー不要ですが、暗号化ゲートウェイには必ずキーが必要です。オフにすると、個別キーをまだ持っていない人はすぐに接続できなくなります。先に全員がゲートウェイの URL と個別キーに切り替えたことを確認してください。",
+"ko": "지금 직접 연결은 키가 필요 없지만 암호화 게이트웨이는 항상 키가 필요합니다. 끄면 개인 키를 아직 받지 않은 사람은 즉시 연결할 수 없게 됩니다. 먼저 모두 게이트웨이 URL과 개인 키로 바꿨는지 확인하세요."
+},
+"現在直連不用金鑰，加密入口一定要金鑰，而且還沒有任何一把能用這一格。請先在「API 串接」頁產生金鑰發給要用的人，再回來關直連。": {
+"en": "Direct access currently needs no key, but the encrypted gateway always does, and no key can use this slot yet. Create keys on the API page and hand them out first, then come back to turn off direct access.",
+"ja": "現在の直接接続はキー不要ですが、暗号化ゲートウェイには必ずキーが必要で、このスロットを使えるキーはまだありません。先に「API 連携」ページでキーを作成して配ってから、直接接続をオフにしてください。",
+"ko": "지금 직접 연결은 키가 필요 없지만 암호화 게이트웨이는 항상 키가 필요하며, 이 슬롯을 쓸 수 있는 키가 아직 없습니다. 먼저 'API 연동' 페이지에서 키를 만들어 나눠 준 뒤 직접 연결을 끄세요."
+},
+"還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有 {0} 把能用這一格）。": {
+"en": "Tools still using the direct URL will lose access; they must switch to the gateway URL and a personal key ({0} key(s) can use this slot now).",
+"ja": "直接接続の URL を使っているツールは接続できなくなります。ゲートウェイの URL と個別キーに切り替えてください（現在このスロットを使えるキーは {0} 個）。",
+"ko": "직접 연결 URL을 쓰는 도구는 연결할 수 없게 됩니다. 게이트웨이 URL과 개인 키로 바꿔야 합니다(지금 이 슬롯을 쓸 수 있는 키 {0}개)."
+},
+"還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有": {
+"en": "Tools still using the direct URL will lose access; they must switch to the gateway URL and a personal key (keys that can use this slot now:",
+"ja": "直接接続の URL を使っているツールは接続できなくなります。ゲートウェイの URL と個別キーに切り替えてください（現在このスロットを使えるキー：",
+"ko": "직접 연결 URL을 쓰는 도구는 연결할 수 없게 됩니다. 게이트웨이 URL과 개인 키로 바꿔야 합니다(지금 이 슬롯을 쓸 수 있는 키:"
+},
+"把能用這一格": {
+"en": "can use this slot",
+"ja": "個",
+"ko": "개"
+},
+"「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口成功送到模型的量，包含網頁對話與 IDE 直連 8080；只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。加密入口的用量以小時記，本期起點所在的那一小時整段算進來。": {
+"en": "\"Not via the gateway\" = the engine log total minus what the gateway successfully delivered to the model, covering web chat and IDEs connecting directly to 8080; only llama.cpp slots have engine logs to count, so Strata slots show only the gateway part. Gateway usage is recorded per hour, and the whole hour containing the start of the period is included.",
+"ja": "「ゲートウェイを通っていない」＝エンジンログの合計から、ゲートウェイがモデルに正常に届けた量を引いたもので、Web の会話と 8080 に直接接続した IDE を含みます。エンジンログがあるのは llama.cpp のスロットだけで、Strata のスロットはゲートウェイ分だけ数えられます。ゲートウェイの使用量は 1 時間単位で記録し、期間の開始時刻を含む 1 時間はまるごと含めます。",
+"ko": "'게이트웨이를 거치지 않음' = 엔진 로그 합계에서 게이트웨이가 모델에 정상적으로 전달한 양을 뺀 값으로, 웹 대화와 8080에 직접 연결한 IDE를 포함합니다. 엔진 로그가 있는 것은 llama.cpp 슬롯뿐이라 Strata 슬롯은 게이트웨이 부분만 셉니다. 게이트웨이 사용량은 시간 단위로 기록하며, 기간 시작 시각이 속한 1시간은 통째로 포함합니다."
 }
 }

@@ -16,6 +16,7 @@
 """
 import base64
 import concurrent.futures
+import contextlib
 import datetime as dt
 import hashlib
 import http.client
@@ -51,6 +52,7 @@ import agentlink  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
+import gateway  # noqa: E402
 from store import Store  # noqa: E402
 
 # Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
@@ -789,6 +791,7 @@ def sampler():
                 STORE.audit("系統", "", "tls.expiry_notice", cur.get("subject", ""), True,
                             {"threshold": tag, "daysLeft": cur.get("daysLeft"),
                              "validToTaipei": cur.get("validToTaipei")})
+            import_legacy_keys(force=True)          # 升級後第一輪就把舊共用金鑰匯入加密入口（代理是舊版就跳過，下一輪再試）
             if time.time() - last_prune > 86400:
                 STORE.prune()
                 last_prune = time.time()
@@ -1654,6 +1657,284 @@ def provider_save(body):
         "ca": bool(ca), "cn_origin": provider_public(saved)["cn_origin"]}
 
 
+# ---------------------------------------------------------------- 加密入口的金鑰（/v1）
+
+GATEWAY_URL_RX = re.compile(r"https://[A-Za-z0-9.\-\[\]:]{1,255}(/[\w.\-/]{0,100})?")
+
+
+def gateway_url():
+    """IDE 要填的網址。管理者有填就用填的（例：前面另有反向代理走 443）；沒填就用主控台憑證上的第一個名稱。"""
+    u = (fleet().get("gateway") or {}).get("public_url")
+    if u:
+        return u
+    h = (hostnames() or ["127.0.0.1"])[0]
+    h = f"[{h}]" if ":" in h and not h.startswith("[") else h
+    return f"https://{h}:{PORT}/v1"
+
+
+def gateway_url_ok(u):
+    """加密入口網址：https、主機名稱不能空、埠要是 1～65535 的數字、/v1 結尾。"""
+    if not (GATEWAY_URL_RX.fullmatch(u) and u.endswith("/v1")):
+        return False
+    try:
+        p = urlparse(u)
+        port = p.port                     # 埠不是數字或超出範圍會丟 ValueError
+    except ValueError:
+        return False
+    return bool(p.hostname) and (port is None or 1 <= port <= 65535) and not p.username and not p.password
+
+
+def key_slots_ok(slots):
+    """金鑰能用的模型：每一格的機器都要在納管清單裡（格子可以還沒建，之後建了就能用）。"""
+    if slots == "*":
+        return None
+    ids = {n["id"] for n in fleet()["nodes"]}
+    bad = [s for s in slots if s.split("/", 1)[0] not in ids]
+    return f"這些機器不在納管清單裡：{', '.join(bad)[:120]}" if bad else None
+
+
+def keys_overview(owner=None):
+    use = STORE.usage_by_key(gateway.month_start())
+    zero = {"requests": 0, "errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
+    return {"items": [gateway.public(r, use.get(r["id"], zero)) for r in STORE.key_list(owner)],
+            "url": gateway_url(), "url_custom": bool((fleet().get("gateway") or {}).get("public_url")),
+            "limits": {"name": gateway.NAME_MAX, "inflight": gateway.INFLIGHT_MAX, "default_inflight": gateway.DEFAULT_INFLIGHT}}
+
+
+def key_create(body, by, owner=None):
+    """回 (狀態碼, 回應, 稽核細節)。完整金鑰只在這次回傳，資料庫只留雜湊。"""
+    f, err = gateway.check_fields(body)
+    if err:
+        return 400, {"error": err}, None
+    err = key_slots_ok(f["slots"])
+    if err:
+        return 400, {"error": err}, None
+    key = gateway.new_key()
+    row = {"id": secrets.token_hex(4), "name": f["name"], "owner": owner, "prefix": key[:8], "hash": gateway.key_hash(key),
+           "slots": f["slots"], "max_inflight": f["max_inflight"], "created": time.time(), "created_by": by or "",
+           "expires": f["expires"], "revoked": None, "revoked_by": None, "last_used": None, "last_ip": None, "source": "new"}
+    STORE.key_insert(row)
+    return 200, {"ok": True, "key": key, "item": gateway.public(row), "url": gateway_url()}, \
+        {"id": row["id"], "name": f["name"], "slots": f["slots"], "max_inflight": f["max_inflight"], "expires": f["expires"]}
+
+
+def key_update(kid, body):
+    cur = STORE.key_get(kid)
+    if not cur:
+        return 404, {"error": "沒有這把金鑰"}, None
+    if cur.get("revoked"):
+        return 409, {"error": "這把金鑰已撤銷，不能再改；要用請產生一把新的"}, None
+    f, err = gateway.check_fields(body, partial=True)
+    if err:
+        return 400, {"error": err}, None
+    if "slots" in f:
+        err = key_slots_ok(f["slots"])
+        if err:
+            return 400, {"error": err}, None
+    if not STORE.key_update(kid, f):            # 同時有人撤銷了它：條件式更新沒有改到任何一列
+        return 409, {"error": "這把金鑰已撤銷，不能再改；要用請產生一把新的"}, None
+    return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {k: v for k, v in f.items()}
+
+
+def key_revoke(kid, by):
+    cur = STORE.key_get(kid)
+    if not cur:
+        return 404, {"error": "沒有這把金鑰"}, None
+    if not STORE.key_revoke(kid, by):
+        return 409, {"error": "這把金鑰已經撤銷了"}, None
+    return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {"name": cur["name"]}
+
+
+def gateway_slots():
+    """每台機器、每一格有在跑模型的欄位叫什麼名字（加密入口依本文的 model 找要送哪一格）。各台平行問。"""
+    def one(n):
+        code, reg = call_node(n["id"], "/registry", timeout=15)
+        rows = []
+        for s in (reg.get("slots") or []) if code == 200 else []:
+            if not s.get("unit"):
+                continue
+            c, info = apiinfo_brief(n["id"], s["id"], timeout=15)
+            if c == 200 and info.get("model_name"):
+                rows.append({"node": n["id"], "slot": s["id"], "kind": info.get("kind"), "name": info["model_name"],
+                             "online": bool(info.get("online")), "ctx": info.get("max_context"), "vision": bool(info.get("vision"))})
+        return rows
+    nodes = fleet()["nodes"]
+    if not nodes:
+        return []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(nodes))) as ex:
+        return [r for rows in ex.map(one, nodes) for r in rows]
+
+
+HEX64 = re.compile(r"[0-9a-f]{64}")
+_IMPORT_LOCK, _IMPORT_AT, _IMPORT_SHORT = threading.Lock(), [0.0], set()
+_NAME_LOCK = threading.Lock()                       # 改模型名稱：檢查重名到套用完成要一起做，兩個人同時改成同一個名字才擋得住
+GW_SELFTEST = secrets.token_hex(16)                  # 實測時故意不帶金鑰打一次：帶這個標頭的不算進送錯金鑰的次數
+
+
+def import_legacy_keys(only=None, force=False):
+    """舊的共用金鑰（每格一把、IDE 直連 8080 用的）自動匯入成加密入口的金鑰，老師只要把網址改成加密入口，金鑰不用換。
+    代理只回雜湊。主控台自己換上的內部金鑰不匯入；同一把金鑰用在好幾格，就併成一列、每一格都能用。
+    太短（少於 16 個字）的金鑰加密入口收不下，不匯入並記一筆稽核，請管理者重新產生。最多每分鐘做一次（force 例外）。
+    only＝(機器, 格子) 時只看那一格。回新匯入或有改動的金鑰 id。"""
+    with _IMPORT_LOCK:
+        if not force and only is None and time.time() - _IMPORT_AT[0] < 60:
+            return []
+        if only is None:
+            _IMPORT_AT[0] = time.time()
+        internal = set(((fleet().get("gateway") or {}).get("internal") or {}).values())
+        added = []
+        for n in fleet()["nodes"]:
+            if only and n["id"] != only[0]:
+                continue
+            code, reg = call_node(n["id"], "/registry", timeout=15)
+            for s in (reg.get("slots") or []) if code == 200 else []:
+                if not s.get("unit") or (only and s["id"] != only[1]):
+                    continue
+                c, k = call_node(n["id"], f"/apikey/{s['id']}", timeout=15)
+                h = (k or {}).get("hash") or ""
+                if c != 200 or not k.get("set") or not HEX64.fullmatch(h) or h in internal:
+                    continue
+                sk = f"{n['id']}/{s['id']}"
+                if isinstance(k.get("length"), int) and k["length"] < 16:
+                    if h not in _IMPORT_SHORT:
+                        _IMPORT_SHORT.add(h)
+                        STORE.audit("", "", "apikey.import", sk, False,
+                                    {"message": "這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰"})
+                    continue
+                cur = STORE.key_by_hash(h)
+                if cur:
+                    # 同一把金鑰也保護別格：併進同一列（只併自動匯入的、還有效的），不然搬過去之後只剩第一格能用
+                    if cur.get("source") == "legacy" and gateway.state(cur) == "active" and cur["slots"] != "*" \
+                            and sk not in cur["slots"]:
+                        STORE.key_update(cur["id"], {"slots": sorted(cur["slots"] + [sk])})
+                        STORE.audit("", "", "apikey.import", cur["id"], True, {"name": cur["name"], "slots": cur["slots"] + [sk]})
+                        added.append(cur["id"])
+                    continue
+                row = {"id": secrets.token_hex(4), "name": f"舊共用金鑰（{s.get('role') or s['id']}）"[:gateway.NAME_MAX],
+                       "owner": None, "prefix": str(k.get("prefix") or "")[:8], "hash": h, "slots": [sk],
+                       "max_inflight": gateway.INFLIGHT_MAX, "created": time.time(), "created_by": "自動匯入", "expires": None,
+                       "revoked": None, "revoked_by": None, "last_used": None, "last_ip": None, "source": "legacy"}
+                STORE.key_insert(row)
+                STORE.audit("", "", "apikey.import", row["id"], True, {"name": row["name"], "slots": row["slots"]})
+                added.append(row["id"])
+        return added
+
+
+def retire_legacy(node_id, slot_id, old_hash, by):
+    """管理者在 API 串接頁明確換掉或拿掉直連金鑰：舊的那把在加密入口也要跟著失效（只拿掉這一格；沒有格子了就撤銷）。
+    「只走加密入口」那條路不經過這裡：那是刻意保留舊金鑰，等大家換完再撤銷。"""
+    row = STORE.key_by_hash(old_hash) if old_hash else None
+    if not row or row.get("source") != "legacy" or gateway.state(row) != "active" or row["slots"] == "*":
+        return None
+    rest = [x for x in row["slots"] if x != f"{node_id}/{slot_id}"]
+    if rest:
+        STORE.key_update(row["id"], {"slots": rest})
+    else:
+        STORE.key_revoke(row["id"], by)
+    STORE.audit(by, "", "apikey.retire", row["id"], True, {"name": row["name"], "slots": rest})
+    return row["id"]
+
+
+def gateway_only(node_id, slot_id, on, force=False):
+    """「只走加密入口」：模型改聽 127.0.0.1，並換上一把只有主控台知道、從不顯示的內部金鑰，然後重啟模型。
+    換內部金鑰的用意：以後就算有人又把區網打開，舊的共用金鑰也已經打不進模型。舊共用金鑰先匯入，經加密入口照樣能用，
+    等管理者確認大家都換了再撤銷。回 (狀態碼, 回應)。"""
+    if on:
+        import_legacy_keys(only=(node_id, slot_id))
+        code, out = call_node(node_id, f"/apiinfo/{slot_id}/settings", "POST", {"lan": False, "key": "new", "force": force},
+                              timeout=2000)
+        k = out.pop("api_key", None)
+        if code == 200 and k:
+            update_fleet(lambda c: c.setdefault("gateway", {}).setdefault("internal", {}).__setitem__(
+                f"{node_id}/{slot_id}", gateway.key_hash(k)))
+        if code == 200:
+            out["message"] = "已改成只走加密入口：模型只聽這台自己，IDE 請改用加密入口的網址與個別金鑰"
+    else:
+        code, out = call_node(node_id, f"/apiinfo/{slot_id}/settings", "POST", {"lan": True, "force": force}, timeout=2000)
+        if code == 200:
+            out["message"] = ("已重新開放區網直連。模型現在用的是只有主控台知道的內部金鑰，要讓 IDE 直連，"
+                              "請在下面產生新金鑰（這把也會自動加進加密入口）")
+    GW_ROUTES.invalidate()
+    return code, out
+
+
+def gateway_selftest(node_id, slot_id):
+    """從主控台這台用一把 2 分鐘的臨時金鑰打一次自己的加密入口：證明 https、金鑰驗證、轉送到這一格都通。
+    憑證照樣驗（自簽就拿自己這張當信任來源），不准略過。臨時金鑰不寫資料庫、不記用量。"""
+    code, info = apiinfo_brief(node_id, slot_id)
+    name = (info or {}).get("model_name")
+    if code != 200 or not name:
+        return {"ok": False, "url": gateway_url(), "detail": (info or {}).get("error") or "讀不到這格的模型名稱"}
+    GW_ROUTES.invalidate()
+    key = gateway.new_key()
+    GW_TEMP[gateway.key_hash(key)] = {"id": "selftest-" + secrets.token_hex(4), "name": "實測", "slots": [f"{node_id}/{slot_id}"],
+                                      "max_inflight": 1, "source": "selftest", "expires": time.time() + 120, "revoked": None}
+    host = (hostnames() or ["127.0.0.1"])[0]
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    try:
+        ctx.load_verify_locations(CERTS.p.live_cert)
+    except (OSError, ssl.SSLError):
+        pass
+
+    def call(method, path, body=None, with_key=True):
+        try:
+            raw = socket.create_connection(("127.0.0.1", PORT), timeout=15)
+            conn = http.client.HTTPConnection(host, PORT, timeout=180)
+            conn.sock = ctx.wrap_socket(raw, server_hostname=host.strip("[]"))
+            conn.request(method, "/v1/" + path, body=json.dumps(body).encode() if body is not None else None,
+                         headers={"Content-Type": "application/json", "X-XConsole-Selftest": GW_SELFTEST,
+                                  **({"Authorization": f"Bearer {key}"} if with_key else {})})
+            r = conn.getresponse()
+            data = r.read(1024 * 1024)
+            conn.close()
+            try:
+                return r.status, json.loads(data or b"{}")
+            except ValueError:
+                return r.status, {}
+        except ssl.SSLCertVerificationError as exc:
+            return -1, {"error": {"message": f"憑證驗不過（{exc.verify_message}）"}}
+        except Exception as exc:  # noqa: BLE001
+            return 0, {"error": {"message": type(exc).__name__}}
+
+    t0 = time.time()
+    try:
+        st, models = call("GET", "models")
+        if st != 200:
+            return {"ok": False, "url": gateway_url(), "detail": f"/v1/models 回 {st}：{((models or {}).get('error') or {}).get('message', '')}"}
+        if name not in [m.get("id") for m in models.get("data") or []]:
+            return {"ok": False, "url": gateway_url(), "detail": f"加密入口的模型清單沒有 {name}（模型沒在跑，或有別格同名）"}
+        st, _ = call("POST", "chat/completions", {"model": name, "messages": []}, with_key=False)
+        if st != 401:
+            return {"ok": False, "url": gateway_url(), "detail": f"沒帶金鑰回 {st}，沒有被擋"}
+        st, out = call("POST", "chat/completions", {"model": name, "max_tokens": 8,
+                                                    "messages": [{"role": "user", "content": "請只回答：連線成功"}]})
+        if st != 200:
+            return {"ok": False, "url": gateway_url(), "detail": f"對話回 {st}：{((out or {}).get('error') or {}).get('message', '')}"}
+        return {"ok": True, "url": gateway_url(), "ms": int((time.time() - t0) * 1000),
+                "detail": f"加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（{name}）"}
+    finally:
+        GW_TEMP.pop(gateway.key_hash(key), None)
+
+
+GW_TEMP = {}
+GW_ROUTES = gateway.Routes(gateway_slots)
+GW_MAX = 64 * 1024 * 1024
+GW_QUERY_SECRETS = {"key", "api_key", "apikey", "api-key", "token", "access_token", "auth", "authorization", "x-api-key"}
+GW_INFLIGHT = gateway.Inflight()
+GW_FAILS = gateway.FailLimit()
+_GW_TOUCH, _GW_TOUCH_LOCK = {}, threading.Lock()
+
+
+def gateway_touch(kid, ip):
+    """最後使用時間每把金鑰每分鐘最多寫一次，不每個請求都寫資料庫。"""
+    with _GW_TOUCH_LOCK:
+        if time.time() - _GW_TOUCH.get(kid, 0) < 60:
+            return
+        _GW_TOUCH[kid] = time.time()
+    STORE.key_touch(kid, ip)
+
+
 CHAT_ROLES = ("system", "user", "assistant", "tool")
 
 
@@ -2265,6 +2546,158 @@ class Handler(BaseHTTPRequestHandler):
                 pass
         return None
 
+    # ---- 加密入口 /v1：IDE 用個別金鑰呼叫模型（不認網頁的登入 cookie、不回 CORS 標頭）
+    def _oai(self, code, message, typ, extra=None):
+        """OpenAI 格式的錯誤：IDE 才看得懂、才會把原因顯示出來。"""
+        self._send(code, json.dumps({"error": {"message": message, "type": typ, "code": typ}}, ensure_ascii=False).encode(),
+                   "application/json; charset=utf-8", extra)
+
+    def _gateway(self, method):
+        u = urlparse(self.path)
+        sub = u.path[len("/v1/"):].strip("/") if u.path.startswith("/v1/") else ""
+        if any(k.strip().lower() in GW_QUERY_SECRETS for k in parse_qs(u.query or "", keep_blank_values=True)):
+            if method == "POST":                # GET 不讀本文：宣稱有本文卻不送，會佔住執行緒
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(400, "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）", "invalid_request")
+        key = gateway.presented_key(self.headers)
+        row = (STORE.key_by_hash(gateway.key_hash(key)) or GW_TEMP.get(gateway.key_hash(key))) if key else None
+        if not row or gateway.state(row) != "active":
+            if method == "POST" and self._body(MAX_ANON_BODY) is None:
+                return None
+            self._headers_done()
+            if hmac.compare_digest((self.headers.get("X-XConsole-Selftest") or "").encode(), GW_SELFTEST.encode()) \
+                    and is_local_address(self.ip):
+                return self._oai(401, "沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>", "invalid_api_key")
+            if GW_FAILS.blocked(self.ip):
+                return self._oai(429, "金鑰錯太多次，請 15 分鐘後再試", "rate_limited", {"Retry-After": "900"})
+            if GW_FAILS.add(self.ip):                   # 每個來源每一輪只記一筆，免得灌爆稽核表
+                STORE.audit("", self.ip, "gateway.auth", sub, False,
+                            {"reason": "沒帶金鑰" if not key else "金鑰不對" if not row else gateway.state(row)})
+            time.sleep(0.3)
+            msg = ("沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>" if not key else
+                   "金鑰不對" if not row else "這把金鑰已撤銷" if row.get("revoked") else "這把金鑰已過期")
+            return self._oai(401, msg, "invalid_api_key")
+        promote = getattr(self.server, "promote", None)
+        limit = int(row.get("max_inflight") or gateway.DEFAULT_INFLIGHT)
+        if promote is not None and not promote("key:" + row["id"], limit + 4):
+            # 已驗過金鑰的連線依金鑰計，不算進來源 IP 的 64 條：一間教室在同一個 NAT 後面也不會互相擋
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            self.close_connection = True
+            return self._oai(429, "這把金鑰同時開的連線太多", "rate_limited", {"Retry-After": "5"})
+        want = gateway.PATHS.get(sub) or gateway.STRATA_PATHS.get(sub)
+        if not want:
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(404, f"加密入口沒有 /v1/{sub}", "not_found")
+        if want != method:
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(405, f"/v1/{sub} 要用 {want}", "method_not_allowed")
+        if sub == "models":
+            if row.get("source") != "selftest":
+                gateway_touch(row["id"], self.ip)
+            rows = [r for r in GW_ROUTES.rows() if r.get("online") and gateway.allows(row, f"{r['node']}/{r['slot']}")]
+            names = [r["name"] for r in rows]
+            return self._json(200, {"object": "list", "data": [
+                {"id": r["name"], "object": "model", "created": 0, "owned_by": "xconsole",
+                 **({"context_length": r["ctx"]} if r.get("ctx") else {})} for r in rows if names.count(r["name"]) == 1]})
+        if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(415, "只接受 application/json", "invalid_request")
+        body = self._body(CHAT_BODY)
+        self._headers_done()
+        if body is None:
+            return self._oai(413, "請求內容太大（上限 16 MB）", "invalid_request")
+        if not isinstance(body, dict) or not isinstance(body.get("model"), str) or not body["model"]:
+            return self._oai(400, "本文要是 JSON 物件，並帶 model", "invalid_request")
+        so = body.get("stream_options")
+        if so is not None and not isinstance(so, dict):
+            return self._oai(400, "stream_options 要是 JSON 物件", "invalid_request")
+        hit, err = GW_ROUTES.find(body["model"], allowed=lambda r: gateway.allows(row, f"{r['node']}/{r['slot']}"))
+        if err:
+            return self._oai(err[0], err[1], err[2])
+        if sub in gateway.STRATA_PATHS and hit.get("kind") != "strata":
+            return self._oai(404, f"{body['model']} 不支援 /v1/{sub}，請用 /v1/chat/completions", "not_found")
+        injected = False
+        if sub in ("chat/completions", "completions") and body.get("stream") is True and not (so or {}).get("include_usage"):
+            body["stream_options"] = {**(so or {}), "include_usage": True}
+            injected = True
+        if not GW_INFLIGHT.acquire(row["id"], limit):
+            return self._oai(429, f"這把金鑰同時進行中的請求已達上限（{limit}），請等前一個回完", "rate_limited",
+                             {"Retry-After": "5"})
+        status, usage = 0, (0, 0)
+        try:
+            status, usage = self._gateway_forward(hit, sub, body, injected)
+        finally:
+            GW_INFLIGHT.release(row["id"])
+            if row.get("source") != "selftest":
+                STORE.usage_add(row["id"], gateway.hour(), hit["node"], hit["slot"], status == 200, *usage)
+                gateway_touch(row["id"], self.ip)
+        return None
+
+    def _gateway_forward(self, hit, sub, body, injected):
+        """經代理送給模型。回 (狀態碼, (輸入 token, 輸出 token))。"""
+        req, ctx = node_request(hit["node"], f"/relay/{hit['slot']}",
+                                json.dumps({"path": sub, "method": "POST", "body": body}).encode())
+        if req is None:
+            self._oai(502, ctx, "server_error")
+            return 502, (0, 0)
+        try:
+            resp = agent_open(req, ctx, 600)
+        except urllib.error.HTTPError as exc:
+            raw = exc.read(4 * 1024 * 1024) if exc.fp else b""
+            try:
+                obj = json.loads(raw or b"{}")
+            except ValueError:
+                obj = None
+            if exc.code == 404 and isinstance(obj, dict) and obj.get("error") == "找不到":
+                self._oai(502, "這台的代理是舊版，還不支援加密入口；請到「設定 › 版本與更新」更新代理", "server_error")
+                return 502, (0, 0)
+            if isinstance(obj, dict) and isinstance(obj.get("error"), str):   # 代理自己的錯誤（連不到模型等）改成 OpenAI 格式
+                self._oai(exc.code, obj["error"], "server_error" if exc.code >= 500 else "invalid_request")
+            else:
+                self._send(exc.code, raw, exc.headers.get("Content-Type") or "application/json")
+            return exc.code, (0, 0)
+        except Exception as exc:  # noqa: BLE001
+            self._oai(502, f"連不上那台的代理：{str(exc)[:120]}", "server_error")
+            return 502, (0, 0)
+        with resp:
+            ctype = resp.headers.get("Content-Type") or "application/json"
+            if "event-stream" not in ctype:
+                raw = resp.read(GW_MAX + 1)
+                if len(raw) > GW_MAX:
+                    # 截斷的 JSON 帶著 200 回去，IDE 只會拿到壞掉的內容：明講太大
+                    self._oai(502, "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）", "server_error")
+                    return 502, (0, 0)
+                try:
+                    usage = gateway.usage_of(json.loads(raw).get("usage"))
+                except (ValueError, AttributeError):
+                    usage = (0, 0)
+                self._send(resp.status, raw, ctype)
+                return resp.status, usage
+            su = gateway.StreamUsage(injected)
+            self.send_response(resp.status)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self._sec_headers()
+            self.end_headers()
+            self.close_connection = True
+            try:
+                for line in resp:
+                    if su.feed(line):
+                        self.wfile.write(line)
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, TimeoutError):
+                pass                                   # IDE 按了停止：模型那邊也跟著斷
+            return resp.status, (su.prompt, su.completion)
+
     def _update_upload(self, ctype):
         """手動上傳更新包（不能連外的機器）：本文就是 .tar.gz，sha256 放在網址查詢字串（管理者從 GitHub 版本頁抄來）。"""
         if not self.user:
@@ -2644,6 +3077,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/preview/([A-Za-z0-9_-]{16,40})", path)
         if m:
             return self._preview(m.group(1))
+        if path == "/v1" or path.startswith("/v1/"):
+            return self._gateway("GET")
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
@@ -2751,6 +3186,9 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, out = chats.load(STORE, chat_unseal, self.user, m.group(1))
             return self._json(code, out)
+        if path == "/api/keys":
+            import_legacy_keys()
+            return self._json(200, keys_overview())
         if path == "/api/providers":
             return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
                                     "presets": PROVIDER_PRESETS})
@@ -2846,6 +3284,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/v1" or path.startswith("/v1/"):
+            return self._gateway("POST")
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/upload", path)
         if m:
@@ -3091,6 +3531,23 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 return self._json(400, {"error": err})
             return self._json(200, {"url": f"/preview/{pid}", "id": pid, "expires_at": time.time() + PREVIEW_TTL})
+        # ---- 加密入口的金鑰
+        if path == "/api/keys/create":
+            code, out, det = key_create(body, self.user)
+            self._audit("apikey.create", (det or {}).get("id", ""), code == 200, det or {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/keys/([0-9a-f]{8})/(update|revoke)", path)
+        if m:
+            code, out, det = key_update(m.group(1), body) if m.group(2) == "update" else key_revoke(m.group(1), self.user)
+            self._audit("apikey." + m.group(2), m.group(1), code == 200, det or {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/keys/settings":
+            u = str(body.get("public_url") or "").strip().rstrip("/")
+            if u and not gateway_url_ok(u):
+                return self._json(400, {"error": "加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1"})
+            update_fleet(lambda c: c.setdefault("gateway", {}).__setitem__("public_url", u or None))
+            self._audit("apikey.settings", "", True, {"public_url": u or None})
+            return self._json(200, {"ok": True, "url": gateway_url()})
         # ---- 第三方 API
         if path == "/api/providers/save":
             code, out, det = provider_save(body)
@@ -3248,24 +3705,57 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             want = {k: body.get(k) for k in ("public_url", "model_name", "max_context", "max_tokens", "key", "thinking", "lan")
                     if k in body}
-            # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
-            code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
-                                  {**want, "force": bool(body.get("force"))}, timeout=2000)
+            nm = str(want.get("model_name") or "").strip()
+            old_hash = None
+            if want.get("key") in ("new", "none"):
+                c0, k0 = call_node(m.group(1), f"/apikey/{m.group(2)}", timeout=15)
+                old_hash = (k0 or {}).get("hash") if c0 == 200 else None
+            lock = _NAME_LOCK if nm else contextlib.nullcontext()
+            with lock:
+                clash = [r for r in GW_ROUTES.rows(force=True) if r["name"] == nm
+                         and (r["node"], r["slot"]) != (m.group(1), m.group(2))] if nm else []
+                if clash:
+                    return self._json(400, {"error": f"{clash[0]['node']} 的 {clash[0]['slot']} 已經叫 {nm}，"
+                                                     "加密入口會分不出要送哪一格，請換一個名稱"})
+                # 代理端套用最久等 900 秒、失敗還原再等 900 秒，這裡的逾時要涵蓋整段，否則代理還在做事主控台就回失敗
+                code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/settings", "POST",
+                                      {**want, "force": bool(body.get("force"))}, timeout=2000)
+                GW_ROUTES.invalidate()
             # 新金鑰只回給這一次的畫面；稽核只記「換了金鑰」，不記內容
             self._audit("api.settings", f"{m.group(1)}/{m.group(2)}", code == 200,
                         {"changed": out.get("changed"), "public_url": want.get("public_url"),
                          "key": want.get("key"), "restarted": out.get("restarted"),
                          "reverted": out.get("reverted"), "message": out.get("error")})
+            if code == 200 and want.get("key") in ("new", "none"):
+                retire_legacy(m.group(1), m.group(2), old_hash, self.user)
+                if want["key"] == "new":
+                    threading.Thread(target=import_legacy_keys, kwargs={"only": (m.group(1), m.group(2))}, daemon=True).start()
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/gateway", path)
+        if m:
+            if not isinstance(body.get("only"), bool):
+                return self._json(400, {"error": "only 要是 true 或 false"})
+            on = body["only"]
+            code, out = gateway_only(m.group(1), m.group(2), on, bool(body.get("force")))
+            self._audit("api.gateway_only", f"{m.group(1)}/{m.group(2)}", code == 200,
+                        {"only": on, "restarted": out.get("restarted"), "reverted": out.get("reverted"), "message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/apiinfo/([\w.-]+)/test", path)
         if m:
             code, out = call_node(m.group(1), f"/apiinfo/{m.group(2)}/test", "POST", {}, timeout=420)
             if code == 200:
-                out["network"] = network_test(m.group(1), m.group(2), str(body.get("key") or ""))
-                out["ok"] = out["ok"] and out["network"]["ok"]
+                _, brief = apiinfo_brief(m.group(1), m.group(2))
+                if (brief or {}).get("bind") == "127.0.0.1":
+                    # 只走加密入口：模型只聽這台自己，直連本來就連不到，不算失敗
+                    out["network"] = {"ok": True, "skipped": True, "url": brief.get("public_url"),
+                                      "detail": "只走加密入口：模型只聽這台自己，不測直連"}
+                else:
+                    out["network"] = network_test(m.group(1), m.group(2), str(body.get("key") or ""))
+                out["gateway"] = gateway_selftest(m.group(1), m.group(2))
+                out["ok"] = out["ok"] and out["network"]["ok"] and out["gateway"]["ok"]
             self._audit("api.test", f"{m.group(1)}/{m.group(2)}", code == 200 and out.get("ok"),
                         {"checks": [(c["name"], c["ok"]) for c in out.get("checks") or []],
-                         "network": (out.get("network") or {}).get("ok")})
+                         "network": (out.get("network") or {}).get("ok"), "gateway": (out.get("gateway") or {}).get("ok")})
             return self._json(code, out)
         # ---- 模型庫：查 Hugging Face、下載、取消、刪除（權杖只轉給代理，不寫稽核）
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/(hf|hf/tree|download|delete|dirs)", path)
