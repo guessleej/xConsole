@@ -247,6 +247,9 @@ function groups() {
 // → 管理（最後）。機群管理（機器清單、加機器、記錄）收進設定；全站共用頂列右側的「目前這台機器」。
 const NAV = [["home", "概覽"], ["models", "模型"], ["run", "執行"], ["chat", "對話"], ["agent", "Agent"],
   ["image", "畫圖"], ["video", "影片"], ["settings", "設定"]];
+// 一般使用者（學生、老師）：只放用得到的；模型、執行、設定都是管理員的事
+const USER_NAV = [["chat", "對話"], ["agent", "Agent"], ["image", "畫圖"], ["video", "影片"], ["mykeys", "API 金鑰"], ["account", "我的帳號"]];
+const isAdmin = () => S.me?.role !== "user";
 
 // 頂列放不下（窄螢幕、日文等較長的分頁名）就把分頁收進漢堡，不讓整頁往右溢出
 function fitTopbar() {
@@ -263,7 +266,7 @@ function renderNav() {
   const sub = $("#subnav");
   nav.textContent = "";
   sub.textContent = "";
-  const items = NAV;
+  const items = isAdmin() ? NAV : USER_NAV;
   const v = S.view;
   const active = topOf(v);
   items.forEach(([key, label]) => {
@@ -2149,9 +2152,11 @@ function sdGen(n, rec, redraw, toRec, kind) {
   if (!ready.length || !rec.sd_cli) {
     const w = el("div", "note warn");
     w.appendChild(document.createTextNode(!rec.sd_cli ? "這台還沒安裝 stable-diffusion.cpp。" : `這台還沒有下載好的${kind === "video" ? "影片" : kind === "image" ? "畫圖" : "畫圖／影片"}模型。`));
-    const b = el("button", "btn sm primary", !rec.sd_cli ? "一鍵安裝" : "看推薦");
-    b.onclick = !rec.sd_cli ? () => openEngineBuild(n.id, "sd", redraw) : toRec;
-    w.appendChild(b);
+    if (isAdmin()) {
+      const b = el("button", "btn sm primary", !rec.sd_cli ? "一鍵安裝" : "看推薦");
+      b.onclick = !rec.sd_cli ? () => openEngineBuild(n.id, "sd", redraw) : toRec;
+      w.appendChild(b);
+    } else w.appendChild(document.createTextNode("請找管理員安裝。"));
     left.appendChild(w);
   }
   const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・手動組" : ""}${m.cn_origin ? "・中國來源" : ""}）`]), S.sdModel);
@@ -2957,7 +2962,8 @@ function slotLabel(sk) {
 }
 
 function gatewayCard(list) {
-  const c = card("加密入口與金鑰", "IDE 填這個 https 網址，每位老師或每門課各用一把金鑰；撤銷一把，其他人不受影響");
+  const c = isAdmin() ? card("加密入口與金鑰", "IDE 填這個 https 網址，每位老師或每門課各用一把金鑰；撤銷一把，其他人不受影響")
+    : card("我的 API 金鑰", "IDE 填這個 https 網址與你自己的金鑰；金鑰外流就撤銷再產生一把，不影響別人");
   const body = el("div");
   c.appendChild(body);
   const reload = () => {
@@ -2973,23 +2979,31 @@ function renderKeys(body, d, list, reload) {
   body.textContent = "";
   S.gwUrl = d.url;
   body.appendChild(copyRow("網址（Base URL）", d.url));
-  body.appendChild(el("p", "small muted", "模型名稱照下面各格的填。金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。"));
+  body.appendChild(el("p", "small muted", (isAdmin() ? "模型名稱照下面各格的填。" : "")
+    + "金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。"));
   const bar = el("div", "slot-actions");
   const add = el("button", "btn primary", "產生金鑰");
   add.onclick = () => keyForm(null, list, reload);
-  const urlb = el("button", "btn", "修改網址");
-  urlb.onclick = () => gatewayUrlForm(d, reload);
   bar.appendChild(add);
-  bar.appendChild(urlb);
+  if (isAdmin()) {
+    const urlb = el("button", "btn", "修改網址");
+    urlb.onclick = () => gatewayUrlForm(d, reload);
+    bar.appendChild(urlb);
+  } else if (d.max_own) {
+    bar.appendChild(el("span", "small muted", `每個人最多 ${d.max_own} 把有效的金鑰`));
+  }
   body.appendChild(bar);
   if (!d.items.length) {
-    body.appendChild(el("p", "note", "還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。"));
+    body.appendChild(el("p", "note", isAdmin() ? "還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。"
+      : "你還沒有金鑰。按「產生金鑰」產生一把，貼到 IDE 的 API 金鑰欄。"));
     return;
   }
   const sb = el("div", "scrollbox");
   const tb = el("table", "api-table");
   const hr = el("tr");
-  ["名稱", "金鑰開頭", "能用的模型", "同時上限", "本月請求", "本月 token（輸入／輸出）", "最後使用", "狀態", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  const own = isAdmin();                       // 管理員看全部：多一欄是誰的（使用者自己產生的，或管理員發的）
+  ["名稱", ...(own ? ["擁有者"] : []), "金鑰開頭", "能用的模型", "同時上限", "本月請求", "本月 token（輸入／輸出）", "最後使用", "狀態", ""]
+    .forEach((h) => hr.appendChild(el("th", null, h)));
   const th = el("thead");
   th.appendChild(hr);
   tb.appendChild(th);
@@ -2998,10 +3012,11 @@ function renderKeys(body, d, list, reload) {
     const tr = el("tr");
     const u = k.usage || {};
     const slots = k.slots === "*" ? "全部" : (k.slots || []).map(slotLabel).join("、");
-    const cells = [k.name, `${k.prefix}…`, slots, String(k.max_inflight), int(u.requests), `${int(u.prompt_tokens)}／${int(u.completion_tokens)}`,
+    const cells = [k.name, ...(own ? [k.owner || (k.source === "legacy" ? "升級時匯入" : "管理員發的")] : []), `${k.prefix}…`, slots,
+      String(k.max_inflight), int(u.requests), `${int(u.prompt_tokens)}／${int(u.completion_tokens)}`,
       k.last_used ? new Date(k.last_used * 1000).toLocaleString(uiLocale(), { hour12: false }) : "還沒用過",
       KEY_STATE[k.state] + (k.expires && k.state === "active" ? `（${new Date(k.expires * 1000).toLocaleDateString(uiLocale())} 到期）` : "")];
-    cells.forEach((v, i) => tr.appendChild(el("td", i === 1 ? "mono" : null, v)));
+    cells.forEach((v, i) => tr.appendChild(el("td", i === (own ? 2 : 1) ? "mono" : null, v)));
     const act = el("td");
     if (k.state !== "revoked") {
       const e = el("button", "btn sm", "修改");
@@ -3045,8 +3060,8 @@ function keyForm(k, list, done, pre) {
   };
   const fName = el("input");
   fName.value = v.name || "";
-  fName.placeholder = "例：資工系 王老師、機器學習（週三）";
-  fld("名稱", fName, "撤銷時靠這個認是誰的");
+  fName.placeholder = isAdmin() ? "例：資工系 王老師、機器學習（週三）" : "例：我的筆電 VS Code";
+  fld("名稱", fName, isAdmin() ? "撤銷時靠這個認是誰的" : "撤銷時靠這個認是哪一把");
   const all = el("label", "check-row");
   const fAll = el("input");
   fAll.type = "checkbox";
@@ -3937,7 +3952,7 @@ function hfRepoOf(text) {
 
 const SETTINGS_TABS = [
   ["machines", "機器"], ["groups", "群組"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
-  ["logs", "記錄"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
+  ["logs", "記錄"], ["users", "使用者帳號"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
 ];
 // 桌面版（一般人單機用）：只留會用到的，照先後排；機群、使用報告、品牌是管理一群機器才用的。
 // HTTPS 與憑證只在打開區網存取（別台電腦要連進來）時才有意義
@@ -3958,7 +3973,7 @@ function viewSettings() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
-     account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+     users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
 }
 
 /* ---------------------------------------------------------------- 版本與更新
@@ -4973,17 +4988,14 @@ function settingsLan(wrap, me) {
   wrap.appendChild(c);
 }
 
-async function settingsAccount(wrap) {
-  let me = {};
-  try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
-  if (me.desktop) { S.lanOn = !!me.lan_access; settingsLan(wrap, me); }
+function passwordCard(wrap, me, after) {
   const first = me.app_window && me.password_unset;
   const c = card(first ? "設定密碼" : "變更密碼", first ? "這台的視窗不用密碼；別台電腦連進來（區網存取）時要用這組密碼登入"
-    : `目前登入：${me.username || "admin"}`);
+    : `目前登入：${me.username || me.user || "admin"}`);
   const fr = el("div", "form-row");
   const mk = (label) => { const d = el("div"); d.appendChild(el("label", null, label)); const i = Object.assign(el("input"), { type: "password", autocomplete: "new-password" }); d.appendChild(i); fr.appendChild(d); return i; };
-  const o = first ? { value: "" } : mk("目前的密碼");
-  const n1 = mk("新密碼（至少 8 碼）");
+  const o = first ? { value: "" } : mk(me.must_change ? "目前的密碼（管理員給的一次性密碼）" : "目前的密碼");
+  const n1 = mk("新密碼（至少 12 碼）");
   const n2 = mk("再輸入一次新密碼");
   c.appendChild(fr);
   const b = el("button", "btn sm primary", first ? "設定密碼" : "變更密碼");
@@ -4992,7 +5004,7 @@ async function settingsAccount(wrap) {
     try {
       const r = await api("/api/account/password", { method: "POST", body: { old: o.value, new: n1.value } });
       toast(r.message, "ok");
-      if (me.app_window) { n1.value = n2.value = ""; render(); } else setTimeout(showLogin, 800);
+      if (after) after(); else if (me.app_window) { n1.value = n2.value = ""; render(); } else setTimeout(showLogin, 800);
     } catch (ex) { toast(ex.message, "bad"); }
   };
   b.onclick = go2;
@@ -5000,6 +5012,14 @@ async function settingsAccount(wrap) {
   const br = el("div", "slot-actions"); br.appendChild(b); c.appendChild(br);
   c.appendChild(el("p", "small muted", "密碼以 PBKDF2-SHA256（20 萬輪）加鹽雜湊後存檔，不存明文。變更後所有已登入的裝置都會被登出。"));
   wrap.appendChild(c);
+  return c;
+}
+
+async function settingsAccount(wrap) {
+  let me = {};
+  try { me = await api("/api/settings"); } catch (_) { /* 沒拿到就顯示預設 */ }
+  if (me.desktop) { S.lanOn = !!me.lan_access; settingsLan(wrap, me); }
+  passwordCard(wrap, me);
 
   const ac = card("最近的操作紀錄", "只記操作與結果，不記密碼、私鑰與權杖");
   const box = el("div");
@@ -5029,6 +5049,218 @@ async function settingsAccount(wrap) {
     tb.appendChild(body); sb.appendChild(tb);
     box.textContent = ""; box.appendChild(sb);
   } catch (ex) { box.textContent = ex.message; }
+}
+
+/* ---------------------------------------------------------------- 使用者自己的頁：第一次登入改密碼、API 金鑰、我的帳號 */
+
+// 管理員給的是一次性密碼：第一次登入只能改密碼，其他頁都看不到（伺服器端也一樣擋）
+function viewForcePassword() {
+  $("#nav").textContent = "";
+  $("#subnav").textContent = "";
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  const intro = card(`歡迎，${S.me.display || S.me.user}`, "第一次登入請先換一組自己的密碼");
+  intro.appendChild(el("p", "small muted", "管理員給你的是一次性密碼。換好之後會回到登入頁，用新密碼再登入一次。"));
+  wrap.appendChild(intro);
+  passwordCard(wrap, { ...S.me, username: S.me.user }, () => setTimeout(showLogin, 800));
+}
+
+function viewMyKeys() {
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  const list = [];
+  (S.fleet.nodes || []).forEach((n) => (n.state?.slots || []).filter(isApiSlot).forEach((s) => list.push([n, s])));
+  const how = card("在 IDE 裡用這台的模型", "GitHub Copilot、Continue、Cline 這類工具選「OpenAI 相容」，填網址、金鑰與模型名稱");
+  const models = el("p", "small");
+  how.appendChild(models);
+  wrap.appendChild(how);
+  wrap.appendChild(gatewayCard(list));
+  api("/api/keys").then((d) => {
+    models.textContent = d.models?.length ? `現在可以用的模型名稱：${d.models.join("、")}` : "現在沒有正在跑的模型，請找管理員。";
+  }).catch(() => {});
+}
+
+function viewMyAccount() {
+  const main = $("#main");
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  const c = card(S.me.display || S.me.user, `帳號：${S.me.user}`);
+  c.appendChild(el("p", "small muted", "你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。"));
+  wrap.appendChild(c);
+  passwordCard(wrap, { ...S.me, username: S.me.user });
+}
+
+/* ---------------------------------------------------------------- 使用者帳號（管理員）
+   一間教室一次要開幾十個帳號：單筆新增或貼上名單批次匯入，系統產一次性密碼，第一次登入一定要改。
+   使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰；管理員看不到他們的對話內容。 */
+const ROLE_LABEL = { admin: "管理員", user: "使用者" };
+
+async function settingsUsers(wrap) {
+  const v = S.view;
+  const c = card("使用者帳號", "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  const reload = async () => {
+    loading(body);
+    let d;
+    try { d = await api("/api/users"); } catch (ex) { errNote(body, ex.message); return; }
+    if (S.view !== v) return;
+    body.textContent = "";
+    const bar = el("div", "slot-actions");
+    const add = el("button", "btn primary", "新增帳號");
+    add.onclick = () => userForm(null, reload);
+    const imp = el("button", "btn", "批次匯入");
+    imp.onclick = () => userImport(reload);
+    bar.append(add, imp);
+    body.appendChild(bar);
+    const sb = el("div", "scrollbox");
+    const tb = el("table", "api-table");
+    const hr = el("tr");
+    ["帳號", "顯示名稱", "角色", "狀態", "上次登入", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+    const th = el("thead");
+    th.appendChild(hr);
+    tb.appendChild(th);
+    const tbody = el("tbody");
+    d.items.forEach((u) => {
+      const tr = el("tr");
+      const state = u.disabled ? "停用" : u.must_change ? "等他第一次登入改密碼" : "使用中";
+      [u.username, u.display, ROLE_LABEL[u.role] || u.role, state,
+        u.last_login ? new Date(u.last_login * 1000).toLocaleString(uiLocale(), { hour12: false }) : "還沒登入過"]
+        .forEach((x, i) => tr.appendChild(el("td", i === 0 ? "mono" : null, x)));
+      const act = el("td");
+      const btn = (t, cls, fn) => { const b = el("button", "btn sm" + (cls ? " " + cls : ""), t); b.onclick = fn; act.appendChild(b); };
+      btn("修改", "", () => userForm(u, reload));
+      btn("重設密碼", "", () => modal({ title: `重設 ${u.display} 的密碼`, bodyNode: el("p", "small muted", "會產生一組新的一次性密碼，他現在的登入會被登出，下次登入要先改密碼。"),
+        confirmText: "重設", onConfirm: async () => {
+          try { const r = await api(`/api/users/${encodeURIComponent(u.username)}/reset`, { method: "POST", body: {} }); showOneTime([{ ...r.user, password: r.password }]); } catch (ex) { toast(ex.message, "bad"); }
+          reload();
+        } }));
+      if (u.username !== d.me) {
+        btn(u.disabled ? "啟用" : "停用", "", async () => {
+          try { await api(`/api/users/${encodeURIComponent(u.username)}/update`, { method: "POST", body: { disabled: !u.disabled } }); toast(u.disabled ? "已啟用" : "已停用，他現在的登入已失效", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          reload();
+        });
+        btn("刪除", "danger", () => {
+          const dd = el("div");
+          dd.appendChild(el("p", "note warn", `刪除 ${u.display}（${u.username}）會一起刪掉他的對話紀錄與附圖，撤銷他的 API 金鑰，不能復原。`));
+          dd.appendChild(el("p", "small muted", "他的 Agent 工作資料夾不會刪，改歸你管理。只是暫時不讓他用的話，按「停用」就好。"));
+          modal({ title: "刪除帳號", bodyNode: dd, confirmText: "刪除", danger: true, onConfirm: async () => {
+            try { const r = await api(`/api/users/${encodeURIComponent(u.username)}/delete`, { method: "POST", body: {} }); toast(`已刪除，撤銷了 ${r.revoked_keys} 把金鑰`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+            reload();
+          } });
+        });
+      }
+      tr.appendChild(act);
+      tbody.appendChild(tr);
+    });
+    tb.appendChild(tbody);
+    sb.appendChild(tb);
+    body.appendChild(sb);
+    body.appendChild(el("p", "small muted", `新密碼至少 ${d.pw_min} 碼。最後一位管理員不能被停用、降級或刪除；也不能停用或刪除自己。`));
+  };
+  reload();
+}
+
+function userForm(u, done, pre) {
+  const v = pre || (u ? { display: u.display, role: u.role } : { role: "user" });
+  const d = el("div", "form-row");
+  const fld = (label, input, hint) => { const w = el("div"); w.appendChild(el("label", null, label)); w.appendChild(input); if (hint) w.appendChild(el("div", "assume", hint)); d.appendChild(w); return input; };
+  let fUser = null;
+  if (!u) {
+    fUser = el("input");
+    fUser.value = v.username || "";
+    fUser.placeholder = "例：s1101、t0001@cloudinfo.com.tw";
+    fld("帳號", fUser, "學號、員工編號或 email；建好之後不能改");
+  }
+  const fDisp = el("input");
+  fDisp.value = v.display || "";
+  fDisp.placeholder = "例：王小明";
+  fld("顯示名稱", fDisp);
+  const fRole = selectInput([["user", "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）"], ["admin", "管理員（全部）"]], v.role);
+  fld("角色", fRole);
+  [fUser, fDisp].filter(Boolean).forEach((i) => imeGuard(i, () => {}));
+  modal({ title: u ? `修改 ${u.username}` : "新增帳號", bodyNode: d, hasInput: true, confirmText: u ? "儲存" : "新增", onConfirm: async () => {
+    const body = { display: fDisp.value.trim(), role: fRole.value };
+    try {
+      if (u) {
+        await api(`/api/users/${encodeURIComponent(u.username)}/update`, { method: "POST", body });
+        toast(u.role !== body.role ? "已儲存；角色改了，他要重新登入" : "已儲存", "ok");
+      } else {
+        const r = await api("/api/users/create", { method: "POST", body: { ...body, username: fUser.value.trim() } });
+        showOneTime([{ ...r.user, password: r.password }]);
+      }
+      done();
+    } catch (ex) { toast(ex.message, "bad"); userForm(u, done, { ...body, username: fUser?.value.trim() }); }
+  } });
+  (fUser || fDisp).focus();
+}
+
+// 貼上名單：一行一個，「帳號,顯示名稱,角色」（角色可省略＝使用者）。也可以直接選 CSV 檔
+function userImport(done) {
+  const d = el("div");
+  d.appendChild(el("p", "small muted", "一行一個帳號，格式：帳號,顯示名稱,角色。角色填 admin 是管理員，不填或填 user 是使用者。一次最多 500 個。"));
+  const ta = el("textarea");
+  ta.rows = 8;
+  ta.placeholder = "s1101,王小明\ns1102,李小華\nt0001,陳老師,admin";
+  d.appendChild(ta);
+  const f = el("input");
+  f.type = "file";
+  f.accept = ".csv,text/csv,text/plain";
+  f.onchange = async () => { if (f.files[0]) ta.value = (await f.files[0].text()).replace(/^\ufeff/, ""); };
+  d.appendChild(f);
+  modal({ title: "批次匯入帳號", bodyNode: d, hasInput: true, confirmText: "匯入", onConfirm: async () => {
+    const rows = ta.value.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^帳號|^username/i.test(l)).map((l) => {
+      const [username, display, role] = l.split(/[,\t]/).map((x) => (x || "").trim());
+      return { username, display, role: role === "admin" ? "admin" : "user" };
+    });
+    if (!rows.length) { toast("沒有讀到任何一行", "bad"); return; }
+    try {
+      const r = await api("/api/users/import", { method: "POST", body: { rows } });
+      if (r.created.length) showOneTime(r.created, r.errors);
+      else toast(`沒有建立任何帳號：${(r.errors[0] || {}).error || ""}`, "bad");
+      done();
+    } catch (ex) { toast(ex.message, "bad"); }
+  } });
+}
+
+// 一次性密碼只顯示這一次：可以下載成 CSV 發給學生，主控台自己不留
+function showOneTime(rows, errors) {
+  const d = el("div");
+  d.appendChild(el("p", "note warn", "這些一次性密碼只顯示這一次，主控台不會再顯示。請現在下載或抄下來交給本人；他第一次登入要先改密碼。"));
+  const sb = el("div", "scrollbox");
+  const tb = el("table");
+  const tbody = el("tbody");
+  rows.forEach((r) => {
+    const tr = el("tr");
+    [r.username, r.display, r.password].forEach((x, i) => tr.appendChild(el("td", i === 2 ? "mono" : null, x)));
+    tbody.appendChild(tr);
+  });
+  tb.appendChild(tbody);
+  sb.appendChild(tb);
+  d.appendChild(sb);
+  if (errors?.length) {
+    d.appendChild(el("p", "note bad", `有 ${errors.length} 行沒建立：` + errors.slice(0, 5).map((e) => `第 ${e.row} 行 ${e.username}：${e.error}`).join("；")));
+  }
+  const dl = el("button", "btn sm primary", "下載成 CSV");
+  // 逗號、引號要加引號包起來；= + - @ 開頭的前面補 '，免得試算表把名字當公式執行
+  const cell = (v) => {
+    let t = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  dl.onclick = () => download(`xconsole-帳號-${new Date().toISOString().slice(0, 10)}.csv`,
+    "\ufeff帳號,顯示名稱,一次性密碼\r\n" + rows.map((r) => [r.username, r.display, r.password].map(cell).join(",")).join("\r\n") + "\r\n", "text/csv");
+  const a = el("div", "slot-actions");
+  a.appendChild(dl);
+  d.appendChild(a);
+  d.appendChild(el("p", "small muted", "這個檔案裡有密碼：發完就刪掉，不要寄到群組或放在共用雲端。"));
+  modal({ title: rows.length > 1 ? `建立了 ${rows.length} 個帳號` : "一次性密碼", bodyNode: d });
 }
 
 /* ---------------------------------------------------------------- 5 品牌與外觀 */
@@ -5142,6 +5374,8 @@ function render() {
   else if (v === "image") viewCreate("image");
   else if (v === "video") viewCreate("video");
   else if (v === "settings") viewSettings();
+  else if (v === "mykeys") viewMyKeys();
+  else if (v === "account") viewMyAccount();
   else viewHome();
 }
 
@@ -5996,9 +6230,12 @@ async function refresh() {
   }
 }
 
-function start() {
+async function start() {
   $("#login").hidden = true;
   $("#app").hidden = false;
+  try { S.me = await api("/api/me"); } catch (_) { return; }
+  if (S.me.must_change) { viewForcePassword(); return; }
+  if (!isAdmin() && !USER_NAV.some(([k]) => k === topOf(S.view))) S.view = "chat";
   checkTlsBanner();
   refresh();
   if (S.timer) clearInterval(S.timer);

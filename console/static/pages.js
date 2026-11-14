@@ -947,6 +947,11 @@ async function viewAgent() {
   try { folders = await api(`/api/node/${n.id}/agent/folders`); } catch (ex) {
     if (S.view !== v) return;
     const c = card("Agent 還沒在這台開啟");
+    if (!isAdmin()) {
+      c.appendChild(el("p", "note", "管理員還沒在這台打開 Agent。需要用的話請找管理員。"));
+      wrap.appendChild(c);
+      return;
+    }
     c.appendChild(el("p", "small muted", "Agent 會在這台機器上建檔、跑指令。為了安全，每台預設關閉，要管理者在「這台的設定」打開；"
       + "打開後檔案只能動工作資料夾裡面（~/xconsole-agent/ 底下的，或你連結進來的資料夾），每條指令都要人按允許。"));
     c.appendChild(el("p", "note", ex.message));
@@ -980,7 +985,7 @@ async function viewAgent() {
   linkF.title = "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選";
   linkF.onclick = () => openFolderBrowser(n, (name) => { S.agentFolder = name; viewAgent(); });
   const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}）`])], S.agentTask || "");
-  bar.append(mSel, fSel, newF, linkF, el("span", "spacer"), taskSel);
+  bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel);
   mainC.appendChild(bar);
   mSel.onchange = () => { S.agentModel = mSel.value; };
   fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(); };
@@ -1012,7 +1017,8 @@ async function viewAgent() {
   stopB.hidden = true;
   const send = el("button", "btn primary", "交給 Agent");
   const tools = el("div", "chat-tools");
-  tools.append(el("span", "small muted", "檔案只能動工作資料夾裡的；每條指令都會先問你"), el("span", "spacer"), stopB, send);
+  tools.append(el("span", "small muted", isAdmin() ? "檔案只能動工作資料夾裡的；每條指令都會先問你"
+    : "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方 Agent 會寫給你自己跑"), el("span", "spacer"), stopB, send);
   inputRow.append(ta, tools);
   mainC.appendChild(inputRow);
 
@@ -1195,7 +1201,7 @@ async function viewCreate(kind) {
   head.appendChild(el("span", "spacer"));
   const dl = el("button", "btn sm", kind === "image" ? "下載畫圖模型" : "下載影片模型");
   dl.onclick = () => { S.libTab = "sd"; S.sdSub = "rec"; go("models"); };
-  head.appendChild(dl);
+  if (isAdmin()) head.appendChild(dl);
   wrap.appendChild(head);
   const holder = el("div");
   wrap.appendChild(holder);
