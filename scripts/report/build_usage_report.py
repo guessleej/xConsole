@@ -433,6 +433,11 @@ def build_docx(r, figs, out, org, preparer, toc_pages=None):
              "tls.rollback": "還原憑證", "tls.csr": "產生 CSR", "tls.hsts": "HSTS 開關", "tls.hostnames": "修改網址",
              "tls.bootstrap": "重產暫用自簽", "trust.import": "信任代理憑證", "account.password": "變更密碼"}
     rows = [[label.get(k, k), n(v)] for k, v in P["operations_by_type"].items()] or [["本期沒有操作紀錄", "—"]]
+    A = P.get("accounts") or {}
+    if A.get("total"):
+        body(doc, f"主控台目前有 {n(A['total'])} 個帳號，其中管理員 {n(A['admins'])} 位、使用者 {n(A['users'])} 位；"
+                  f"停用 {n(A['disabled'])} 個，還沒登入過的 {n(A['never_logged_in'])} 個。"
+                  "使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰，各自的對話與產出彼此看不到。")
     table(doc, ["操作類型", "次數"], rows, [12.6, 4], caption="表 2-1　本期操作次數")
     rows = [[o["user"], n(o["operations"])] for o in P["operators"]] or [["本期沒有操作紀錄", "—"]]
     table(doc, ["帳號", "操作次數"], rows, [12.6, 4], caption="表 2-2　各帳號的操作次數")
@@ -480,6 +485,11 @@ def build_docx(r, figs, out, org, preparer, toc_pages=None):
                          n(sum(x["prompt"] for x in rest)), n(sum(x["generated"] for x in rest))])
         table(doc, ["金鑰名稱", "金鑰開頭", "請求數", "失敗", "輸入 token", "輸出 token"], rows, [4.4, 2.6, 2.2, 1.6, 3.0, 3.0],
               caption="表 3-2　加密入口依金鑰的本期用量")
+        bo = G.get("by_owner") or []
+        if len(bo) > 1 or (bo and not bo[0]["owner"].startswith("（")):
+            rows = [[x["owner"], n(x["requests"]), n(x["prompt"]), n(x["generated"])] for x in bo[:30]]
+            table(doc, ["帳號", "請求數", "輸入 token", "輸出 token"], rows, [7.6, 2.8, 3.2, 3.2],
+                  caption="表 3-3　加密入口依帳號的本期用量（使用者自己產生的金鑰）")
     elif G:
         body(doc, "本期還沒有經過加密入口的請求。老師在 IDE 改用主控台的 https 網址與個別金鑰之後，這裡會依金鑰列出用量。")
 

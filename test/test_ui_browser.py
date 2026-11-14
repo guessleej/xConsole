@@ -274,6 +274,55 @@ def test_gateway_ui(pg):
     pg.unroute("**/api/node/*/apiinfo/brain**")
 
 
+def test_user_journey(pg, base):
+    """多帳號：管理員在設定頁新增帳號拿到一次性密碼；使用者第一次登入只能改密碼，
+    之後只看得到對話、Agent、畫圖、影片、API 金鑰、我的帳號，沒有管理員的按鈕，也不會打到被擋的 API。"""
+    pg.evaluate("() => { S.settingsTab = 'users'; go('settings'); }")
+    pg.wait_for_selector("h2:has-text('使用者帳號')", timeout=10000)
+    pg.locator("button:has-text('新增帳號')").click()
+    pg.locator(".modal input").nth(0).fill("s1101")
+    pg.locator(".modal input").nth(1).fill("王小明")
+    pg.locator(".modal button:has-text('新增')").click()
+    pg.wait_for_selector(".modal h3:has-text('一次性密碼')", timeout=10000)
+    otp = pg.locator(".modal td.mono").first.text_content()
+    check("管理員新增帳號：彈窗顯示 16 碼一次性密碼", len(otp) == 16, otp)
+    pg.locator(".modal button:has-text('取消')").click()
+    check("  清單出現這個帳號，狀態是等他第一次登入改密碼", "等他第一次登入改密碼" in pg.locator("tr:has(td:has-text('s1101'))").text_content())
+
+    u = pg.context.browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900}, locale="zh-TW").new_page()
+    blocked, errs = [], []
+    u.on("response", lambda r: blocked.append(r.url) if r.status == 403 and "/agent/folders" not in r.url else None)
+    u.on("pageerror", lambda e: errs.append(str(e)))
+    u.route("**/api/fleet", with_slot)
+    u.goto(base + "/")
+    u.locator("#un").fill("s1101")
+    u.locator("#pw").fill(otp)
+    u.locator(".login-submit").click()
+    u.wait_for_selector("h2:has-text('變更密碼')", timeout=15000)
+    check("使用者第一次登入：只看到改密碼，導覽列是空的", u.locator("#nav button").count() == 0)
+    ins = u.locator("#main input[type=password]")
+    ins.nth(0).fill(otp)
+    ins.nth(1).fill("student-pass-2026")
+    ins.nth(2).fill("student-pass-2026")
+    u.locator("#main button:has-text('變更密碼')").click()
+    u.wait_for_selector("#login:not([hidden])", timeout=10000)
+    u.locator("#un").fill("s1101")
+    u.locator("#pw").fill("student-pass-2026")
+    u.locator(".login-submit").click()
+    u.wait_for_selector("#nav button", state="attached", timeout=15000)
+    nav = [b.text_content() for b in u.locator("#nav button").all()]
+    check("  改完密碼重新登入：導覽列只有使用者用得到的六項", nav == ["對話", "Agent", "畫圖", "影片", "API 金鑰", "我的帳號"], nav)
+    for v in ("chat", "agent", "image", "video", "mykeys", "account"):
+        u.evaluate("(v) => go(v)", v)
+        u.wait_for_timeout(1500)
+    txt = u.locator("#app").text_content()
+    check("  沒有管理員的按鈕（操作電腦、下載模型、修改網址）",
+          not any(t in txt for t in ("操作電腦", "下載畫圖模型", "修改網址")))
+    check("  走完六頁沒有打到被擋的 API", not blocked, blocked[:5])
+    check("  沒有 JavaScript 錯誤", not errs, errs[:3])
+    u.context.close()
+
+
 def test_english(ctx, base):
     """BUG-9：英文介面下，概覽、執行、設定各分頁不准留下介面中文（資料除外）。"""
     pg = ctx.new_page()
@@ -283,7 +332,8 @@ def test_english(ctx, base):
     pg.wait_for_selector("#nav button", state="attached", timeout=30000)
     left = {}
     pg.route("**/api/node/*/apiinfo/brain**", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
-    for v in ["home", "run", "apis", "api:local:brain", "settings:machines", "settings:engine", "settings:tls", "settings:report"]:
+    for v in ["home", "run", "apis", "api:local:brain", "settings:machines", "settings:engine", "settings:tls", "settings:report",
+              "settings:users"]:
         if v.startswith("settings:"):
             pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", v.split(":", 1)[1])
         else:
@@ -317,6 +367,7 @@ def main():
             login(pg, base)
             test_api_list(pg)
             test_gateway_ui(pg)
+            test_user_journey(pg, base)
             test_desktop_toggle(pg)
             test_home_quiet(pg)
             test_mobile_width(ctx, base)
