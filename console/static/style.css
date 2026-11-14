@@ -7,24 +7,25 @@
   --brand-dark: #9c1218;
   --brand-glow: #e0484f;
 
-  --bg: #f4f7f9;
+  --bg: #edf1f4;
   --bg-hover: #e7edf1;
   --panel: #f8fafc;
   --card: #ffffff;
 
   --ink: #16202a;
-  --ink-2: #3d4b56;
-  --ink-3: #5a6873;
+  --ink-2: #26323c;     /* 對比調高：淡灰字長時間看很吃力（2026-11-14 客戶回饋） */
+  --ink-3: #3b4853;
 
-  --line: rgba(22, 32, 42, .10);
+  --line: rgba(22, 32, 42, .16);
   --shadow: 0 12px 32px rgba(22, 32, 42, .11);
   --shadow-sm: 0 4px 14px rgba(22, 32, 42, .07);
 
   --ok: #2e7d32;
   --warn: #d97706;
+  --warn-t: #9a4a05;     /* 當文字用的警告色：#d97706 在白底只有 3.2:1，字看不清楚 */
   --bad: #c62828;
-  --info: #0891b2;
-  --idle: #8a97a1;
+  --info: #0e7490;
+  --idle: #5f6c76;
 
   --radius: 14px;
   --radius-sm: 9px;
@@ -44,9 +45,9 @@
   --panel: #13202a;
   --card: #16242f;
   --ink: #e8eef3;
-  --ink-2: #c5d1dc;
-  --ink-3: #9fb0be;
-  --line: rgba(255, 255, 255, .09);
+  --ink-2: #dbe4eb;
+  --ink-3: #bccad5;
+  --line: rgba(255, 255, 255, .15);
   --shadow: 0 12px 32px rgba(0, 0, 0, .36);
   --shadow-sm: 0 4px 14px rgba(0, 0, 0, .28);
   --brand: #e0484f;
@@ -55,8 +56,9 @@
   --topbar-bg-scrolled: rgba(15, 24, 32, .96);
   --ok: #4caf50;
   --warn: #f0a33a;
+  --warn-t: #f5b75c;
   --bad: #ef5350;
-  --idle: #6b7a86;
+  --idle: #8696a3;
 }
 
 * { box-sizing: border-box; }
@@ -224,10 +226,10 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
 .hero-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .hero-edit {
   border: 0; border-radius: 99px; padding: 5px 12px; font-size: 14px; font-weight: 600; cursor: pointer;
-  background: rgba(255, 255, 255, .10); color: rgba(255, 255, 255, .78);
+  background: rgba(255, 255, 255, .12); color: rgba(255, 255, 255, .92);
 }
 .hero-edit:hover, .hero-edit:focus-visible { background: rgba(255, 255, 255, .18); color: #fff; }
-.hero p { margin: 6px 0 0; color: rgba(238, 244, 248, .72); font-size: 15px; }
+.hero p { margin: 6px 0 0; color: rgba(238, 244, 248, .9); font-size: 15px; }
 
 .tiles {
   display: grid;
@@ -242,9 +244,9 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
   padding: 13px 15px;
   backdrop-filter: blur(6px);
 }
-.tile .k { font-size: 14px; color: rgba(238, 244, 248, .8); }
+.tile .k { font-size: 14px; color: rgba(238, 244, 248, .92); }
 .tile .v { font-size: 25px; font-weight: 700; margin-top: 2px; letter-spacing: -.02em; }
-.tile .s { font-size: 14px; color: rgba(238, 244, 248, .72); }
+.tile .s { font-size: 14px; color: rgba(238, 244, 248, .88); }
 
 .card {
   background: var(--card);
@@ -268,6 +270,8 @@ main { min-height: calc(100vh - 98px - 60px); }   /* 扣掉頁尾，短頁面不
 .card-head h2 { font-size: 18px; font-weight: 700; flex: none; white-space: nowrap; }
 .card-head .sub { font-size: 14px; color: var(--ink-3); flex: 1 1 240px; min-width: 0; }
 
+/* 輸入框的提示字：瀏覽器預設的淡灰太淡；用 --idle（白底約 5:1），還是看得出不是已填的值 */
+input::placeholder, textarea::placeholder { color: var(--idle); opacity: 1; }
 .col-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .grid {
   display: grid;
@@ -722,7 +726,7 @@ table.api-table td:last-child { text-align: right; white-space: nowrap; }
 .step.now .st { background: var(--brand); color: #fff; }
 .step.blocked .st { background: rgba(22, 32, 42, .07); color: var(--ink-3); }
 :root[data-theme="dark"] .step.blocked .st { background: rgba(255, 255, 255, .08); }
-.step.skip .st { background: rgba(217, 119, 6, .13); color: var(--warn); }
+.step.skip .st { background: rgba(217, 119, 6, .13); color: var(--warn-t); }
 .step .n {
   width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center;
   font-size: 14px; background: rgba(22, 32, 42, .08); color: var(--ink-2); flex: none;
@@ -752,7 +756,7 @@ table.api-table td:last-child { text-align: right; white-space: nowrap; }
 .res-group.ok { background: rgba(46, 125, 50, .09); }
 .res-group.ok h4 { color: var(--ok); }
 .res-group.warn { background: rgba(217, 119, 6, .1); }
-.res-group.warn h4 { color: var(--warn); }
+.res-group.warn h4 { color: var(--warn-t); }
 .res-group.bad { background: rgba(198, 40, 40, .09); }
 .res-group.bad h4 { color: var(--bad); }
 
@@ -786,7 +790,7 @@ textarea {
 
 /* ---------------------------------------------------------- 換模型與模型庫 */
 .modal.wide { width: min(760px, 100%); }
-.chip.warn { background: rgba(217, 119, 6, .14); color: var(--warn); }
+.chip.warn { background: rgba(217, 119, 6, .14); color: var(--warn-t); }
 .chip.bad { background: rgba(198, 40, 40, .12); color: var(--bad); }
 .pick-h { font-size: 15px; margin: 14px 0 2px; }
 .pick-list { display: grid; gap: 6px; margin-top: 8px; }
@@ -1006,9 +1010,9 @@ html.brand-pending #login-org { visibility: hidden; }
 .login-page { grid-template-rows: 1fr auto; }
 .login-page .powered {
   position: relative;
-  color: rgba(255, 255, 255, .55);
+  color: rgba(255, 255, 255, .8);
 }
-.login-page .powered strong { color: rgba(255, 255, 255, .82); }
+.login-page .powered strong { color: rgba(255, 255, 255, .95); }
 
 .brand-preview {
   display: flex;
@@ -1036,7 +1040,7 @@ html.brand-pending #login-org { visibility: hidden; }
 
 /* ---- 畫圖與影片（產生頁左邊填、右邊看結果；最近產出在區塊內捲，不把頁面拉長） */
 .ok-t { color: var(--ok); }
-.warn-t { color: var(--warn); }
+.warn-t { color: var(--warn-t); }
 textarea.short { min-height: 48px; }
 .grid.sd-gen { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 .sd-admit { flex: 1 1 260px; min-width: 0; }
@@ -1226,7 +1230,7 @@ input.switch:checked::after { transform: translateX(18px); }
 .chat-card { display: flex; flex-direction: column; }
 .chat-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .chat-bar select { max-width: 340px; }
-.chat-status.warn-t { color: var(--warn); }
+.chat-status.warn-t { color: var(--warn-t); }
 .chat-box { height: clamp(320px, calc(100vh - 330px), 680px); }
 .chat-empty h3 { font-size: 22px; margin-bottom: 4px; }
 .chat-ex { justify-content: center; margin-top: 12px; gap: 8px; }
