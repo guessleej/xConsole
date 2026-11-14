@@ -3321,8 +3321,9 @@ async function viewApi() {
   };
 
   /* ---- 直連（明文）或只走加密入口 */
+  let dc = null;
   if (info.editable) {
-    const dc = card("明文直連", lanOff ? `已關閉：模型只聽這台自己，外面只能經加密入口連` : `開著：別台電腦可以用 ${info.public_url} 直接連（http，明文）`);
+    dc = card("明文直連", lanOff ? `已關閉：模型只聽這台自己，外面只能經加密入口連` : `開著：別台電腦可以用 ${info.public_url} 直接連（http，明文）`);
     dc.appendChild(el("p", "small muted", lanOff
       ? "要讓 IDE 再直連，按下面重新開放，再到「設定」產生一把直連金鑰（模型現在用的是只有主控台知道的內部金鑰）。"
       : "老師都改用加密入口之後再關。關的時候會把現在的直連金鑰先加進加密入口（經加密入口照樣能用，等你確認大家都換了再撤銷），"
@@ -3358,7 +3359,6 @@ async function viewApi() {
     const da = el("div", "slot-actions");
     da.appendChild(db);
     dc.appendChild(da);
-    wrap.appendChild(dc);
   }
 
   /* ---- 實測 ｜ 工具設定範例 */
@@ -3405,7 +3405,11 @@ async function viewApi() {
   ta.appendChild(tb);
   tc.appendChild(ta);
   tc.appendChild(res);
-  pair2.appendChild(tc);
+  // 實測卡較短：明文直連收在它底下同一欄，頁面不用多一整列
+  const leftCol = el("div", "col-stack");
+  leftCol.appendChild(tc);
+  if (dc) leftCol.appendChild(dc);
+  pair2.appendChild(leftCol);
 
   const ec = card("工具設定範例", "依上面的設定即時產生");
   const gwUrl = S.gwInfo?.url;
@@ -4614,7 +4618,10 @@ async function settingsTls(wrap) {
   });
   ccAct.appendChild(bs);
   cc.appendChild(ccAct);
-  wrap.appendChild(cc);
+  // 兩欄排：一張卡一整列會讓這頁長到兩屏半，管理者要一直往下捲
+  const row1 = el("div", "grid pair"), row2 = el("div", "grid pair"), row3 = el("div", "grid pair");
+  wrap.append(row1, row2, row3);
+  row1.appendChild(cc);
 
   // ---- 第 1 步：網址
   const hc = card("1. 使用者會打的網址", "一行一個，網域或 IP 都可以");
@@ -4630,7 +4637,7 @@ async function settingsTls(wrap) {
   const hbr = el("div", "slot-actions");
   hbr.appendChild(hb);
   hc.appendChild(hbr);
-  wrap.appendChild(hc);
+  row1.appendChild(hc);
 
   // ---- 第 2 步：CSR
   const csrc = card("2. 還沒有憑證：產生 CSR 交給憑證廠商", "私鑰在這台伺服器上產生並加密保存，不會離開伺服器");
@@ -4667,7 +4674,7 @@ async function settingsTls(wrap) {
     } catch (ex) { toast(ex.message, "bad"); }
   };
   const gr = el("div", "slot-actions"); gr.appendChild(gb); csrc.appendChild(gr);
-  wrap.appendChild(csrc);
+  row2.appendChild(csrc);
 
   // ---- 第 3、4 步：上傳、檢查、套用
   const up = card("3. 上傳並檢查　4. 套用", "PFX／P12、PEM、CER、CRT、KEY、P7B 都可以，順序不拘");
@@ -4773,7 +4780,7 @@ async function settingsTls(wrap) {
     });
   };
   up.appendChild(dz); up.appendChild(fl); up.appendChild(pwBox); up.appendChild(act); up.appendChild(res);
-  wrap.appendChild(up);
+  row2.appendChild(up);
   if (ui.files.length) showFiles();
   if (ui.inspected) { showResult(ui.inspected); ab.disabled = !ui.inspected.ok; }
 
@@ -4793,8 +4800,8 @@ async function settingsTls(wrap) {
     catch (ex) { toast(ex.message, "bad"); }
     render();
   };
-  wrap.appendChild(hs);
-  await settingsLinkCard(wrap);
+  row3.appendChild(hs);
+  await settingsLinkCard(row3);
 }
 
 // 工作站主動連回用的通道：另一個埠、另一張憑證。換上面那張管理網頁的憑證不會影響它
@@ -4803,7 +4810,7 @@ async function settingsLinkCard(wrap) {
   try { li = await api("/api/link"); } catch (ex) { return; }
   const day = (t) => t ? new Date(t * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" }).slice(0, 10) : "—";
   const ring = li.ring || {};
-  const c = card("工作站連回通道", `主動連回的機器 ${li.nodes} 台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線`);
+  let c = card("工作站連回通道", `主動連回的機器 ${li.nodes} 台；這裡的憑證和上面的管理網頁憑證分開，換那張不會讓工作站斷線`);
   const kv = el("div");
   kv.style.maxWidth = "640px";
   kv.appendChild(kvRow("通道埠", li.listen && li.listen.ok ? `${li.port}（有在聽）` : (li.listen && li.listen.error) || `${li.port}（沒有在聽）`));
@@ -4832,6 +4839,13 @@ async function settingsLinkCard(wrap) {
   act.appendChild(rb);
   c.appendChild(act);
 
+  // 對外網址與代理伺服器只有筆電在外面連回、或公司網路要經代理時才用得到：收起來，有填過就預設打開
+  const more = el("details", "upd-manual");
+  more.open = !!((li.public || []).length || li.proxy);
+  more.appendChild(el("summary", null, "對外網址與代理伺服器（筆電在外面連回時才需要）"));
+  c.appendChild(more);
+  const cc0 = c;
+  c = more;
   c.appendChild(el("h3", null, "對外網址"));
   c.appendChild(el("p", "small muted",
     "筆電帶回家或在外面時，從這些位址連回來（一行一個，寫成「主機:埠」，例如 vpn.example.com:9402）。對外只要開通道埠，不必開管理網頁的埠。各台在辦公室裡照樣走內部位址，連不到才改走這些。"));
@@ -4858,7 +4872,7 @@ async function settingsLinkCard(wrap) {
   const sr = el("div", "slot-actions");
   sr.appendChild(sb);
   c.appendChild(sr);
-  wrap.appendChild(c);
+  wrap.appendChild(cc0);
 }
 
 /* ---------------------------------------------------------------- 3 使用報告 */

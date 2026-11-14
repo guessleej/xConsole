@@ -22408,5 +22408,10 @@
 "en": "The account that owns this key is disabled",
 "ja": "このキーのアカウントは無効化されています",
 "ko": "이 키의 계정은 비활성화되었습니다"
+},
+"對外網址與代理伺服器（筆電在外面連回時才需要）": {
+"en": "External URL and proxy server (only needed when laptops connect back from outside)",
+"ja": "外部 URL とプロキシサーバー（ノート PC が外部から接続し直すときだけ必要）",
+"ko": "외부 URL과 프록시 서버(노트북이 외부에서 다시 연결할 때만 필요)"
 }
 }

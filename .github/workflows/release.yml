@@ -8,9 +8,21 @@ permissions:
   contents: write
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-latest"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 自建 runner 沒有 gh：裝到這次的暫存目錄（核對官方 checksum）
+        if: runner.environment == 'self-hosted'
+        env:
+          GH_VERSION: 2.103.3
+        run: |
+          command -v gh >/dev/null && exit 0
+          base=https://github.com/cli/cli/releases/download/v${GH_VERSION}
+          f=gh_${GH_VERSION}_linux_amd64.tar.gz
+          cd "$RUNNER_TEMP" && curl -sSfLO "$base/$f"
+          curl -sSfL "$base/gh_${GH_VERSION}_checksums.txt" | grep " $f\$" | sha256sum -c -
+          tar xzf "$f" && mkdir -p bin && mv "gh_${GH_VERSION}_linux_amd64/bin/gh" bin/ && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: 版本檔要跟標籤一致
         run: |
           test "v$(cat VERSION)" = "${GITHUB_REF_NAME}" || { echo "VERSION 是 $(cat VERSION)，標籤是 ${GITHUB_REF_NAME}"; exit 1; }
