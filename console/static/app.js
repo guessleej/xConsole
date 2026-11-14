@@ -2797,13 +2797,15 @@ function apiOutTokens(info) {
 }
 
 /* 依目前設定產生各工具的設定範例。金鑰：剛產生的就直接填；設了但看不到就放提示字；沒設就不放。 */
-function apiExamples(node, info) {
-  const base = info.public_url;
+function apiExamples(node, info, gwUrl) {
+  // gwUrl 有給＝走加密入口：網址是主控台的 https，金鑰一定要帶（剛產生的個別金鑰會直接填入）
+  const base = gwUrl || info.public_url;
   const name = info.model_name || "（模型名稱）";
   const ctx = info.max_context || 32768;
   const out = apiOutTokens(info);
-  const newKey = S.newKeys[node.id + "/" + info.slot];
-  const key = newKey || (info.api_key_set ? "<貼上金鑰>" : "");
+  const newKey = gwUrl ? S.gwKey : S.newKeys[node.id + "/" + info.slot];
+  const needKey = !!gwUrl || !!info.api_key_set;
+  const key = newKey || (needKey ? "<貼上金鑰>" : "");
   const label = `${info.role}（${node.name}）`;
   const pid = ("xconsole-" + node.name.replace(/[^\w]/g, "") + "-" + info.slot).toLowerCase();
   const j = (o) => JSON.stringify(o, null, 2);
@@ -2817,7 +2819,7 @@ function apiExamples(node, info) {
     code: `"github.copilot.chat.customOAIModels": ${j({
       [name]: {
         name: label, url: base, toolCalling: info.tools !== false, vision: !!info.vision, thinking: false,
-        maxInputTokens: ctx - out, maxOutputTokens: out, requiresAPIKey: !!info.api_key_set,
+        maxInputTokens: ctx - out, maxOutputTokens: out, requiresAPIKey: needKey,
       },
     })}`,
   });
@@ -2837,13 +2839,13 @@ function apiExamples(node, info) {
   });
   const ocProvider = {
     npm: "@ai-sdk/openai-compatible", name: label,
-    options: { baseURL: base, ...(info.api_key_set ? { apiKey: "{env:XCONSOLE_API_KEY}" } : {}) },
+    options: { baseURL: base, ...(needKey ? { apiKey: "{env:XCONSOLE_API_KEY}" } : {}) },
     models: { [name]: { name: info.model || name, tool_call: info.tools !== false, limit: { context: ctx, output: out } } },
   };
   ex.push({
     key: "opencode", label: "OpenCode",
     note: "存成專案根目錄的 opencode.json，或 ~/.config/opencode/opencode.json。"
-      + (info.api_key_set ? "金鑰放在環境變數 XCONSOLE_API_KEY，不寫進設定檔。" : ""),
+      + (needKey ? "金鑰放在環境變數 XCONSOLE_API_KEY，不寫進設定檔。" : ""),
     code: j({ $schema: "https://opencode.ai/config.json", provider: { [pid]: ocProvider }, model: `${pid}/${name}` }),
   });
   ex.push({
@@ -2922,8 +2924,10 @@ function apiSteps(info) {
       done: !!info.online && !!info.model_name && (info.served || []).some((m) => m.id === info.model_name) },
     { t: "決定要不要金鑰", why: "有金鑰才不會讓內網任何人都能用；開了之後每個工具都要補上金鑰",
       done: !!info.api_key_set, optional: true },
-    { t: "實測一次", why: "從這台本機與主控台經網路各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
+    { t: "實測一次", why: "從這台本機、主控台經網路、加密入口各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
       done: !!(t && t.ok) },
+    { t: "關掉明文直連", why: "老師都改用加密入口之後再關；關掉之後金鑰與對話不再以明文在網路上傳",
+      done: info.bind === "127.0.0.1", optional: true },
   ];
   const firstOpen = steps.findIndex((s) => !s.done && !s.optional);
   steps.forEach((s, i) => {
@@ -2935,15 +2939,194 @@ function apiSteps(info) {
   return steps;
 }
 
+/* ---------------------------------------------------------------- 加密入口與金鑰
+   IDE 改填主控台的 https 網址（/v1），每位老師或每門課各用一把金鑰；撤銷一把不影響其他人。
+   完整金鑰只在產生當下回一次，存在這個分頁的記憶體裡讓設定範例帶入，重新整理就沒了。 */
+
+const KEY_STATE = { active: "使用中", revoked: "已撤銷", expired: "已過期" };
+
+function slotLabel(sk) {
+  if (sk === "*") return "全部";
+  const [nid, sid] = sk.split("/");
+  const n = (S.fleet?.nodes || []).find((x) => x.id === nid);
+  const sl = (n?.state?.slots || []).find((x) => x.id === sid);
+  return n ? `${n.name} ${sl ? sl.role : sid}` : sk;
+}
+
+function gatewayCard(list) {
+  const c = card("加密入口與金鑰", "IDE 填這個 https 網址，每位老師或每門課各用一把金鑰；撤銷一把，其他人不受影響");
+  const body = el("div");
+  c.appendChild(body);
+  const reload = () => {
+    loading(body);
+    api("/api/keys").then((d) => renderKeys(body, d, list, reload))
+      .catch((ex) => { body.textContent = ""; body.appendChild(el("p", "note bad", ex.message)); });
+  };
+  reload();
+  return c;
+}
+
+function renderKeys(body, d, list, reload) {
+  body.textContent = "";
+  S.gwUrl = d.url;
+  body.appendChild(copyRow("網址（Base URL）", d.url));
+  body.appendChild(el("p", "small muted", "模型名稱照下面各格的填。金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。"));
+  const bar = el("div", "slot-actions");
+  const add = el("button", "btn primary", "產生金鑰");
+  add.onclick = () => keyForm(null, list, reload);
+  const urlb = el("button", "btn", "修改網址");
+  urlb.onclick = () => gatewayUrlForm(d, reload);
+  bar.appendChild(add);
+  bar.appendChild(urlb);
+  body.appendChild(bar);
+  if (!d.items.length) {
+    body.appendChild(el("p", "note", "還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。"));
+    return;
+  }
+  const sb = el("div", "scrollbox");
+  const tb = el("table", "api-table");
+  const hr = el("tr");
+  ["名稱", "金鑰開頭", "能用的模型", "同時上限", "本月請求", "本月 token（輸入／輸出）", "最後使用", "狀態", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  const th = el("thead");
+  th.appendChild(hr);
+  tb.appendChild(th);
+  const tbody = el("tbody");
+  d.items.forEach((k) => {
+    const tr = el("tr");
+    const u = k.usage || {};
+    const slots = k.slots === "*" ? "全部" : (k.slots || []).map(slotLabel).join("、");
+    const cells = [k.name, `${k.prefix}…`, slots, String(k.max_inflight), int(u.requests), `${int(u.prompt_tokens)}／${int(u.completion_tokens)}`,
+      k.last_used ? new Date(k.last_used * 1000).toLocaleString(uiLocale(), { hour12: false }) : "還沒用過",
+      KEY_STATE[k.state] + (k.expires && k.state === "active" ? `（${new Date(k.expires * 1000).toLocaleDateString(uiLocale())} 到期）` : "")];
+    cells.forEach((v, i) => tr.appendChild(el("td", i === 1 ? "mono" : null, v)));
+    const act = el("td");
+    if (k.state !== "revoked") {
+      const e = el("button", "btn sm", "修改");
+      e.onclick = () => keyForm(k, list, reload);
+      const r = el("button", "btn sm danger", "撤銷");
+      r.onclick = () => {
+        const dd = el("div");
+        dd.appendChild(el("p", "note warn", `撤銷「${k.name}」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響。`));
+        if (k.source === "legacy") dd.appendChild(el("p", "small muted", "這是升級時自動匯入的舊共用金鑰。撤銷前先確認最後使用時間：還有人在用，就先發新金鑰給他。"));
+        modal({ title: "撤銷金鑰", bodyNode: dd, confirmText: "撤銷", danger: true, onConfirm: async () => {
+          try { await api(`/api/keys/${k.id}/revoke`, { method: "POST", body: {} }); toast("已撤銷", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          reload();
+        } });
+      };
+      act.appendChild(e);
+      act.appendChild(r);
+    }
+    tr.appendChild(act);
+    tbody.appendChild(tr);
+  });
+  tb.appendChild(tbody);
+  sb.appendChild(tb);
+  body.appendChild(sb);
+}
+
+function keyForm(k, list, done, pre) {
+  // pre：上一次送出被擋下時填的值（彈窗按下就關了，錯誤時重開並帶回原本填的，不用重打）
+  const v = pre || (k ? { name: k.name, slots: k.slots, max_inflight: k.max_inflight } : { slots: "*", max_inflight: 2 });
+  const d = el("div", "form-row");
+  const fld = (label, input, hint) => {
+    const w = el("div");
+    w.appendChild(el("label", null, label));
+    w.appendChild(input);
+    if (hint) w.appendChild(el("div", "assume", hint));
+    d.appendChild(w);
+    return input;
+  };
+  const fName = el("input");
+  fName.value = v.name || "";
+  fName.placeholder = "例：資工系 王老師、機器學習（週三）";
+  fld("名稱", fName, "撤銷時靠這個認是誰的");
+  const all = el("label", "check-row");
+  const fAll = el("input");
+  fAll.type = "checkbox";
+  fAll.checked = v.slots === "*";
+  all.appendChild(fAll);
+  all.appendChild(el("span", null, "全部模型（之後新開的也能用）"));
+  const box = el("div");
+  box.appendChild(all);
+  const picks = list.map(([n, sl]) => {
+    const r = el("label", "check-row");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = `${n.id}/${sl.id}`;
+    cb.checked = v.slots !== "*" && (v.slots || []).includes(cb.value);
+    r.appendChild(cb);
+    r.appendChild(el("span", null, `${n.name} ${sl.role}・${sl.tier || ""}`));
+    box.appendChild(r);
+    return cb;
+  });
+  const sync = () => picks.forEach((cb) => { cb.disabled = fAll.checked; cb.parentNode.classList.toggle("disabled", fAll.checked); });
+  fAll.onchange = sync;
+  sync();
+  fld("能用的模型", box);
+  const fIn = el("input");
+  fIn.type = "number";
+  fIn.min = "1";
+  fIn.max = "16";
+  fIn.value = String(v.max_inflight || 2);
+  fld("同時進行的請求上限", fIn, "一個人同時最多送幾個請求，免得把整台佔滿；一般 2 就夠");
+  const fExp = el("input");
+  fExp.type = "number";
+  fExp.min = "0";
+  fExp.max = "3650";
+  fExp.value = v.expires_days !== undefined ? String(v.expires_days) : k ? "" : "0";
+  fExp.placeholder = k ? "留空＝不改" : "";
+  fld("有效天數", fExp, k ? "從現在起算；0＝不到期；留空＝不改" : "0＝不到期；給一學期用可以填 150");
+  [fName, fIn, fExp].forEach((i) => imeGuard(i, () => {}));
+  modal({ title: k ? `修改金鑰：${k.name}` : "產生金鑰", bodyNode: d, hasInput: true, confirmText: k ? "儲存" : "產生", onConfirm: async () => {
+    const body = { name: fName.value.trim(), slots: fAll.checked ? "*" : picks.filter((cb) => cb.checked).map((cb) => cb.value),
+      max_inflight: Number(fIn.value) };
+    if (fExp.value !== "") body.expires_days = Number(fExp.value);
+    try {
+      const r = await api(k ? `/api/keys/${k.id}/update` : "/api/keys/create", { method: "POST", body });
+      if (r.key) { S.gwKey = r.key; showGatewayKey(r.key, r.url, body.name); } else toast("已儲存", "ok");
+      done();
+    } catch (ex) { toast(ex.message, "bad"); keyForm(k, list, done, body); }
+  } });
+  fName.focus();
+}
+
+function showGatewayKey(key, url, name) {
+  const d = el("div");
+  d.appendChild(el("p", "note warn", "這把金鑰只顯示這一次。關掉之後主控台不會再顯示它，請現在交給使用的人。"));
+  d.appendChild(copyRow("名稱", name, { noCopy: true }));
+  d.appendChild(copyRow("網址（Base URL）", url));
+  d.appendChild(copyRow("金鑰", key));
+  d.appendChild(el("p", "small muted", "在這個分頁重新整理之前，各格 API 串接頁的設定範例會直接帶入這把金鑰。"));
+  modal({ title: "新的金鑰", bodyNode: d });
+}
+
+function gatewayUrlForm(d, done) {
+  const w = el("div", "form-row");
+  const f = el("input");
+  f.value = d.url_custom ? d.url : "";
+  f.placeholder = d.url;
+  const b = el("div");
+  b.appendChild(el("label", null, "加密入口網址"));
+  b.appendChild(f);
+  b.appendChild(el("div", "assume", "留空＝主控台憑證上的第一個名稱加 9400 埠。前面另有反向代理（例如走 443）時改成那個，要 https:// 開頭、/v1 結尾"));
+  w.appendChild(b);
+  imeGuard(f, () => {});
+  modal({ title: "加密入口網址", bodyNode: w, hasInput: true, confirmText: "儲存", onConfirm: async () => {
+    try { await api("/api/keys/settings", { method: "POST", body: { public_url: f.value.trim() } }); toast("已儲存", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+    done();
+  } });
+}
+
 /* 全部機器的 API 一覽：要串 IDE 或其他服務時，從這裡挑一個 */
 function viewApis() {
   const main = $("#main");
   main.textContent = "";
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
-  const c = card("API 串接", "換完模型之後，IDE 與其他服務要打的網址、模型名稱與上下文都在這裡");
   const list = [];
   (S.fleet.nodes || []).forEach((n) => (n.state?.slots || []).filter(isApiSlot).forEach((s) => list.push([n, s])));
+  wrap.appendChild(gatewayCard(list));
+  const c = card("各格的 API", "每一格的模型名稱、上下文與直連網址；改設定、實測、看工具設定範例按右邊的按鈕");
   if (!list.length) {
     c.appendChild(el("p", "note", "目前沒有提供 API 的模型欄位。先到機器頁啟動或換上一顆文字模型。"));
     wrap.appendChild(c);
@@ -2953,7 +3136,7 @@ function viewApis() {
   const tb = el("table", "api-table");
   const th = el("thead");
   const hr = el("tr");
-  ["機器", "欄位", "模型名稱（填進 IDE）", "網址", "上下文", "金鑰", "上次實測", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  ["機器", "欄位", "模型名稱（填進 IDE）", "直連網址", "上下文", "直連金鑰", "上次實測", ""].forEach((h) => hr.appendChild(el("th", null, h)));
   th.appendChild(hr);
   tb.appendChild(th);
   const body = el("tbody");
@@ -2972,7 +3155,7 @@ function viewApis() {
     body.appendChild(tr);
     api(`/api/node/${n.id}/apiinfo/${s.id}/brief`).then((info) => {
       cells[2].textContent = info.model_name || "—";
-      cells[3].textContent = info.public_url;
+      cells[3].textContent = info.bind === "127.0.0.1" ? "已關閉（只走加密入口）" : info.public_url;
       cells[4].textContent = int(info.max_context);
       cells[5].textContent = info.api_key_set ? "有" : "沒有";
       cells[6].textContent = info.last_test
@@ -2982,7 +3165,8 @@ function viewApis() {
   tb.appendChild(body);
   sb.appendChild(tb);
   c.appendChild(sb);
-  c.appendChild(el("p", "small muted", "網址是 http：這些模型服務在內網直接對外，沒有經過主控台。設了金鑰的話，金鑰會以明文在內網傳輸。"));
+  c.appendChild(el("p", "small muted", "直連網址是 http：金鑰與對話內容會以明文在網路上傳。老師都改用上面的加密入口之後，"
+    + "可以到各格的頁面把直連關掉（只走加密入口）。"));
   wrap.appendChild(c);
 }
 
@@ -3002,7 +3186,7 @@ async function viewApi() {
   loading(head.appendChild(el("div")));
   let info;
   try {
-    info = await api(`/api/node/${nodeId}/apiinfo/${slotId}`);
+    [info, S.gwInfo] = await Promise.all([api(`/api/node/${nodeId}/apiinfo/${slotId}`), api("/api/keys").catch(() => null)]);
   } catch (ex) {
     head.lastChild.textContent = "";
     head.lastChild.appendChild(el("p", "note bad", ex.message));
@@ -3021,11 +3205,15 @@ async function viewApi() {
   wrap.appendChild(pair);
   const ci = card("連線資訊", info.online ? "服務有回應" : "服務沒有回應");
   const newKey = S.newKeys[nodeId + "/" + slotId];
-  ci.appendChild(copyRow("網址（Base URL）", info.public_url));
+  const lanOff = info.bind === "127.0.0.1";
+  if (S.gwInfo) ci.appendChild(copyRow("加密入口網址（建議）", S.gwInfo.url));
+  ci.appendChild(copyRow("直連網址", lanOff ? "已關閉（只聽這台自己）" : info.public_url, { noCopy: lanOff }));
   ci.appendChild(copyRow("模型名稱", info.model_name));
   ci.appendChild(copyRow("上下文長度", info.max_context ? String(info.max_context) : null));
   ci.appendChild(copyRow("單次輸出上限", info.max_tokens ? String(info.max_tokens) : `引擎預設（範例填 ${apiOutTokens(info)}）`, { noCopy: !info.max_tokens }));
-  ci.appendChild(copyRow("API 金鑰", newKey || (info.api_key_set ? "已設定（只在產生當下顯示一次）" : "沒有設定"), { noCopy: !newKey }));
+  if (S.gwInfo) ci.appendChild(copyRow("加密入口的金鑰", "每人一把，在「API 串接」頁產生", { noCopy: true }));
+  ci.appendChild(copyRow("直連金鑰", lanOff ? "主控台內部使用，不顯示" : newKey || (info.api_key_set ? "已設定（只在產生當下顯示一次）" : "沒有設定"),
+    { noCopy: !newKey || lanOff }));
   ci.appendChild(copyRow("支援的介面", (info.dialects || []).map((d) => ({ openai: "OpenAI", anthropic: "Anthropic", responses: "Responses" }[d])).join("、"), { noCopy: true }));
   ci.appendChild(copyRow("工具呼叫／看圖", `${info.tools === false ? "不支援" : info.tools ? "支援" : "未知"}／${info.vision ? "支援" : "不支援"}`, { noCopy: true }));
   if ((info.served || []).length && !(info.served || []).some((m) => m.id === info.model_name)) {
@@ -3107,11 +3295,40 @@ async function viewApi() {
     modal({ title: "套用並重啟", bodyNode: d, confirmText: "套用並重啟", danger: !!slot.critical, onConfirm: () => send(false) });
   };
 
+  /* ---- 直連（明文）或只走加密入口 */
+  if (info.editable) {
+    const dc = card("明文直連", lanOff ? `已關閉：模型只聽這台自己，外面只能經加密入口連` : `開著：別台電腦可以用 ${info.public_url} 直接連（http，明文）`);
+    dc.appendChild(el("p", "small muted", lanOff
+      ? "要讓 IDE 再直連，按下面重新開放，再到「設定」產生一把直連金鑰（模型現在用的是只有主控台知道的內部金鑰）。"
+      : "老師都改用加密入口之後再關。關的時候會把現在的直連金鑰先加進加密入口（經加密入口照樣能用，等你確認大家都換了再撤銷），"
+        + "再讓模型改聽這台自己並換上一把內部金鑰，然後重啟模型。"));
+    const db = el("button", "btn " + (lanOff ? "" : "primary"), lanOff ? "重新開放直連" : "改成只走加密入口");
+    db.onclick = () => {
+      const d = el("div");
+      d.appendChild(el("p", "small muted", "會重啟這個模型，重啟期間 API 中斷約一到兩分鐘；套用後實際打一次，打不通就自動換回。"));
+      if (slot.critical) d.appendChild(el("p", "note warn", slot.note || "這是標記為關鍵的服務，請排在不上課的時段。"));
+      if (!lanOff) d.appendChild(el("p", "note warn", "還在用直連網址的工具會連不上，要改成加密入口的網址（金鑰可以先不換）。"));
+      modal({ title: lanOff ? "重新開放直連" : "改成只走加密入口", bodyNode: d, confirmText: "套用並重啟", danger: !!slot.critical, onConfirm: async () => {
+        db.disabled = true;
+        db.textContent = "套用中，模型重新載入約一到兩分鐘…";
+        try {
+          const r = await api(`/api/node/${nodeId}/apiinfo/${slotId}/gateway`, { method: "POST", body: { only: !lanOff } });
+          toast(r.message || "已套用", "ok");
+        } catch (ex) { toast(ex.message, "bad"); }
+        viewApi();
+      } });
+    };
+    const da = el("div", "slot-actions");
+    da.appendChild(db);
+    dc.appendChild(da);
+    wrap.appendChild(dc);
+  }
+
   /* ---- 實測 ｜ 工具設定範例 */
   const pair2 = el("div", "grid pair");
   wrap.appendChild(pair2);
   const tc = card("實測", info.last_test ? `上次：${info.last_test.ok ? "通過" : "失敗"}・${new Date(info.last_test.at * 1000).toLocaleString(uiLocale(), { hour12: false })}（台北時間）` : "還沒測過");
-  tc.appendChild(el("p", "small muted", "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。"));
+  tc.appendChild(el("p", "small muted", "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打直連網址，最後用一把臨時金鑰打一次加密入口。"));
   let fTestKey = null;
   if (info.api_key_set && !newKey) {
     const w = el("div");
@@ -3132,10 +3349,12 @@ async function viewApi() {
     res.textContent = "";
     try {
       const r = await api(`/api/node/${nodeId}/apiinfo/${slotId}/test`, { method: "POST", body: { key: newKey || fTestKey?.value || "" } });
-      const rows = [...(r.checks || []), ...(r.network ? [{ name: "從主控台經網路連對外網址", ok: r.network.ok, ms: r.network.ms, detail: r.network.detail }] : [])];
+      const rows = [...(r.checks || []),
+        ...(r.network ? [{ name: "從主控台經網路連直連網址", ok: r.network.ok, ms: r.network.ms, detail: r.network.detail, skipped: r.network.skipped }] : []),
+        ...(r.gateway ? [{ name: "經加密入口（https）", ok: r.gateway.ok, ms: r.gateway.ms, detail: r.gateway.detail }] : [])];
       rows.forEach((c) => {
         const g = el("div", "res-group " + (c.ok ? "ok" : "bad"));
-        const h4 = el("h4", null, `${c.ok ? "通過" : "失敗"}　${c.name}`);
+        const h4 = el("h4", null, `${c.skipped ? "略過" : c.ok ? "通過" : "失敗"}　${c.name}`);
         g.appendChild(h4);
         g.appendChild(el("div", "small", `${c.detail || ""}${c.ms ? `（${int(c.ms)} 毫秒）` : ""}`));
         res.appendChild(g);
@@ -3152,7 +3371,20 @@ async function viewApi() {
   pair2.appendChild(tc);
 
   const ec = card("工具設定範例", "依上面的設定即時產生");
-  const exs = apiExamples(node, info);
+  const gwUrl = S.gwInfo?.url;
+  if (S.apiMode === undefined || (lanOff && S.apiMode === "direct")) S.apiMode = gwUrl ? "gw" : "direct";
+  if (gwUrl && !lanOff) {
+    const mb = el("div", "tabbar");
+    [["gw", "加密入口（建議）"], ["direct", "直連"]].forEach(([k, t]) => {
+      const b = el("button", null, t);
+      b.setAttribute("aria-current", S.apiMode === k ? "true" : "false");
+      b.onclick = () => { S.apiMode = k; viewApi(); };
+      mb.appendChild(b);
+    });
+    ec.appendChild(mb);
+  }
+  const exs = apiExamples(node, info, S.apiMode === "gw" ? gwUrl : null);
+  if (S.apiMode === "gw" && !S.gwKey) ec.appendChild(el("p", "small muted", "金鑰欄要填個別金鑰：在「API 串接」頁按「產生金鑰」，這個分頁裡的範例就會直接帶入。"));
   const tabs = el("div", "tabbar");
   const note = el("p", "small muted");
   const pre = el("pre", "code");
