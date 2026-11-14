@@ -120,6 +120,9 @@ def installers():
     check("專用帳號還不存在（第一次安裝）：mhome 回空字串，不會被 set -e 中斷", r.returncode == 0 and r.stdout.strip() == "[]", r)
     check("--data-dir 有空白或中文：建帳號前就擋（systemd 會把空白拆成別的參數）",
           "grep -q '^[A-Za-z0-9._/-]*$' || die \"--data-dir 只能用英數字" in body)
+    import re
+    bad = re.findall(r"\$[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7f])", body)
+    check("install.sh 的變數後面緊接中文時都加了大括號（macOS 的 bash 3.2 會把中文的位元組吃進變數名稱，set -u 就中斷）", not bad, bad)
     check("install.sh 讀完回應檔就刪", 'IFS= read -r CODE < "$CODEFILE" || true\n    rm -f "$CODEFILE"' in body)
 
     ps1 = open(os.path.join(ROOT, "install", "install.ps1"), encoding="utf-8-sig").read()
@@ -128,7 +131,8 @@ def installers():
           and "'S-1-5-18', 'S-1-5-32-544'" in ps1)
     check("install.ps1：回應檔擁有者要是 SYSTEM 或 Administrators；資料夾權限整份重設並讀回核對",
           "GetOwner([Security.Principal.SecurityIdentifier])" in ps1 and "SetAccessRuleProtection($true, $false)" in ps1
-          and "AreAccessRulesProtected" in ps1 and "/inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'" not in ps1)
+          and "AreAccessRulesProtected" in ps1 and "/inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'" not in ps1
+          and "icacls $p /reset" not in ps1 and "Get-Acl -" not in ps1 and "Set-Acl -" not in ps1)
     pwsh = shutil.which("pwsh") or shutil.which("powershell")
     if pwsh:
         r = subprocess.run([pwsh, "-NoProfile", "-File", os.path.join(ROOT, "install", "install.ps1"), "-JoinCode", "abc"],
@@ -151,6 +155,9 @@ def scripts():
                        env={**os.environ, "XCONSOLE_HOME": home})
     d = json.loads(r.stdout)
     check("  送回主控台的資料：加入碼來自標準輸入", d["code"] == "abc_DEF-123" and d["token"] == "tok", r)
+    import re
+    bad = re.findall(r"\$[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7f])", sh)
+    check("  產出的 bash 腳本：變數後面緊接中文時都加了大括號", not bad, bad)
     r = subprocess.run(["bash", "-n"], input=sh, capture_output=True, text=True)
     check("  bash 腳本語法正確", r.returncode == 0, r.stderr)
 

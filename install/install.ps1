@@ -36,10 +36,13 @@ function ProtectDir($p) {
       'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
   }
   $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'))
-  try { Set-Acl -LiteralPath $p -AclObject $acl -ErrorAction Stop } catch { Die "設不了 $p 的權限：$($_.Exception.Message)" }
-  icacls $p /reset /T /C /Q | Out-Null
-  $got = Get-Acl -LiteralPath $p
-  $who = @($got.Access | ForEach-Object { $r = $_; try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $r.IdentityReference.Value } } | Select-Object -Unique)
+  # 直接用 .NET 的 ACL API，不用 Get-Acl／Set-Acl：從 PowerShell 7 或部分派送工具帶起來時，那個模組可能載不進來
+  $d = New-Object IO.DirectoryInfo $p
+  try { $d.SetAccessControl($acl) } catch { Die "設不了 $p 的權限：$($_.Exception.Message)" }
+  # 只重設底下既有的檔案與資料夾（改成繼承上面這份）；不能對 $p 本身 /reset，那會讓它又繼承 ProgramData 給 Users 的權限
+  if (Get-ChildItem -LiteralPath $p -Force -ErrorAction SilentlyContinue) { icacls (Join-Path $p '*') /reset /T /C /Q | Out-Null }
+  $got = $d.GetAccessControl()
+  $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Select-Object -Unique)
   $extra = @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544') -notcontains $_ })
   if (-not $got.AreAccessRulesProtected -or $extra.Count) { Die "$p 的權限沒有收乾淨（還給了 $($extra -join '、')），權杖與私鑰不能放在這裡；請換一個位置或請 IT 檢查這顆磁碟的權限設定" }
 }
@@ -79,10 +82,10 @@ if ($Console) {
     if (-not (Test-Path -LiteralPath $JoinCodeFile -PathType Leaf)) { Die "找不到回應檔 $JoinCodeFile" }
     $okSid = @('S-1-5-18', 'S-1-5-32-544')
     # 擁有者隨時可以改權限：一般使用者擁有的回應檔，就算權限收好了，他也能在派送前把讀取權加回去
-    $owner = try { (Get-Acl -LiteralPath $JoinCodeFile).GetOwner([Security.Principal.SecurityIdentifier]).Value } catch { '' }
-    $bad = @((Get-Acl -LiteralPath $JoinCodeFile).Access | Where-Object { $_.AccessControlType -eq 'Allow' } | ForEach-Object {
-      $r = $_; try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $r.IdentityReference.Value } } |
-      Where-Object { $okSid -notcontains $_ } | Select-Object -Unique)
+    $fs = [IO.File]::GetAccessControl($JoinCodeFile)
+    $owner = $fs.GetOwner([Security.Principal.SecurityIdentifier]).Value
+    $bad = @($fs.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.AccessControlType -eq 'Allow' } |
+      ForEach-Object { $_.IdentityReference.Value } | Where-Object { $okSid -notcontains $_ } | Select-Object -Unique)
     $code = Get-Content -LiteralPath $JoinCodeFile -TotalCount 1
     Remove-Item -LiteralPath $JoinCodeFile -Force
     $fix = "準備回應檔：icacls <檔> /setowner *S-1-5-32-544; icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F"

@@ -32,7 +32,8 @@ def check(name, cond, detail=""):
 
 
 def sh(cmd, **kw):
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=900, **kw)
+    # 輸出照 UTF-8 讀、讀不了的位元組換成替代字元：安裝程式的訊息要能完整印出來，不能因為解碼失敗把測試本身弄掛
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, **kw)
 
 
 def write_code(path, code, ok=True):
@@ -67,7 +68,7 @@ def agent_user():
 def agent_pid():
     if WIN:
         r = sh(["powershell", "-NoProfile", "-Command",
-                "(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*xconsole_agent.py*' } | Select-Object -First 1).ProcessId"])
+                "(Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' -and $_.CommandLine -like '*xconsole_agent.py*' } | Select-Object -First 1).ProcessId"])
     else:
         r = sh(["sh", "-c", "pgrep -f '[x]console_agent.py' | head -1"])
     return r.stdout.strip()

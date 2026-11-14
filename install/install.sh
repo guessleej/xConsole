@@ -88,7 +88,7 @@ managed() {
     IFS= read -r CODE || true
   else
     [ -f "$CODEFILE" ] || die "找不到回應檔 $CODEFILE"
-    perm_ok "$CODEFILE" || { rm -f "$CODEFILE"; die "回應檔 $CODEFILE 的擁有者要是 root、權限 600（chown root $CODEFILE; chmod 600 $CODEFILE）；別人讀得到的加入碼可能已外流，已刪掉這個檔，請在主控台作廢它、重新產生"; }
+    perm_ok "$CODEFILE" || { rm -f "$CODEFILE"; die "回應檔 $CODEFILE 的擁有者要是 root、權限 600（chown root $CODEFILE; chmod 600 ${CODEFILE}）；別人讀得到的加入碼可能已外流，已刪掉這個檔，請在主控台作廢它、重新產生"; }
     IFS= read -r CODE < "$CODEFILE" || true
     rm -f "$CODEFILE"
   fi
@@ -104,7 +104,7 @@ managed() {
   python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || die "Python 版本要 3.9 以上"
   if [ "$OSN" = Darwin ]; then
     for p in /Users/*/Library/LaunchAgents/$LA.plist; do
-      [ -f "$p" ] && die "這台已經有人用一般帳號裝過代理（$p），兩份會搶同一個埠。請先用那個帳號執行 bash install/install.sh --uninstall"
+      [ -f "$p" ] && die "這台已經有人用一般帳號裝過代理（${p}），兩份會搶同一個埠。請先用那個帳號執行 bash install/install.sh --uninstall"
     done
   else
     command -v runuser >/dev/null && command -v loginctl >/dev/null || die "這支需要 systemd（runuser、loginctl）"
@@ -115,7 +115,7 @@ managed() {
   say "2/5 專用帳號 $MU"
   local H; H=$(mhome)
   if [ -n "$H" ]; then
-    [ -z "$DATA" ] || [ "$DATA" = "$H" ] || die "這台的代理已經裝在 $H，要換位置請先 --uninstall 並搬走資料"
+    [ -z "$DATA" ] || [ "$DATA" = "$H" ] || die "這台的代理已經裝在 ${H}，要換位置請先 --uninstall 並搬走資料"
     DATA="$H"
   elif [ "$OSN" = Darwin ]; then
     DATA="${DATA:-/opt/xconsole}"
@@ -143,7 +143,7 @@ managed() {
     # 顯示卡裝置（AMD 的 /dev/kfd、/dev/dri）要這兩個群組才開得了
     for g in video render; do getent group "$g" >/dev/null && usermod -aG "$g" "$MU"; done
   fi
-  echo "帳號 $MU，資料放 $DATA"
+  echo "帳號 ${MU}，資料放 $DATA"
 
   say "3/5 複製代理與 Python 環境（cryptography）"
   mkdir -p "$DATA/.xconsole"
