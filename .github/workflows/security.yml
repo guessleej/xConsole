@@ -93,9 +93,19 @@ jobs:
           fi
           python test/test_api_integration.py
       - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
-        run: python test/test_llama_engine.py
+        run: |
+          # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
+            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          fi
+          python test/test_llama_engine.py
       - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
-        run: python test/test_machine_admin.py
+        run: |
+          # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
+            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          fi
+          python test/test_machine_admin.py
       - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
         run: |
           python -m pip install --disable-pip-version-check playwright==1.65.0
