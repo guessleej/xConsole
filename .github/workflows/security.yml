@@ -86,7 +86,12 @@ jobs:
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）
-        run: python test/test_api_integration.py
+        run: |
+          # 自建 runner 是系統服務，連不到 xcloud 的 systemd --user：指回真正的使用者匯流排與家目錄（測試單元名稱與埠都是隨機的，結束自己刪掉）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
+            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          fi
+          python test/test_api_integration.py
       - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
         run: python test/test_llama_engine.py
       - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
@@ -106,6 +111,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
