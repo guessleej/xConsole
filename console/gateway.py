@@ -221,6 +221,45 @@ class FailLimit:
             return len(self._f)
 
 
+class Routes:
+    """模型名稱 → 哪台機器哪一格。list_slots() 回 [{node, slot, kind, name, online, ctx, vision}]，
+    結果快取 ttl 秒；找不到名稱時最多每 5 秒強制重抓一次（剛改名、剛換模型的情形）。"""
+
+    def __init__(self, list_slots, ttl=30):
+        self.list_slots, self.ttl = list_slots, ttl
+        self._at, self._forced, self._rows, self._lock = 0, 0, [], threading.Lock()
+
+    def rows(self, force=False):
+        with self._lock:
+            now = time.time()
+            if force and now - self._forced < 5:
+                force = False
+            if force or now - self._at > self.ttl:
+                try:
+                    self._rows = self.list_slots()
+                except Exception:  # noqa: BLE001  # 抓不到就沿用上一次的
+                    pass
+                self._at = now
+                if force:
+                    self._forced = now
+            return list(self._rows)
+
+    def invalidate(self):
+        with self._lock:
+            self._at = 0
+
+    def find(self, name, force=False):
+        """回 (那一格, None) 或 (None, (狀態碼, 訊息, 錯誤類型))。"""
+        hits = [r for r in self.rows(force) if r["name"] == name]
+        if not hits and not force:
+            return self.find(name, force=True)
+        if not hits:
+            return None, (404, f"沒有叫 {name} 的模型；可用的模型請看 /v1/models", "model_not_found")
+        if len(hits) > 1:
+            return None, (409, f"有 {len(hits)} 格都叫 {name}，請管理員到「執行 › API 串接」把其中一格改名", "model_name_conflict")
+        return hits[0], None
+
+
 if __name__ == "__main__":
     # 自我檢查
     k = new_key()
