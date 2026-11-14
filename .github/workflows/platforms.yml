@@ -106,9 +106,12 @@ jobs:
             HOME="$H" XDG_RUNTIME_DIR="/run/user/$(id -u)" bash install/install.sh --uninstall || true
             rm -rf "$H/.xconsole" "$H/xconsole" "$H/xconsole_agent.py"
           fi
-          for p in "$H/.xconsole" "$H/xconsole" "$H/.config/systemd/user/xconsole.service" "$H/.config/systemd/user/xconsole-agent.service"; do
+          for p in "$H/xconsole" "$H/.config/systemd/user/xconsole.service" "$H/.config/systemd/user/xconsole-agent.service"; do
             [ -e "$p" ] && { echo "::error::這台已有不是 CI 裝的 xConsole（$p），CI 不覆蓋正式安裝"; exit 1; }
           done
+          # 只有 ~/.xconsole：多半是 security 的整合測試正在跑（經 systemd --user 帶起的行程會建它，那一步結束就刪），等它收掉
+          for i in $(seq 1 60); do [ -e "$H/.xconsole" ] || break; sleep 5; done
+          [ -e "$H/.xconsole" ] && { echo "::error::$H/.xconsole 不是 CI 留下的（可能是正式安裝移除後保留的資料），CI 不動它"; exit 1; }
           true
       - name: 帳密檔（只在這次 CI 用，權限 600）
         shell: bash
