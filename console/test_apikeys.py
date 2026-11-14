@@ -243,8 +243,7 @@ def main():
     check("API 設定改成別格已經在用的模型名稱 → 400（不送到代理）", st == 400 and "m1" in o.get("error", ""), (st, o))
 
     # ---- 舊共用金鑰匯入：只聽本機的格子也匯入（不是主控台換上的內部金鑰）、同一把用在兩格併成一列、太短的不收
-    import hmac as _h
-    hh = lambda k: _h.new(b"xconsole-api-key-v1", k.encode(), "sha256").hexdigest()  # noqa: E731
+    hh = gateway.key_hash
     shared, lone, short = "xc-" + "S" * 43, "xc-" + "L" * 43, "short-key"
     fake = {"/registry": {"slots": [{"id": "s1", "unit": "u", "role": "甲"}, {"id": "s2", "unit": "u", "role": "乙"},
                                     {"id": "s3", "unit": "u", "role": "丙"}, {"id": "s4", "unit": "u", "role": "丁"}]},
