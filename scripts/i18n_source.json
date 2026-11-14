@@ -5700,7 +5700,7 @@
 "pattern": false
 },
 {
-"zh": "把下面的加入碼寫進回應檔，權限只給系統管理員：Windows 只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600",
+"zh": "把下面的加入碼寫進回應檔，只有系統管理員碰得到：Windows 擁有者是 Administrators、權限只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600",
 "pattern": false
 },
 {
@@ -5716,7 +5716,7 @@
 "pattern": false
 },
 {
-"zh": "Windows 回應檔權限",
+"zh": "Windows 回應檔權限（PowerShell）",
 "pattern": false
 },
 {

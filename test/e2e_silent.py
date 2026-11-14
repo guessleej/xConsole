@@ -40,6 +40,7 @@ def write_code(path, code, ok=True):
     if WIN:
         open(path, "w", encoding="ascii").write(code + "\n")
         if ok:
+            sh(["icacls", path, "/setowner", "*S-1-5-32-544"])
             sh(["icacls", path, "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
         else:
             sh(["icacls", path, "/grant", "*S-1-5-32-545:R"])

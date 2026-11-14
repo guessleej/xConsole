@@ -20879,11 +20879,6 @@
 "ja": "xConsole のインストールパッケージを各マシンに配布して展開します（install フォルダーが入っています）",
 "ko": "xConsole 설치 패키지를 각 머신에 배포하고 압축을 풉니다(install 폴더가 들어 있습니다)"
 },
-"把下面的加入碼寫進回應檔，權限只給系統管理員：Windows 只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600": {
-"en": "Write the join code below into a response file readable only by administrators: on Windows only SYSTEM and Administrators; on Linux and macOS owned by root with mode 600",
-"ja": "下の参加コードを応答ファイルに書き込み、権限は管理者だけにします。Windows は SYSTEM と Administrators のみ、Linux と macOS は所有者 root・権限 600",
-"ko": "아래 가입 코드를 응답 파일에 쓰고 권한은 관리자만 갖게 합니다. Windows는 SYSTEM과 Administrators만, Linux와 macOS는 소유자 root, 권한 600"
-},
 "用系統管理員（Windows 可用 SYSTEM）或 root 在安裝包資料夾裡執行下面的指令；安裝程式讀完回應檔就刪掉": {
 "en": "Run the command below in the package folder as an administrator (SYSTEM works on Windows) or root; the installer deletes the response file after reading it",
 "ja": "パッケージのフォルダーで、管理者（Windows では SYSTEM も可）または root として下のコマンドを実行します。インストーラーは応答ファイルを読んだらすぐ削除します",
@@ -20898,11 +20893,6 @@
 "en": "Windows command",
 "ja": "Windows のコマンド",
 "ko": "Windows 명령"
-},
-"Windows 回應檔權限": {
-"en": "Windows response file permissions",
-"ja": "Windows の応答ファイルの権限",
-"ko": "Windows 응답 파일 권한"
 },
 "Linux／macOS 指令": {
 "en": "Linux/macOS command",
@@ -20943,5 +20933,15 @@
 "en": "This background service cannot use Metal (GPU), so models run on the CPU and will be much slower",
 "ja": "このバックグラウンドサービスでは Metal（GPU）が使えないため、モデルは CPU で動き、かなり遅くなります",
 "ko": "이 백그라운드 서비스는 Metal(GPU)을 쓸 수 없어 모델이 CPU로 실행되며 훨씬 느립니다"
+},
+"把下面的加入碼寫進回應檔，只有系統管理員碰得到：Windows 擁有者是 Administrators、權限只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600": {
+"en": "Write the join code below into a response file only administrators can touch: on Windows owned by Administrators with access for SYSTEM and Administrators only; on Linux and macOS owned by root with mode 600",
+"ja": "下の参加コードを、管理者だけが触れられる応答ファイルに書き込みます。Windows は所有者 Administrators、権限は SYSTEM と Administrators のみ。Linux と macOS は所有者 root・権限 600",
+"ko": "아래 가입 코드를 관리자만 접근할 수 있는 응답 파일에 씁니다. Windows는 소유자 Administrators, 권한은 SYSTEM과 Administrators만. Linux와 macOS는 소유자 root, 권한 600"
+},
+"Windows 回應檔權限（PowerShell）": {
+"en": "Windows response file permissions (PowerShell)",
+"ja": "Windows の応答ファイルの権限（PowerShell）",
+"ko": "Windows 응답 파일 권한(PowerShell)"
 }
 }

@@ -169,8 +169,9 @@
 | Windows | `powershell -ExecutionPolicy Bypass -File install\install.ps1 -Console <主控台:埠> -Fingerprint <指紋> -JoinCodeFile <回應檔> [-DataDrive D:]` | SYSTEM 開機自啟，資料放 `C:\ProgramData\xConsole`（或 `D:\xConsole`），開防火牆 9401 與 8090～8289 |
 
 - 加入碼**不收指令列與環境變數**（會留在行程清單與派送紀錄）：`--join-code`／`-JoinCode` 一律拒絕。只收回應檔或標準輸入（回應檔寫 `-`）。
-- 回應檔權限：Linux 與 macOS 擁有者 root、權限 600；Windows 只給 SYSTEM 與 Administrators（`icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F`）。安裝程式讀完就刪；權限不對也會刪掉，並要求到主控台作廢那個碼。
+- 回應檔權限：Linux 與 macOS 擁有者 root、權限 600；Windows 擁有者 Administrators、權限只給 SYSTEM 與 Administrators（`icacls <檔> /setowner *S-1-5-32-544; icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F`，擁有者可以自己把權限加回去，所以兩項都驗）。安裝程式讀完就刪；權限不對也會刪掉，並要求到主控台作廢那個碼。
 - 指紋是主控台目前憑證的 SHA-256，只接受這一張；主控台換成正式憑證後可以不給指紋，改用一般驗證。
+- `--data-dir` 只能用英數字與 `. _ - /`（要寫進 systemd 與 launchd 設定）；Windows 的資料夾權限整份換成只有 SYSTEM 與 Administrators，讀回來核對過才放權杖與私鑰。
 - 移除：`sudo bash install/install.sh --uninstall`（Windows `-Uninstall`），專用帳號與資料保留。
 
 **三個系統哪裡不一樣：**

@@ -114,12 +114,21 @@ def installers():
     r = subprocess.run(["bash", "-c", f"OSN={osn}\n{fn}\nperm_ok \"$1\" && echo ok || echo bad", "_", f], capture_output=True, text=True)
     want = "ok" if os.geteuid() == 0 else "bad"
     check(f"回應檔 600：擁有者{'是' if want == 'ok' else '不是'} root 時判定{'合格' if want == 'ok' else '不合格'}", r.stdout.strip() == want, r)
+    mh = body[body.index("mhome() {"):].split("\n", 1)[0]
+    r = subprocess.run(["bash", "-c", f"set -euo pipefail\nOSN={osn}\nMU=xc-no-such-user-$$\n{mh}\nH=$(mhome)\necho \"[$H]\""],
+                       capture_output=True, text=True)
+    check("專用帳號還不存在（第一次安裝）：mhome 回空字串，不會被 set -e 中斷", r.returncode == 0 and r.stdout.strip() == "[]", r)
+    check("--data-dir 有空白或中文：建帳號前就擋（systemd 會把空白拆成別的參數）",
+          "grep -q '^[A-Za-z0-9._/-]*$' || die \"--data-dir 只能用英數字" in body)
     check("install.sh 讀完回應檔就刪", 'IFS= read -r CODE < "$CODEFILE" || true\n    rm -f "$CODEFILE"' in body)
 
     ps1 = open(os.path.join(ROOT, "install", "install.ps1"), encoding="utf-8-sig").read()
     check("install.ps1：-JoinCode 一律拒絕、讀完回應檔就刪、權限只准 SYSTEM 與 Administrators",
           "ContainsKey('JoinCode')" in ps1 and "Remove-Item -LiteralPath $JoinCodeFile -Force" in ps1
           and "'S-1-5-18', 'S-1-5-32-544'" in ps1)
+    check("install.ps1：回應檔擁有者要是 SYSTEM 或 Administrators；資料夾權限整份重設並讀回核對",
+          "GetOwner([Security.Principal.SecurityIdentifier])" in ps1 and "SetAccessRuleProtection($true, $false)" in ps1
+          and "AreAccessRulesProtected" in ps1 and "/inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'" not in ps1)
     pwsh = shutil.which("pwsh") or shutil.which("powershell")
     if pwsh:
         r = subprocess.run([pwsh, "-NoProfile", "-File", os.path.join(ROOT, "install", "install.ps1"), "-JoinCode", "abc"],

@@ -64,7 +64,8 @@ mstop() {   # 停掉大量部署裝的代理服務（重裝與移除共用）
     [ -d "/run/user/$u" ] && runuser -u "$MU" -- env XDG_RUNTIME_DIR="/run/user/$u" systemctl --user disable --now xconsole-agent.service 2>/dev/null || true
   fi
 }
-mhome() { if [ "$OSN" = Darwin ]; then dscl . -read "/Users/$MU" NFSHomeDirectory 2>/dev/null | awk '{print $2}'; else getent passwd "$MU" | cut -d: -f6; fi; }
+# 專用帳號的家目錄；帳號還不存在就回空字串（不能讓 set -e／pipefail 在第一次安裝時直接中斷）
+mhome() { if [ "$OSN" = Darwin ]; then dscl . -read "/Users/$MU" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true; else getent passwd "$MU" | cut -d: -f6 || true; fi; }
 managed_uninstall() {
   mstop
   if [ "$OSN" = Darwin ]; then rm -f "/Library/LaunchDaemons/$LA.plist"
@@ -92,6 +93,11 @@ managed() {
     rm -f "$CODEFILE"
   fi
   [ -n "$CODE" ] || die "加入碼是空的"
+  # 資料夾路徑要寫進 systemd 服務檔與 launchd 設定：空白會被 systemd 拆成別的參數，先擋掉，不要等建好帳號才失敗
+  if [ -n "$DATA" ]; then
+    case "$DATA" in /*) ;; *) die "--data-dir 要是絕對路徑" ;; esac
+    printf '%s' "$DATA" | grep -q '^[A-Za-z0-9._/-]*$' || die "--data-dir 只能用英數字與 . _ - /（不能有空白或中文），例：/data/xconsole"
+  fi
 
   say "1/5 檢查這台"
   python3 -c 'import ssl, venv' 2>/dev/null || die "這台沒有 python3（含 venv）。Ubuntu：apt install python3-venv；macOS：xcode-select --install"
@@ -113,11 +119,11 @@ managed() {
     DATA="$H"
   elif [ "$OSN" = Darwin ]; then
     DATA="${DATA:-/opt/xconsole}"
-    local id
-    for id in $(seq 400 499); do
-      dscl . -search /Users UniqueID "$id" | grep -q . || dscl . -search /Groups PrimaryGroupID "$id" | grep -q . || break
+    local id="" i
+    for i in $(seq 400 499); do
+      dscl . -search /Users UniqueID "$i" | grep -q . || dscl . -search /Groups PrimaryGroupID "$i" | grep -q . || { id=$i; break; }
     done
-    [ "$id" != 499 ] || die "找不到空的帳號代號（400～499 都被用掉了）"
+    [ -n "$id" ] || die "找不到空的帳號代號（400～499 都被用掉了）"
     dscl . -create "/Groups/$MU" PrimaryGroupID "$id"
     dscl . -create "/Groups/$MU" Password '*'
     dscl . -create "/Users/$MU"
@@ -132,7 +138,7 @@ managed() {
     DATA="${DATA:-/var/lib/xconsole}"
     useradd --system --home-dir "$DATA" --shell "$(command -v nologin || echo /bin/false)" --user-group "$MU"
   fi
-  case "$DATA" in /*) ;; *) die "--data-dir 要是絕對路徑" ;; esac
+  printf '%s' "$DATA" | grep -q '^/[A-Za-z0-9._/-]*$' || die "這台的代理資料夾 $DATA 有空白或特殊字元，systemd 與 launchd 設定寫不進去；請先 --uninstall 再用 --data-dir 指定別的位置"
   if [ "$OSN" != Darwin ]; then
     # 顯示卡裝置（AMD 的 /dev/kfd、/dev/dri）要這兩個群組才開得了
     for g in video render; do getent group "$g" >/dev/null && usermod -aG "$g" "$MU"; done

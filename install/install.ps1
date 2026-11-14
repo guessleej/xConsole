@@ -26,6 +26,23 @@ $dir = Join-Path $base 'xconsole'
 $st = Join-Path $base '.xconsole'
 function Say($t) { Write-Host "`n== $t ==" }
 function Die($t) { Write-Host "`n安裝停止：$t" -ForegroundColor Red; exit 1 }
+# 權杖與私鑰所在的資料夾：整份權限換成只有 SYSTEM 與 Administrators、擁有者 Administrators，底下既有的檔案一併重設，
+# 再實際讀回來核對。icacls /grant:r 只取代指定對象的權限，資料夾原本另外給 Users 的權限會留著，所以不用它。
+function ProtectDir($p) {
+  $acl = New-Object Security.AccessControl.DirectorySecurity
+  $acl.SetAccessRuleProtection($true, $false)
+  foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') {
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid),
+      'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+  }
+  $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-544'))
+  try { Set-Acl -LiteralPath $p -AclObject $acl -ErrorAction Stop } catch { Die "設不了 $p 的權限：$($_.Exception.Message)" }
+  icacls $p /reset /T /C /Q | Out-Null
+  $got = Get-Acl -LiteralPath $p
+  $who = @($got.Access | ForEach-Object { $r = $_; try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $r.IdentityReference.Value } } | Select-Object -Unique)
+  $extra = @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544') -notcontains $_ })
+  if (-not $got.AreAccessRulesProtected -or $extra.Count) { Die "$p 的權限沒有收乾淨（還給了 $($extra -join '、')），權杖與私鑰不能放在這裡；請換一個位置或請 IT 檢查這顆磁碟的權限設定" }
+}
 function FindPy {
   $probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
   # py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
@@ -61,14 +78,21 @@ if ($Console) {
   else {
     if (-not (Test-Path -LiteralPath $JoinCodeFile -PathType Leaf)) { Die "找不到回應檔 $JoinCodeFile" }
     $okSid = @('S-1-5-18', 'S-1-5-32-544')
+    # 擁有者隨時可以改權限：一般使用者擁有的回應檔，就算權限收好了，他也能在派送前把讀取權加回去
+    $owner = try { (Get-Acl -LiteralPath $JoinCodeFile).GetOwner([Security.Principal.SecurityIdentifier]).Value } catch { '' }
     $bad = @((Get-Acl -LiteralPath $JoinCodeFile).Access | Where-Object { $_.AccessControlType -eq 'Allow' } | ForEach-Object {
       $r = $_; try { $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $r.IdentityReference.Value } } |
       Where-Object { $okSid -notcontains $_ } | Select-Object -Unique)
     $code = Get-Content -LiteralPath $JoinCodeFile -TotalCount 1
     Remove-Item -LiteralPath $JoinCodeFile -Force
+    $fix = "準備回應檔：icacls <檔> /setowner *S-1-5-32-544; icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F"
     if ($bad.Count) {
       Die ("回應檔的權限要只給 SYSTEM 與 Administrators（現在還給了 " + ($bad -join '、') + "）。別人讀得到的加入碼可能已外流，" +
-           "已刪掉這個檔，請在主控台作廢它、重新產生；準備回應檔：icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F")
+           "已刪掉這個檔，請在主控台作廢它、重新產生；$fix")
+    }
+    if ($okSid -notcontains $owner) {
+      Die ("回應檔的擁有者要是 SYSTEM 或 Administrators（現在是 $owner），擁有者可以自己把讀取權加回去。" +
+           "已刪掉這個檔，請在主控台作廢它、重新產生；$fix")
     }
   }
   if (-not $code) { Die '加入碼是空的' }
@@ -88,7 +112,7 @@ if ($Console) {
   Say "2/5 複製代理到 $dir"
   New-Item -ItemType Directory -Force -Path $st, $dir | Out-Null
   # 權杖與私鑰放在這裡：只留給 SYSTEM 與系統管理員（ProgramData 與其他磁碟的根目錄預設一般使用者讀得到）
-  icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+  ProtectDir $base
   Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'xconsole_agent.py')
   Copy-Item -Force (Join-Path $SRC 'install\join.py') (Join-Path $dir 'join.py')
 
@@ -151,7 +175,7 @@ Say "2/6 複製程式到 $dir"
 New-Item -ItemType Directory -Force -Path $st, (Join-Path $dir 'static'), (Join-Path $dir 'agent') | Out-Null
 if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
-  icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+  ProtectDir $base
 }
 foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'linkcert.py', 'groups.py', 'joincodes.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
