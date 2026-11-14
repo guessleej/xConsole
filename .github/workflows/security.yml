@@ -243,8 +243,10 @@ jobs:
           # 自建 runner 同一台還有別的工作與服務：主控台與連回通道用系統給的空埠，不固定占 9400／9402
           read -r XC_PORT XC_LINK < <(python -c 'import socket;s=[socket.socket() for _ in (0,1)];[x.bind(("127.0.0.1",0)) for x in s];print(*[x.getsockname()[1] for x in s])')
           echo "XC_PORT=$XC_PORT" >> "$GITHUB_ENV"
-          # .50 的 CI 用 rootless Docker：ZAP 容器裡的 localhost 不是主機，主機的 localhost 要走 10.0.2.2
-          case "${DOCKER_HOST:-}" in unix:///run/user/*) echo "ZAP_HOST=10.0.2.2" ;; *) echo "ZAP_HOST=localhost" ;; esac >> "$GITHUB_ENV"
+          # rootless Docker：ZAP 容器裡的 localhost 不是主機，主機的 localhost 要走 10.0.2.2。
+          # 直接問 daemon 是不是 rootless（不論是靠 DOCKER_HOST 還是 docker context 選到的都抓得到）
+          if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+            echo "ZAP_HOST=10.0.2.2"; else echo "ZAP_HOST=localhost"; fi >> "$GITHUB_ENV"
           export XCONSOLE_PORT="$XC_PORT" XCONSOLE_LINK_PORT="$XC_LINK"
           printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
             | python console/xconsole_server.py --set-credentials
