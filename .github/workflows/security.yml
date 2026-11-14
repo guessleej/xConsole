@@ -243,6 +243,8 @@ jobs:
           # 自建 runner 同一台還有別的工作與服務：主控台與連回通道用系統給的空埠，不固定占 9400／9402
           read -r XC_PORT XC_LINK < <(python -c 'import socket;s=[socket.socket() for _ in (0,1)];[x.bind(("127.0.0.1",0)) for x in s];print(*[x.getsockname()[1] for x in s])')
           echo "XC_PORT=$XC_PORT" >> "$GITHUB_ENV"
+          # .50 的 CI 用 rootless Docker：ZAP 容器裡的 localhost 不是主機，主機的 localhost 要走 10.0.2.2
+          case "${DOCKER_HOST:-}" in unix:///run/user/*) echo "ZAP_HOST=10.0.2.2" ;; *) echo "ZAP_HOST=localhost" ;; esac >> "$GITHUB_ENV"
           export XCONSOLE_PORT="$XC_PORT" XCONSOLE_LINK_PORT="$XC_LINK"
           printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
             | python console/xconsole_server.py --set-credentials
@@ -255,7 +257,7 @@ jobs:
           docker image inspect -f '{{.Id}}' ghcr.io/zaproxy/zaproxy:stable > "$RUNNER_TEMP/zap-image-before" 2>/dev/null || true
       - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
-          target: https://localhost:${{ env.XC_PORT }}
+          target: https://${{ env.ZAP_HOST }}:${{ env.XC_PORT }}
           rules_file_name: .zap/rules.tsv
           cmd_options: '-a -j'
           fail_action: true
