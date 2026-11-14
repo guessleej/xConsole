@@ -5248,8 +5248,14 @@ function showOneTime(rows, errors) {
     d.appendChild(el("p", "note bad", `有 ${errors.length} 行沒建立：` + errors.slice(0, 5).map((e) => `第 ${e.row} 行 ${e.username}：${e.error}`).join("；")));
   }
   const dl = el("button", "btn sm primary", "下載成 CSV");
+  // 逗號、引號要加引號包起來；= + - @ 開頭的前面補 '，免得試算表把名字當公式執行
+  const cell = (v) => {
+    let t = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
   dl.onclick = () => download(`xconsole-帳號-${new Date().toISOString().slice(0, 10)}.csv`,
-    "\ufeff帳號,顯示名稱,一次性密碼\n" + rows.map((r) => [r.username, r.display, r.password].join(",")).join("\n") + "\n", "text/csv");
+    "\ufeff帳號,顯示名稱,一次性密碼\r\n" + rows.map((r) => [r.username, r.display, r.password].map(cell).join(",")).join("\r\n") + "\r\n", "text/csv");
   const a = el("div", "slot-actions");
   a.appendChild(dl);
   d.appendChild(a);

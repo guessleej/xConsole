@@ -6088,7 +6088,7 @@
 "pattern": false
 },
 {
-"zh": "ufeff帳號,顯示名稱,一次性密碼\n",
+"zh": "ufeff帳號,顯示名稱,一次性密碼r\n",
 "pattern": false
 },
 {
@@ -10220,6 +10220,10 @@
 "pattern": false
 },
 {
+"zh": "第三方 API 用的是單位付費的金鑰，只有管理員能用",
+"pattern": false
+},
+{
 "zh": "沒有「{0}」這個工作資料夾，請先建立",
 "pattern": true
 },
@@ -10593,6 +10597,10 @@
 },
 {
 "zh": "金鑰不對",
+"pattern": false
+},
+{
+"zh": "這把金鑰的帳號已停用",
 "pattern": false
 },
 {
