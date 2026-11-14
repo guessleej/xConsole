@@ -5502,6 +5502,23 @@ function openAddMachine(group) {
         "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
         "llama.cpp 不用自己編：加入後在「這台的設定」按一鍵安裝，會依顯示卡下載官方預編譯版（NVIDIA 用 CUDA、AMD／Intel 用 Vulkan）",
         "下載時只接受主控台這一張憑證（比對整張憑證的 SHA-256），不是關掉驗證"].forEach((t) => need.appendChild(el("li", null, t)));
+      } else if (k === "silent") {
+        // 大量部署：安裝包先派送到每台，加入碼放回應檔，指令裡只有主控台位址與憑證指紋
+        osBox.appendChild(el("h4", "pick-h", "用 Intune、SCCM、Jamf、Ansible 或映像派送，不必到每台貼指令"));
+        const steps = el("ol", "small need-list");
+        ["把 xConsole 安裝包派送到每台並解開（裡面有 install 資料夾）",
+          "把下面的加入碼寫進回應檔，只有系統管理員碰得到：Windows 擁有者是 Administrators、權限只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600",
+          "用系統管理員（Windows 可用 SYSTEM）或 root 在安裝包資料夾裡執行下面的指令；安裝程式讀完回應檔就刪掉"].forEach((t) => steps.appendChild(el("li", null, t)));
+        osBox.appendChild(steps);
+        osBox.appendChild(copyRow("加入碼（寫進回應檔）", r.silent.code));
+        osBox.appendChild(copyRow("Windows 指令", r.silent.windows));
+        osBox.appendChild(copyRow("Windows 回應檔權限（PowerShell）", "icacls C:\\Windows\\Temp\\xconsole-join.txt /setowner *S-1-5-32-544; icacls C:\\Windows\\Temp\\xconsole-join.txt /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F"));
+        osBox.appendChild(copyRow("Linux／macOS 指令", r.silent.unix));
+        ["加入碼不放在指令列也不放環境變數：會留在行程清單與派送紀錄。安裝程式看到 -JoinCode 參數一律拒絕；也可以用標準輸入給（回應檔寫成 -）",
+          "裝成開機自動啟動，沒有人登入也會跑：Windows 是 SYSTEM 排程；Linux 建專用帳號 xconsole；macOS 建隱藏帳號 _xconsole、裝成 LaunchDaemon",
+          "Windows 可以加 -DataDrive D: 把程式、資料與模型放到 D 槽；Linux 與 macOS 用 --data-dir",
+          "指令裡的指紋是主控台目前憑證的 SHA-256，安裝程式只接受這一張；主控台換成正式憑證後指紋會變，請重新抄，或拿掉指紋改用一般驗證",
+          "macOS 的背景服務用不到 Metal 時，模型改用 CPU 跑，機器頁的記憶體區會標出來"].forEach((t) => need.appendChild(el("li", null, t)));
       } else {
         osBox.appendChild(el("h4", "pick-h", "到那台機器上，用一般帳號（不要用 root）開終端機貼上執行"));
         osBox.appendChild(copyRow("安裝指令", r.command));
@@ -5513,7 +5530,7 @@ function openAddMachine(group) {
       }
       osBox.appendChild(need);
     };
-    [["unix", "Linux／macOS"], ["win", "Windows"]].forEach(([k, label]) => {
+    [["unix", "Linux／macOS"], ["win", "Windows"], ["silent", "大量部署"]].forEach(([k, label]) => {
       const b = el("button", null, label);
       b.dataset.k = k;
       b.onclick = () => showOs(k);

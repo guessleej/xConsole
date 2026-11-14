@@ -443,9 +443,23 @@ def apple_gpu_limit(total):
     return int(total * (0.75 if total > 36 * GIB else 2 / 3))
 
 
+@functools.lru_cache(maxsize=1)
+def metal_ok():
+    """這個行程拿不拿得到 Metal 裝置。大量部署裝成 LaunchDaemon（背景服務、沒有登入工作階段）時可能拿不到，
+    那時 llama.cpp 只能用 CPU 跑：GPU 就不列，免得准入照 GPU 的上限算，機器頁也照實標出來。"""
+    try:
+        import ctypes
+        ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")   # 少了它，部分版本拿不到裝置
+        f = ctypes.CDLL("/System/Library/Frameworks/Metal.framework/Metal").MTLCreateSystemDefaultDevice
+        f.restype = ctypes.c_void_p
+        return bool(f())
+    except (OSError, AttributeError):
+        return False
+
+
 def probe_apple():
     """Apple Silicon：一顆晶片、一個統一記憶體池。GPU 已用量讀 IOAccelerator 的統計（ioreg）。"""
-    if OS != "darwin" or platform_machine() != "arm64":
+    if OS != "darwin" or platform_machine() != "arm64" or not metal_ok():
         return None
     total = int(_sysctl_n("hw.memsize") or 0)
     _, out, _ = sh(["ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"], timeout=10)
@@ -4764,6 +4778,8 @@ def pools(reg, hw):
         if OS == "darwin" and vram_total:
             # Apple Silicon：GPU 只能用到統一記憶體的一部分（Metal 的上限），模型超過就載不起來
             out["unified"]["gpu_limit_gib"] = round(vram_total, 1)
+        elif OS == "darwin" and platform_machine() == "arm64" and not metal_ok():
+            out["model_note"] = "這個背景服務拿不到 Metal（GPU），模型改用 CPU 跑，速度會慢很多"
         elif OS == "windows" and vram_total and not has_nvidia():
             # Windows 的內顯：專用記憶體（BIOS 切的那塊）＋共用 GPU 記憶體（Windows 固定讓 GPU 借最多一半的系統記憶體）。
             # 有的驅動在登錄檔回報的「顯存」已經含共用的部分（HP 的 890M 回 32 GB，跟整台記憶體一樣大）：

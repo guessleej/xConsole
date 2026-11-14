@@ -20859,6 +20859,91 @@
 "ja": "この機器ではデスクトップを操作できません：デスクトップヘルパーが動いていません。操作したいアカウントでこの機器のデスクトップにログインしてください",
 "ko": "이 기기는 데스크톱을 조작할 수 없습니다: 데스크톱 도우미가 실행 중이 아닙니다. 조작할 계정으로 이 기기의 데스크톱에 로그인하세요"
 },
+"' <<<\"$CODE\" | curl -sSk -m 150 --pinnedpubkey \"$PIN\" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{http_code}' \"$C/api/join\"\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '": {
+"en": "' <<<\"$CODE\" | curl -sSk -m 150 --pinnedpubkey \"$PIN\" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{http_code}' \"$C/api/join\"\n) || { echo \"Cannot reach the console $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"ja": "' <<<\"$CODE\" | curl -sSk -m 150 --pinnedpubkey \"$PIN\" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{http_code}' \"$C/api/join\"\n) || { echo \"コンソール $C に接続できません\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"ko": "' <<<\"$CODE\" | curl -sSk -m 150 --pinnedpubkey \"$PIN\" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{http_code}' \"$C/api/join\"\n) || { echo \"콘솔 $C에 연결할 수 없습니다\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '"
+},
+"&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"代理沒有起來，請看記錄：$LOGHINT\"; exit 1; }\necho \"== 4/4 加入主控台 ==\"\nRESP=$(XC_LINGER=\"$LINGER\" \"$PY\" -c '{10}'": {
+"en": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"The agent did not start; see the log: $LOGHINT\"; exit 1; }\necho \"== 4/4 Join the console ==\"\nRESP=$(XC_LINGER=\"$LINGER\" \"$PY\" -c '{10}'",
+"ja": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"エージェントが起動しませんでした。ログを確認してください：$LOGHINT\"; exit 1; }\necho \"== 4/4 コンソールに参加 ==\"\nRESP=$(XC_LINGER=\"$LINGER\" \"$PY\" -c '{10}'",
+"ko": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"에이전트가 시작되지 않았습니다. 로그를 확인하세요: $LOGHINT\"; exit 1; }\necho \"== 4/4 콘솔에 가입 ==\"\nRESP=$(XC_LINGER=\"$LINGER\" \"$PY\" -c '{10}'"
+},
+"用 Intune、SCCM、Jamf、Ansible 或映像派送，不必到每台貼指令": {
+"en": "Deploy with Intune, SCCM, Jamf, Ansible or a disk image instead of pasting a command on each machine",
+"ja": "Intune、SCCM、Jamf、Ansible やイメージ配布で展開し、1 台ずつコマンドを貼る必要はありません",
+"ko": "Intune, SCCM, Jamf, Ansible 또는 이미지 배포로 설치하면 머신마다 명령을 붙여 넣을 필요가 없습니다"
+},
+"把 xConsole 安裝包派送到每台並解開（裡面有 install 資料夾）": {
+"en": "Push the xConsole package to each machine and unpack it (it contains the install folder)",
+"ja": "xConsole のインストールパッケージを各マシンに配布して展開します（install フォルダーが入っています）",
+"ko": "xConsole 설치 패키지를 각 머신에 배포하고 압축을 풉니다(install 폴더가 들어 있습니다)"
+},
+"用系統管理員（Windows 可用 SYSTEM）或 root 在安裝包資料夾裡執行下面的指令；安裝程式讀完回應檔就刪掉": {
+"en": "Run the command below in the package folder as an administrator (SYSTEM works on Windows) or root; the installer deletes the response file after reading it",
+"ja": "パッケージのフォルダーで、管理者（Windows では SYSTEM も可）または root として下のコマンドを実行します。インストーラーは応答ファイルを読んだらすぐ削除します",
+"ko": "패키지 폴더에서 관리자(Windows는 SYSTEM도 가능) 또는 root로 아래 명령을 실행합니다. 설치 프로그램은 응답 파일을 읽은 뒤 바로 삭제합니다"
+},
+"加入碼（寫進回應檔）": {
+"en": "Join code (put it in the response file)",
+"ja": "参加コード（応答ファイルに書く）",
+"ko": "가입 코드(응답 파일에 기록)"
+},
+"Windows 指令": {
+"en": "Windows command",
+"ja": "Windows のコマンド",
+"ko": "Windows 명령"
+},
+"Linux／macOS 指令": {
+"en": "Linux/macOS command",
+"ja": "Linux／macOS のコマンド",
+"ko": "Linux/macOS 명령"
+},
+"加入碼不放在指令列也不放環境變數：會留在行程清單與派送紀錄。安裝程式看到 -JoinCode 參數一律拒絕；也可以用標準輸入給（回應檔寫成 -）": {
+"en": "The join code never goes on the command line or in an environment variable: both end up in process lists and deployment logs. The installer refuses a -JoinCode parameter; you can also pass the code on standard input (use - as the response file)",
+"ja": "参加コードはコマンドラインにも環境変数にも置きません。プロセス一覧や配布ログに残るためです。インストーラーは -JoinCode パラメーターを必ず拒否します。標準入力で渡すこともできます（応答ファイルに - を指定）",
+"ko": "가입 코드는 명령줄이나 환경 변수에 넣지 않습니다. 프로세스 목록과 배포 기록에 남기 때문입니다. 설치 프로그램은 -JoinCode 매개변수를 항상 거부합니다. 표준 입력으로 줄 수도 있습니다(응답 파일을 - 로 지정)"
+},
+"裝成開機自動啟動，沒有人登入也會跑：Windows 是 SYSTEM 排程；Linux 建專用帳號 xconsole；macOS 建隱藏帳號 _xconsole、裝成 LaunchDaemon": {
+"en": "Installs to start at boot and runs with nobody signed in: a SYSTEM scheduled task on Windows, a dedicated xconsole account on Linux, and a hidden _xconsole account with a LaunchDaemon on macOS",
+"ja": "起動時に自動開始し、誰もログインしていなくても動きます。Windows は SYSTEM のタスク、Linux は専用アカウント xconsole、macOS は隠しアカウント _xconsole の LaunchDaemon です",
+"ko": "부팅 시 자동 시작되며 아무도 로그인하지 않아도 실행됩니다. Windows는 SYSTEM 예약 작업, Linux는 전용 계정 xconsole, macOS는 숨김 계정 _xconsole의 LaunchDaemon입니다"
+},
+"Windows 可以加 -DataDrive D: 把程式、資料與模型放到 D 槽；Linux 與 macOS 用 --data-dir": {
+"en": "On Windows, add -DataDrive D: to put the program, data and models on drive D; on Linux and macOS use --data-dir",
+"ja": "Windows では -DataDrive D: を付けると、プログラム・データ・モデルを D ドライブに置けます。Linux と macOS は --data-dir を使います",
+"ko": "Windows에서는 -DataDrive D: 를 붙이면 프로그램, 데이터, 모델을 D 드라이브에 둡니다. Linux와 macOS는 --data-dir 를 씁니다"
+},
+"指令裡的指紋是主控台目前憑證的 SHA-256，安裝程式只接受這一張；主控台換成正式憑證後指紋會變，請重新抄，或拿掉指紋改用一般驗證": {
+"en": "The fingerprint in the command is the SHA-256 of the console's current certificate, and the installer accepts only that one. It changes when the console gets a proper certificate: copy it again, or drop the fingerprint and use normal verification",
+"ja": "コマンドの指紋はコンソールの現在の証明書の SHA-256 で、インストーラーはこの 1 枚だけを受け入れます。正式な証明書に替えると指紋が変わるので、写し直すか、指紋を外して通常の検証を使ってください",
+"ko": "명령의 지문은 콘솔 현재 인증서의 SHA-256이며 설치 프로그램은 이 인증서만 받아들입니다. 정식 인증서로 바꾸면 지문이 바뀌므로 다시 복사하거나 지문을 빼고 일반 검증을 사용하세요"
+},
+"macOS 的背景服務用不到 Metal 時，模型改用 CPU 跑，機器頁的記憶體區會標出來": {
+"en": "If the macOS background service cannot use Metal, models run on the CPU, and the memory section of the machine page says so",
+"ja": "macOS のバックグラウンドサービスで Metal が使えない場合、モデルは CPU で動き、マシンページのメモリ欄に表示されます",
+"ko": "macOS 백그라운드 서비스에서 Metal을 쓸 수 없으면 모델은 CPU로 실행되며 머신 페이지의 메모리 영역에 표시됩니다"
+},
+"大量部署": {
+"en": "Bulk deploy",
+"ja": "一括展開",
+"ko": "대량 배포"
+},
+"這個背景服務拿不到 Metal（GPU），模型改用 CPU 跑，速度會慢很多": {
+"en": "This background service cannot use Metal (GPU), so models run on the CPU and will be much slower",
+"ja": "このバックグラウンドサービスでは Metal（GPU）が使えないため、モデルは CPU で動き、かなり遅くなります",
+"ko": "이 백그라운드 서비스는 Metal(GPU)을 쓸 수 없어 모델이 CPU로 실행되며 훨씬 느립니다"
+},
+"把下面的加入碼寫進回應檔，只有系統管理員碰得到：Windows 擁有者是 Administrators、權限只給 SYSTEM 與 Administrators；Linux 與 macOS 擁有者 root、權限 600": {
+"en": "Write the join code below into a response file only administrators can touch: on Windows owned by Administrators with access for SYSTEM and Administrators only; on Linux and macOS owned by root with mode 600",
+"ja": "下の参加コードを、管理者だけが触れられる応答ファイルに書き込みます。Windows は所有者 Administrators、権限は SYSTEM と Administrators のみ。Linux と macOS は所有者 root・権限 600",
+"ko": "아래 가입 코드를 관리자만 접근할 수 있는 응답 파일에 씁니다. Windows는 소유자 Administrators, 권한은 SYSTEM과 Administrators만. Linux와 macOS는 소유자 root, 권한 600"
+},
+"Windows 回應檔權限（PowerShell）": {
+"en": "Windows response file permissions (PowerShell)",
+"ja": "Windows の応答ファイルの権限（PowerShell）",
+"ko": "Windows 응답 파일 권한(PowerShell)"
+},
 "從這台本機、主控台經網路、加密入口各打一次，連工具呼叫一起驗，確認 IDE 真的連得上": {
 "en": "Test once from this machine, once from the console over the network, and once through the encrypted gateway, including tool calls, to confirm the IDE can really connect",
 "ja": "このマシン、コンソールからネットワーク経由、暗号化ゲートウェイ経由でそれぞれ一度ずつ、ツール呼び出しも含めて試し、IDE が本当に接続できるか確認します",
