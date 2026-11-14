@@ -1743,6 +1743,41 @@ def key_revoke(kid, by):
     return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {"name": cur["name"]}
 
 
+def gateway_slots():
+    """每台機器、每一格有在跑模型的欄位叫什麼名字（加密入口依本文的 model 找要送哪一格）。各台平行問。"""
+    def one(n):
+        code, reg = call_node(n["id"], "/registry", timeout=15)
+        rows = []
+        for s in (reg.get("slots") or []) if code == 200 else []:
+            if not s.get("unit"):
+                continue
+            c, info = apiinfo_brief(n["id"], s["id"], timeout=15)
+            if c == 200 and info.get("model_name"):
+                rows.append({"node": n["id"], "slot": s["id"], "kind": info.get("kind"), "name": info["model_name"],
+                             "online": bool(info.get("online")), "ctx": info.get("max_context"), "vision": bool(info.get("vision"))})
+        return rows
+    nodes = fleet()["nodes"]
+    if not nodes:
+        return []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(nodes))) as ex:
+        return [r for rows in ex.map(one, nodes) for r in rows]
+
+
+GW_ROUTES = gateway.Routes(gateway_slots)
+GW_INFLIGHT = gateway.Inflight()
+GW_FAILS = gateway.FailLimit()
+_GW_TOUCH, _GW_TOUCH_LOCK = {}, threading.Lock()
+
+
+def gateway_touch(kid, ip):
+    """最後使用時間每把金鑰每分鐘最多寫一次，不每個請求都寫資料庫。"""
+    with _GW_TOUCH_LOCK:
+        if time.time() - _GW_TOUCH.get(kid, 0) < 60:
+            return
+        _GW_TOUCH[kid] = time.time()
+    STORE.key_touch(kid, ip)
+
+
 CHAT_ROLES = ("system", "user", "assistant", "tool")
 
 
@@ -2354,6 +2389,149 @@ class Handler(BaseHTTPRequestHandler):
                 pass
         return None
 
+    # ---- 加密入口 /v1：IDE 用個別金鑰呼叫模型（不認網頁的登入 cookie、不回 CORS 標頭）
+    def _oai(self, code, message, typ, extra=None):
+        """OpenAI 格式的錯誤：IDE 才看得懂、才會把原因顯示出來。"""
+        self._send(code, json.dumps({"error": {"message": message, "type": typ, "code": typ}}, ensure_ascii=False).encode(),
+                   "application/json; charset=utf-8", extra)
+
+    def _gateway(self, method):
+        u = urlparse(self.path)
+        sub = u.path[len("/v1/"):].strip("/") if u.path.startswith("/v1/") else ""
+        if re.search(r"(^|&)(key|api_key|apikey|token|access_token)=", u.query or "", re.I):
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(400, "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）", "invalid_request")
+        key = gateway.presented_key(self.headers)
+        row = STORE.key_by_hash(gateway.key_hash(key)) if key else None
+        if not row or gateway.state(row) != "active":
+            if method == "POST" and self._body(MAX_ANON_BODY) is None:
+                return None
+            self._headers_done()
+            if GW_FAILS.blocked(self.ip):
+                return self._oai(429, "金鑰錯太多次，請 15 分鐘後再試", "rate_limited", {"Retry-After": "900"})
+            if GW_FAILS.add(self.ip):                   # 每個來源每一輪只記一筆，免得灌爆稽核表
+                STORE.audit("", self.ip, "gateway.auth", sub, False,
+                            {"reason": "沒帶金鑰" if not key else "金鑰不對" if not row else gateway.state(row)})
+            time.sleep(0.3)
+            msg = ("沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>" if not key else
+                   "金鑰不對" if not row else "這把金鑰已撤銷" if row.get("revoked") else "這把金鑰已過期")
+            return self._oai(401, msg, "invalid_api_key")
+        promote = getattr(self.server, "promote", None)
+        if promote is not None and not promote("key:" + row["id"]):
+            # 已驗過金鑰的連線依金鑰計，不算進來源 IP 的 64 條：一間教室在同一個 NAT 後面也不會互相擋
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            self.close_connection = True
+            return self._oai(429, "這把金鑰同時開的連線太多", "rate_limited", {"Retry-After": "5"})
+        want = gateway.PATHS.get(sub) or gateway.STRATA_PATHS.get(sub)
+        if not want:
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(404, f"加密入口沒有 /v1/{sub}", "not_found")
+        if want != method:
+            if method == "POST":
+                self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(405, f"/v1/{sub} 要用 {want}", "method_not_allowed")
+        if sub == "models":
+            gateway_touch(row["id"], self.ip)
+            rows = [r for r in GW_ROUTES.rows() if r["online"] and gateway.allows(row, f"{r['node']}/{r['slot']}")]
+            names = [r["name"] for r in rows]
+            return self._json(200, {"object": "list", "data": [
+                {"id": r["name"], "object": "model", "created": 0, "owned_by": "xconsole",
+                 **({"context_length": r["ctx"]} if r.get("ctx") else {})} for r in rows if names.count(r["name"]) == 1]})
+        if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._oai(415, "只接受 application/json", "invalid_request")
+        body = self._body(CHAT_BODY)
+        self._headers_done()
+        if body is None:
+            return self._oai(413, "請求內容太大（上限 16 MB）", "invalid_request")
+        if not isinstance(body, dict) or not isinstance(body.get("model"), str) or not body["model"]:
+            return self._oai(400, "本文要是 JSON 物件，並帶 model", "invalid_request")
+        hit, err = GW_ROUTES.find(body["model"])
+        if err:
+            return self._oai(err[0], err[1], err[2])
+        sk = f"{hit['node']}/{hit['slot']}"
+        if not gateway.allows(row, sk):
+            return self._oai(403, f"這把金鑰沒有被授權用 {body['model']}", "permission_denied")
+        if sub in gateway.STRATA_PATHS and hit.get("kind") != "strata":
+            return self._oai(404, f"{body['model']} 不支援 /v1/{sub}，請用 /v1/chat/completions", "not_found")
+        if not GW_INFLIGHT.acquire(row["id"], int(row.get("max_inflight") or gateway.DEFAULT_INFLIGHT)):
+            return self._oai(429, f"這把金鑰同時進行中的請求已達上限（{row.get('max_inflight')}），請等前一個回完", "rate_limited",
+                             {"Retry-After": "5"})
+        injected = False
+        if sub in ("chat/completions", "completions") and body.get("stream") is True \
+                and not (body.get("stream_options") or {}).get("include_usage"):
+            body["stream_options"] = {**(body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}),
+                                      "include_usage": True}
+            injected = True
+        status, usage = 0, (0, 0)
+        try:
+            status, usage = self._gateway_forward(hit, sub, body, injected)
+        finally:
+            GW_INFLIGHT.release(row["id"])
+            STORE.usage_add(row["id"], gateway.day(), hit["node"], hit["slot"], status == 200, *usage)
+            gateway_touch(row["id"], self.ip)
+        return None
+
+    def _gateway_forward(self, hit, sub, body, injected):
+        """經代理送給模型。回 (狀態碼, (輸入 token, 輸出 token))。"""
+        req, ctx = node_request(hit["node"], f"/relay/{hit['slot']}",
+                                json.dumps({"path": sub, "method": "POST", "body": body}).encode())
+        if req is None:
+            self._oai(502, ctx, "server_error")
+            return 502, (0, 0)
+        try:
+            resp = agent_open(req, ctx, 600)
+        except urllib.error.HTTPError as exc:
+            raw = exc.read(4 * 1024 * 1024) if exc.fp else b""
+            try:
+                obj = json.loads(raw or b"{}")
+            except ValueError:
+                obj = None
+            if exc.code == 404 and isinstance(obj, dict) and obj.get("error") == "找不到":
+                self._oai(502, "這台的代理是舊版，還不支援加密入口；請到「設定 › 版本與更新」更新代理", "server_error")
+                return 502, (0, 0)
+            if isinstance(obj, dict) and isinstance(obj.get("error"), str):   # 代理自己的錯誤（連不到模型等）改成 OpenAI 格式
+                self._oai(exc.code, obj["error"], "server_error" if exc.code >= 500 else "invalid_request")
+            else:
+                self._send(exc.code, raw, exc.headers.get("Content-Type") or "application/json")
+            return exc.code, (0, 0)
+        except Exception as exc:  # noqa: BLE001
+            self._oai(502, f"連不上那台的代理：{str(exc)[:120]}", "server_error")
+            return 502, (0, 0)
+        with resp:
+            ctype = resp.headers.get("Content-Type") or "application/json"
+            if "event-stream" not in ctype:
+                raw = resp.read(64 * 1024 * 1024)
+                try:
+                    usage = gateway.usage_of(json.loads(raw).get("usage"))
+                except (ValueError, AttributeError):
+                    usage = (0, 0)
+                self._send(resp.status, raw, ctype)
+                return resp.status, usage
+            su = gateway.StreamUsage(injected)
+            self.send_response(resp.status)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Connection", "close")
+            self._sec_headers()
+            self.end_headers()
+            self.close_connection = True
+            try:
+                for line in resp:
+                    if su.feed(line):
+                        self.wfile.write(line)
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, TimeoutError):
+                pass                                   # IDE 按了停止：模型那邊也跟著斷
+            return resp.status, (su.prompt, su.completion)
+
     def _update_upload(self, ctype):
         """手動上傳更新包（不能連外的機器）：本文就是 .tar.gz，sha256 放在網址查詢字串（管理者從 GitHub 版本頁抄來）。"""
         if not self.user:
@@ -2733,6 +2911,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/preview/([A-Za-z0-9_-]{16,40})", path)
         if m:
             return self._preview(m.group(1))
+        if path == "/v1" or path.startswith("/v1/"):
+            return self._gateway("GET")
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
@@ -2937,6 +3117,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/v1" or path.startswith("/v1/"):
+            return self._gateway("POST")
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         m = re.fullmatch(r"/api/node/([\w.-]+)/library/upload", path)
         if m:

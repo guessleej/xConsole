@@ -155,6 +155,38 @@ def main():
     req("POST", "/api/keys/settings", {"public_url": ""})
     check("  清空就回到預設", not req("GET", "/api/keys")[1]["url_custom"])
 
+    # ---- 主控台先升級、代理還是舊版（不認得 /relay）：講清楚要更新代理，不要回看不懂的 404
+    import io
+    x.GW_ROUTES.list_slots = lambda: [{"node": "n1", "slot": "brain", "kind": "llama", "name": "m1", "online": True, "ctx": 4096},
+                                      {"node": "n1", "slot": "b2", "kind": "llama", "name": "dup", "online": True},
+                                      {"node": "n1", "slot": "b3", "kind": "llama", "name": "dup", "online": True}]
+    x.GW_ROUTES.invalidate()
+    x.node_request = lambda nid, path, data, ctype="application/json": (urllib.request.Request("https://127.0.0.1:1" + path, data=data), None)
+
+    def old_agent(req, ctx, timeout):
+        raise urllib.error.HTTPError(req.full_url, 404, "nf", {"Content-Type": "application/json"},
+                                     io.BytesIO(json.dumps({"error": "找不到"}).encode()))
+    x.agent_open = old_agent
+    k = out2["key"]
+
+    def v1(path, body):
+        r = urllib.request.Request(BASE + path, data=json.dumps(body).encode(), method="POST",
+                                   headers={"Content-Type": "application/json", "Authorization": f"Bearer {k}"})
+        try:
+            resp = urllib.request.urlopen(r, timeout=20)
+        except urllib.error.HTTPError as e:
+            resp = e
+        return resp.status, json.loads(resp.read() or b"{}")
+    st, o = v1("/v1/chat/completions", {"model": "m1", "messages": [{"role": "user", "content": "hi"}]})
+    check("代理是舊版 → 502 並說要更新代理", st == 502 and "更新代理" in o["error"]["message"], (st, o))
+    u = x.STORE.usage_by_key(gateway.day())[out2["item"]["id"]]
+    check("  記成一次錯誤", u["errors"] == 2 and u["requests"] == 3, u)
+    st, o = v1("/v1/chat/completions", {"model": "dup", "messages": [{"role": "user", "content": "hi"}]})
+    check("兩格同名 → 409，請管理員改名", st == 409 and o["error"]["type"] == "model_name_conflict", (st, o))
+    r = urllib.request.Request(BASE + "/v1/models", headers={"Authorization": f"Bearer {k}"})
+    names = [m["id"] for m in json.loads(urllib.request.urlopen(r, timeout=20).read())["data"]]
+    check("  /v1/models 不列重名的模型", names == ["m1"], names)
+
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1
 
