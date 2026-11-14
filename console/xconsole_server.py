@@ -51,6 +51,7 @@ import agentlink  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
+import gateway  # noqa: E402
 from store import Store  # noqa: E402
 
 # Windows 以 SYSTEM 帳號開機自啟時沒有一般的家目錄：安裝程式用 --home 指到 C:\ProgramData\xConsole
@@ -1654,6 +1655,81 @@ def provider_save(body):
         "ca": bool(ca), "cn_origin": provider_public(saved)["cn_origin"]}
 
 
+# ---------------------------------------------------------------- 加密入口的金鑰（/v1）
+
+GATEWAY_URL_RX = re.compile(r"https://[A-Za-z0-9.\-\[\]:]{1,255}(/[\w.\-/]{0,100})?")
+
+
+def gateway_url():
+    """IDE 要填的網址。管理者有填就用填的（例：前面另有反向代理走 443）；沒填就用主控台憑證上的第一個名稱。"""
+    u = (fleet().get("gateway") or {}).get("public_url")
+    if u:
+        return u
+    h = (hostnames() or ["127.0.0.1"])[0]
+    h = f"[{h}]" if ":" in h and not h.startswith("[") else h
+    return f"https://{h}:{PORT}/v1"
+
+
+def key_slots_ok(slots):
+    """金鑰能用的模型：每一格的機器都要在納管清單裡（格子可以還沒建，之後建了就能用）。"""
+    if slots == "*":
+        return None
+    ids = {n["id"] for n in fleet()["nodes"]}
+    bad = [s for s in slots if s.split("/", 1)[0] not in ids]
+    return f"這些機器不在納管清單裡：{', '.join(bad)[:120]}" if bad else None
+
+
+def keys_overview(owner=None):
+    use = STORE.usage_by_key(gateway.month_start())
+    zero = {"requests": 0, "errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
+    return {"items": [gateway.public(r, use.get(r["id"], zero)) for r in STORE.key_list(owner)],
+            "url": gateway_url(), "url_custom": bool((fleet().get("gateway") or {}).get("public_url")),
+            "limits": {"name": gateway.NAME_MAX, "inflight": gateway.INFLIGHT_MAX, "default_inflight": gateway.DEFAULT_INFLIGHT}}
+
+
+def key_create(body, by, owner=None):
+    """回 (狀態碼, 回應, 稽核細節)。完整金鑰只在這次回傳，資料庫只留雜湊。"""
+    f, err = gateway.check_fields(body)
+    if err:
+        return 400, {"error": err}, None
+    err = key_slots_ok(f["slots"])
+    if err:
+        return 400, {"error": err}, None
+    key = gateway.new_key()
+    row = {"id": secrets.token_hex(4), "name": f["name"], "owner": owner, "prefix": key[:8], "hash": gateway.key_hash(key),
+           "slots": f["slots"], "max_inflight": f["max_inflight"], "created": time.time(), "created_by": by or "",
+           "expires": f["expires"], "revoked": None, "revoked_by": None, "last_used": None, "last_ip": None, "source": "new"}
+    STORE.key_insert(row)
+    return 200, {"ok": True, "key": key, "item": gateway.public(row), "url": gateway_url()}, \
+        {"id": row["id"], "name": f["name"], "slots": f["slots"], "max_inflight": f["max_inflight"], "expires": f["expires"]}
+
+
+def key_update(kid, body):
+    cur = STORE.key_get(kid)
+    if not cur:
+        return 404, {"error": "沒有這把金鑰"}, None
+    if cur.get("revoked"):
+        return 409, {"error": "這把金鑰已撤銷，不能再改；要用請產生一把新的"}, None
+    f, err = gateway.check_fields(body, partial=True)
+    if err:
+        return 400, {"error": err}, None
+    if "slots" in f:
+        err = key_slots_ok(f["slots"])
+        if err:
+            return 400, {"error": err}, None
+    STORE.key_update(kid, f)
+    return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {k: v for k, v in f.items()}
+
+
+def key_revoke(kid, by):
+    cur = STORE.key_get(kid)
+    if not cur:
+        return 404, {"error": "沒有這把金鑰"}, None
+    if not STORE.key_revoke(kid, by):
+        return 409, {"error": "這把金鑰已經撤銷了"}, None
+    return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {"name": cur["name"]}
+
+
 CHAT_ROLES = ("system", "user", "assistant", "tool")
 
 
@@ -2751,6 +2827,8 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             code, out = chats.load(STORE, chat_unseal, self.user, m.group(1))
             return self._json(code, out)
+        if path == "/api/keys":
+            return self._json(200, keys_overview())
         if path == "/api/providers":
             return self._json(200, {"items": [provider_public(p) for p in STORE.provider_list()],
                                     "presets": PROVIDER_PRESETS})
@@ -3091,6 +3169,23 @@ class Handler(BaseHTTPRequestHandler):
             if err:
                 return self._json(400, {"error": err})
             return self._json(200, {"url": f"/preview/{pid}", "id": pid, "expires_at": time.time() + PREVIEW_TTL})
+        # ---- 加密入口的金鑰
+        if path == "/api/keys/create":
+            code, out, det = key_create(body, self.user)
+            self._audit("apikey.create", (det or {}).get("id", ""), code == 200, det or {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/keys/([0-9a-f]{8})/(update|revoke)", path)
+        if m:
+            code, out, det = key_update(m.group(1), body) if m.group(2) == "update" else key_revoke(m.group(1), self.user)
+            self._audit("apikey." + m.group(2), m.group(1), code == 200, det or {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/keys/settings":
+            u = str(body.get("public_url") or "").strip().rstrip("/")
+            if u and not (GATEWAY_URL_RX.fullmatch(u) and u.endswith("/v1")):
+                return self._json(400, {"error": "加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1"})
+            update_fleet(lambda c: c.setdefault("gateway", {}).__setitem__("public_url", u or None))
+            self._audit("apikey.settings", "", True, {"public_url": u or None})
+            return self._json(200, {"ok": True, "url": gateway_url()})
         # ---- 第三方 API
         if path == "/api/providers/save":
             code, out, det = provider_save(body)

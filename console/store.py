@@ -7,6 +7,7 @@
 import hashlib
 import json
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -71,6 +72,14 @@ class Store:
         CREATE TABLE IF NOT EXISTS chat_blobs(
           id TEXT PRIMARY KEY, chat TEXT, user TEXT, mime TEXT, data TEXT, created REAL);
         CREATE INDEX IF NOT EXISTS chat_blobs_chat ON chat_blobs(chat);
+        CREATE TABLE IF NOT EXISTS api_keys(
+          id TEXT PRIMARY KEY, name TEXT, owner TEXT, prefix TEXT, hash TEXT UNIQUE, slots TEXT,
+          max_inflight INTEGER, created REAL, created_by TEXT, expires REAL, revoked REAL, revoked_by TEXT,
+          last_used REAL, last_ip TEXT, source TEXT);
+        CREATE TABLE IF NOT EXISTS api_usage(
+          key_id TEXT, day TEXT, node TEXT, slot TEXT, requests INTEGER, errors INTEGER,
+          prompt_tokens INTEGER, completion_tokens INTEGER, PRIMARY KEY(key_id, day, node, slot));
+        CREATE INDEX IF NOT EXISTS api_usage_day ON api_usage(day);
         """)
 
     # ---- 稽核
@@ -257,6 +266,86 @@ class Store:
                 if bid not in keep:
                     self.db.execute("DELETE FROM chat_blobs WHERE id=?", (bid,))
 
+    # ---- 加密入口的金鑰：只存 SHA-256 與前 8 個字元（明文只在產生當下回一次，這裡碰不到）
+    KEY_COLS = ("id", "name", "owner", "prefix", "hash", "slots", "max_inflight", "created", "created_by",
+                "expires", "revoked", "revoked_by", "last_used", "last_ip", "source")
+
+    def _key_row(self, r):
+        d = dict(zip(self.KEY_COLS, r))
+        d["slots"] = d["slots"] if d["slots"] == "*" else json.loads(d["slots"] or "[]")
+        return d
+
+    def key_insert(self, row):
+        if not re.fullmatch(r"[0-9a-f]{64}", row.get("hash") or ""):
+            raise ValueError("金鑰雜湊格式不對，拒絕寫入")       # 防呼叫端把明文當雜湊傳進來
+        with self.lock:
+            self.db.execute("INSERT INTO api_keys(" + ",".join(self.KEY_COLS) + ") VALUES(" + ",".join("?" * len(self.KEY_COLS)) + ")",
+                            tuple(json.dumps(row[k]) if k == "slots" and row[k] != "*" else row.get(k) for k in self.KEY_COLS))
+
+    def key_by_hash(self, h):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.KEY_COLS) + " FROM api_keys WHERE hash=?", (h,)).fetchone()
+        return self._key_row(r) if r else None
+
+    def key_get(self, kid):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.KEY_COLS) + " FROM api_keys WHERE id=?", (kid,)).fetchone()
+        return self._key_row(r) if r else None
+
+    def key_list(self, owner=None):
+        q, a = "SELECT " + ",".join(self.KEY_COLS) + " FROM api_keys", []
+        if owner is not None:
+            q, a = q + " WHERE owner=?", [owner]
+        with self.lock:
+            rows = self.db.execute(q + " ORDER BY created DESC", a).fetchall()
+        return [self._key_row(r) for r in rows]
+
+    def key_update(self, kid, fields):
+        cols = [k for k in ("name", "slots", "max_inflight", "expires") if k in fields]
+        if not cols:
+            return self.key_get(kid) is not None
+        vals = [json.dumps(fields[k]) if k == "slots" and fields[k] != "*" else fields[k] for k in cols]
+        with self.lock:
+            return self.db.execute("UPDATE api_keys SET " + ",".join(f"{k}=?" for k in cols) + " WHERE id=? AND revoked IS NULL",
+                                   (*vals, kid)).rowcount > 0
+
+    def key_revoke(self, kid, by):
+        with self.lock:
+            return self.db.execute("UPDATE api_keys SET revoked=?, revoked_by=? WHERE id=? AND revoked IS NULL",
+                                   (time.time(), by or "", kid)).rowcount > 0
+
+    def key_touch(self, kid, ip):
+        with self.lock:
+            self.db.execute("UPDATE api_keys SET last_used=?, last_ip=? WHERE id=?", (time.time(), ip or "", kid))
+
+    def usage_add(self, kid, day, node, slot, ok, prompt, completion):
+        with self.lock:
+            self.db.execute(
+                "INSERT INTO api_usage(key_id,day,node,slot,requests,errors,prompt_tokens,completion_tokens) VALUES(?,?,?,?,1,?,?,?) "
+                "ON CONFLICT(key_id,day,node,slot) DO UPDATE SET requests=requests+1, errors=errors+excluded.errors, "
+                "prompt_tokens=prompt_tokens+excluded.prompt_tokens, completion_tokens=completion_tokens+excluded.completion_tokens",
+                (kid, day, node, slot, 0 if ok else 1, int(prompt), int(completion)))
+
+    def usage_by_key(self, since_day, until_day=None):
+        """{金鑰 id: {requests, errors, prompt_tokens, completion_tokens}}，日期含頭含尾（台北時間）。"""
+        q, a = ("SELECT key_id, SUM(requests), SUM(errors), SUM(prompt_tokens), SUM(completion_tokens) FROM api_usage "
+                "WHERE day>=?"), [since_day]
+        if until_day:
+            q, a = q + " AND day<=?", a + [until_day]
+        with self.lock:
+            rows = self.db.execute(q + " GROUP BY key_id", a).fetchall()
+        return {r[0]: {"requests": r[1], "errors": r[2], "prompt_tokens": r[3], "completion_tokens": r[4]} for r in rows}
+
+    def usage_by_slot(self, since_day, until_day=None):
+        """{(node, slot): {...}}：跟引擎記錄檔算到的總量相減，就是沒經過加密入口（直連）的量。"""
+        q, a = ("SELECT node, slot, SUM(requests), SUM(errors), SUM(prompt_tokens), SUM(completion_tokens) FROM api_usage "
+                "WHERE day>=?"), [since_day]
+        if until_day:
+            q, a = q + " AND day<=?", a + [until_day]
+        with self.lock:
+            rows = self.db.execute(q + " GROUP BY node, slot", a).fetchall()
+        return {(r[0], r[1]): {"requests": r[2], "errors": r[3], "prompt_tokens": r[4], "completion_tokens": r[5]} for r in rows}
+
     # ---- 取樣
     def sample(self, node, online, st=None, counters=None):
         p = (st or {}).get("pools") or {}
@@ -307,3 +396,5 @@ class Store:
         with self.lock:
             self.db.execute("DELETE FROM samples WHERE ts<?", (cut,))
             self.db.execute("DELETE FROM audit WHERE ts<?", (cut,))
+            self.db.execute("DELETE FROM api_usage WHERE day<?",
+                            (time.strftime("%Y-%m-%d", time.gmtime(cut + 8 * 3600)),))
