@@ -2803,7 +2803,10 @@ function apiExamples(node, info, gwUrl) {
   const name = info.model_name || "（模型名稱）";
   const ctx = info.max_context || 32768;
   const out = apiOutTokens(info);
-  const newKey = gwUrl ? S.gwKey : S.newKeys[node.id + "/" + info.slot];
+  // 剛產生的個別金鑰：只在它能用這一格、而且還沒撤銷時才帶進範例（只授權別格的金鑰帶進來只會 403）
+  const gk = S.gwKey;
+  const gkOk = gk && (gk.slots === "*" || (gk.slots || []).includes(node.id + "/" + info.slot));
+  const newKey = gwUrl ? (gkOk ? gk.key : null) : S.newKeys[node.id + "/" + info.slot];
   const needKey = !!gwUrl || !!info.api_key_set;
   const key = newKey || (needKey ? "<貼上金鑰>" : "");
   const label = `${info.role}（${node.name}）`;
@@ -3009,7 +3012,11 @@ function renderKeys(body, d, list, reload) {
         dd.appendChild(el("p", "note warn", `撤銷「${k.name}」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響。`));
         if (k.source === "legacy") dd.appendChild(el("p", "small muted", "這是升級時自動匯入的舊共用金鑰。撤銷前先確認最後使用時間：還有人在用，就先發新金鑰給他。"));
         modal({ title: "撤銷金鑰", bodyNode: dd, confirmText: "撤銷", danger: true, onConfirm: async () => {
-          try { await api(`/api/keys/${k.id}/revoke`, { method: "POST", body: {} }); toast("已撤銷", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          try {
+            await api(`/api/keys/${k.id}/revoke`, { method: "POST", body: {} });
+            if (S.gwKey?.id === k.id) S.gwKey = null;           // 撤銷了就不再帶進範例
+            toast("已撤銷", "ok");
+          } catch (ex) { toast(ex.message, "bad"); }
           reload();
         } });
       };
@@ -3083,7 +3090,10 @@ function keyForm(k, list, done, pre) {
     if (fExp.value !== "") body.expires_days = Number(fExp.value);
     try {
       const r = await api(k ? `/api/keys/${k.id}/update` : "/api/keys/create", { method: "POST", body });
-      if (r.key) { S.gwKey = r.key; showGatewayKey(r.key, r.url, body.name); } else toast("已儲存", "ok");
+      if (r.key) { S.gwKey = { key: r.key, id: r.item.id, slots: r.item.slots }; showGatewayKey(r.key, r.url, body.name); } else {
+        if (S.gwKey?.id === k?.id) S.gwKey.slots = r.item.slots;      // 改了能用的模型：範例帶不帶這把跟著改
+        toast("已儲存", "ok");
+      }
       done();
     } catch (ex) { toast(ex.message, "bad"); keyForm(k, list, done, body); }
   } });
@@ -3303,11 +3313,23 @@ async function viewApi() {
       : "老師都改用加密入口之後再關。關的時候會把現在的直連金鑰先加進加密入口（經加密入口照樣能用，等你確認大家都換了再撤銷），"
         + "再讓模型改聽這台自己並換上一把內部金鑰，然後重啟模型。"));
     const db = el("button", "btn " + (lanOff ? "" : "primary"), lanOff ? "重新開放直連" : "改成只走加密入口");
+    // 直連本來就沒有金鑰：沒有舊金鑰可以搬過去，加密入口又一定要金鑰。先要有一把能用這格的個別金鑰發下去才能關
+    const sk = nodeId + "/" + slotId;
+    const usable = (S.gwInfo?.items || []).filter((k) => k.state === "active" && (k.slots === "*" || (k.slots || []).includes(sk)));
+    const keyless = !lanOff && !info.api_key_set;
+    if (keyless) {
+      dc.appendChild(el("p", "note warn", usable.length
+        ? "現在直連不用金鑰，加密入口一定要金鑰：關掉之後，還沒拿到個別金鑰的人會立刻連不上。先確認每個人都已經換成加密入口的網址與個別金鑰。"
+        : "現在直連不用金鑰，加密入口一定要金鑰，而且還沒有任何一把能用這一格。請先在「API 串接」頁產生金鑰發給要用的人，再回來關直連。"));
+      if (!usable.length) db.disabled = true;
+    }
     db.onclick = () => {
       const d = el("div");
       d.appendChild(el("p", "small muted", "會重啟這個模型，重啟期間 API 中斷約一到兩分鐘；套用後實際打一次，打不通就自動換回。"));
       if (slot.critical) d.appendChild(el("p", "note warn", slot.note || "這是標記為關鍵的服務，請排在不上課的時段。"));
-      if (!lanOff) d.appendChild(el("p", "note warn", "還在用直連網址的工具會連不上，要改成加密入口的網址（金鑰可以先不換）。"));
+      if (!lanOff) d.appendChild(el("p", "note warn", keyless
+        ? `還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有 ${usable.length} 把能用這一格）。`
+        : "還在用直連網址的工具會連不上，要改成加密入口的網址（金鑰可以先不換）。"));
       modal({ title: lanOff ? "重新開放直連" : "改成只走加密入口", bodyNode: d, confirmText: "套用並重啟", danger: !!slot.critical, onConfirm: async () => {
         db.disabled = true;
         db.textContent = "套用中，模型重新載入約一到兩分鐘…";
@@ -3384,7 +3406,7 @@ async function viewApi() {
     ec.appendChild(mb);
   }
   const exs = apiExamples(node, info, S.apiMode === "gw" ? gwUrl : null);
-  if (S.apiMode === "gw" && !S.gwKey) ec.appendChild(el("p", "small muted", "金鑰欄要填個別金鑰：在「API 串接」頁按「產生金鑰」，這個分頁裡的範例就會直接帶入。"));
+  if (S.apiMode === "gw" && !(S.gwKey && (S.gwKey.slots === "*" || (S.gwKey.slots || []).includes(nodeId + "/" + slotId)))) ec.appendChild(el("p", "small muted", "金鑰欄要填個別金鑰：在「API 串接」頁按「產生金鑰」，這個分頁裡的範例就會直接帶入。"));
   const tabs = el("div", "tabbar");
   const note = el("p", "small muted");
   const pre = el("pre", "code");

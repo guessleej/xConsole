@@ -73,8 +73,8 @@ def main():
     st.key_insert({**base, "id": "aaaa0002", "name": "舊共用金鑰（主腦）", "prefix": "xc-abcd", "hash": "b" * 64,
                    "source": "legacy", "last_used": now - 3600})
     for _ in range(30):
-        st.usage_add("aaaa0001", gateway.day(now), "26", "brain", True, 100, 10)
-    st.usage_add("aaaa0002", gateway.day(now), "26", "brain", False, 0, 0)
+        st.usage_add("aaaa0001", gateway.hour(now), "26", "brain", True, 100, 10)
+    st.usage_add("aaaa0002", gateway.hour(now), "26", "brain", False, 0, 0)
 
     cfg = {"nodes": [{"id": "26", "name": ".26", "host": "h"}, {"id": "20", "name": ".20", "host": "h"}],
            "report": {"price_ntd_per_kwh": 4.0}}
@@ -108,7 +108,17 @@ def main():
     g = r["build_vs_buy"]["gateway"]
     check("加密入口依金鑰：請求多的排前面、名稱與舊共用標記", [x["name"] for x in g["by_key"]] == ["王老師", "舊共用金鑰（主腦）"]
           and g["by_key"][0]["requests"] == 30 and g["by_key"][0]["prompt"] == 3000 and g["by_key"][1]["legacy"], g["by_key"])
-    check("  沒經過加密入口＝引擎總量減加密入口", g["not_via_gateway"]["requests"] == want_req - 31, g["not_via_gateway"])
+    check("  沒經過加密入口＝引擎總量減加密入口成功送到的（失敗的那 1 次沒到引擎，不扣）", g["not_via_gateway"]["requests"] == want_req - 30,
+          g["not_via_gateway"])
+    st.usage_add("aaaa0001", gateway.hour(now - 3 * 86400), "26", "brain", True, 999, 999)
+    r2 = report.build(st, cm, cfg, days=1, now=now)
+    check("  本期之前的加密入口用量不算進來（以小時對齊起點）", r2["build_vs_buy"]["gateway"]["by_key"][0]["requests"] == 30)
+    for i in range(25):
+        st.key_insert({**base, "id": f"bbbb{i:04d}", "name": f"課程{i}", "prefix": f"xck_{i:04d}", "hash": f"{i:064x}",
+                       "source": "new", "last_used": now})
+        st.usage_add(f"bbbb{i:04d}", gateway.hour(now), "26", "brain", True, 1, 1)
+    r3 = report.build(st, cm, cfg, days=1, now=now)
+    check("  金鑰超過 20 把：每一把都在，不會被截掉", len(r3["build_vs_buy"]["gateway"]["by_key"]) == 27)
     check("  仍有效的舊共用金鑰列出來", g["legacy_active"] == ["舊共用金鑰（主腦）"], g["legacy_active"])
 
     # ---- 4 設備
