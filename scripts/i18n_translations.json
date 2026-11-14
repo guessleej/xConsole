@@ -20593,5 +20593,270 @@
 "en": "Files incomplete",
 "ja": "ファイル不足",
 "ko": "파일 일부 없음"
+},
+"產生加入碼": {
+"en": "Create join code",
+"ja": "参加コードを作成",
+"ko": "가입 코드 생성"
+},
+"主控台會產生一行安裝指令。到要加入的機器上貼上執行，它會裝好節點代理、自動出現在這裡。一間教室可以共用同一行指令：設好可用次數與名稱樣板，每台貼上同一行就好。": {
+"en": "The console generates a one-line install command. Paste and run it on the machine to add; it installs the node agent and shows up here automatically. A whole classroom can share one command: set the number of uses and a name template, then paste the same line on every machine.",
+"ja": "コンソールが1行のインストールコマンドを生成します。追加するマシンで貼り付けて実行すると、ノードエージェントがインストールされ、自動的にここに表示されます。教室全体で同じコマンドを共有できます。使用回数と名前テンプレートを設定し、各マシンで同じ行を貼り付けるだけです。",
+"ko": "콘솔이 한 줄짜리 설치 명령을 생성합니다. 추가할 장비에 붙여 넣고 실행하면 노드 에이전트가 설치되고 여기에 자동으로 나타납니다. 교실 전체가 같은 명령을 함께 쓸 수 있습니다. 사용 횟수와 이름 템플릿을 설정하고 각 장비에 같은 줄을 붙여 넣으면 됩니다."
+},
+"選填，例：A{01..20}；不填就用各台的主機名稱": {
+"en": "Optional, e.g. A{01..20}; leave blank to use each machine's hostname",
+"ja": "任意。例：A{01..20}。空欄なら各マシンのホスト名",
+"ko": "선택 사항. 예: A{01..20}. 비워 두면 각 장비의 호스트 이름 사용"
+},
+"選填，例：198.51.100.0/24": {
+"en": "Optional, e.g. 198.51.100.0/24",
+"ja": "任意。例：198.51.100.0/24",
+"ko": "선택 사항. 예: 198.51.100.0/24"
+},
+"多台時用樣板：A{01..20} 依加入順序給 A01、A02…": {
+"en": "For multiple machines use a template: A{01..20} assigns A01, A02… in join order",
+"ja": "複数台はテンプレートで：A{01..20} なら参加順に A01、A02…",
+"ko": "여러 대는 템플릿 사용: A{01..20}이면 가입 순서대로 A01, A02…"
+},
+"可用次數": {
+"en": "Uses",
+"ja": "使用回数",
+"ko": "사용 횟수"
+},
+"這行指令最多能加入幾台": {
+"en": "Maximum number of machines this command can add",
+"ja": "このコマンドで追加できる最大台数",
+"ko": "이 명령으로 추가할 수 있는 최대 장비 수"
+},
+"有效時間（分鐘）": {
+"en": "Valid for (minutes)",
+"ja": "有効時間（分）",
+"ko": "유효 시간(분)"
+},
+"5 分鐘到 7 天（10080 分鐘）": {
+"en": "5 minutes to 7 days (10080 minutes)",
+"ja": "5分〜7日（10080分）",
+"ko": "5분~7일(10080분)"
+},
+"只收這些網段": {
+"en": "Only accept these subnets",
+"ja": "受け付けるサブネット",
+"ko": "허용할 서브넷"
+},
+"選填；填了之後，網段以外的機器拿到指令也加入不了": {
+"en": "Optional; once set, machines outside these subnets cannot join even with the command",
+"ja": "任意。設定すると、範囲外のマシンはコマンドがあっても参加できません",
+"ko": "선택 사항. 설정하면 범위 밖의 장비는 명령이 있어도 가입할 수 없습니다"
+},
+"名稱依加入順序：{0}～{1}。": {
+"en": "Names in join order: {0} to {1}. ",
+"ja": "名前は参加順に {0}〜{1}。",
+"ko": "이름은 가입 순서대로 {0}~{1}. "
+},
+"名稱依加入順序": {
+"en": "Names in join order",
+"ja": "名前は参加順",
+"ko": "이름은 가입 순서대로"
+},
+"這行指令可以加入 {0} 台，{1}（台北時間）前有效。{2}指令只顯示這一次，關掉視窗後請到「設定／群組」的加入碼清單查進度或作廢。": {
+"en": "This command can add {0} machines and is valid until {1} (Taipei time). {2}It is shown only once; after closing this window, check progress or revoke it in the join code list under Settings / Groups.",
+"ja": "このコマンドで {0} 台を追加でき、{1}（台北時間）まで有効です。{2}コマンドは一度しか表示されません。閉じた後は「設定／グループ」の参加コード一覧で進捗確認や無効化ができます。",
+"ko": "이 명령으로 {0}대를 추가할 수 있으며 {1}(타이베이 시간)까지 유효합니다. {2}명령은 한 번만 표시됩니다. 창을 닫은 후에는 '설정/그룹'의 가입 코드 목록에서 진행 상황을 확인하거나 무효화하세요."
+},
+"這行指令可以加入": {
+"en": "This command can add",
+"ja": "このコマンドで追加できる台数",
+"ko": "이 명령으로 추가 가능"
+},
+"台北時間）前有效": {
+"en": "Taipei time)",
+"ja": "台北時間）まで有効",
+"ko": "타이베이 시간)까지 유효"
+},
+"指令只顯示這一次，關掉視窗後請到「設定／群組」的加入碼清單查進度或作廢": {
+"en": "The command is shown only once; after closing this window, check progress or revoke it in the join code list under Settings / Groups",
+"ja": "コマンドは一度しか表示されません。閉じた後は「設定／グループ」の参加コード一覧で進捗確認や無効化ができます",
+"ko": "명령은 한 번만 표시됩니다. 창을 닫은 후에는 '설정/그룹'의 가입 코드 목록에서 진행 상황을 확인하거나 무효화하세요"
+},
+"這行指令只能加入 1 台，{0}（台北時間）前有效。指令只顯示這一次。": {
+"en": "This command can add 1 machine and is valid until {0} (Taipei time). It is shown only once.",
+"ja": "このコマンドで追加できるのは1台で、{0}（台北時間）まで有効です。コマンドは一度しか表示されません。",
+"ko": "이 명령으로 1대만 추가할 수 있으며 {0}(타이베이 시간)까지 유효합니다. 명령은 한 번만 표시됩니다."
+},
+"這行指令只能加入 1 台": {
+"en": "This command can add only 1 machine",
+"ja": "このコマンドで追加できるのは1台のみ",
+"ko": "이 명령으로 1대만 추가 가능"
+},
+"台北時間）前有效。指令只顯示這一次": {
+"en": "Taipei time). It is shown only once",
+"ja": "台北時間）まで有効。コマンドは一度しか表示されません",
+"ko": "타이베이 시간)까지 유효. 명령은 한 번만 표시됩니다"
+},
+"已加入 {0}／{1} 台{2}": {
+"en": "{0} of {1} machines joined{2}",
+"ja": "{0}／{1} 台が参加{2}",
+"ko": "{0}/{1}대 가입{2}"
+},
+"。最近一次失敗：{0}": {
+"en": ". Last failure: {0}",
+"ja": "。直近の失敗：{0}",
+"ko": ". 최근 실패: {0}"
+},
+"最近一次失敗": {
+"en": "Last failure",
+"ja": "直近の失敗",
+"ko": "최근 실패"
+},
+"。其他台貼上同一行就好（這個視窗開著會自動更新）": {
+"en": ". Paste the same line on the other machines (this window updates automatically while open)",
+"ja": "。他のマシンには同じ行を貼り付けるだけです（このウィンドウは開いている間自動更新されます）",
+"ko": ". 다른 장비에는 같은 줄을 붙여 넣으면 됩니다(이 창은 열려 있는 동안 자동 갱신됩니다)"
+},
+"{0} 台都加入了：{1}": {
+"en": "All {0} machines joined: {1}",
+"ja": "{0} 台すべて参加しました：{1}",
+"ko": "{0}대 모두 가입했습니다: {1}"
+},
+"台都加入了": {
+"en": "machines all joined",
+"ja": "台すべて参加しました",
+"ko": "대 모두 가입했습니다"
+},
+"這個加入碼已作廢": {
+"en": "This join code has been revoked",
+"ja": "この参加コードは無効化されました",
+"ko": "이 가입 코드는 무효화되었습니다"
+},
+"已用完": {
+"en": "Used up",
+"ja": "使い切り",
+"ko": "모두 사용됨"
+},
+"已過期": {
+"en": "Expired",
+"ja": "期限切れ",
+"ko": "만료됨"
+},
+"已作廢": {
+"en": "Revoked",
+"ja": "無効化済み",
+"ko": "무효화됨"
+},
+"加入碼": {
+"en": "Join codes",
+"ja": "参加コード",
+"ko": "가입 코드"
+},
+"看每個加入碼加入了哪些機器；還沒用完的可以作廢": {
+"en": "See which machines each join code added; codes not yet used up can be revoked",
+"ja": "各参加コードで追加されたマシンを確認できます。使い切っていないコードは無効化できます",
+"ko": "각 가입 코드로 추가된 장비를 확인합니다. 다 쓰지 않은 코드는 무효화할 수 있습니다"
+},
+"還沒有加入碼。產生後指令只顯示一次，這裡只看得到進度，看不到碼本身。": {
+"en": "No join codes yet. The command is shown only once when created; this list shows progress, never the code itself.",
+"ja": "参加コードはまだありません。コマンドは作成時に一度だけ表示され、ここでは進捗のみ確認でき、コード自体は表示されません。",
+"ko": "아직 가입 코드가 없습니다. 명령은 생성 시 한 번만 표시되며, 여기서는 진행 상황만 보이고 코드 자체는 보이지 않습니다."
+},
+"產生時間（台北時間）": {
+"en": "Created (Taipei time)",
+"ja": "作成日時（台北時間）",
+"ko": "생성 시각(타이베이 시간)"
+},
+"到期（台北時間）": {
+"en": "Expires (Taipei time)",
+"ja": "有効期限（台北時間）",
+"ko": "만료(타이베이 시간)"
+},
+"加入的機器": {
+"en": "Machines joined",
+"ja": "参加したマシン",
+"ko": "가입한 장비"
+},
+"主機名稱": {
+"en": "Hostname",
+"ja": "ホスト名",
+"ko": "호스트 이름"
+},
+"限 ": {
+"en": "Only ",
+"ja": "限定 ",
+"ko": "제한 "
+},
+"作廢": {
+"en": "Revoke",
+"ja": "無効化",
+"ko": "무효화"
+},
+"作廢加入碼": {
+"en": "Revoke join code",
+"ja": "参加コードを無効化",
+"ko": "가입 코드 무효화"
+},
+"作廢後，還沒執行這行指令的機器就加入不了；已加入的 {0} 台不受影響。": {
+"en": "After revoking, machines that have not run this command can no longer join; the {0} machines already joined are not affected.",
+"ja": "無効化すると、まだこのコマンドを実行していないマシンは参加できなくなります。参加済みの {0} 台には影響しません。",
+"ko": "무효화하면 아직 이 명령을 실행하지 않은 장비는 가입할 수 없습니다. 이미 가입한 {0}대는 영향을 받지 않습니다."
+},
+"作廢後，還沒執行這行指令的機器就加入不了；已加入的": {
+"en": "After revoking, machines that have not run this command can no longer join; already joined:",
+"ja": "無効化すると、まだこのコマンドを実行していないマシンは参加できなくなります。参加済み：",
+"ko": "무효화하면 아직 이 명령을 실행하지 않은 장비는 가입할 수 없습니다. 이미 가입:"
+},
+"台不受影響": {
+"en": "machines are not affected",
+"ja": "台には影響しません",
+"ko": "대는 영향을 받지 않습니다"
+},
+"PY\n) || { echo \"連不到主控台 $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '": {
+"en": "PY\n) || { echo \"Cannot reach the console $C\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"ja": "PY\n) || { echo \"コンソール $C に接続できません\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '",
+"ko": "PY\n) || { echo \"콘솔 $C에 연결할 수 없습니다\"; exit 1; }\nSTATUS=$(printf '%s' \"$RESP\" | tail -n 1)\nprintf '%s' \"$RESP\" | sed '$d' | XCONSOLE_HOME=\"$HOME\" \"$PY\" -c '"
+},
+"'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"提醒：這個帳號登出後代理會跟著停。請有 sudo 權限的人執行一次：sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"提醒：macOS 第一次會問「是否允許 python3 接受傳入連線」，請按「允許」，主控台才連得到這台\"\nexit 0\n": {
+"en": "'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"Note: the agent stops when this account logs out. Ask someone with sudo to run once: sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"Note: the first time, macOS asks whether to allow python3 to accept incoming connections; click Allow so the console can reach this machine\"\nexit 0\n",
+"ja": "'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"注意：このアカウントがログアウトするとエージェントも停止します。sudo 権限のある人に一度実行してもらってください：sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"注意：macOS は初回に「python3 の受信接続を許可しますか」と尋ねます。コンソールが接続できるよう「許可」を押してください\"\nexit 0\n",
+"ko": "'\n[ \"$STATUS\" = 200 ] || exit 1\n[ \"$LINGER\" = no ] && echo \"참고: 이 계정이 로그아웃하면 에이전트도 멈춥니다. sudo 권한이 있는 사람이 한 번 실행하세요: sudo loginctl enable-linger $USER\"\n[ \"$OSN\" = Darwin ] && echo \"참고: macOS는 처음에 python3의 수신 연결 허용 여부를 묻습니다. 콘솔이 이 장비에 연결할 수 있도록 '허용'을 누르세요\"\nexit 0\n"
+},
+"&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"代理沒有起來，請看記錄：$LOGHINT\"; exit 1; }\necho \"== 4/4 加入主控台 ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -": {
+"en": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"The agent did not start; see the log: $LOGHINT\"; exit 1; }\necho \"== 4/4 Join the console ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -",
+"ja": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"エージェントが起動しませんでした。ログを確認してください：$LOGHINT\"; exit 1; }\necho \"== 4/4 コンソールに参加 ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -",
+"ko": "&1; then UP=yes; break; fi\n  sleep 1\ndone\n[ \"$UP\" = yes ] || { echo \"에이전트가 시작되지 않았습니다. 로그를 확인하세요: $LOGHINT\"; exit 1; }\necho \"== 4/4 콘솔에 가입 ==\"\nRESP=$(XC_CODE=\"$CODE\" XC_LINGER=\"$LINGER\" \"$PY\" -"
+},
+"'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }\n": {
+"en": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host 'Note: this was not run as administrator, so the agent only runs while this account is logged in and port 9401 was not opened in the firewall. Ask an administrator to run this command again' }\n",
+"ja": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '注意：管理者として実行されていないため、エージェントはこのアカウントのログイン中のみ動作し、ファイアウォールの 9401 番ポートも開いていません。管理者にもう一度このコマンドを実行してもらってください' }\n",
+"ko": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '참고: 관리자 권한으로 실행하지 않아 에이전트는 이 계정이 로그인한 동안만 실행되며 방화벽의 9401 포트도 열리지 않았습니다. 관리자가 이 명령을 다시 실행하세요' }\n"
+},
+"加入碼不對、已經用完、過期、被作廢，或這台不在限定的網段裡；請在主控台重新產生加入碼。\n": {
+"en": "The join code is wrong, used up, expired or revoked, or this machine is outside the allowed subnets; create a new join code in the console.\n",
+"ja": "参加コードが正しくない、使い切り、期限切れ、無効化済み、またはこのマシンが許可されたサブネット外です。コンソールで参加コードを作り直してください。\n",
+"ko": "가입 코드가 잘못되었거나, 모두 사용되었거나, 만료 또는 무효화되었거나, 이 장비가 허용된 서브넷 밖에 있습니다. 콘솔에서 가입 코드를 다시 생성하세요.\n"
+},
+"；這個群組還能用的 {0} 個加入碼一起作廢": {
+"en": "; the group's {0} unused join codes were revoked as well",
+"ja": "。このグループの未使用の参加コード {0} 個も無効化しました",
+"ko": "; 이 그룹의 아직 쓸 수 있던 가입 코드 {0}개도 무효화했습니다"
+},
+"這個群組還能用的": {
+"en": "The group's unused",
+"ja": "このグループの未使用の",
+"ko": "이 그룹의 아직 쓸 수 있던"
+},
+"個加入碼一起作廢": {
+"en": "join codes were revoked as well",
+"ja": "個の参加コードも無効化しました",
+"ko": "개 가입 코드도 무효화했습니다"
+},
+"加入碼在驗證期間被作廢，或它的群組被刪掉了；請在主控台重新產生加入碼": {
+"en": "The join code was revoked or its group was deleted while verifying; create a new join code in the console",
+"ja": "確認中に参加コードが無効化されたか、グループが削除されました。コンソールで参加コードを作り直してください",
+"ko": "확인 중에 가입 코드가 무효화되었거나 그룹이 삭제되었습니다. 콘솔에서 가입 코드를 다시 생성하세요"
+},
+"這台不能操作桌面：桌面小幫手沒有在執行，請用要操作的那個帳號登入這台的桌面": {
+"en": "This machine can't control the desktop: the desktop helper isn't running; sign in to this machine's desktop with the account you want to control",
+"ja": "この機器ではデスクトップを操作できません：デスクトップヘルパーが動いていません。操作したいアカウントでこの機器のデスクトップにログインしてください",
+"ko": "이 기기는 데스크톱을 조작할 수 없습니다: 데스크톱 도우미가 실행 중이 아닙니다. 조작할 계정으로 이 기기의 데스크톱에 로그인하세요"
 }
 }

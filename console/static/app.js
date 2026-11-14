@@ -3979,6 +3979,9 @@ async function settingsGroups(wrap) {
     const eb = el("button", "btn sm" + (S.groupEdit === g.id ? " primary" : ""), "編輯設定");
     eb.onclick = () => { S.groupEdit = S.groupEdit === g.id ? null : g.id; render(); };
     td.appendChild(eb);
+    const jb = el("button", "btn sm", "產生加入碼");
+    jb.onclick = () => openAddMachine(g.name);
+    td.appendChild(jb);
     if (g.name !== "未分類") {
       const db = el("button", "btn sm", "刪除");
       db.onclick = () => modal({
@@ -3987,7 +3990,7 @@ async function settingsGroups(wrap) {
           ? `這個群組有 ${g.members} 台機器。刪除後它們移到「未分類」，機器本身不受影響。`
           : "這個群組沒有機器。"),
         onConfirm: async () => {
-          try { const r = await api(`/api/groups/${g.id}/delete`, { method: "POST" }); toast(r.moved ? `已刪除，${r.moved} 台移到「未分類」` : "已刪除", "ok"); }
+          try { const r = await api(`/api/groups/${g.id}/delete`, { method: "POST" }); toast((r.moved ? `已刪除，${r.moved} 台移到「未分類」` : "已刪除") + (r.join_codes_revoked ? `；這個群組還能用的 ${r.join_codes_revoked} 個加入碼一起作廢` : ""), "ok"); }
           catch (ex) { toast(ex.message, "bad"); }
           if (S.groupEdit === g.id) S.groupEdit = null;
           render();
@@ -4008,6 +4011,7 @@ async function settingsGroups(wrap) {
     wrap.appendChild(groupEditor(g, d));
     wrap.appendChild(groupMembers(g));
   }
+  wrap.appendChild(await joinCodesCard());
 }
 
 const GROUP_PHASE = { queued: "收到，排隊中", preparing: "準備中", waiting_boot: "已準備，等下次開機套用", waiting_time: "已準備，等指定時間套用",
@@ -4941,17 +4945,26 @@ async function machineInfo(nid, fresh) {
   return S.minfo[nid];
 }
 
-function openAddMachine() {
+function openAddMachine(group) {
   const body = el("div");
   body.appendChild(el("p", "small muted",
-    "主控台會產生一行安裝指令。到要加入的那台機器上貼上執行，它會裝好節點代理、自動出現在這裡。指令 30 分鐘內有效、只能用一次。"));
+    "主控台會產生一行安裝指令。到要加入的機器上貼上執行，它會裝好節點代理、自動出現在這裡。一間教室可以共用同一行指令：設好可用次數與名稱樣板，每台貼上同一行就好。"));
   const form = el("div", "form-row");
-  const fName = textInput("", "選填，不填就用那台的主機名稱");
-  const [fGroup, dl] = groupInput("");
+  const fName = textInput("", "選填，例：A{01..20}；不填就用各台的主機名稱");
+  const [fGroup, dl] = groupInput(group || "");
   const fHost = textInput(location.host);
+  const fUses = numInput(1);
+  fUses.step = "1"; fUses.min = "1"; fUses.max = "1000";
+  const fMin = numInput(30);
+  fMin.step = "1"; fMin.min = "5"; fMin.max = "10080";
+  const fCidr = textInput("", "選填，例：198.51.100.0/24");
   const fReplace = selectInput([["", "不是，這是新的一台"], ...(S.fleet?.nodes || []).map((x) => [x.id, `${x.name}（${x.host}）`])], "");
-  form.append(fieldBox("名稱", fName), fieldBox("群組", fGroup), fieldBox("主控台位址", fHost, "要加入的那台機器連得到的位址（IP:埠）"),
-    fieldBox("這是哪一台重新安裝？", fReplace, "代理重裝或換了 IP 時選它，加入後會更新那一筆，名稱與群組不變；新機器不用選"));
+  const replaceBox = fieldBox("這是哪一台重新安裝？", fReplace, "代理重裝或換了 IP 時選它，加入後會更新那一筆，名稱與群組不變；新機器不用選");
+  fUses.oninput = () => { replaceBox.hidden = Number(fUses.value) > 1; if (replaceBox.hidden) fReplace.value = ""; };
+  form.append(fieldBox("名稱", fName, "多台時用樣板：A{01..20} 依加入順序給 A01、A02…"), fieldBox("群組", fGroup),
+    fieldBox("可用次數", fUses, "這行指令最多能加入幾台"), fieldBox("有效時間（分鐘）", fMin, "5 分鐘到 7 天（10080 分鐘）"),
+    fieldBox("只收這些網段", fCidr, "選填；填了之後，網段以外的機器拿到指令也加入不了"),
+    fieldBox("主控台位址", fHost, "要加入的那台機器連得到的位址（IP:埠）"), replaceBox);
   body.append(form, dl);
   const out = el("div");
   body.appendChild(out);
@@ -4961,7 +4974,8 @@ function openAddMachine() {
   const gen = formButton(ov, "產生安裝指令", "primary", async () => {
     let r;
     try {
-      r = await api("/api/nodes/join-code", { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), console: fHost.value.trim(), replace: fReplace.value } });
+      r = await api("/api/nodes/join-code", { method: "POST", body: { name: fName.value.trim(), group: fGroup.value.trim(), console: fHost.value.trim(), replace: fReplace.value,
+        uses: Math.round(Number(fUses.value) || 1), minutes: Math.round(Number(fMin.value) || 30), cidrs: fCidr.value.trim() } });
     } catch (ex) { errNote(out, ex.message); return; }
     const me = ++run;                       // 重新產生時，舊指令的等待就不再更新畫面
     gen.textContent = "重新產生";
@@ -5005,13 +5019,33 @@ function openAddMachine() {
     });
     out.append(osBar, osBox);
     showOs(S.joinOs || "unix");
+    const until = new Date(r.expires_at * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" });
+    out.appendChild(el("p", "small muted", r.uses > 1
+      ? `這行指令可以加入 ${r.uses} 台，${until}（台北時間）前有效。${r.names.length ? `名稱依加入順序：${r.names[0]}～${r.names[r.names.length - 1]}。` : ""}指令只顯示這一次，關掉視窗後請到「設定／群組」的加入碼清單查進度或作廢。`
+      : `這行指令只能加入 1 台，${until}（台北時間）前有效。指令只顯示這一次。`));
     const st = el("p", "note", "等待那台執行…（這個視窗開著會自動更新）");
     out.appendChild(st);
+    let seen = 0;
     const poll = async () => {
       if (!ov.isConnected || me !== run) return;
       let j;
       try { j = await api(`/api/nodes/join-code/${r.id}`); } catch (_) { setTimeout(poll, 3000); return; }
       if (!ov.isConnected || me !== run) return;
+      if (j.uses > 1 && j.state === "waiting") {
+        st.className = j.error ? "note bad" : "note";
+        st.textContent = `已加入 ${j.used}／${j.uses} 台${j.nodes.length ? "：" + j.nodes.map((x) => x.name).join("、") : ""}` + (j.error ? `。最近一次失敗：${j.error}` : "。其他台貼上同一行就好（這個視窗開著會自動更新）");
+        if (j.used > seen) { seen = j.used; refresh(); }   // 有新的一台加入才重抓清單，不每 3 秒重畫
+        setTimeout(poll, 3000);
+        return;
+      }
+      if (j.state === "joined" && j.uses > 1) {
+        st.className = "note ok";
+        st.textContent = `${j.uses} 台都加入了：${j.nodes.map((x) => x.name).join("、")}`;
+        await refresh();
+        gen.remove();
+        return;
+      }
+      if (j.state === "revoked") { st.className = "note bad"; st.textContent = "這個加入碼已作廢"; return; }
       if (j.state === "joined") {
         st.className = "note ok";
         st.textContent = "已加入。" + (j.linger === false ? "提醒：那台還沒開 linger，帳號登出後代理會停，請照安裝畫面最後一行處理。" : "");
@@ -5029,7 +5063,58 @@ function openAddMachine() {
     };
     setTimeout(poll, 3000);
   });
-  [fName, fGroup, fHost].forEach((i) => imeGuard(i, () => gen.click()));
+  [fName, fGroup, fHost, fCidr].forEach((i) => imeGuard(i, () => gen.click()));
+}
+
+const JOIN_STATE = { waiting: "可用", joined: "已用完", expired: "已過期", revoked: "已作廢" };
+
+async function joinCodesCard() {
+  const c = card("加入碼", "看每個加入碼加入了哪些機器；還沒用完的可以作廢");
+  const add = el("div", "slot-actions");
+  const nb = el("button", "btn sm primary", "產生加入碼");
+  nb.onclick = () => openAddMachine();
+  add.appendChild(nb);
+  c.appendChild(add);
+  let d;
+  try { d = await api("/api/nodes/join-codes"); } catch (ex) { c.appendChild(el("p", "note warn", ex.message)); return c; }
+  if (!d.codes.length) { c.appendChild(el("p", "small muted", "還沒有加入碼。產生後指令只顯示一次，這裡只看得到進度，看不到碼本身。")); return c; }
+  const tbl = el("table", "api-table");
+  const hr = el("tr");
+  ["產生時間（台北時間）", "群組", "名稱", "已用", "到期（台北時間）", "狀態", "加入的機器", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  tbl.appendChild(hr);
+  const t = (x) => new Date(x * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" });
+  d.codes.forEach((j) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", "nowrap", t(j.created)));
+    tr.appendChild(el("td", null, j.group || "未分類"));
+    tr.appendChild(el("td", "mono", j.template || j.name || "主機名稱"));
+    tr.appendChild(el("td", "nowrap", `${j.used}／${j.uses}`));
+    tr.appendChild(el("td", "nowrap", t(j.expires_at)));
+    const sc = el("td", "nowrap", JOIN_STATE[j.state] || j.state);
+    if (j.cidrs.length) sc.appendChild(el("div", "small muted", "限 " + j.cidrs.join("、")));
+    if (j.error && j.state === "waiting") sc.appendChild(el("div", "small bad-t", j.error));
+    tr.appendChild(sc);
+    tr.appendChild(el("td", "small", j.nodes.map((x) => x.name).join("、") || "—"));
+    const td = el("td", "nowrap");
+    if (j.state === "waiting") {
+      const rb = el("button", "btn sm", "作廢");
+      rb.onclick = () => modal({
+        title: "作廢加入碼", hasInput: false, danger: true, confirmText: "作廢",
+        bodyNode: el("p", "small muted", `作廢後，還沒執行這行指令的機器就加入不了；已加入的 ${j.used} 台不受影響。`),
+        onConfirm: async () => {
+          try { await api(`/api/nodes/join-code/${j.id}/revoke`, { method: "POST" }); toast("已作廢", "ok"); } catch (ex) { toast(ex.message, "bad"); }
+          render();
+        },
+      });
+      td.appendChild(rb);
+    }
+    tr.appendChild(td);
+    tbl.appendChild(tr);
+  });
+  const tw = el("div", "md-table-wrap");
+  tw.appendChild(tbl);
+  c.appendChild(tw);
+  return c;
 }
 
 async function openMachineSettings(nid) {

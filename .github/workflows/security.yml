@@ -39,6 +39,8 @@ jobs:
         run: cd agent && python test_group.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
+      - name: 群組加入碼（可用次數、有效時間、名稱樣板、限定網段、作廢、主控台重啟後仍有效）
+        run: cd console && python test_joincodes.py
       - name: 服務使用報告
         run: cd console && python test_usage_report.py
       - name: 網頁換憑證端對端
