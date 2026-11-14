@@ -21,11 +21,15 @@ jobs:
   # ── 0. 測試（含 test/security/ 安全測試）──────────────────
   tests:
     name: 0 Tests
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
+      # 自建 runner 會重複使用 Python 工具快取：套件一律裝進這次新建的虛擬環境，用完隨暫存目錄清掉
+      - name: 這次專用的虛擬環境
+        run: python -m venv "$RUNNER_TEMP/venv" && echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: 准入試算
         run: cd agent && python test_admit.py
@@ -90,24 +94,36 @@ jobs:
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）
-        run: python test/test_api_integration.py
+        run: |
+          # 自建 runner 是系統服務，連不到 xcloud 的 systemd --user：接上使用者匯流排（做法見 .github/self-hosted-systemd.sh）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
+          python test/test_api_integration.py
       - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
-        run: python test/test_llama_engine.py
+        run: |
+          # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
+          python test/test_llama_engine.py
       - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
-        run: python test/test_machine_admin.py
+        run: |
+          # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
+          python test/test_machine_admin.py
       - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
         run: |
           python -m pip install --disable-pip-version-check playwright==1.65.0
-          python -m playwright install --with-deps chromium
+          # 自建 runner 沒有免密碼 sudo，Chromium 需要的系統函式庫已裝在 .50，只下載瀏覽器本身
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then python -m playwright install chromium; else python -m playwright install --with-deps chromium; fi
           python test/test_ui_browser.py
 
   # ── 1. SAST ────────────────────────────────────────────────
   codeql:
     name: 1 SAST (CodeQL)
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     permissions:
       contents: read
       security-events: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -125,7 +141,8 @@ jobs:
   # ── 2. 機密掃描（含整個 git 歷史）──────────────────────────
   gitleaks:
     name: 2 Secrets (gitleaks)
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     env:
       GITLEAKS_VERSION: 8.30.1
     steps:
@@ -147,11 +164,15 @@ jobs:
   # ── 3. 依賴弱點（真的擋，不掛 || true）──────────────────────
   deps:
     name: 3 Dependencies (pip-audit)
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
+      # 自建 runner 會重複使用 Python 工具快取：套件一律裝進這次新建的虛擬環境，用完隨暫存目錄清掉
+      - name: 這次專用的虛擬環境
+        run: python -m venv "$RUNNER_TEMP/venv" && echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
       - run: python -m pip install --disable-pip-version-check pip-audit==2.10.1
       - name: 主控台與報表產生器的依賴（有已知弱點就 fail）
         run: pip-audit --strict --desc -r requirements.txt -r requirements-report.txt
@@ -159,7 +180,8 @@ jobs:
   # ── 4+5. SBOM 產出與弱點掃描 ─────────────────────────────────
   sbom:
     name: 4+5 SBOM (syft) + Vulns (grype)
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -205,22 +227,35 @@ jobs:
   # ── 6. DAST（中級必跑）──────────────────────────────────────
   zap:
     name: 6 DAST (OWASP ZAP baseline)
-    runs-on: ubuntu-24.04
+    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: { python-version: '3.12' }
+      # 自建 runner 會重複使用 Python 工具快取：套件一律裝進這次新建的虛擬環境，用完隨暫存目錄清掉
+      - name: 這次專用的虛擬環境
+        run: python -m venv "$RUNNER_TEMP/venv" && echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
-      - name: 起一個測試用主控台（暫用自簽、隨機密碼）
+      - name: 起一個測試用主控台（暫用自簽、隨機密碼、隨機空埠）
         run: |
           export HOME="$RUNNER_TEMP/xc-home"; mkdir -p "$HOME"
+          # 自建 runner 同一台還有別的工作與服務：主控台與連回通道用系統給的空埠，不固定占 9400／9402
+          read -r XC_PORT XC_LINK < <(python -c 'import socket;s=[socket.socket() for _ in (0,1)];[x.bind(("127.0.0.1",0)) for x in s];print(*[x.getsockname()[1] for x in s])')
+          echo "XC_PORT=$XC_PORT" >> "$GITHUB_ENV"
+          export XCONSOLE_PORT="$XC_PORT" XCONSOLE_LINK_PORT="$XC_LINK"
           printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
             | python console/xconsole_server.py --set-credentials
           nohup python console/xconsole_server.py > "$RUNNER_TEMP/console.log" 2>&1 &
-          for i in $(seq 1 40); do curl -skf https://localhost:9400/healthz && break; sleep 1; done
+          for i in $(seq 1 40); do curl -skf "https://localhost:$XC_PORT/healthz" && break; sleep 1; done
+      - name: 記下 ZAP 映像與容器（自建 runner 結束時只清這次留下的）
+        if: runner.environment == 'self-hosted'
+        run: |
+          docker ps -aq --no-trunc --filter ancestor=ghcr.io/zaproxy/zaproxy:stable | sort > "$RUNNER_TEMP/zap-before"
+          docker image inspect -f '{{.Id}}' ghcr.io/zaproxy/zaproxy:stable > "$RUNNER_TEMP/zap-image-before" 2>/dev/null || true
       - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
-          target: https://localhost:9400
+          target: https://localhost:${{ env.XC_PORT }}
           rules_file_name: .zap/rules.tsv
           cmd_options: '-a -j'
           fail_action: true
@@ -228,3 +263,15 @@ jobs:
           artifact_name: zap-report
       - if: always()
         run: tail -n 50 "$RUNNER_TEMP/console.log"
+      # ZAP action 的 docker run 沒有 --rm，每次留一個已停止的容器；:stable 換版後舊映像也會懸空。
+      # 只刪這次多出來的已停止 ZAP 容器、和已經沒有標籤又沒人用的舊 ZAP 映像，其他容器與映像一律不碰。
+      - name: 清掉這次留下的 ZAP 容器與換版後的舊映像（自建 runner）
+        if: always() && runner.environment == 'self-hosted'
+        run: |
+          docker ps -aq --no-trunc --filter ancestor=ghcr.io/zaproxy/zaproxy:stable --filter status=exited | sort > "$RUNNER_TEMP/zap-after"
+          for c in $(comm -13 "$RUNNER_TEMP/zap-before" "$RUNNER_TEMP/zap-after"); do docker rm "$c" >/dev/null && echo "已刪容器 ${c:0:12}"; done
+          old=$(cat "$RUNNER_TEMP/zap-image-before" 2>/dev/null || true)
+          new=$(docker image inspect -f '{{.Id}}' ghcr.io/zaproxy/zaproxy:stable 2>/dev/null || true)
+          if [ -n "$old" ] && [ "$old" != "$new" ] && [ -z "$(docker ps -aq --filter ancestor="$old")" ]; then
+            docker rmi "$old" && echo "已刪換版前的 ZAP 映像 ${old:7:12}" || true
+          fi
