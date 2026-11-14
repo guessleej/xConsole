@@ -7,6 +7,8 @@ import datetime as dt
 import os
 import time
 
+import gateway
+
 TPE = dt.timezone(dt.timedelta(hours=8))
 SAMPLE_GAP = 900          # 兩筆取樣相隔超過 15 分鐘就當中間沒資料，不把空窗算成耗電
 
@@ -118,7 +120,29 @@ def build(store, certs, cfg, days=30, now=None):
                  "assumption": (f"以 {ref.get('name', '參考模型')} 每百萬輸入 token US$ {ref['usd_per_mtok_in']}、"
                                 f"輸出 US$ {ref['usd_per_mtok_out']} 計；重用快取的 token 不計費"
                                 + (f"；匯率 {fx}" if fx else ""))}
+    # 加密入口（/v1）依金鑰分開算；引擎記錄檔的總量減掉加密入口的量，就是沒經過加密入口的（網頁對話、直連 8080）
+    d0 = gateway.day(since)
+    names = {k["id"]: k for k in store.key_list()}
+    by_key = []
+    for kid, u in store.usage_by_key(d0).items():
+        k = names.get(kid) or {}
+        by_key.append({"name": k.get("name", "（已刪除的金鑰）"), "prefix": k.get("prefix"), "legacy": k.get("source") == "legacy",
+                       "state": gateway.state(k) if k else "revoked", "requests": u["requests"], "errors": u["errors"],
+                       "prompt": u["prompt_tokens"], "generated": u["completion_tokens"]})
+    by_key.sort(key=lambda r: -r["requests"])
+    gw_tot = {"requests": sum(r["requests"] for r in by_key), "prompt": sum(r["prompt"] for r in by_key),
+              "generated": sum(r["generated"] for r in by_key)}
+    gateway_use = {
+        "by_key": by_key[:20],
+        "total": gw_tot,
+        "not_via_gateway": {k: max(0, tok[k] - gw_tot[k]) for k in ("requests", "prompt", "generated")},
+        "keys_active": sum(1 for k in names.values() if gateway.state(k) == "active"),
+        "legacy_active": [k["name"] for k in names.values() if k.get("source") == "legacy" and gateway.state(k) == "active"],
+        "assumption": "「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口算到的量，包含網頁對話與 IDE 直連 8080；"
+                      "只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。",
+    }
     build_vs_buy = {
+        "gateway": gateway_use,
         "local": tok,
         "cache_hit_ratio": round(tok["reused"] / tok["prompt"], 3) if tok["prompt"] else None,
         "per_slot": sorted(per_slot, key=lambda r: -r["prompt"])[:20],
@@ -198,6 +222,11 @@ def build(store, certs, cfg, days=30, now=None):
     if integrations["admission"]["forced"]:
         items.append({"level": "注意", "what": f"有 {integrations['admission']['forced']} 次強制略過記憶體准入試算",
                       "fix": "確認當時操作者是否知情；強制載入有機會把統一記憶體機拖死"})
+    recent_legacy = [k["name"] for k in names.values() if k.get("source") == "legacy" and gateway.state(k) == "active"
+                     and (k.get("last_used") or 0) > now - 7 * 86400]
+    if recent_legacy:
+        items.append({"level": "待改善", "what": f"近 7 天還有人用舊共用金鑰（{'、'.join(recent_legacy)[:80]}）",
+                      "fix": "全校共用一把，外流只能一起換：在「API 串接」替每位老師發個別金鑰，確認沒人用了再撤銷"})
     if people["logins_failed"] >= 10:
         items.append({"level": "注意", "what": f"登入失敗 {people['logins_failed']} 次",
                       "fix": "確認是否有人在猜密碼"})
