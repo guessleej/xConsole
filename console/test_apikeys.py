@@ -187,6 +187,59 @@ def main():
     names = [m["id"] for m in json.loads(urllib.request.urlopen(r, timeout=20).read())["data"]]
     check("  /v1/models 不列重名的模型", names == ["m1"], names)
 
+    # ---- 只在這把金鑰看得到的格子裡找名稱：別格剛好同名不影響（跟 /v1/models 一致）
+    _, mine = req("POST", "/api/keys/create", {"name": "只能用 b2", "slots": ["n1/b2"]})
+    k2 = mine["key"]
+    r = urllib.request.Request(BASE + "/v1/models", headers={"Authorization": f"Bearer {k2}"})
+    names = [m["id"] for m in json.loads(urllib.request.urlopen(r, timeout=20).read())["data"]]
+    check("只授權 b2 的金鑰：/v1/models 列得出 dup（看不到同名的 b3）", names == ["dup"], names)
+    k, k_saved = k2, k
+    st, o = v1("/v1/chat/completions", {"model": "dup", "messages": [{"role": "user", "content": "hi"}]})
+    check("  用 dup 會送到 b2，不回 409", st == 502 and "更新代理" in o["error"]["message"], (st, o))
+    k = k_saved
+
+    # ---- stream_options 不是物件：先擋下，不佔同時名額
+    kid2 = out2["item"]["id"]
+    for _ in range(3):
+        st, o = v1("/v1/chat/completions", {"model": "m1", "stream": True, "stream_options": "x",
+                                            "messages": [{"role": "user", "content": "hi"}]})
+    check("stream_options 不是物件 → 400，同時名額沒有被卡住", st == 400 and x.GW_INFLIGHT.count(kid2) == 0, (st, o))
+
+    # ---- 回應超過上限：回 502 明講，不送截斷的 JSON
+    class Big:
+        status, headers = 200, {"Content-Type": "application/json"}
+
+        def read(self, n=-1):
+            return b"{" + b" " * 50 + b"}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    x.agent_open, real_open, x.GW_MAX = (lambda req, ctx, timeout: Big()), x.agent_open, 10
+    st, o = v1("/v1/chat/completions", {"model": "m1", "messages": [{"role": "user", "content": "hi"}]})
+    x.agent_open, x.GW_MAX = real_open, 64 * 1024 * 1024
+    check("回應超過上限 → 502，不送截斷的內容", st == 502 and "64 MB" in o["error"]["message"], (st, o))
+
+    # ---- 金鑰放網址：參數名解碼後才比對；GET 宣稱有本文卻不送也不會卡住
+    for q in ("api_key=abc", "api%5fkey=abc", "Access_Token=abc"):
+        r = urllib.request.Request(BASE + "/v1/models?" + q, headers={"Authorization": f"Bearer {k}"})
+        try:
+            urllib.request.urlopen(r, timeout=10)
+            st = 200
+        except urllib.error.HTTPError as e:
+            st = e.code
+        check(f"網址參數 {q} → 400", st == 400, st)
+    import socket
+    host, port = srv.server_address
+    sk = socket.create_connection((host, port), timeout=5)
+    sk.sendall(b"GET /v1/models?api_key=x HTTP/1.1\r\nHost: t\r\nContent-Length: 100\r\n\r\n")
+    t0 = time.time()
+    first = sk.recv(64)
+    sk.close()
+    check("  GET 宣稱有本文但不送：馬上回 400，不等本文", first.startswith(b"HTTP/1.1 400") and time.time() - t0 < 3, first)
+
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1
 
