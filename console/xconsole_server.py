@@ -1670,6 +1670,18 @@ def gateway_url():
     return f"https://{h}:{PORT}/v1"
 
 
+def gateway_url_ok(u):
+    """加密入口網址：https、主機名稱不能空、埠要是 1～65535 的數字、/v1 結尾。"""
+    if not (GATEWAY_URL_RX.fullmatch(u) and u.endswith("/v1")):
+        return False
+    try:
+        p = urlparse(u)
+        port = p.port                     # 埠不是數字或超出範圍會丟 ValueError
+    except ValueError:
+        return False
+    return bool(p.hostname) and (port is None or 1 <= port <= 65535) and not p.username and not p.password
+
+
 def key_slots_ok(slots):
     """金鑰能用的模型：每一格的機器都要在納管清單裡（格子可以還沒建，之後建了就能用）。"""
     if slots == "*":
@@ -1717,7 +1729,8 @@ def key_update(kid, body):
         err = key_slots_ok(f["slots"])
         if err:
             return 400, {"error": err}, None
-    STORE.key_update(kid, f)
+    if not STORE.key_update(kid, f):            # 同時有人撤銷了它：條件式更新沒有改到任何一列
+        return 409, {"error": "這把金鑰已撤銷，不能再改；要用請產生一把新的"}, None
     return 200, {"ok": True, "item": gateway.public(STORE.key_get(kid))}, {k: v for k, v in f.items()}
 
 
@@ -3181,7 +3194,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         if path == "/api/keys/settings":
             u = str(body.get("public_url") or "").strip().rstrip("/")
-            if u and not (GATEWAY_URL_RX.fullmatch(u) and u.endswith("/v1")):
+            if u and not gateway_url_ok(u):
                 return self._json(400, {"error": "加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1"})
             update_fleet(lambda c: c.setdefault("gateway", {}).__setitem__("public_url", u or None))
             self._audit("apikey.settings", "", True, {"public_url": u or None})

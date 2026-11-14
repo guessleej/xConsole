@@ -6,6 +6,7 @@
 """
 import datetime as dt
 import hashlib
+import hmac
 import json
 import re
 import secrets
@@ -27,8 +28,13 @@ def new_key():
     return PREFIX + secrets.token_urlsafe(32)
 
 
+# 雜湊加一段固定的用途標記（HMAC）：同一串字拿去別處算的 SHA-256 對不上這裡，彩虹表也得專門為 xConsole 重算。
+# 代理那邊匯入舊金鑰時算的是同一個（agent/xconsole_agent.py 的 KEY_HASH_TAG），兩邊要一致。
+HASH_TAG = b"xconsole-api-key-v1"
+
+
 def key_hash(key):
-    return hashlib.sha256(key.encode()).hexdigest()
+    return hmac.new(HASH_TAG, key.encode(), hashlib.sha256).hexdigest()
 
 
 def presented_key(headers):
@@ -178,17 +184,38 @@ class FailLimit:
     def __init__(self, window=900, limit=30):
         self.window, self.limit, self._f, self._lock = window, limit, {}, threading.Lock()
 
+    MAX_SOURCES = 10000
+
+    def _purge(self):
+        """過期的來源整筆刪掉：掃描器或一直換 IPv6 位址的客戶端不能讓這張表無限長大。"""
+        cut = time.time() - self.window
+        for ip in [k for k, v in self._f.items() if not v or v[-1] <= cut]:
+            del self._f[ip]
+
     def blocked(self, ip):
         with self._lock:
-            self._f[ip] = [t for t in self._f.get(ip, []) if t > time.time() - self.window]
-            return len(self._f[ip]) >= self.limit
+            lst = [t for t in self._f.get(ip, []) if t > time.time() - self.window]
+            if lst:
+                self._f[ip] = lst
+            else:
+                self._f.pop(ip, None)
+            return len(lst) >= self.limit
 
     def add(self, ip):
         """回 True＝這一輪第一次失敗（要寫一筆稽核）。"""
         with self._lock:
+            if len(self._f) >= self.MAX_SOURCES:
+                self._purge()
+                if len(self._f) >= self.MAX_SOURCES:      # 全部都還沒過期：丟掉最舊的那一半
+                    for ip in sorted(self._f, key=lambda k: self._f[k][-1])[:len(self._f) // 2]:
+                        del self._f[ip]
             lst = self._f.setdefault(ip, [])
             lst.append(time.time())
             return len(lst) == 1
+
+    def size(self):
+        with self._lock:
+            return len(self._f)
 
 
 if __name__ == "__main__":
@@ -198,6 +225,12 @@ if __name__ == "__main__":
     assert presented_key({"Authorization": "Bearer " + k}) == k
     assert presented_key({"x-api-key": k}) == k
     assert presented_key({"Authorization": "Basic abc"}) == ""
+    fl = FailLimit(window=900, limit=3)
+    fl.MAX_SOURCES = 4
+    for i in range(10):
+        fl.add(f"10.0.0.{i}")
+    assert fl.size() <= 4                      # 來源表有上限，不會無限長大
+    assert not fl.blocked("10.9.9.9") and fl.size() <= 4
     su = StreamUsage(True)
     assert su.feed(b'data: {"choices":[{"delta":{"content":"hi"}}]}\n')
     assert not su.feed(b'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2}}\n')

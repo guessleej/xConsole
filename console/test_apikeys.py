@@ -113,6 +113,11 @@ def main():
     st, o = req("POST", "/api/keys/0000beef/update", {"name": "x"})
     check("  改不存在的 → 404", st == 404)
 
+    real = x.STORE.key_update
+    x.STORE.key_update = lambda k, f: False          # 模擬：讀完之後、更新之前，別人把它撤銷了
+    st, o = req("POST", f"/api/keys/{kid}/update", {"name": "搶在撤銷之後"})
+    x.STORE.key_update = real
+    check("  改的同時被撤銷（條件式更新沒改到）→ 409，不回成功", st == 409, (st, o))
     st, o = req("POST", f"/api/keys/{kid}/revoke", {})
     check("撤銷", st == 200 and o["item"]["state"] == "revoked" and o["item"]["revoked_by"] == "admin", o)
     st, o = req("POST", f"/api/keys/{kid}/revoke", {})
@@ -138,7 +143,8 @@ def main():
     st, o = req("GET", "/api/keys")
     check("加密入口網址：沒填就用主控台憑證上的名稱與埠", o["url"].startswith("https://") and o["url"].endswith(f":{x.PORT}/v1")
           and not o["url_custom"], o["url"])
-    for bad in ("http://ai.example.edu.tw/v1", "https://ai.example.edu.tw/api", "javascript:alert(1)"):
+    for bad in ("http://ai.example.edu.tw/v1", "https://ai.example.edu.tw/api", "javascript:alert(1)",
+                "https://example.com:notaport/v1", "https://:/v1", "https://example.com:70000/v1", "https://u:p@example.com/v1"):
         st, o = req("POST", "/api/keys/settings", {"public_url": bad})
         check(f"  網址不收 {bad}", st == 400)
     st, o = req("POST", "/api/keys/settings", {"public_url": "https://ai.example.edu.tw/v1"})
