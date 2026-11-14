@@ -87,24 +87,18 @@ jobs:
         run: python test/security/test_security.py
       - name: API 串接整合測試（需要 systemd --user；CI 主機沒有時自動略過，交付前在實機跑）
         run: |
-          # 自建 runner 是系統服務，連不到 xcloud 的 systemd --user：指回真正的使用者匯流排與家目錄（測試單元名稱與埠都是隨機的，結束自己刪掉）
-          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
-            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
-          fi
+          # 自建 runner 是系統服務，連不到 xcloud 的 systemd --user：接上使用者匯流排（做法見 .github/self-hosted-systemd.sh）
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
           python test/test_api_integration.py
       - name: 模型庫與 llama.cpp 引擎整合測試（假的 Hugging Face 與假引擎，跨引擎切換與還原）
         run: |
           # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
-          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
-            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
-          fi
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
           python test/test_llama_engine.py
       - name: 機器的納管與設定（加入、改名、移除、機器設定、欄位增改刪）
         run: |
           # 同上：自建 runner 接上 xcloud 的 systemd --user（單元名稱隨機，結束自己刪掉）
-          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then
-            export HOME="$(getent passwd "$(id -un)" | cut -d: -f6)" XDG_RUNTIME_DIR="/run/user/$(id -u)"
-          fi
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
           python test/test_machine_admin.py
       - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
         run: |
