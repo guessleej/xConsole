@@ -204,6 +204,28 @@ def main():
               and "轉址" in t["network"]["detail"], t.get("network"))
         co("POST", "/api/node/t1/apiinfo/brain/settings", {"public_url": ""})
 
+        # ---- 只走加密入口：舊共用金鑰先匯入，模型改聽本機並換上只有主控台知道的內部金鑰
+        st, lst = co("GET", "/api/keys")
+        nleg = len([i for i in lst.get("items", []) if i["source"] == "legacy"])
+        check("舊共用金鑰已自動匯入加密入口", st == 200 and nleg == 1, lst)
+        st, d = co("POST", "/api/node/t1/apiinfo/brain/gateway", {"only": True})
+        raw = json.load(open(cfg_path))
+        check("只走加密入口：重啟、模型改聽 127.0.0.1、回應不含內部金鑰", st == 200 and d.get("restarted")
+              and raw.get("host") == "127.0.0.1" and "api_key" not in d, d)
+        check("  舊共用金鑰直連模型打不進去（換成內部金鑰了）", plain(llm_port, "/v1/models", key) == 401)
+        gst, gd, _ = https(console_port, ccert, "POST", "/v1/chat/completions",
+                           {"model": "xvita-coder", "messages": [{"role": "user", "content": "hi"}]}, {"Authorization": f"Bearer {key}"})
+        check("  舊共用金鑰經加密入口照樣能用（等管理者撤銷）", gst == 200, gd)
+        st, lst2 = co("GET", "/api/keys")
+        check("  內部金鑰沒有被當成舊共用金鑰匯入", len([i for i in lst2["items"] if i["source"] == "legacy"]) == nleg, lst2)
+        st, t = co("POST", "/api/node/t1/apiinfo/brain/test", {})
+        check("  API 實測：直連那項略過、加密入口那項通過", st == 200 and t["network"].get("skipped") and t["gateway"]["ok"] and t["ok"], t)
+        st, d = co("POST", "/api/node/t1/apiinfo/brain/gateway", {"only": False})
+        check("重新開放區網直連", st == 200 and json.load(open(cfg_path)).get("host") == "0.0.0.0", d)
+        st, d = co("POST", "/api/node/t1/apiinfo/brain/settings", {"key": "new"})
+        key = d.get("api_key", "")
+        check("  重新產生的金鑰直連打得通", st == 200 and plain(llm_port, "/v1/models", key) == 200, d)
+
         st, d = co("POST", "/api/node/t1/apiinfo/brain/settings", {"key": "none"})
         check("主控台改設定：拿掉金鑰 → 重啟後不帶金鑰打得通", st == 200 and plain(llm_port, "/v1/models") == 200, d)
         st, au = co("GET", "/api/admin/audit?limit=50")

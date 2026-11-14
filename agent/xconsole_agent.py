@@ -2410,9 +2410,9 @@ def api_settings(slot_id, body, force=False):
                     errors.append("單次輸出上限要在 256～131,072 之間，而且要小於上下文長度")
                 elif mt != raw.get("max_tokens"):
                     want["max_tokens"] = mt
-        if "thinking" in body or "lan" in body:
+        if "thinking" in body:
             if slot.get("kind") != "llama":
-                errors.append("思考模式與區網存取只有 llama.cpp 的欄位能在這裡改")
+                errors.append("思考模式只有 llama.cpp 的欄位能在這裡改")
             else:
                 th = body.get("thinking")
                 if th is not None:
@@ -2420,10 +2420,11 @@ def api_settings(slot_id, body, force=False):
                         errors.append("思考模式只能是 on、off、auto")
                     elif th != (raw.get("reasoning") or "auto"):
                         want["thinking"] = th
-                if "lan" in body:
-                    host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
-                    if host != (raw.get("host") or "0.0.0.0"):
-                        want["lan"] = host
+        if "lan" in body:
+            # 區網存取：關掉＝模型只聽 127.0.0.1，外面只能經主控台的加密入口（/v1）連。Strata 的設定檔一樣有 host
+            host = "0.0.0.0" if body.get("lan") else "127.0.0.1"
+            if host != (raw.get("host") or "0.0.0.0"):
+                want["lan"] = host
         if "extra_args" in body:
             if slot.get("kind") != "llama":
                 errors.append("自訂啟動引數只有 llama.cpp 的欄位能設")
@@ -2457,7 +2458,9 @@ def api_settings(slot_id, body, force=False):
     old = dict(raw)
     new = dict(raw)
     for k, v in want.items():
-        if k == "max_context":
+        if k == "lan":
+            new["host"] = v
+        elif k == "max_context":
             args = list(new.get("args") or [])
             if "--max-context" in args:
                 args[args.index("--max-context") + 1] = str(v)
