@@ -160,6 +160,10 @@ jobs:
         if: always()
         shell: bash
         run: |
+          # 自建 runner：只移除 CI 自己裝的那一份（有 .ci-owned）；前面檢查到正式安裝而停下時，這裡什麼都不動
+          if [ "$RUNNER_ENVIRONMENT" = self-hosted ] && [ ! -e "$HOME/.xconsole/.ci-owned" ]; then
+            echo "這台的 xConsole 不是這次 CI 裝的，不移除"; rm -f "$RUNNER_TEMP/pw"; exit 0
+          fi
           if [ "$RUNNER_OS" = Windows ]; then powershell -NoProfile -ExecutionPolicy Bypass -File install/install.ps1 -Uninstall
           else export XDG_RUNTIME_DIR="/run/user/$(id -u)"; bash install/install.sh --uninstall; fi
           rm -f "$RUNNER_TEMP/pw"
