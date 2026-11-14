@@ -17,7 +17,6 @@ import base64
 import functools
 import glob
 import hashlib
-import hmac
 import http.client
 import io
 import json
