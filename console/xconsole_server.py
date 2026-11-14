@@ -2477,7 +2477,7 @@ class Handler(BaseHTTPRequestHandler):
             status, usage = self._gateway_forward(hit, sub, body, injected)
         finally:
             GW_INFLIGHT.release(row["id"])
-            STORE.usage_add(row["id"], gateway.day(), hit["node"], hit["slot"], status == 200, *usage)
+            STORE.usage_add(row["id"], gateway.hour(), hit["node"], hit["slot"], status == 200, *usage)
             gateway_touch(row["id"], self.ip)
         return None
 
