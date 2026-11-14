@@ -77,9 +77,9 @@ class Store:
           max_inflight INTEGER, created REAL, created_by TEXT, expires REAL, revoked REAL, revoked_by TEXT,
           last_used REAL, last_ip TEXT, source TEXT);
         CREATE TABLE IF NOT EXISTS api_usage(
-          key_id TEXT, day TEXT, node TEXT, slot TEXT, requests INTEGER, errors INTEGER,
-          prompt_tokens INTEGER, completion_tokens INTEGER, PRIMARY KEY(key_id, day, node, slot));
-        CREATE INDEX IF NOT EXISTS api_usage_day ON api_usage(day);
+          key_id TEXT, hour TEXT, node TEXT, slot TEXT, requests INTEGER, errors INTEGER,
+          prompt_tokens INTEGER, completion_tokens INTEGER, PRIMARY KEY(key_id, hour, node, slot));
+        CREATE INDEX IF NOT EXISTS api_usage_hour ON api_usage(hour);
         """)
 
     # ---- 稽核
@@ -318,30 +318,32 @@ class Store:
         with self.lock:
             self.db.execute("UPDATE api_keys SET last_used=?, last_ip=? WHERE id=?", (time.time(), ip or "", kid))
 
-    def usage_add(self, kid, day, node, slot, ok, prompt, completion):
+    def usage_add(self, kid, hour, node, slot, ok, prompt, completion):
+        """hour 是台北時間的「YYYY-MM-DD HH」：以小時分桶，報表的起點才能對到幾點，不會多算整天。"""
         with self.lock:
             self.db.execute(
-                "INSERT INTO api_usage(key_id,day,node,slot,requests,errors,prompt_tokens,completion_tokens) VALUES(?,?,?,?,1,?,?,?) "
-                "ON CONFLICT(key_id,day,node,slot) DO UPDATE SET requests=requests+1, errors=errors+excluded.errors, "
+                "INSERT INTO api_usage(key_id,hour,node,slot,requests,errors,prompt_tokens,completion_tokens) VALUES(?,?,?,?,1,?,?,?) "
+                "ON CONFLICT(key_id,hour,node,slot) DO UPDATE SET requests=requests+1, errors=errors+excluded.errors, "
                 "prompt_tokens=prompt_tokens+excluded.prompt_tokens, completion_tokens=completion_tokens+excluded.completion_tokens",
-                (kid, day, node, slot, 0 if ok else 1, int(prompt), int(completion)))
+                (kid, hour, node, slot, 0 if ok else 1, int(prompt), int(completion)))
 
-    def usage_by_key(self, since_day, until_day=None):
-        """{金鑰 id: {requests, errors, prompt_tokens, completion_tokens}}，日期含頭含尾（台北時間）。"""
+    def usage_by_key(self, since, until=None):
+        """{金鑰 id: {requests, errors, prompt_tokens, completion_tokens}}。since／until 是「YYYY-MM-DD」或「YYYY-MM-DD HH」
+        （台北時間），含 since、不含 until；字串照字典序比，日期當成那天 00 時。"""
         q, a = ("SELECT key_id, SUM(requests), SUM(errors), SUM(prompt_tokens), SUM(completion_tokens) FROM api_usage "
-                "WHERE day>=?"), [since_day]
-        if until_day:
-            q, a = q + " AND day<=?", a + [until_day]
+                "WHERE hour>=?"), [since]
+        if until:
+            q, a = q + " AND hour<?", a + [until]
         with self.lock:
             rows = self.db.execute(q + " GROUP BY key_id", a).fetchall()
         return {r[0]: {"requests": r[1], "errors": r[2], "prompt_tokens": r[3], "completion_tokens": r[4]} for r in rows}
 
-    def usage_by_slot(self, since_day, until_day=None):
+    def usage_by_slot(self, since, until=None):
         """{(node, slot): {...}}：跟引擎記錄檔算到的總量相減，就是沒經過加密入口（直連）的量。"""
         q, a = ("SELECT node, slot, SUM(requests), SUM(errors), SUM(prompt_tokens), SUM(completion_tokens) FROM api_usage "
-                "WHERE day>=?"), [since_day]
-        if until_day:
-            q, a = q + " AND day<=?", a + [until_day]
+                "WHERE hour>=?"), [since]
+        if until:
+            q, a = q + " AND hour<?", a + [until]
         with self.lock:
             rows = self.db.execute(q + " GROUP BY node, slot", a).fetchall()
         return {(r[0], r[1]): {"requests": r[2], "errors": r[3], "prompt_tokens": r[4], "completion_tokens": r[5]} for r in rows}
@@ -396,5 +398,5 @@ class Store:
         with self.lock:
             self.db.execute("DELETE FROM samples WHERE ts<?", (cut,))
             self.db.execute("DELETE FROM audit WHERE ts<?", (cut,))
-            self.db.execute("DELETE FROM api_usage WHERE day<?",
+            self.db.execute("DELETE FROM api_usage WHERE hour<?",
                             (time.strftime("%Y-%m-%d", time.gmtime(cut + 8 * 3600)),))
