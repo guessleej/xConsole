@@ -9864,11 +9864,7 @@
 "pattern": false
 },
 {
-"zh": "這把金鑰沒有被授權用 {0}",
-"pattern": true
-},
-{
-"zh": "這把金鑰沒有被授權用",
+"zh": "stream_options 要是 JSON 物件",
 "pattern": false
 },
 {
@@ -10180,10 +10176,6 @@
 "pattern": false
 },
 {
-"zh": "這把金鑰沒有被授權用 ",
-"pattern": false
-},
-{
 "zh": " 不支援 /v1/",
 "pattern": false
 },
@@ -10408,6 +10400,10 @@
 "pattern": false
 },
 {
+"zh": "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）",
+"pattern": false
+},
+{
 "zh": "找不到這個預覽，或已經過期（預覽保留 30 分鐘）。\n",
 "pattern": false
 },
@@ -10496,19 +10492,7 @@
 "pattern": false
 },
 {
-"zh": "{0} 的 {1} 已經叫 {2}，加密入口會分不出要送哪一格，請換一個名稱",
-"pattern": true
-},
-{
-"zh": "的",
-"pattern": false
-},
-{
-"zh": "已經叫",
-"pattern": false
-},
-{
-"zh": "加密入口會分不出要送哪一格，請換一個名稱",
+"zh": "only 要是 true 或 false",
 "pattern": false
 },
 {
@@ -10696,15 +10680,19 @@
 "pattern": false
 },
 {
-"zh": " 的 ",
+"zh": "{0} 的 {1} 已經叫 {2}，加密入口會分不出要送哪一格，請換一個名稱",
+"pattern": true
+},
+{
+"zh": "的",
 "pattern": false
 },
 {
-"zh": " 已經叫 ",
+"zh": "已經叫",
 "pattern": false
 },
 {
-"zh": "，加密入口會分不出要送哪一格，請換一個名稱",
+"zh": "加密入口會分不出要送哪一格，請換一個名稱",
 "pattern": false
 },
 {
@@ -10772,6 +10760,10 @@
 "pattern": false
 },
 {
+"zh": "這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰",
+"pattern": false
+},
+{
 "zh": "憑證驗不過（",
 "pattern": false
 },
@@ -10785,6 +10777,18 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址。",
+"pattern": false
+},
+{
+"zh": " 的 ",
+"pattern": false
+},
+{
+"zh": " 已經叫 ",
+"pattern": false
+},
+{
+"zh": "，加密入口會分不出要送哪一格，請換一個名稱",
 "pattern": false
 },
 {
@@ -12136,6 +12140,14 @@
 "pattern": false
 },
 {
+"zh": "這把金鑰沒有被授權用 {0}",
+"pattern": true
+},
+{
+"zh": "這把金鑰沒有被授權用",
+"pattern": false
+},
+{
 "zh": "有 {0} 格都叫 {1}，請管理員到「執行 › API 串接」把其中一格改名",
 "pattern": true
 },
@@ -12148,6 +12160,14 @@
 "pattern": false
 },
 {
+"zh": "{0} 現在沒有在跑",
+"pattern": true
+},
+{
+"zh": "現在沒有在跑",
+"pattern": false
+},
+{
 "zh": "沒有叫 ",
 "pattern": false
 },
@@ -12156,11 +12176,19 @@
 "pattern": false
 },
 {
+"zh": "這把金鑰沒有被授權用 ",
+"pattern": false
+},
+{
 "zh": " 格都叫 ",
 "pattern": false
 },
 {
 "zh": "，請管理員到「執行 › API 串接」把其中一格改名",
+"pattern": false
+},
+{
+"zh": " 現在沒有在跑",
 "pattern": false
 },
 {
