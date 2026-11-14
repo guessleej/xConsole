@@ -21678,5 +21678,40 @@
 "en": "Thinking mode can only be changed here for llama.cpp slots",
 "ja": "思考モードをここで変更できるのは llama.cpp のスロットだけです",
 "ko": "사고 모드는 llama.cpp 슬롯에서만 여기서 바꿀 수 있습니다"
+},
+"stream_options 要是 JSON 物件": {
+"en": "stream_options must be a JSON object",
+"ja": "stream_options は JSON オブジェクトにしてください",
+"ko": "stream_options는 JSON 객체여야 합니다"
+},
+"模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）": {
+"en": "The model's response exceeds 64 MB and was not relayed; send less at a time (e.g. split embeddings into batches)",
+"ja": "モデルの応答が 64 MB を超えたため転送しませんでした。1 回の量を減らしてください（例：embeddings を分けて送る）",
+"ko": "모델 응답이 64 MB를 넘어 전달하지 않았습니다. 한 번에 보내는 양을 줄이세요(예: embeddings를 나눠 보내기)"
+},
+"only 要是 true 或 false": {
+"en": "only must be true or false",
+"ja": "only は true か false にしてください",
+"ko": "only는 true 또는 false여야 합니다"
+},
+"這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰": {
+"en": "This slot's direct-access key is shorter than 16 characters and cannot be used with the gateway; create a new key on the API page",
+"ja": "このスロットの直接接続キーは 16 文字未満のため、ゲートウェイでは使えません。「API 連携」ページでキーを作り直してください",
+"ko": "이 슬롯의 직접 연결 키는 16자보다 짧아 게이트웨이에서 쓸 수 없습니다. 'API 연동' 페이지에서 키를 다시 만드세요"
+},
+"{0} 現在沒有在跑": {
+"en": "{0} is not running right now",
+"ja": "{0} は現在動いていません",
+"ko": "{0}은(는) 지금 실행 중이 아닙니다"
+},
+"現在沒有在跑": {
+"en": "is not running right now",
+"ja": "は現在動いていません",
+"ko": "지금 실행 중이 아님"
+},
+" 現在沒有在跑": {
+"en": " is not running right now",
+"ja": " は現在動いていません",
+"ko": " 지금 실행 중이 아님"
 }
 }
