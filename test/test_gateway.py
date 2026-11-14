@@ -217,12 +217,13 @@ def main():
               and g.get("url", "").startswith("https://"), g)
         check("  臨時金鑰不寫資料庫、不記用量", not any(i["name"] == "實測" for i in admin("GET", "/api/keys")[1]["items"]))
 
+        # 前面已經錯了 4 次（沒帶、只帶 cookie、金鑰不對、撤銷的）；API 實測故意不帶金鑰的那次不算
         n401 = 0
-        for _ in range(31):
+        for _ in range(26):
             st, _, _ = v1("GET", "models", headers={"Authorization": "Bearer xck_" + "B" * 43})
             n401 += st == 401
         st, d, _ = v1("GET", "models", headers={"Authorization": "Bearer xck_" + "B" * 43})
-        check("同一來源送錯金鑰太多次 → 429", st == 429 and n401 >= 20, (st, n401))
+        check("同一來源送錯金鑰第 31 次 → 429；API 實測的那次不算進去", st == 429 and n401 == 26, (st, n401))
         _, aud = admin("GET", "/api/admin/audit?limit=200")
         rows = [r for r in aud.get("items", aud if isinstance(aud, list) else []) if r.get("action") == "gateway.auth"]
         check("  稽核只記一筆（每個來源每一輪）", len(rows) == 1, len(rows))
