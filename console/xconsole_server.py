@@ -1764,6 +1764,8 @@ def gateway_slots():
 
 
 GW_ROUTES = gateway.Routes(gateway_slots)
+GW_MAX = 64 * 1024 * 1024
+GW_QUERY_SECRETS = {"key", "api_key", "apikey", "api-key", "token", "access_token", "auth", "authorization", "x-api-key"}
 GW_INFLIGHT = gateway.Inflight()
 GW_FAILS = gateway.FailLimit()
 _GW_TOUCH, _GW_TOUCH_LOCK = {}, threading.Lock()
@@ -2398,8 +2400,9 @@ class Handler(BaseHTTPRequestHandler):
     def _gateway(self, method):
         u = urlparse(self.path)
         sub = u.path[len("/v1/"):].strip("/") if u.path.startswith("/v1/") else ""
-        if re.search(r"(^|&)(key|api_key|apikey|token|access_token)=", u.query or "", re.I):
-            self._body(MAX_ANON_BODY)
+        if any(k.strip().lower() in GW_QUERY_SECRETS for k in parse_qs(u.query or "", keep_blank_values=True)):
+            if method == "POST":                # GET 不讀本文：宣稱有本文卻不送，會佔住執行緒
+                self._body(MAX_ANON_BODY)
             self._headers_done()
             return self._oai(400, "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）", "invalid_request")
         key = gateway.presented_key(self.headers)
@@ -2418,7 +2421,8 @@ class Handler(BaseHTTPRequestHandler):
                    "金鑰不對" if not row else "這把金鑰已撤銷" if row.get("revoked") else "這把金鑰已過期")
             return self._oai(401, msg, "invalid_api_key")
         promote = getattr(self.server, "promote", None)
-        if promote is not None and not promote("key:" + row["id"]):
+        limit = int(row.get("max_inflight") or gateway.DEFAULT_INFLIGHT)
+        if promote is not None and not promote("key:" + row["id"], limit + 4):
             # 已驗過金鑰的連線依金鑰計，不算進來源 IP 的 64 條：一間教室在同一個 NAT 後面也不會互相擋
             if method == "POST":
                 self._body(MAX_ANON_BODY)
@@ -2438,7 +2442,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._oai(405, f"/v1/{sub} 要用 {want}", "method_not_allowed")
         if sub == "models":
             gateway_touch(row["id"], self.ip)
-            rows = [r for r in GW_ROUTES.rows() if r["online"] and gateway.allows(row, f"{r['node']}/{r['slot']}")]
+            rows = [r for r in GW_ROUTES.rows() if r.get("online") and gateway.allows(row, f"{r['node']}/{r['slot']}")]
             names = [r["name"] for r in rows]
             return self._json(200, {"object": "list", "data": [
                 {"id": r["name"], "object": "model", "created": 0, "owned_by": "xconsole",
@@ -2453,23 +2457,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._oai(413, "請求內容太大（上限 16 MB）", "invalid_request")
         if not isinstance(body, dict) or not isinstance(body.get("model"), str) or not body["model"]:
             return self._oai(400, "本文要是 JSON 物件，並帶 model", "invalid_request")
-        hit, err = GW_ROUTES.find(body["model"])
+        so = body.get("stream_options")
+        if so is not None and not isinstance(so, dict):
+            return self._oai(400, "stream_options 要是 JSON 物件", "invalid_request")
+        hit, err = GW_ROUTES.find(body["model"], allowed=lambda r: gateway.allows(row, f"{r['node']}/{r['slot']}"))
         if err:
             return self._oai(err[0], err[1], err[2])
-        sk = f"{hit['node']}/{hit['slot']}"
-        if not gateway.allows(row, sk):
-            return self._oai(403, f"這把金鑰沒有被授權用 {body['model']}", "permission_denied")
         if sub in gateway.STRATA_PATHS and hit.get("kind") != "strata":
             return self._oai(404, f"{body['model']} 不支援 /v1/{sub}，請用 /v1/chat/completions", "not_found")
-        if not GW_INFLIGHT.acquire(row["id"], int(row.get("max_inflight") or gateway.DEFAULT_INFLIGHT)):
-            return self._oai(429, f"這把金鑰同時進行中的請求已達上限（{row.get('max_inflight')}），請等前一個回完", "rate_limited",
-                             {"Retry-After": "5"})
         injected = False
-        if sub in ("chat/completions", "completions") and body.get("stream") is True \
-                and not (body.get("stream_options") or {}).get("include_usage"):
-            body["stream_options"] = {**(body.get("stream_options") if isinstance(body.get("stream_options"), dict) else {}),
-                                      "include_usage": True}
+        if sub in ("chat/completions", "completions") and body.get("stream") is True and not (so or {}).get("include_usage"):
+            body["stream_options"] = {**(so or {}), "include_usage": True}
             injected = True
+        if not GW_INFLIGHT.acquire(row["id"], limit):
+            return self._oai(429, f"這把金鑰同時進行中的請求已達上限（{limit}），請等前一個回完", "rate_limited",
+                             {"Retry-After": "5"})
         status, usage = 0, (0, 0)
         try:
             status, usage = self._gateway_forward(hit, sub, body, injected)
@@ -2508,7 +2510,11 @@ class Handler(BaseHTTPRequestHandler):
         with resp:
             ctype = resp.headers.get("Content-Type") or "application/json"
             if "event-stream" not in ctype:
-                raw = resp.read(64 * 1024 * 1024)
+                raw = resp.read(GW_MAX + 1)
+                if len(raw) > GW_MAX:
+                    # 截斷的 JSON 帶著 200 回去，IDE 只會拿到壞掉的內容：明講太大
+                    self._oai(502, "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）", "server_error")
+                    return 502, (0, 0)
                 try:
                     usage = gateway.usage_of(json.loads(raw).get("usage"))
                 except (ValueError, AttributeError):

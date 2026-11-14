@@ -223,41 +223,69 @@ class FailLimit:
 
 class Routes:
     """模型名稱 → 哪台機器哪一格。list_slots() 回 [{node, slot, kind, name, online, ctx, vision}]，
-    結果快取 ttl 秒；找不到名稱時最多每 5 秒強制重抓一次（剛改名、剛換模型的情形）。"""
+    結果快取 ttl 秒；找不到名稱時最多每 5 秒強制重抓一次（剛改名、剛換模型的情形）。
+    重抓要問每台代理，可能好幾秒：不鎖著等網路，同時進來的請求先用上一份（第一次還沒有時才等）。"""
 
     def __init__(self, list_slots, ttl=30):
         self.list_slots, self.ttl = list_slots, ttl
         self._at, self._forced, self._rows, self._lock = 0, 0, [], threading.Lock()
+        self._busy, self._done = False, threading.Event()
+        self._done.set()
 
     def rows(self, force=False):
         with self._lock:
             now = time.time()
             if force and now - self._forced < 5:
                 force = False
-            if force or now - self._at > self.ttl:
-                try:
-                    self._rows = self.list_slots()
-                except Exception:  # noqa: BLE001  # 抓不到就沿用上一次的
-                    pass
-                self._at = now
+            if not force and now - self._at <= self.ttl:
+                return list(self._rows)
+            if self._busy:
+                if self._rows:
+                    return list(self._rows)
+                wait = True
+            else:
+                wait = False
+                self._busy = True
+                self._done.clear()
                 if force:
                     self._forced = now
+        if wait:
+            self._done.wait(40)
+            with self._lock:
+                return list(self._rows)
+        try:
+            got = self.list_slots()
+        except Exception:  # noqa: BLE001  # 抓不到就沿用上一次的
+            got = None
+        with self._lock:
+            if got is not None:
+                self._rows = got
+            self._at, self._busy = time.time(), False
+            self._done.set()
             return list(self._rows)
 
     def invalidate(self):
         with self._lock:
             self._at = 0
 
-    def find(self, name, force=False):
-        """回 (那一格, None) 或 (None, (狀態碼, 訊息, 錯誤類型))。"""
-        hits = [r for r in self.rows(force) if r["name"] == name]
-        if not hits and not force:
-            return self.find(name, force=True)
-        if not hits:
+    def find(self, name, allowed=None, force=False):
+        """回 (那一格, None) 或 (None, (狀態碼, 訊息, 錯誤類型))。
+        只在「這把金鑰能用、而且正在跑」的格子裡找，跟 /v1/models 列出來的一致：
+        別人的格子或沒在跑的格子剛好同名，不影響這把金鑰。"""
+        rows = [r for r in self.rows(force) if r["name"] == name]
+        if not rows and not force:
+            return self.find(name, allowed, force=True)
+        if not rows:
             return None, (404, f"沒有叫 {name} 的模型；可用的模型請看 /v1/models", "model_not_found")
-        if len(hits) > 1:
-            return None, (409, f"有 {len(hits)} 格都叫 {name}，請管理員到「執行 › API 串接」把其中一格改名", "model_name_conflict")
-        return hits[0], None
+        mine = [r for r in rows if allowed is None or allowed(r)]
+        if not mine:
+            return None, (403, f"這把金鑰沒有被授權用 {name}", "permission_denied")
+        up = [r for r in mine if r.get("online")]
+        if len(up) > 1:
+            return None, (409, f"有 {len(up)} 格都叫 {name}，請管理員到「執行 › API 串接」把其中一格改名", "model_name_conflict")
+        if not up:
+            return None, (503, f"{name} 現在沒有在跑", "model_offline")
+        return up[0], None
 
 
 if __name__ == "__main__":
@@ -273,6 +301,28 @@ if __name__ == "__main__":
         fl.add(f"10.0.0.{i}")
     assert fl.size() <= 4                      # 來源表有上限，不會無限長大
     assert not fl.blocked("10.9.9.9") and fl.size() <= 4
+    # Routes：重抓時不鎖著等網路，同時進來的請求先用上一份
+    calls = []
+
+    def slow():
+        calls.append(1)
+        time.sleep(0.4)
+        return [{"node": "n", "slot": "s", "name": "m", "online": True}]
+    rt = Routes(slow, ttl=30)
+    assert rt.rows()[0]["name"] == "m"
+    rt.invalidate()
+    th = threading.Thread(target=rt.rows)
+    th.start()
+    time.sleep(0.1)
+    t0 = time.time()
+    assert rt.rows() and time.time() - t0 < 0.2       # 另一個請求正在重抓：直接拿舊的，不等
+    th.join()
+    assert len(calls) == 2
+    rt2 = Routes(lambda: [{"node": "n", "slot": "a", "name": "x", "online": True},
+                          {"node": "n", "slot": "b", "name": "x", "online": True}])
+    assert rt2.find("x")[1][0] == 409
+    assert rt2.find("x", allowed=lambda r: r["slot"] == "a")[0]["slot"] == "a"   # 只看這把金鑰能用的
+    assert rt2.find("x", allowed=lambda r: False)[1][0] == 403
     su = StreamUsage(True)
     assert su.feed(b'data: {"choices":[{"delta":{"content":"hi"}}]}\n')
     assert not su.feed(b'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2}}\n')
