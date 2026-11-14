@@ -121,7 +121,7 @@ def build(store, certs, cfg, days=30, now=None):
                                 f"輸出 US$ {ref['usd_per_mtok_out']} 計；重用快取的 token 不計費"
                                 + (f"；匯率 {fx}" if fx else ""))}
     # 加密入口（/v1）依金鑰分開算；引擎記錄檔的總量減掉加密入口的量，就是沒經過加密入口的（網頁對話、直連 8080）
-    d0 = gateway.day(since)
+    d0 = gateway.hour(since)
     names = {k["id"]: k for k in store.key_list()}
     by_key = []
     for kid, u in store.usage_by_key(d0).items():
@@ -132,14 +132,18 @@ def build(store, certs, cfg, days=30, now=None):
     by_key.sort(key=lambda r: -r["requests"])
     gw_tot = {"requests": sum(r["requests"] for r in by_key), "prompt": sum(r["prompt"] for r in by_key),
               "generated": sum(r["generated"] for r in by_key)}
+    # 引擎只數到真的送到它那邊的請求：加密入口失敗的（代理連不上等）沒到引擎，不能拿來扣
+    gw_ok = sum(r["requests"] - r["errors"] for r in by_key)
     gateway_use = {
-        "by_key": by_key[:20],
+        "by_key": by_key,
         "total": gw_tot,
-        "not_via_gateway": {k: max(0, tok[k] - gw_tot[k]) for k in ("requests", "prompt", "generated")},
+        "not_via_gateway": {"requests": max(0, tok["requests"] - gw_ok), "prompt": max(0, tok["prompt"] - gw_tot["prompt"]),
+                            "generated": max(0, tok["generated"] - gw_tot["generated"])},
         "keys_active": sum(1 for k in names.values() if gateway.state(k) == "active"),
         "legacy_active": [k["name"] for k in names.values() if k.get("source") == "legacy" and gateway.state(k) == "active"],
-        "assumption": "「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口算到的量，包含網頁對話與 IDE 直連 8080；"
-                      "只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。",
+        "assumption": "「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口成功送到模型的量，包含網頁對話與 IDE 直連 8080；"
+                      "只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。"
+                      "加密入口的用量以小時記，本期起點所在的那一小時整段算進來。",
     }
     build_vs_buy = {
         "gateway": gateway_use,
