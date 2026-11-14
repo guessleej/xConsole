@@ -3148,6 +3148,10 @@
 "pattern": false
 },
 {
+"zh": "擁有者",
+"pattern": false
+},
+{
 "zh": "金鑰開頭",
 "pattern": false
 },
@@ -3169,6 +3173,14 @@
 },
 {
 "zh": "最後使用",
+"pattern": false
+},
+{
+"zh": "升級時匯入",
+"pattern": false
+},
+{
+"zh": "管理員發的",
 "pattern": false
 },
 {

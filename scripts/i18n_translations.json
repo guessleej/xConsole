@@ -22298,5 +22298,20 @@
 "en": "You are a programming assistant working on the user's own machine; explain things to the user in the user's language. Use only the provided tools; every file path is relative to the work folder \"{0}\". This account cannot run commands and can only read and write files. Approach: first list the steps with update_plan, then do them one by one, updating the plan after each step; use list_files and read_file to understand the current state when needed, and write_file to write whole files. Where running something is needed to verify, state exactly which command the user should run. When everything is done, call finish with a summary.",
 "ja": "あなたはユーザー自身のマシンで作業するプログラミングアシスタントです。ユーザーの言語で説明してください。提供されたツールだけを使い、ファイルパスはすべて作業フォルダー「{0}」からの相対パスです。このアカウントはコマンドを実行できず、ファイルの読み書きだけができます。進め方：まず update_plan で手順を並べ、1 つずつ進めて、終わるたびに計画を更新します。必要に応じて list_files と read_file で現状を確認し、write_file でファイル全体を書きます。実行して確かめる必要がある箇所は、ユーザーが自分で実行するコマンドを明記してください。すべて終わったら finish を呼んで要約を書いてください。",
 "ko": "당신은 사용자 자신의 머신에서 일하는 프로그래밍 도우미입니다. 사용자의 언어로 설명하세요. 제공된 도구만 쓰며, 모든 파일 경로는 작업 폴더 '{0}' 기준의 상대 경로입니다. 이 계정은 명령을 실행할 수 없고 파일 읽기와 쓰기만 할 수 있습니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며, 단계를 마칠 때마다 계획을 갱신합니다. 필요하면 list_files와 read_file로 현재 상태를 확인하고 write_file로 파일 전체를 씁니다. 실행해서 확인해야 하는 부분은 사용자가 직접 실행할 명령을 분명히 적으세요. 모두 끝나면 finish를 호출해 요약을 쓰세요."
+},
+"擁有者": {
+"en": "Owner",
+"ja": "所有者",
+"ko": "소유자"
+},
+"升級時匯入": {
+"en": "Imported at upgrade",
+"ja": "アップグレード時に取り込み",
+"ko": "업그레이드 때 가져옴"
+},
+"管理員發的": {
+"en": "Issued by an administrator",
+"ja": "管理者が発行",
+"ko": "관리자가 발급"
 }
 }
