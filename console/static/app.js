@@ -3001,7 +3001,9 @@ function renderKeys(body, d, list, reload) {
   const sb = el("div", "scrollbox");
   const tb = el("table", "api-table");
   const hr = el("tr");
-  ["名稱", "金鑰開頭", "能用的模型", "同時上限", "本月請求", "本月 token（輸入／輸出）", "最後使用", "狀態", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  const own = isAdmin();                       // 管理員看全部：多一欄是誰的（使用者自己產生的，或管理員發的）
+  ["名稱", ...(own ? ["擁有者"] : []), "金鑰開頭", "能用的模型", "同時上限", "本月請求", "本月 token（輸入／輸出）", "最後使用", "狀態", ""]
+    .forEach((h) => hr.appendChild(el("th", null, h)));
   const th = el("thead");
   th.appendChild(hr);
   tb.appendChild(th);
@@ -3010,10 +3012,11 @@ function renderKeys(body, d, list, reload) {
     const tr = el("tr");
     const u = k.usage || {};
     const slots = k.slots === "*" ? "全部" : (k.slots || []).map(slotLabel).join("、");
-    const cells = [k.name, `${k.prefix}…`, slots, String(k.max_inflight), int(u.requests), `${int(u.prompt_tokens)}／${int(u.completion_tokens)}`,
+    const cells = [k.name, ...(own ? [k.owner || (k.source === "legacy" ? "升級時匯入" : "管理員發的")] : []), `${k.prefix}…`, slots,
+      String(k.max_inflight), int(u.requests), `${int(u.prompt_tokens)}／${int(u.completion_tokens)}`,
       k.last_used ? new Date(k.last_used * 1000).toLocaleString(uiLocale(), { hour12: false }) : "還沒用過",
       KEY_STATE[k.state] + (k.expires && k.state === "active" ? `（${new Date(k.expires * 1000).toLocaleDateString(uiLocale())} 到期）` : "")];
-    cells.forEach((v, i) => tr.appendChild(el("td", i === 1 ? "mono" : null, v)));
+    cells.forEach((v, i) => tr.appendChild(el("td", i === (own ? 2 : 1) ? "mono" : null, v)));
     const act = el("td");
     if (k.state !== "revoked") {
       const e = el("button", "btn sm", "修改");
