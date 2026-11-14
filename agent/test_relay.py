@@ -7,7 +7,6 @@
 不需要 systemd：假引擎直接起，欄位只用來查埠與金鑰。跑法：python3 test_relay.py
 """
 import hashlib
-import hmac
 import json
 import os
 import socket
@@ -114,7 +113,7 @@ def main():
         case("空欄位 → 404", st == 404, d)
 
         st, d, _ = call("/apikey/brain")
-        case("/apikey：回雜湊與前 7 個字元，不回金鑰", st == 200 and d["set"] and d["hash"] == hmac.new(b"xconsole-api-key-v1", KEY.encode(), hashlib.sha256).hexdigest()
+        case("/apikey：回雜湊與前 7 個字元，不回金鑰", st == 200 and d["set"] and d["hash"] == hashlib.pbkdf2_hmac("sha256", KEY.encode(), b"xconsole-api-key-v1", 10000).hex()
              and d["prefix"] == KEY[:7] and KEY not in json.dumps(d) and d["port"] == lp, d)
         st, d, _ = call("/apikey/small")
         case("/apikey：沒設金鑰的欄位 set=false、沒有雜湊", st == 200 and not d["set"] and d["hash"] is None and d["bind"] == "0.0.0.0", d)
