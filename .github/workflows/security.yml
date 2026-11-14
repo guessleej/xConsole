@@ -65,6 +65,8 @@ jobs:
         run: cd console && python test_apikeys.py
       - name: 代理的加密入口轉送（換上模型金鑰、串流原樣轉、路徑白名單、舊金鑰只回雜湊）
         run: cd agent && python test_relay.py
+      - name: 加密入口端到端（個別金鑰、撤銷、權限、同時上限、用量、OpenAI 錯誤格式）
+        run: python test/test_gateway.py
       - name: 操作電腦與 Hugging Face 令牌（每步允許、拒絕、這次都允許、步數上限、令牌加密與自動帶上）
         run: cd console && python test_computer.py
       - name: 對齊 LocModel（自訂啟動引數白名單、MoE 依張量分層、內顯、手動指定顯示卡、鏡像不送令牌、連結資料夾、實測校正）
