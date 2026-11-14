@@ -22313,5 +22313,15 @@
 "en": "Issued by an administrator",
 "ja": "管理者が発行",
 "ko": "관리자가 발급"
+},
+"第三方 API 用的是單位付費的金鑰，只有管理員能用": {
+"en": "Third-party APIs use keys paid for by the organization; only administrators can use them",
+"ja": "サードパーティ API は組織が費用を払っているキーを使うため、管理者だけが使えます",
+"ko": "서드파티 API는 기관이 비용을 내는 키를 쓰므로 관리자만 쓸 수 있습니다"
+},
+"這把金鑰的帳號已停用": {
+"en": "The account that owns this key is disabled",
+"ja": "このキーのアカウントは無効化されています",
+"ko": "이 키의 계정은 비활성화되었습니다"
 }
 }

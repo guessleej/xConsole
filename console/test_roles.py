@@ -19,6 +19,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 TMP = tempfile.mkdtemp(prefix="xc-roles-")
@@ -329,6 +330,86 @@ def main():
         Client().login("s2002@cloudinfo.com.tw", "wrong-password-x")
     check("  同一帳號錯到 5 次以上：只擋這個帳號", Client().login("s2002@cloudinfo.com.tw", out["created"][1]["password"])[0] == 429
           and Client().login("admin", ADMIN_PW)[0] == 200)
+
+    # ---- 審查補強
+    st, o = admin.req("POST", "/api/users/create", {"username": "a0002@cloudinfo.com.tw", "display": "副管理員", "role": "admin"})
+    a2 = Client()
+    a2.login("a0002@cloudinfo.com.tw", o["password"])
+    st, _ = a2.req("POST", "/api/branding", {"org": "被改掉的單位"})
+    check("還沒改一次性密碼：連品牌設定也不能改（只放行看自己、改密碼、登出）", st == 403)
+    a2.req("POST", "/api/account/password", {"old": o["password"], "new": "second-admin-pass-1"})
+    a2.login("a0002@cloudinfo.com.tw", "second-admin-pass-1")
+
+    t = x.AgentTask("a0002@cloudinfo.com.tw", "", "n1", "f", {"kind": "local"}, "p", "l")
+    t.state, t.always = "waiting_approval", True
+    x.AGENT_TASKS[t.id] = t
+    admin.req("POST", "/api/users/a0002@cloudinfo.com.tw/update", {"role": "user"})
+    check("管理員被降級：他進行中的 Agent 任務停掉，也不能再執行指令", t.state == "stopped" and not t.can_exec and not t.always)
+    admin.req("POST", "/api/users/a0002@cloudinfo.com.tw/update", {"role": "admin"})
+    code, out = x.agent_start("s9", "", {"node": "n1", "folder": "f", "prompt": "做事", "model": {"kind": "provider", "id": "p00000000001"}},
+                              can_exec=False)
+    check("使用者的 Agent 不能用第三方 API（單位付費的金鑰）", code == 403, (code, out))
+
+    # 兩位管理員同時互相降級：至少留一位
+    res = []
+    th = [threading.Thread(target=lambda a, b: res.append(x.user_change(a, {"role": "user"}, b)[0]), args=p)
+          for p in (("a0002@cloudinfo.com.tw", "admin"), ("admin", "a0002@cloudinfo.com.tw"))]
+    [z.start() for z in th]
+    [z.join() for z in th]
+    check("兩位管理員同時互相降級：只成功一個，至少留一位管理員", sorted(res) == [200, 409] and x.STORE.admin_count() >= 1, res)
+    keep = "admin" if x.STORE.user_get("admin")["role"] == "admin" else "a0002@cloudinfo.com.tw"
+    gone = "a0002@cloudinfo.com.tw" if keep == "admin" else "admin"
+    x.user_change(gone, {"role": "admin"}, keep)
+
+    # 停用帳號：他自己產生的金鑰跟著不能用
+    st, o = admin.req("POST", "/api/users/create", {"username": "s3001@cloudinfo.com.tw", "display": "丙"})
+    u3 = Client()
+    u3.login("s3001@cloudinfo.com.tw", o["password"])
+    u3.req("POST", "/api/account/password", {"old": o["password"], "new": "student-three-pw-1"})
+    u3.login("s3001@cloudinfo.com.tw", "student-three-pw-1")
+    res = []
+    th = [threading.Thread(target=lambda: res.append(u3.req("POST", "/api/keys/create", {"name": "並行"}))) for _ in range(6)]
+    [z.start() for z in th]
+    [z.join() for z in th]
+    ok_keys = [r[1]["key"] for r in res if r[0] == 200]
+    check("同時送 6 個產生金鑰的請求：只成功 3 把", len(ok_keys) == 3, [r[0] for r in res])
+
+    def v1(key):
+        r = urllib.request.Request(BASE + "/v1/models", headers={"Authorization": f"Bearer {key}"})
+        try:
+            resp = urllib.request.urlopen(r, timeout=20)
+        except urllib.error.HTTPError as e:
+            resp = e
+        return resp.status, json.loads(resp.read() or b"{}")
+    admin.req("POST", "/api/users/s3001@cloudinfo.com.tw/update", {"disabled": True})
+    st, o = v1(ok_keys[0])
+    check("帳號停用：他自己產生的金鑰在加密入口也不能用", st == 401 and "停用" in o["error"]["message"], (st, o))
+
+    # 刪帳號：Agent 任務與畫圖影片產出一起清掉，同名的新帳號看不到前一個人的東西
+    t = x.AgentTask("s3001@cloudinfo.com.tw", "", "n1", "f", {"kind": "local"}, "p", "l")
+    t.state = "done"
+    x.AGENT_TASKS[t.id] = t
+    deleted = []
+    real_call = x.call_node
+    x.call_node = lambda nid, path, method="GET", body=None, timeout=40: (
+        (200, {"jobs": [{"id": "eeee0001", "by": "s3001@cloudinfo.com.tw"}, {"id": "ffff0002", "by": "admin"}]}) if path == "/sd/jobs"
+        else (deleted.append(path), (200, {"ok": True}))[1] if path.endswith("/delete") else (404, {"error": "找不到"}))
+    st, o = admin.req("POST", "/api/users/s3001@cloudinfo.com.tw/delete", {})
+    x.call_node = real_call
+    check("刪帳號：他的畫圖影片產出一起刪、別人的不動", deleted == ["/sd/jobs/eeee0001/delete"] and o.get("deleted_jobs") == 1, (deleted, o))
+    check("  他的 Agent 任務紀錄一起丟掉", t.id not in x.AGENT_TASKS)
+
+    # 刪掉從 fleet.json 搬進來的那位管理員：退回舊版用的那份帳密改成做這件事的管理員
+    check("退回舊版用的帳密原本是 admin", x.fleet()["auth"]["username"] == "admin")
+    a2.login("a0002@cloudinfo.com.tw", "second-admin-pass-1")       # 互相降級那一步可能把他登出了
+    st, o = a2.req("POST", "/api/users/admin/delete", {})
+    check("刪掉原本那位管理員：fleet.json 的帳密改成做這件事的管理員", st == 200 and x.fleet()["auth"]["username"] == "a0002@cloudinfo.com.tw"
+          and x.fleet()["auth"]["hash"] == x.STORE.user_get("a0002@cloudinfo.com.tw")["hash"], (st, o))
+
+    # 舊版搬進來的帳號可能是中文：管理動作照樣找得到
+    x.STORE.user_insert({"username": "管理員", "display": "管理員", "role": "user", "disabled": 0})
+    st, o = a2.req("POST", "/api/users/" + urllib.parse.quote("管理員") + "/update", {"display": "舊帳號"})
+    check("帳號是中文（舊版搬進來的）：改得到", st == 200 and o["user"]["display"] == "舊帳號", (st, o))
 
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1

@@ -96,7 +96,7 @@ LOGIN_MAX_PER_ACCOUNT = 5
 LOGIN_MAX_PER_IP = 30
 PW_MIN = 12                       # 新設的密碼至少 12 碼（OWASP ASVS L2 2.1.1）；舊的 8 碼密碼下次改時才套用
 USER_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]{2,63}")
-MUST_CHANGE_OK = {"/api/me", "/api/account/password", "/api/logout", "/api/branding"}
+MUST_CHANGE_OK = {("GET", "/api/me"), ("POST", "/api/account/password"), ("POST", "/api/logout")}
 # 使用者（非管理員）能用的路由：對話、Agent、畫圖影片、自己的金鑰與密碼。沒列在這裡的一律只有管理員能用：
 # 新加的路由忘了列，結果是使用者用不到，而不是不小心開放出去（console/test_roles.py 逐條檢查每一條路由都有歸屬）。
 USER_ROUTES = [
@@ -117,6 +117,7 @@ USER_ROUTES = [
 _USER_ROUTES = [(m, re.compile(rx)) for m, rx in USER_ROUTES]
 UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload")
 USER_KEYS_MAX = 3                  # 使用者自己能產生的有效金鑰上限（管理員發的不算）
+_KEY_LOCK = threading.Lock()
 
 
 def user_may(method, path):
@@ -472,8 +473,53 @@ def user_create(body, by):
     return 200, {"ok": True, "user": user_public(STORE.user_get(f["username"])), "password": pw}
 
 
+_USER_LOCK = threading.Lock()                         # 「還剩幾位管理員」的檢查與改動要一起做，兩位管理員同時互相降級才擋得住
+
+
+def transfer_legacy_auth(username, to):
+    """fleet.json 的 auth 是給退回舊版用的那一份：它指的人被刪、停用或降級時，改成做這件事的管理員，
+    不然退回舊版之後，被拿掉權限的人反而變回管理員。"""
+    a = fleet().get("auth") or {}
+    row = STORE.user_get(to)
+    if a.get("username", "admin") != username or not row or not row.get("hash"):
+        return
+    update_fleet(lambda c: c.__setitem__("auth", {"username": to, "salt": row["salt"], "hash": row["hash"],
+                                                  "algo": row.get("algo") or "pbkdf2-sha256-200k", "changed_at": int(time.time())}))
+
+
+def cut_agent_tasks(username, drop=False):
+    """這個人沒有管理員權限了：進行中的 Agent 任務停掉，也不能再執行指令。drop＝帳號刪了，任務紀錄一起丟掉。"""
+    with _AGENT_LOCK:
+        mine = [t for t in AGENT_TASKS.values() if t.user == username]
+    for t in mine:
+        t.can_exec, t.always = False, False
+        if t.state in ("running", "waiting_approval"):
+            agent_stop(t, lambda *a, **k: STORE.audit("系統", "", *a, **k))
+    if drop:
+        with _AGENT_LOCK:
+            for t in mine:
+                AGENT_TASKS.pop(t.id, None)
+
+
+def purge_sd_jobs(username):
+    """刪帳號：他產的畫圖影片一起刪（產出記在帳號名稱下，不刪的話同名的新帳號會看到前一個人的東西）。回刪了幾件。"""
+    n = 0
+    for node in fleet()["nodes"]:
+        code, out = call_node(node["id"], "/sd/jobs", timeout=30)
+        for j in (out.get("jobs") if code == 200 and isinstance(out, dict) else None) or []:
+            if isinstance(j, dict) and j.get("by") == username and j.get("id"):
+                c, _ = call_node(node["id"], f"/sd/jobs/{j['id']}/delete", "POST", {}, timeout=30)
+                n += c == 200
+    return n
+
+
 def user_change(username, body, me):
     """改顯示名稱、角色、停用。最後一位管理員不能被降級或停用；不能停用或降級自己（免得把自己關在門外）。"""
+    with _USER_LOCK:
+        return _user_change(username, body, me)
+
+
+def _user_change(username, body, me):
     cur = STORE.user_get(username)
     if not cur:
         return 404, {"error": "沒有這個帳號"}
@@ -488,6 +534,8 @@ def user_change(username, body, me):
     STORE.user_update(username, f)
     if f.get("disabled") == 1 or f.get("role") == "user":
         STORE.session_end_all(username)              # 停用或降級：現有的登入馬上失效
+        cut_agent_tasks(username)                    # 進行中的 Agent 任務停掉，也不能再執行指令
+        transfer_legacy_auth(username, me)
     return 200, {"ok": True, "user": user_public(STORE.user_get(username))}
 
 
@@ -500,6 +548,11 @@ def user_reset(username):
 
 
 def user_remove(username, me):
+    with _USER_LOCK:
+        return _user_remove(username, me)
+
+
+def _user_remove(username, me):
     cur = STORE.user_get(username)
     if not cur:
         return 404, {"error": "沒有這個帳號"}
@@ -511,8 +564,11 @@ def user_remove(username, me):
     for kid in revoked:
         STORE.key_revoke(kid, me)
     STORE.folders_reassign(username, me)             # Agent 資料夾裡的檔案不刪，改歸做這件事的管理員
+    cut_agent_tasks(username, drop=True)
+    jobs = purge_sd_jobs(username)
+    transfer_legacy_auth(username, me)
     STORE.user_delete(username)
-    return 200, {"ok": True, "revoked_keys": len(revoked)}
+    return 200, {"ok": True, "revoked_keys": len(revoked), "deleted_jobs": jobs}
 
 
 # ---------------------------------------------------------------- API 串接：從主控台經網路打一次
@@ -2496,6 +2552,8 @@ def agent_start(user, ip, body, can_exec=True):
                                                                     "model": rest.split(":", 1)[1] if ":" in rest else ""}
     if not isinstance(m, dict) or m.get("kind") not in ("local", "provider"):
         return 400, {"error": "模型要是本機欄位（kind=local, slot）或第三方 API（kind=provider, id）"}
+    if m["kind"] == "provider" and not can_exec:
+        return 403, {"error": "第三方 API 用的是單位付費的金鑰，只有管理員能用"}
     if m["kind"] == "local":
         slot = str(m.get("slot") or "")
         mnode = str(m.get("node") or node)
@@ -2643,7 +2701,7 @@ class Handler(BaseHTTPRequestHandler):
     def _gate(self, method, path, drain=False):
         """登入之後的第二道門：要先改密碼的人只能改密碼、看自己是誰、登出。回 True＝已經回應了，呼叫端直接結束。"""
         w = self.who
-        if w and w.get("must_change") and path not in MUST_CHANGE_OK:
+        if w and w.get("must_change") and (method, path) not in MUST_CHANGE_OK:
             if drain:
                 self._body(MAX_ANON_BODY)
                 self._headers_done()
@@ -2786,6 +2844,14 @@ class Handler(BaseHTTPRequestHandler):
             msg = ("沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>" if not key else
                    "金鑰不對" if not row else "這把金鑰已撤銷" if row.get("revoked") else "這把金鑰已過期")
             return self._oai(401, msg, "invalid_api_key")
+        if row.get("owner"):
+            ow = STORE.user_get(row["owner"])
+            if not ow or ow.get("disabled"):
+                # 帳號停用或刪掉了，他自己產生的金鑰跟著不能用（不必一把一把撤銷）
+                if method == "POST":
+                    self._body(MAX_ANON_BODY)
+                self._headers_done()
+                return self._oai(401, "這把金鑰的帳號已停用", "invalid_api_key")
         promote = getattr(self.server, "promote", None)
         limit = int(row.get("max_inflight") or gateway.DEFAULT_INFLIGHT)
         if promote is not None and not promote("key:" + row["id"], limit + 4):
@@ -3803,9 +3869,10 @@ class Handler(BaseHTTPRequestHandler):
                                        "error": out["error"]})
                 self._audit("user.import", "", bool(done), {"created": len(done), "failed": len(errors)})
                 return self._json(200, {"ok": True, "created": done, "errors": errors})
-            m = re.fullmatch(r"/api/users/([A-Za-z0-9._@-]{3,64})/(update|reset|delete)", path)
+            # 帳號放在網址裡要先解碼：舊版 --set-credentials 不限制字元，搬進來的帳號可能是中文
+            m = re.fullmatch(r"/api/users/([^/]{1,200})/(update|reset|delete)", path)
             if m:
-                u, act = m.groups()
+                u, act = urllib.parse.unquote(m.group(1)), m.group(2)
                 code, out = (user_change(u, body, self.user) if act == "update" else user_reset(u) if act == "reset"
                              else user_remove(u, self.user))
                 self._audit("user." + act, u, code == 200,
@@ -3814,13 +3881,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "找不到"})
         # ---- 加密入口的金鑰
         if path == "/api/keys/create":
-            owner = None
-            if not self.is_admin:
-                owner = self.user
-                mine = [k for k in STORE.key_list(owner=self.user) if gateway.state(k) == "active"]
-                if len(mine) >= USER_KEYS_MAX:
+            owner = None if self.is_admin else self.user
+            with _KEY_LOCK:                              # 數有幾把與新增要一起做：同時送好幾個請求也超不過上限
+                if owner and sum(1 for k in STORE.key_list(owner=owner) if gateway.state(k) == "active") >= USER_KEYS_MAX:
                     return self._json(409, {"error": f"每個人最多 {USER_KEYS_MAX} 把有效的金鑰；請先撤銷用不到的"})
-            code, out, det = key_create(body, self.user, owner=owner)
+                code, out, det = key_create(body, self.user, owner=owner)
             self._audit("apikey.create", (det or {}).get("id", ""), code == 200, det or {"message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/keys/([0-9a-f]{8})/(update|revoke)", path)
