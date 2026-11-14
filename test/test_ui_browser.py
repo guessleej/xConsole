@@ -220,10 +220,58 @@ UNTRANSLATED = """() => { const out = new Set();
     // 管理者取的名稱（機器「本機」、欄位「主腦」）是資料，照設計不翻；推薦清單的模型說明另案決定
     const t = n.nodeValue.replace(/本機|主腦/g, '').trim();
     if (!t || !/[\u3400-\u9fff]/.test(t)) continue;
+    if (typeof I18N !== 'undefined' && I18N.data && I18N.data.has(t)) continue;   // 伺服器回的資料（金鑰名稱等），照設計不翻
     const p = n.parentElement;
     if (!p || p.closest(I18N_SKIP) || p.closest('[hidden]') || p.closest('.rec-row, .rec-list') || !p.offsetParent) continue;
     out.add(t.slice(0, 60)); }
   return [...out]; }"""
+
+
+def test_gateway_ui(pg):
+    """加密入口：在 API 串接頁產生金鑰（完整金鑰只顯示一次）、清單出現、撤銷；單格頁有加密網址、直連開關、範例切換。"""
+    pg.route("**/api/node/*/apiinfo/brain**", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+    pg.evaluate("go('apis')")
+    pg.wait_for_selector("h2:has-text('加密入口與金鑰')", timeout=10000)
+    url = pg.locator(".copyrow .v").first.text_content()
+    check("API 串接頁最上面是加密入口：https 網址、/v1 結尾", url.startswith("https://") and url.endswith("/v1"), url)
+    pg.locator("button:has-text('產生金鑰')").click()
+    pg.locator(".modal input").first.fill("瀏覽器測試 王老師")
+    pg.locator(".modal button:has-text('產生')").click()
+    pg.wait_for_selector(".modal h3:has-text('新的金鑰')", timeout=10000)
+    key = pg.locator(".modal .copyrow .v").nth(2).text_content()
+    check("  產生金鑰：彈窗顯示完整金鑰一次", key.startswith("xck_") and len(key) == 47, key)
+    pg.locator(".modal button:has-text('取消')").click()
+    pg.wait_for_selector("td:has-text('瀏覽器測試 王老師')", timeout=10000)
+    row = pg.locator("tr:has(td:has-text('瀏覽器測試 王老師'))")
+    check("  清單出現這把：使用中、只顯示開頭", "使用中" in row.text_content() and key not in pg.content() and key[:8] in row.text_content())
+    pg.evaluate("go('api:local:brain')")
+    pg.wait_for_selector("h2:has-text('明文直連')", timeout=10000)
+    pg.locator(".tabbar button:has-text('curl')").click()
+    check("  單格頁的範例直接帶入剛產生的金鑰", key in pg.locator("pre.code").text_content())
+    pg.evaluate("go('apis')")
+    pg.wait_for_selector("tr:has(td:has-text('瀏覽器測試 王老師'))", timeout=10000)
+    row = pg.locator("tr:has(td:has-text('瀏覽器測試 王老師'))")
+    row.locator("button:has-text('撤銷')").click()
+    pg.locator(".modal button.danger:has-text('撤銷')").click()
+    pg.wait_for_selector("tr:has(td:has-text('瀏覽器測試 王老師')) td:has-text('已撤銷')", timeout=10000)
+    check("  撤銷後狀態變成已撤銷、不再有撤銷按鈕",
+          pg.locator("tr:has(td:has-text('瀏覽器測試 王老師')) button:has-text('撤銷')").count() == 0)
+    pg.evaluate("go('api:local:brain')")
+    pg.wait_for_selector("h2:has-text('明文直連')", timeout=10000)
+    txt = pg.locator("#main").text_content()
+    check("單格頁：加密入口網址（建議）與直連網址都在", "加密入口網址（建議）" in txt and "直連網址" in txt)
+    check("  有「改成只走加密入口」按鈕", pg.locator("button:has-text('改成只走加密入口')").count() == 1)
+    check("  直連本來沒金鑰、又沒有能用這格的個別金鑰：按鈕停用並說明要先發金鑰",
+          pg.locator("button:has-text('改成只走加密入口')").is_disabled() and "還沒有任何一把能用這一格" in txt)
+    code = pg.locator("pre.code").text_content()
+    check("  撤銷之後範例不再帶入那把金鑰", key not in code and "<貼上金鑰>" in code, code[-200:])
+    pg.evaluate("S.apiTab = 'copilot'")
+    check("  工具設定範例預設用加密入口的網址", url in code, code[:120])
+    pg.locator("button:has-text('直連')").first.click()
+    pg.wait_for_selector("h2:has-text('明文直連')", timeout=10000)
+    check("  切到直連：範例換成直連網址", INFO["public_url"] in pg.locator("pre.code").text_content())
+    pg.evaluate("S.apiMode = 'gw'")
+    pg.unroute("**/api/node/*/apiinfo/brain**")
 
 
 def test_english(ctx, base):
@@ -234,7 +282,8 @@ def test_english(ctx, base):
     pg.goto(base + "/")
     pg.wait_for_selector("#nav button", state="attached", timeout=30000)
     left = {}
-    for v in ["home", "run", "settings:machines", "settings:engine", "settings:tls", "settings:report"]:
+    pg.route("**/api/node/*/apiinfo/brain**", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+    for v in ["home", "run", "apis", "api:local:brain", "settings:machines", "settings:engine", "settings:tls", "settings:report"]:
         if v.startswith("settings:"):
             pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", v.split(":", 1)[1])
         else:
@@ -267,6 +316,7 @@ def main():
             pg.route("**/api/fleet", with_slot)
             login(pg, base)
             test_api_list(pg)
+            test_gateway_ui(pg)
             test_desktop_toggle(pg)
             test_home_quiet(pg)
             test_mobile_width(ctx, base)

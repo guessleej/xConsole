@@ -3064,11 +3064,191 @@
 "pattern": false
 },
 {
-"zh": "從這台本機與主控台經網路各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
+"zh": "從這台本機、主控台經網路、加密入口各打一次，連工具呼叫一起驗，確認 IDE 真的連得上",
 "pattern": false
 },
 {
-"zh": "換完模型之後，IDE 與其他服務要打的網址、模型名稱與上下文都在這裡",
+"zh": "關掉明文直連",
+"pattern": false
+},
+{
+"zh": "老師都改用加密入口之後再關；關掉之後金鑰與對話不再以明文在網路上傳",
+"pattern": false
+},
+{
+"zh": "已撤銷",
+"pattern": false
+},
+{
+"zh": "已過期",
+"pattern": false
+},
+{
+"zh": "加密入口與金鑰",
+"pattern": false
+},
+{
+"zh": "IDE 填這個 https 網址，每位老師或每門課各用一把金鑰；撤銷一把，其他人不受影響",
+"pattern": false
+},
+{
+"zh": "網址（Base URL）",
+"pattern": false
+},
+{
+"zh": "模型名稱照下面各格的填。金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。",
+"pattern": false
+},
+{
+"zh": "產生金鑰",
+"pattern": false
+},
+{
+"zh": "修改網址",
+"pattern": false
+},
+{
+"zh": "還沒有金鑰。按「產生金鑰」替每位老師或每門課各發一把。",
+"pattern": false
+},
+{
+"zh": "金鑰開頭",
+"pattern": false
+},
+{
+"zh": "能用的模型",
+"pattern": false
+},
+{
+"zh": "同時上限",
+"pattern": false
+},
+{
+"zh": "本月請求",
+"pattern": false
+},
+{
+"zh": "本月 token（輸入／輸出）",
+"pattern": false
+},
+{
+"zh": "最後使用",
+"pattern": false
+},
+{
+"zh": "還沒用過",
+"pattern": false
+},
+{
+"zh": "（{0} 到期）",
+"pattern": true
+},
+{
+"zh": "到期",
+"pattern": false
+},
+{
+"zh": "修改",
+"pattern": false
+},
+{
+"zh": "撤銷",
+"pattern": false
+},
+{
+"zh": "撤銷「{0}」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響。",
+"pattern": true
+},
+{
+"zh": "撤銷「",
+"pattern": false
+},
+{
+"zh": "」之後，用這把金鑰的工具會立刻連不上，不能復原；其他金鑰不受影響",
+"pattern": false
+},
+{
+"zh": "這是升級時自動匯入的舊共用金鑰。撤銷前先確認最後使用時間：還有人在用，就先發新金鑰給他。",
+"pattern": false
+},
+{
+"zh": "撤銷金鑰",
+"pattern": false
+},
+{
+"zh": "例：資工系 王老師、機器學習（週三）",
+"pattern": false
+},
+{
+"zh": "撤銷時靠這個認是誰的",
+"pattern": false
+},
+{
+"zh": "全部模型（之後新開的也能用）",
+"pattern": false
+},
+{
+"zh": "同時進行的請求上限",
+"pattern": false
+},
+{
+"zh": "一個人同時最多送幾個請求，免得把整台佔滿；一般 2 就夠",
+"pattern": false
+},
+{
+"zh": "留空＝不改",
+"pattern": false
+},
+{
+"zh": "有效天數",
+"pattern": false
+},
+{
+"zh": "從現在起算；0＝不到期；留空＝不改",
+"pattern": false
+},
+{
+"zh": "0＝不到期；給一學期用可以填 150",
+"pattern": false
+},
+{
+"zh": "修改金鑰：{0}",
+"pattern": true
+},
+{
+"zh": "修改金鑰",
+"pattern": false
+},
+{
+"zh": "這把金鑰只顯示這一次。關掉之後主控台不會再顯示它，請現在交給使用的人。",
+"pattern": false
+},
+{
+"zh": "金鑰",
+"pattern": false
+},
+{
+"zh": "在這個分頁重新整理之前，各格 API 串接頁的設定範例會直接帶入這把金鑰。",
+"pattern": false
+},
+{
+"zh": "新的金鑰",
+"pattern": false
+},
+{
+"zh": "加密入口網址",
+"pattern": false
+},
+{
+"zh": "留空＝主控台憑證上的第一個名稱加 9400 埠。前面另有反向代理（例如走 443）時改成那個，要 https:// 開頭、/v1 結尾",
+"pattern": false
+},
+{
+"zh": "各格的 API",
+"pattern": false
+},
+{
+"zh": "每一格的模型名稱、上下文與直連網址；改設定、實測、看工具設定範例按右邊的按鈕",
 "pattern": false
 },
 {
@@ -3084,11 +3264,11 @@
 "pattern": false
 },
 {
-"zh": "網址",
+"zh": "直連網址",
 "pattern": false
 },
 {
-"zh": "金鑰",
+"zh": "直連金鑰",
 "pattern": false
 },
 {
@@ -3097,6 +3277,10 @@
 },
 {
 "zh": "設定與實測",
+"pattern": false
+},
+{
+"zh": "已關閉（只走加密入口）",
 "pattern": false
 },
 {
@@ -3116,7 +3300,11 @@
 "pattern": false
 },
 {
-"zh": "網址是 http：這些模型服務在內網直接對外，沒有經過主控台。設了金鑰的話，金鑰會以明文在內網傳輸。",
+"zh": "直連網址是 http：金鑰與對話內容會以明文在網路上傳。老師都改用上面的加密入口之後，",
+"pattern": false
+},
+{
+"zh": "可以到各格的頁面把直連關掉（只走加密入口）。",
 "pattern": false
 },
 {
@@ -3136,7 +3324,11 @@
 "pattern": false
 },
 {
-"zh": "網址（Base URL）",
+"zh": "加密入口網址（建議）",
+"pattern": false
+},
+{
+"zh": "已關閉（只聽這台自己）",
 "pattern": false
 },
 {
@@ -3149,6 +3341,18 @@
 },
 {
 "zh": "引擎預設（範例填",
+"pattern": false
+},
+{
+"zh": "加密入口的金鑰",
+"pattern": false
+},
+{
+"zh": "每人一把，在「API 串接」頁產生",
+"pattern": false
+},
+{
+"zh": "主控台內部使用，不顯示",
 "pattern": false
 },
 {
@@ -3244,10 +3448,6 @@
 "pattern": false
 },
 {
-"zh": "產生金鑰",
-"pattern": false
-},
-{
 "zh": "不使用金鑰",
 "pattern": false
 },
@@ -3300,6 +3500,82 @@
 "pattern": false
 },
 {
+"zh": "明文直連",
+"pattern": false
+},
+{
+"zh": "已關閉：模型只聽這台自己，外面只能經加密入口連",
+"pattern": false
+},
+{
+"zh": "開著：別台電腦可以用 {0} 直接連（http，明文）",
+"pattern": true
+},
+{
+"zh": "開著：別台電腦可以用",
+"pattern": false
+},
+{
+"zh": "直接連（http，明文",
+"pattern": false
+},
+{
+"zh": "要讓 IDE 再直連，按下面重新開放，再到「設定」產生一把直連金鑰（模型現在用的是只有主控台知道的內部金鑰）。",
+"pattern": false
+},
+{
+"zh": "老師都改用加密入口之後再關。關的時候會把現在的直連金鑰先加進加密入口（經加密入口照樣能用，等你確認大家都換了再撤銷），",
+"pattern": false
+},
+{
+"zh": "再讓模型改聽這台自己並換上一把內部金鑰，然後重啟模型。",
+"pattern": false
+},
+{
+"zh": "重新開放直連",
+"pattern": false
+},
+{
+"zh": "改成只走加密入口",
+"pattern": false
+},
+{
+"zh": "現在直連不用金鑰，加密入口一定要金鑰：關掉之後，還沒拿到個別金鑰的人會立刻連不上。先確認每個人都已經換成加密入口的網址與個別金鑰。",
+"pattern": false
+},
+{
+"zh": "現在直連不用金鑰，加密入口一定要金鑰，而且還沒有任何一把能用這一格。請先在「API 串接」頁產生金鑰發給要用的人，再回來關直連。",
+"pattern": false
+},
+{
+"zh": "會重啟這個模型，重啟期間 API 中斷約一到兩分鐘；套用後實際打一次，打不通就自動換回。",
+"pattern": false
+},
+{
+"zh": "這是標記為關鍵的服務，請排在不上課的時段。",
+"pattern": false
+},
+{
+"zh": "還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有 {0} 把能用這一格）。",
+"pattern": true
+},
+{
+"zh": "還在用直連網址的工具會連不上，要改成加密入口的網址，並換上個別金鑰（目前有",
+"pattern": false
+},
+{
+"zh": "把能用這一格",
+"pattern": false
+},
+{
+"zh": "還在用直連網址的工具會連不上，要改成加密入口的網址（金鑰可以先不換）。",
+"pattern": false
+},
+{
+"zh": "已套用",
+"pattern": false
+},
+{
 "zh": "上次：{0}・{1}（台北時間）",
 "pattern": true
 },
@@ -3316,7 +3592,7 @@
 "pattern": false
 },
 {
-"zh": "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打對外網址，證明別台電腦連得到。",
+"zh": "在這台本機打模型清單、一般對話與工具呼叫；再從主控台經網路打直連網址，最後用一把臨時金鑰打一次加密入口。",
 "pattern": false
 },
 {
@@ -3328,7 +3604,15 @@
 "pattern": false
 },
 {
-"zh": "從主控台經網路連對外網址",
+"zh": "從主控台經網路連直連網址",
+"pattern": false
+},
+{
+"zh": "經加密入口（https）",
+"pattern": false
+},
+{
+"zh": "略過",
 "pattern": false
 },
 {
@@ -3357,6 +3641,18 @@
 },
 {
 "zh": "依上面的設定即時產生",
+"pattern": false
+},
+{
+"zh": "加密入口（建議）",
+"pattern": false
+},
+{
+"zh": "直連",
+"pattern": false
+},
+{
+"zh": "金鑰欄要填個別金鑰：在「API 串接」頁按「產生金鑰」，這個分頁裡的範例就會直接帶入。",
 "pattern": false
 },
 {
@@ -4220,10 +4516,6 @@
 "pattern": false
 },
 {
-"zh": "已套用",
-"pattern": false
-},
-{
 "zh": "更新時間（台北時間）",
 "pattern": false
 },
@@ -4532,10 +4824,6 @@
 "pattern": false
 },
 {
-"zh": "修改",
-"pattern": false
-},
-{
 "zh": "選 {0} 代理的憑證檔（在該機的 ~/.xconsole/agent-cert.pem）。主控台之後只接受這張憑證，其他人冒充會被拒絕。",
 "pattern": true
 },
@@ -4689,10 +4977,6 @@
 },
 {
 "zh": "發行者",
-"pattern": false
-},
-{
-"zh": "到期",
 "pattern": false
 },
 {
@@ -5444,10 +5728,6 @@
 "pattern": false
 },
 {
-"zh": "修改網址",
-"pattern": false
-},
-{
 "zh": "重產自簽",
 "pattern": false
 },
@@ -5873,10 +6153,6 @@
 },
 {
 "zh": "已用完",
-"pattern": false
-},
-{
-"zh": "已過期",
 "pattern": false
 },
 {
@@ -8992,6 +9268,14 @@
 "pattern": false
 },
 {
+"zh": "這些機器不在納管清單裡：{0}",
+"pattern": true
+},
+{
+"zh": "這些機器不在納管清單裡",
+"pattern": false
+},
+{
 "zh": "」的路徑；指令在這個資料夾裡用 ",
 "pattern": false
 },
@@ -9165,6 +9449,26 @@
 },
 {
 "zh": "換新",
+"pattern": false
+},
+{
+"zh": "這些機器不在納管清單裡：",
+"pattern": false
+},
+{
+"zh": "已改成只走加密入口：模型只聽這台自己，IDE 請改用加密入口的網址與個別金鑰",
+"pattern": false
+},
+{
+"zh": "已重新開放區網直連。模型現在用的是只有主控台知道的內部金鑰，要讓 IDE 直連，請在下面產生新金鑰（這把也會自動加進加密入口）",
+"pattern": false
+},
+{
+"zh": "加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（{0}）",
+"pattern": true
+},
+{
+"zh": "加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200",
 "pattern": false
 },
 {
@@ -9468,6 +9772,66 @@
 "pattern": false
 },
 {
+"zh": "沒有這把金鑰",
+"pattern": false
+},
+{
+"zh": "這把金鑰已撤銷，不能再改；要用請產生一把新的",
+"pattern": false
+},
+{
+"zh": "這把金鑰已經撤銷了",
+"pattern": false
+},
+{
+"zh": "讀不到這格的模型名稱",
+"pattern": false
+},
+{
+"zh": "/v1/models 回 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "/v1/models 回",
+"pattern": false
+},
+{
+"zh": "加密入口的模型清單沒有 {0}（模型沒在跑，或有別格同名）",
+"pattern": true
+},
+{
+"zh": "加密入口的模型清單沒有",
+"pattern": false
+},
+{
+"zh": "模型沒在跑，或有別格同名",
+"pattern": false
+},
+{
+"zh": "沒帶金鑰回 {0}，沒有被擋",
+"pattern": true
+},
+{
+"zh": "沒帶金鑰回",
+"pattern": false
+},
+{
+"zh": "沒有被擋",
+"pattern": false
+},
+{
+"zh": "對話回 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "對話回",
+"pattern": false
+},
+{
+"zh": "加密入口通：https 憑證驗過、沒帶金鑰被擋、帶金鑰對話回 200（",
+"pattern": false
+},
+{
 "zh": "macOS 的 zsh",
 "pattern": false
 },
@@ -9533,6 +9897,74 @@
 },
 {
 "zh": "」這個工作資料夾，請先建立",
+"pattern": false
+},
+{
+"zh": "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）",
+"pattern": false
+},
+{
+"zh": "沒有帶金鑰：請在 Authorization 標頭放 Bearer <金鑰>",
+"pattern": false
+},
+{
+"zh": "這把金鑰同時開的連線太多",
+"pattern": false
+},
+{
+"zh": "加密入口沒有 /v1/{0}",
+"pattern": true
+},
+{
+"zh": "加密入口沒有 /v1/",
+"pattern": false
+},
+{
+"zh": "/v1/{0} 要用 {1}",
+"pattern": true
+},
+{
+"zh": "要用",
+"pattern": false
+},
+{
+"zh": "只接受 application/json",
+"pattern": false
+},
+{
+"zh": "請求內容太大（上限 16 MB）",
+"pattern": false
+},
+{
+"zh": "本文要是 JSON 物件，並帶 model",
+"pattern": false
+},
+{
+"zh": "stream_options 要是 JSON 物件",
+"pattern": false
+},
+{
+"zh": "{0} 不支援 /v1/{1}，請用 /v1/chat/completions",
+"pattern": true
+},
+{
+"zh": "不支援 /v1/",
+"pattern": false
+},
+{
+"zh": "請用 /v1/chat/completions",
+"pattern": false
+},
+{
+"zh": "這把金鑰同時進行中的請求已達上限（{0}），請等前一個回完",
+"pattern": true
+},
+{
+"zh": "這把金鑰同時進行中的請求已達上限",
+"pattern": false
+},
+{
+"zh": "請等前一個回完",
 "pattern": false
 },
 {
@@ -9605,10 +10037,6 @@
 },
 {
 "zh": "設了金鑰，但沒帶金鑰打對話端點回",
-"pattern": false
-},
-{
-"zh": "沒有被擋",
 "pattern": false
 },
 {
@@ -9732,6 +10160,34 @@
 "pattern": false
 },
 {
+"zh": "自動匯入",
+"pattern": false
+},
+{
+"zh": "/v1/models 回 ",
+"pattern": false
+},
+{
+"zh": "加密入口的模型清單沒有 ",
+"pattern": false
+},
+{
+"zh": "（模型沒在跑，或有別格同名）",
+"pattern": false
+},
+{
+"zh": "沒帶金鑰回 ",
+"pattern": false
+},
+{
+"zh": "，沒有被擋",
+"pattern": false
+},
+{
+"zh": "對話回 ",
+"pattern": false
+},
+{
 "zh": "任務已停止",
 "pattern": false
 },
@@ -9784,6 +10240,42 @@
 "pattern": false
 },
 {
+"zh": "金鑰錯太多次，請 15 分鐘後再試",
+"pattern": false
+},
+{
+"zh": "金鑰不對",
+"pattern": false
+},
+{
+"zh": " 要用 ",
+"pattern": false
+},
+{
+"zh": " 不支援 /v1/",
+"pattern": false
+},
+{
+"zh": "，請用 /v1/chat/completions",
+"pattern": false
+},
+{
+"zh": "這把金鑰同時進行中的請求已達上限（",
+"pattern": false
+},
+{
+"zh": "），請等前一個回完",
+"pattern": false
+},
+{
+"zh": "連不上那台的代理：{0}",
+"pattern": true
+},
+{
+"zh": "連不上那台的代理",
+"pattern": false
+},
+{
 "zh": "只接受 application/octet-stream，並要帶 X-XConsole-Upload",
 "pattern": false
 },
@@ -9809,10 +10301,6 @@
 },
 {
 "zh": "請求內容太大",
-"pattern": false
-},
-{
-"zh": "只接受 application/json",
 "pattern": false
 },
 {
@@ -9845,10 +10333,6 @@
 },
 {
 "zh": "設了金鑰，但沒帶金鑰打對話端點回 ",
-"pattern": false
-},
-{
-"zh": "，沒有被擋",
 "pattern": false
 },
 {
@@ -9920,6 +10404,14 @@
 "pattern": false
 },
 {
+"zh": "舊共用金鑰（{0}）",
+"pattern": true
+},
+{
+"zh": "舊共用金鑰",
+"pattern": false
+},
+{
 "zh": "子資料夾的相對路徑，空白＝整個工作資料夾",
 "pattern": false
 },
@@ -9968,11 +10460,23 @@
 "pattern": false
 },
 {
-"zh": "連不上那台的代理：{0}",
-"pattern": true
+"zh": "這把金鑰已撤銷",
+"pattern": false
 },
 {
-"zh": "連不上那台的代理",
+"zh": "這把金鑰已過期",
+"pattern": false
+},
+{
+"zh": "這台的代理是舊版，還不支援加密入口；請到「設定 › 版本與更新」更新代理",
+"pattern": false
+},
+{
+"zh": "連不上那台的代理：",
+"pattern": false
+},
+{
+"zh": "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）",
 "pattern": false
 },
 {
@@ -10052,11 +10556,23 @@
 "pattern": false
 },
 {
+"zh": "加密入口網址要是 https:// 開頭、/v1 結尾，例：https://ai.example.edu.tw/v1",
+"pattern": false
+},
+{
 "zh": "主控台這裡沒有隨附的代理程式",
 "pattern": false
 },
 {
 "zh": "這個任務現在沒有在等核准",
+"pattern": false
+},
+{
+"zh": "only 要是 true 或 false",
+"pattern": false
+},
+{
+"zh": "只走加密入口：模型只聽這台自己，不測直連",
 "pattern": false
 },
 {
@@ -10168,6 +10684,18 @@
 "pattern": false
 },
 {
+"zh": "舊共用金鑰（",
+"pattern": false
+},
+{
+"zh": "憑證驗不過（{0}）",
+"pattern": true
+},
+{
+"zh": "憑證驗不過",
+"pattern": false
+},
+{
 "zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息：",
 "pattern": false
 },
@@ -10176,7 +10704,7 @@
 "pattern": false
 },
 {
-"zh": "連不上那台的代理：",
+"zh": "沒帶金鑰",
 "pattern": false
 },
 {
@@ -10225,6 +10753,22 @@
 },
 {
 "zh": "這一版沒有可以核對的安裝包",
+"pattern": false
+},
+{
+"zh": "{0} 的 {1} 已經叫 {2}，加密入口會分不出要送哪一格，請換一個名稱",
+"pattern": true
+},
+{
+"zh": "的",
+"pattern": false
+},
+{
+"zh": "已經叫",
+"pattern": false
+},
+{
+"zh": "加密入口會分不出要送哪一格，請換一個名稱",
 "pattern": false
 },
 {
@@ -10292,6 +10836,14 @@
 "pattern": false
 },
 {
+"zh": "這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰",
+"pattern": false
+},
+{
+"zh": "憑證驗不過（",
+"pattern": false
+},
+{
 "zh": "對方回的不是 JSON",
 "pattern": false
 },
@@ -10301,6 +10853,18 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址。",
+"pattern": false
+},
+{
+"zh": " 的 ",
+"pattern": false
+},
+{
+"zh": " 已經叫 ",
+"pattern": false
+},
+{
+"zh": "，加密入口會分不出要送哪一格，請換一個名稱",
 "pattern": false
 },
 {
@@ -11304,6 +11868,10 @@
 "pattern": false
 },
 {
+"zh": "「沒經過加密入口」＝引擎記錄檔的總量減掉加密入口成功送到模型的量，包含網頁對話與 IDE 直連 8080；只有 llama.cpp 欄位有引擎記錄檔可算，Strata 欄位只算得到加密入口那一段。加密入口的用量以小時記，本期起點所在的那一小時整段算進來。",
+"pattern": false
+},
+{
 "zh": "只含 GPU 晶片回報的功耗，不含 CPU、記憶體、硬碟、電源轉換損失與冷氣，整機實際用電會明顯較高。",
 "pattern": false
 },
@@ -11392,6 +11960,18 @@
 "pattern": false
 },
 {
+"zh": "近 7 天還有人用舊共用金鑰（{0}）",
+"pattern": true
+},
+{
+"zh": "近 7 天還有人用舊共用金鑰",
+"pattern": false
+},
+{
+"zh": "全校共用一把，外流只能一起換：在「API 串接」替每位老師發個別金鑰，確認沒人用了再撤銷",
+"pattern": false
+},
+{
 "zh": "登入失敗 {0} 次",
 "pattern": true
 },
@@ -11460,6 +12040,10 @@
 "pattern": false
 },
 {
+"zh": "（已刪除的金鑰）",
+"pattern": false
+},
+{
 "zh": "{0} 有 {1}% 的取樣連不上",
 "pattern": true
 },
@@ -11512,6 +12096,10 @@
 "pattern": false
 },
 {
+"zh": "近 7 天還有人用舊共用金鑰（",
+"pattern": false
+},
+{
 "zh": "登入失敗 ",
 "pattern": false
 },
@@ -11556,10 +12144,6 @@
 "pattern": true
 },
 {
-"zh": "的",
-"pattern": false
-},
-{
 "zh": "最後狀態為",
 "pattern": false
 },
@@ -11572,10 +12156,6 @@
 "pattern": false
 },
 {
-"zh": " 的 ",
-"pattern": false
-},
-{
 "zh": " 最後狀態為",
 "pattern": false
 },
@@ -11585,6 +12165,106 @@
 },
 {
 "zh": "一直停在啟動中",
+"pattern": false
+},
+{
+"zh": "名稱要 1～{0} 個字，例如「資工系 王老師」或「機器學習（週三）」",
+"pattern": true
+},
+{
+"zh": "名稱要 1～",
+"pattern": false
+},
+{
+"zh": "個字，例如「資工系 王老師」或「機器學習（週三）」",
+"pattern": false
+},
+{
+"zh": "同時進行的請求上限要是 1～{0}",
+"pattern": true
+},
+{
+"zh": "同時進行的請求上限要是 1～",
+"pattern": false
+},
+{
+"zh": "有效天數要是 0（不到期）～{0}",
+"pattern": true
+},
+{
+"zh": "有效天數要是 0（不到期）～",
+"pattern": false
+},
+{
+"zh": " 個字，例如「資工系 王老師」或「機器學習（週三）」",
+"pattern": false
+},
+{
+"zh": "能用的模型要選「全部」或至少選一格",
+"pattern": false
+},
+{
+"zh": "沒有叫 {0} 的模型；可用的模型請看 /v1/models",
+"pattern": true
+},
+{
+"zh": "沒有叫",
+"pattern": false
+},
+{
+"zh": "的模型；可用的模型請看 /v1/models",
+"pattern": false
+},
+{
+"zh": "這把金鑰沒有被授權用 {0}",
+"pattern": true
+},
+{
+"zh": "這把金鑰沒有被授權用",
+"pattern": false
+},
+{
+"zh": "有 {0} 格都叫 {1}，請管理員到「執行 › API 串接」把其中一格改名",
+"pattern": true
+},
+{
+"zh": "格都叫",
+"pattern": false
+},
+{
+"zh": "請管理員到「執行 › API 串接」把其中一格改名",
+"pattern": false
+},
+{
+"zh": "{0} 現在沒有在跑",
+"pattern": true
+},
+{
+"zh": "現在沒有在跑",
+"pattern": false
+},
+{
+"zh": "沒有叫 ",
+"pattern": false
+},
+{
+"zh": " 的模型；可用的模型請看 /v1/models",
+"pattern": false
+},
+{
+"zh": "這把金鑰沒有被授權用 ",
+"pattern": false
+},
+{
+"zh": " 格都叫 ",
+"pattern": false
+},
+{
+"zh": "，請管理員到「執行 › API 串接」把其中一格改名",
+"pattern": false
+},
+{
+"zh": " 現在沒有在跑",
 "pattern": false
 },
 {
@@ -13420,10 +14100,6 @@
 "pattern": true
 },
 {
-"zh": "/v1/models 回",
-"pattern": false
-},
-{
 "zh": "這個欄位沒有記錄原本的 Strata 服務，無法切回",
 "pattern": false
 },
@@ -13465,6 +14141,10 @@
 },
 {
 "zh": "已經在了，要換掉請先在已安裝的清單刪除",
+"pattern": false
+},
+{
+"zh": "這個欄位沒有這條 API",
 "pattern": false
 },
 {
@@ -14428,7 +15108,7 @@
 "pattern": false
 },
 {
-"zh": "思考模式與區網存取只有 llama.cpp 的欄位能在這裡改",
+"zh": "思考模式只有 llama.cpp 的欄位能在這裡改",
 "pattern": false
 },
 {
@@ -14533,10 +15213,6 @@
 },
 {
 "zh": "（用硬碟執行也放不下：KV、計算緩衝與放 GPU 的層仍要占記憶體）",
-"pattern": false
-},
-{
-"zh": "/v1/models 回 ",
 "pattern": false
 },
 {
