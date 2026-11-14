@@ -606,7 +606,9 @@ async function viewChat() {
   const send = el("button", "btn primary", "送出");
   const stopB = el("button", "btn sm danger", "停止");
   stopB.hidden = true;
-  tools.append(attach, attBtn, toolB, pcB, imgB, vidB, el("span", "spacer"), stopB, send);
+  // 工具（查機器的助理）與操作電腦只有管理員能用：一般使用者不顯示，伺服器端也擋
+  tools.append(attach, attBtn, ...(isAdmin() ? [toolB, pcB] : []), imgB, vidB, el("span", "spacer"), stopB, send);
+  if (!isAdmin() && cur.settings?.tools) delete cur.settings.tools;
   inputRow.append(docsRow, ta, tools);
   drawDocs();
   mainCol.append(noteRow, inputRow);

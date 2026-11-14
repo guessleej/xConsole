@@ -113,6 +113,11 @@ def main():
     st.usage_add("aaaa0001", gateway.hour(now - 3 * 86400), "26", "brain", True, 999, 999)
     r2 = report.build(st, cm, cfg, days=1, now=now)
     check("  本期之前的加密入口用量不算進來（以小時對齊起點）", r2["build_vs_buy"]["gateway"]["by_key"][0]["requests"] == 30)
+    check("  依帳號：管理員發的金鑰歸一列", r["build_vs_buy"]["gateway"]["by_owner"][0]["owner"] == "（管理員發的金鑰）")
+    st.user_insert({"username": "s1101", "role": "user", "disabled": 0, "last_login": None})
+    st.user_insert({"username": "admin2", "role": "admin", "disabled": 1, "last_login": now})
+    acc = report.build(st, cm, cfg, days=1, now=now)["people"]["accounts"]
+    check("帳號數：總數、管理員、使用者、停用、還沒登入過", acc == {"total": 2, "admins": 1, "users": 1, "disabled": 1, "never_logged_in": 1}, acc)
     for i in range(25):
         st.key_insert({**base, "id": f"bbbb{i:04d}", "name": f"課程{i}", "prefix": f"xck_{i:04d}", "hash": f"{i:064x}",
                        "source": "new", "last_used": now})

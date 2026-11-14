@@ -65,6 +65,8 @@ jobs:
         run: cd console && python test_chats.py
       - name: 加密入口金鑰（產生、撤銷、只存雜湊、用量）
         run: cd console && python test_apikeys.py
+      - name: 多帳號與角色（逐條路由守衛、一次性密碼、只看得到自己的、停用與降級即時生效、登入節流不連累同一 NAT）
+        run: cd console && python test_roles.py
       - name: 代理的加密入口轉送（換上模型金鑰、串流原樣轉、路徑白名單、舊金鑰只回雜湊）
         run: cd agent && python test_relay.py
       - name: 加密入口端到端（個別金鑰、撤銷、權限、同時上限、用量、OpenAI 錯誤格式）

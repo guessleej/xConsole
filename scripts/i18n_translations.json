@@ -21828,5 +21828,585 @@
 "en": "\"Not via the gateway\" = the engine log total minus what the gateway successfully delivered to the model, covering web chat and IDEs connecting directly to 8080; only llama.cpp slots have engine logs to count, so Strata slots show only the gateway part. Gateway usage is recorded per hour, and the whole hour containing the start of the period is included.",
 "ja": "「ゲートウェイを通っていない」＝エンジンログの合計から、ゲートウェイがモデルに正常に届けた量を引いたもので、Web の会話と 8080 に直接接続した IDE を含みます。エンジンログがあるのは llama.cpp のスロットだけで、Strata のスロットはゲートウェイ分だけ数えられます。ゲートウェイの使用量は 1 時間単位で記録し、期間の開始時刻を含む 1 時間はまるごと含めます。",
 "ko": "'게이트웨이를 거치지 않음' = 엔진 로그 합계에서 게이트웨이가 모델에 정상적으로 전달한 양을 뺀 값으로, 웹 대화와 8080에 직접 연결한 IDE를 포함합니다. 엔진 로그가 있는 것은 llama.cpp 슬롯뿐이라 Strata 슬롯은 게이트웨이 부분만 셉니다. 게이트웨이 사용량은 시간 단위로 기록하며, 기간 시작 시각이 속한 1시간은 통째로 포함합니다."
+},
+"我的帳號": {
+"en": "My account",
+"ja": "マイアカウント",
+"ko": "내 계정"
+},
+"請找管理員安裝。": {
+"en": "Ask an administrator to install it.",
+"ja": "管理者にインストールを依頼してください。",
+"ko": "관리자에게 설치를 요청하세요."
+},
+"我的 API 金鑰": {
+"en": "My API keys",
+"ja": "マイ API キー",
+"ko": "내 API 키"
+},
+"IDE 填這個 https 網址與你自己的金鑰；金鑰外流就撤銷再產生一把，不影響別人": {
+"en": "Put this https URL and your own key in the IDE; if a key leaks, revoke it and create another without affecting anyone else",
+"ja": "IDE にはこの https の URL と自分のキーを入力します。キーが漏れたら失効させて作り直してください。他の人には影響しません",
+"ko": "IDE에는 이 https URL과 자신의 키를 입력합니다. 키가 유출되면 폐기하고 새로 만드세요. 다른 사람에게는 영향이 없습니다"
+},
+"模型名稱照下面各格的填。": {
+"en": "Use the model names listed for each slot below. ",
+"ja": "モデル名は下の各スロットに表示されているものを入力します。",
+"ko": "모델 이름은 아래 각 슬롯에 표시된 것을 입력합니다. "
+},
+"金鑰只在產生當下顯示一次，主控台只留雜湊；忘了就撤銷再產生一把。": {
+"en": "A key is shown only once when it is created and the console keeps only its hash; if it is lost, revoke it and create a new one.",
+"ja": "キーは作成時に一度だけ表示され、コンソールにはハッシュしか残りません。忘れたら失効させて新しく作成してください。",
+"ko": "키는 생성할 때 한 번만 표시되며 콘솔에는 해시만 남습니다. 잊어버렸으면 폐기하고 새로 만드세요."
+},
+"每個人最多 {0} 把有效的金鑰": {
+"en": "Up to {0} active keys per person",
+"ja": "1 人あたり有効なキーは最大 {0} 個",
+"ko": "1인당 유효한 키는 최대 {0}개"
+},
+"每個人最多": {
+"en": "Up to",
+"ja": "1 人あたり最大",
+"ko": "1인당 최대"
+},
+"把有效的金鑰": {
+"en": "active keys per person",
+"ja": "個の有効なキー",
+"ko": "개의 유효한 키"
+},
+"你還沒有金鑰。按「產生金鑰」產生一把，貼到 IDE 的 API 金鑰欄。": {
+"en": "You have no keys yet. Click \"Create key\" and paste the key into the IDE's API key field.",
+"ja": "まだキーがありません。「キーを作成」を押して、IDE の API キー欄に貼り付けてください。",
+"ko": "아직 키가 없습니다. '키 생성'을 눌러 만든 키를 IDE의 API 키 칸에 붙여 넣으세요."
+},
+"例：我的筆電 VS Code": {
+"en": "e.g. My laptop VS Code",
+"ja": "例：自分のノート PC の VS Code",
+"ko": "예: 내 노트북 VS Code"
+},
+"撤銷時靠這個認是哪一把": {
+"en": "Used to tell which key it is when revoking",
+"ja": "失効させるとき、どのキーかをこれで見分けます",
+"ko": "폐기할 때 어느 키인지 이것으로 구분합니다"
+},
+"使用者帳號": {
+"en": "User accounts",
+"ja": "ユーザーアカウント",
+"ko": "사용자 계정"
+},
+"目前的密碼（管理員給的一次性密碼）": {
+"en": "Current password (the one-time password from the administrator)",
+"ja": "現在のパスワード（管理者から渡されたワンタイムパスワード）",
+"ko": "현재 비밀번호(관리자가 준 일회용 비밀번호)"
+},
+"新密碼（至少 12 碼）": {
+"en": "New password (at least 12 characters)",
+"ja": "新しいパスワード（12 文字以上）",
+"ko": "새 비밀번호(12자 이상)"
+},
+"歡迎，{0}": {
+"en": "Welcome, {0}",
+"ja": "ようこそ、{0} さん",
+"ko": "환영합니다, {0}"
+},
+"歡迎": {
+"en": "Welcome",
+"ja": "ようこそ",
+"ko": "환영합니다"
+},
+"第一次登入請先換一組自己的密碼": {
+"en": "On your first sign-in, set a password of your own",
+"ja": "初回ログインでは、まず自分のパスワードに変更してください",
+"ko": "처음 로그인하면 먼저 자신의 비밀번호로 바꾸세요"
+},
+"管理員給你的是一次性密碼。換好之後會回到登入頁，用新密碼再登入一次。": {
+"en": "The administrator gave you a one-time password. After changing it you return to the sign-in page; sign in again with the new password.",
+"ja": "管理者から渡されたのはワンタイムパスワードです。変更するとログイン画面に戻るので、新しいパスワードでもう一度ログインしてください。",
+"ko": "관리자가 준 것은 일회용 비밀번호입니다. 바꾸고 나면 로그인 화면으로 돌아가니 새 비밀번호로 다시 로그인하세요."
+},
+"在 IDE 裡用這台的模型": {
+"en": "Use this machine's models in your IDE",
+"ja": "IDE でこのマシンのモデルを使う",
+"ko": "IDE에서 이 머신의 모델 사용"
+},
+"GitHub Copilot、Continue、Cline 這類工具選「OpenAI 相容」，填網址、金鑰與模型名稱": {
+"en": "In tools such as GitHub Copilot, Continue or Cline, choose \"OpenAI compatible\" and enter the URL, key and model name",
+"ja": "GitHub Copilot、Continue、Cline などのツールで「OpenAI 互換」を選び、URL・キー・モデル名を入力します",
+"ko": "GitHub Copilot, Continue, Cline 같은 도구에서 'OpenAI 호환'을 고르고 URL, 키, 모델 이름을 입력합니다"
+},
+"現在可以用的模型名稱：{0}": {
+"en": "Model names you can use now: {0}",
+"ja": "現在使えるモデル名：{0}",
+"ko": "지금 쓸 수 있는 모델 이름: {0}"
+},
+"現在可以用的模型名稱": {
+"en": "Model names you can use now",
+"ja": "現在使えるモデル名",
+"ko": "지금 쓸 수 있는 모델 이름"
+},
+"現在沒有正在跑的模型，請找管理員。": {
+"en": "No model is running right now; contact an administrator.",
+"ja": "現在動いているモデルはありません。管理者に連絡してください。",
+"ko": "지금 실행 중인 모델이 없습니다. 관리자에게 문의하세요."
+},
+"帳號：{0}": {
+"en": "Account: {0}",
+"ja": "アカウント：{0}",
+"ko": "계정: {0}"
+},
+"你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。": {
+"en": "Only you can see your chat history, Agent work folders, and generated images and videos. Administrators do not read your conversations.",
+"ja": "会話履歴、Agent の作業フォルダー、画像と動画の生成物は自分だけが見られます。管理者があなたの会話内容を見ることはありません。",
+"ko": "대화 기록, Agent 작업 폴더, 이미지와 동영상 결과물은 본인만 볼 수 있습니다. 관리자는 대화 내용을 보지 않습니다."
+},
+"管理員": {
+"en": "Administrator",
+"ja": "管理者",
+"ko": "관리자"
+},
+"老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰": {
+"en": "One account per teacher and student; users can only use chat, Agent, images, video and their own API keys",
+"ja": "先生と学生に 1 人 1 アカウント。ユーザーが使えるのは会話・Agent・画像・動画と自分の API キーだけです",
+"ko": "교사와 학생마다 계정 하나씩. 사용자는 대화, Agent, 이미지, 동영상과 자신의 API 키만 쓸 수 있습니다"
+},
+"新增帳號": {
+"en": "Add account",
+"ja": "アカウントを追加",
+"ko": "계정 추가"
+},
+"批次匯入": {
+"en": "Bulk import",
+"ja": "一括インポート",
+"ko": "일괄 가져오기"
+},
+"上次登入": {
+"en": "Last sign-in",
+"ja": "最終ログイン",
+"ko": "마지막 로그인"
+},
+"停用": {
+"en": "Disable",
+"ja": "無効化",
+"ko": "비활성화"
+},
+"等他第一次登入改密碼": {
+"en": "Waiting for first sign-in to change password",
+"ja": "初回ログインでのパスワード変更待ち",
+"ko": "첫 로그인에서 비밀번호 변경 대기"
+},
+"還沒登入過": {
+"en": "Never signed in",
+"ja": "未ログイン",
+"ko": "로그인한 적 없음"
+},
+"重設密碼": {
+"en": "Reset password",
+"ja": "パスワードをリセット",
+"ko": "비밀번호 재설정"
+},
+"重設 {0} 的密碼": {
+"en": "Reset {0}'s password",
+"ja": "{0} のパスワードをリセット",
+"ko": "{0}의 비밀번호 재설정"
+},
+"重設": {
+"en": "Reset",
+"ja": "リセット",
+"ko": "재설정"
+},
+"的密碼": {
+"en": "'s password",
+"ja": "のパスワード",
+"ko": "의 비밀번호"
+},
+"會產生一組新的一次性密碼，他現在的登入會被登出，下次登入要先改密碼。": {
+"en": "A new one-time password is generated; the user is signed out now and must change the password at the next sign-in.",
+"ja": "新しいワンタイムパスワードを発行します。現在のログインはログアウトされ、次回ログイン時にまずパスワードを変更する必要があります。",
+"ko": "새 일회용 비밀번호를 만듭니다. 지금 로그인은 로그아웃되고 다음 로그인 때 먼저 비밀번호를 바꿔야 합니다."
+},
+"啟用": {
+"en": "Enable",
+"ja": "有効化",
+"ko": "활성화"
+},
+"已啟用": {
+"en": "Enabled",
+"ja": "有効にしました",
+"ko": "활성화했습니다"
+},
+"已停用，他現在的登入已失效": {
+"en": "Disabled; the user's current sessions are no longer valid",
+"ja": "無効にしました。現在のログインは無効になりました",
+"ko": "비활성화했습니다. 지금 로그인은 무효가 되었습니다"
+},
+"刪除 {0}（{1}）會一起刪掉他的對話紀錄與附圖，撤銷他的 API 金鑰，不能復原。": {
+"en": "Deleting {0} ({1}) also deletes their chat history and attachments and revokes their API keys. This cannot be undone.",
+"ja": "{0}（{1}）を削除すると、会話履歴と添付画像も削除され、API キーは失効します。元に戻せません。",
+"ko": "{0}({1})을(를) 삭제하면 대화 기록과 첨부 이미지도 삭제되고 API 키가 폐기됩니다. 되돌릴 수 없습니다."
+},
+"會一起刪掉他的對話紀錄與附圖，撤銷他的 API 金鑰，不能復原": {
+"en": "also deletes their chat history and attachments and revokes their API keys. This cannot be undone",
+"ja": "を削除すると、会話履歴と添付画像も削除され、API キーは失効します。元に戻せません",
+"ko": "을(를) 삭제하면 대화 기록과 첨부 이미지도 삭제되고 API 키가 폐기됩니다. 되돌릴 수 없습니다"
+},
+"他的 Agent 工作資料夾不會刪，改歸你管理。只是暫時不讓他用的話，按「停用」就好。": {
+"en": "Their Agent work folders are kept and transferred to you. To block the account only temporarily, use \"Disable\" instead.",
+"ja": "Agent の作業フォルダーは削除されず、あなたの管理に移ります。一時的に使えなくするだけなら「無効化」を使ってください。",
+"ko": "Agent 작업 폴더는 삭제되지 않고 당신의 관리로 넘어옵니다. 잠시 쓰지 못하게만 하려면 '비활성화'를 누르세요."
+},
+"刪除帳號": {
+"en": "Delete account",
+"ja": "アカウントを削除",
+"ko": "계정 삭제"
+},
+"已刪除，撤銷了 {0} 把金鑰": {
+"en": "Deleted; {0} key(s) revoked",
+"ja": "削除しました。キーを {0} 個失効させました",
+"ko": "삭제했습니다. 키 {0}개를 폐기했습니다"
+},
+"已刪除，撤銷了": {
+"en": "Deleted; keys revoked:",
+"ja": "削除しました。失効させたキー：",
+"ko": "삭제했습니다. 폐기한 키:"
+},
+"把金鑰": {
+"en": "key(s)",
+"ja": "個",
+"ko": "개"
+},
+"新密碼至少 {0} 碼。最後一位管理員不能被停用、降級或刪除；也不能停用或刪除自己。": {
+"en": "New passwords need at least {0} characters. The last administrator cannot be disabled, demoted or deleted, and you cannot disable or delete yourself.",
+"ja": "新しいパスワードは {0} 文字以上です。最後の管理者は無効化・降格・削除できず、自分自身を無効化・削除することもできません。",
+"ko": "새 비밀번호는 {0}자 이상이어야 합니다. 마지막 관리자는 비활성화, 강등, 삭제할 수 없고 자신을 비활성화하거나 삭제할 수도 없습니다."
+},
+"新密碼至少": {
+"en": "New passwords need at least",
+"ja": "新しいパスワードは最低",
+"ko": "새 비밀번호는 최소"
+},
+"碼。最後一位管理員不能被停用、降級或刪除；也不能停用或刪除自己": {
+"en": "characters. The last administrator cannot be disabled, demoted or deleted, and you cannot disable or delete yourself",
+"ja": "文字です。最後の管理者は無効化・降格・削除できず、自分自身を無効化・削除することもできません",
+"ko": "자입니다. 마지막 관리자는 비활성화, 강등, 삭제할 수 없고 자신을 비활성화하거나 삭제할 수도 없습니다"
+},
+"例：s1101、t0001@cloudinfo.com.tw": {
+"en": "e.g. s1101, t0001@cloudinfo.com.tw",
+"ja": "例：s1101、t0001@cloudinfo.com.tw",
+"ko": "예: s1101, t0001@cloudinfo.com.tw"
+},
+"學號、員工編號或 email；建好之後不能改": {
+"en": "Student ID, staff ID or email; cannot be changed later",
+"ja": "学籍番号、職員番号またはメール。作成後は変更できません",
+"ko": "학번, 직원 번호 또는 이메일. 만든 뒤에는 바꿀 수 없습니다"
+},
+"例：王小明": {
+"en": "e.g. Wang Xiaoming",
+"ja": "例：王小明",
+"ko": "예: 왕샤오밍"
+},
+"使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）": {
+"en": "User (chat, Agent, images, video, own API keys)",
+"ja": "ユーザー（会話・Agent・画像・動画・自分の API キー）",
+"ko": "사용자(대화, Agent, 이미지, 동영상, 자신의 API 키)"
+},
+"管理員（全部）": {
+"en": "Administrator (everything)",
+"ja": "管理者（すべて）",
+"ko": "관리자(전체)"
+},
+"修改 {0}": {
+"en": "Edit {0}",
+"ja": "{0} を編集",
+"ko": "{0} 수정"
+},
+"已儲存；角色改了，他要重新登入": {
+"en": "Saved; the role changed, so the user must sign in again",
+"ja": "保存しました。役割が変わったので、もう一度ログインが必要です",
+"ko": "저장했습니다. 역할이 바뀌어 다시 로그인해야 합니다"
+},
+"一行一個帳號，格式：帳號,顯示名稱,角色。角色填 admin 是管理員，不填或填 user 是使用者。一次最多 500 個。": {
+"en": "One account per line: account,display name,role. Use admin for administrators; leave blank or use user for users. Up to 500 at a time.",
+"ja": "1 行に 1 アカウント、形式は「アカウント,表示名,役割」。役割に admin で管理者、空欄か user でユーザー。一度に最大 500 件。",
+"ko": "한 줄에 계정 하나, 형식: 계정,표시 이름,역할. 역할이 admin이면 관리자, 비우거나 user면 사용자. 한 번에 최대 500개."
+},
+"s1101,王小明\ns1102,李小華\nt0001,陳老師,admin": {
+"en": "s1101,Wang Xiaoming\ns1102,Li Xiaohua\nt0001,Prof. Chen,admin",
+"ja": "s1101,王小明\ns1102,李小華\nt0001,陳先生,admin",
+"ko": "s1101,왕샤오밍\ns1102,리샤오화\nt0001,천 교수,admin"
+},
+"批次匯入帳號": {
+"en": "Bulk import accounts",
+"ja": "アカウントを一括インポート",
+"ko": "계정 일괄 가져오기"
+},
+"沒有讀到任何一行": {
+"en": "No lines were read",
+"ja": "1 行も読み取れませんでした",
+"ko": "읽은 줄이 없습니다"
+},
+"沒有建立任何帳號：{0}": {
+"en": "No accounts were created: {0}",
+"ja": "アカウントは 1 件も作成されませんでした：{0}",
+"ko": "계정을 하나도 만들지 못했습니다: {0}"
+},
+"沒有建立任何帳號": {
+"en": "No accounts were created",
+"ja": "アカウントは 1 件も作成されませんでした",
+"ko": "계정을 하나도 만들지 못했습니다"
+},
+"這些一次性密碼只顯示這一次，主控台不會再顯示。請現在下載或抄下來交給本人；他第一次登入要先改密碼。": {
+"en": "These one-time passwords are shown only this once and the console will not show them again. Download or note them now and hand them to each person; they must change the password at first sign-in.",
+"ja": "これらのワンタイムパスワードは今回だけ表示され、コンソールは二度と表示しません。今すぐダウンロードするか書き留めて本人に渡してください。初回ログイン時にパスワード変更が必要です。",
+"ko": "이 일회용 비밀번호는 이번 한 번만 표시되며 콘솔은 다시 보여 주지 않습니다. 지금 내려받거나 적어서 본인에게 전달하세요. 처음 로그인할 때 비밀번호를 바꿔야 합니다."
+},
+"有 {0} 行沒建立：": {
+"en": "{0} line(s) were not created: ",
+"ja": "{0} 行は作成されませんでした：",
+"ko": "{0}줄은 만들지 못했습니다: "
+},
+"行沒建立": {
+"en": "line(s) were not created",
+"ja": "行は作成されませんでした",
+"ko": "줄은 만들지 못했습니다"
+},
+"第 {0} 行 {1}：{2}": {
+"en": "Line {0} {1}: {2}",
+"ja": "{0} 行目 {1}：{2}",
+"ko": "{0}번째 줄 {1}: {2}"
+},
+"行": {
+"en": "line",
+"ja": "行",
+"ko": "줄"
+},
+"下載成 CSV": {
+"en": "Download as CSV",
+"ja": "CSV でダウンロード",
+"ko": "CSV로 내려받기"
+},
+"xconsole-帳號-{0}.csv": {
+"en": "xconsole-accounts-{0}.csv",
+"ja": "xconsole-accounts-{0}.csv",
+"ko": "xconsole-accounts-{0}.csv"
+},
+"xconsole-帳號-": {
+"en": "xconsole-accounts-",
+"ja": "xconsole-accounts-",
+"ko": "xconsole-accounts-"
+},
+"這個檔案裡有密碼：發完就刪掉，不要寄到群組或放在共用雲端。": {
+"en": "This file contains passwords: delete it once handed out, and do not send it to group chats or shared cloud folders.",
+"ja": "このファイルにはパスワードが含まれます。配り終えたら削除し、グループへの送信や共有クラウドへの保存はしないでください。",
+"ko": "이 파일에는 비밀번호가 들어 있습니다. 나눠 준 뒤 삭제하고, 단체방에 보내거나 공유 클라우드에 두지 마세요."
+},
+"建立了 {0} 個帳號": {
+"en": "Created {0} account(s)",
+"ja": "{0} 件のアカウントを作成しました",
+"ko": "계정 {0}개를 만들었습니다"
+},
+"建立了": {
+"en": "Created",
+"ja": "作成：",
+"ko": "만듦:"
+},
+"一次性密碼": {
+"en": "One-time password",
+"ja": "ワンタイムパスワード",
+"ko": "일회용 비밀번호"
+},
+"管理員還沒在這台打開 Agent。需要用的話請找管理員。": {
+"en": "An administrator has not enabled Agent on this machine. Contact an administrator if you need it.",
+"ja": "このマシンではまだ管理者が Agent を有効にしていません。必要なら管理者に連絡してください。",
+"ko": "관리자가 아직 이 머신에서 Agent를 켜지 않았습니다. 필요하면 관리자에게 문의하세요."
+},
+"檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方 Agent 會寫給你自己跑": {
+"en": "Only files in your own work folder can be changed; your account cannot run commands, so Agent writes down what you need to run yourself",
+"ja": "変更できるのは自分の作業フォルダーのファイルだけです。このアカウントはコマンドを実行できないため、実行が必要な箇所は Agent が手順として書きます",
+"ko": "자신의 작업 폴더 파일만 바꿀 수 있습니다. 이 계정은 명령을 실행할 수 없어서 실행이 필요한 부분은 Agent가 직접 실행할 방법을 적어 줍니다"
+},
+"這個帳號不能執行指令；只能讀寫工作資料夾裡的檔案": {
+"en": "This account cannot run commands; it can only read and write files in the work folder",
+"ja": "このアカウントはコマンドを実行できません。作業フォルダー内のファイルの読み書きだけです",
+"ko": "이 계정은 명령을 실행할 수 없습니다. 작업 폴더 안의 파일만 읽고 쓸 수 있습니다"
+},
+"已把原本的管理員帳號搬進帳號表（密碼不變）": {
+"en": "Moved the existing administrator into the account table (password unchanged)",
+"ja": "既存の管理者をアカウント表に移しました（パスワードは変わりません）",
+"ko": "기존 관리자를 계정 표로 옮겼습니다(비밀번호는 그대로)"
+},
+"帳號要 3～64 個字，英數字開頭，只能用英數字與 . _ @ -（學號、員工編號或 email 都可以）": {
+"en": "Accounts must be 3 to 64 characters, start with a letter or digit, and use only letters, digits and . _ @ - (a student ID, staff ID or email works)",
+"ja": "アカウントは 3～64 文字で英数字から始まり、英数字と . _ @ - だけ使えます（学籍番号、職員番号、メールなど）",
+"ko": "계정은 3~64자, 영문자나 숫자로 시작하고 영숫자와 . _ @ -만 쓸 수 있습니다(학번, 직원 번호, 이메일 가능)"
+},
+"顯示名稱要 1～40 個字": {
+"en": "Display names must be 1 to 40 characters",
+"ja": "表示名は 1～40 文字にしてください",
+"ko": "표시 이름은 1~40자여야 합니다"
+},
+"角色只能是管理員（admin）或使用者（user）": {
+"en": "The role must be administrator (admin) or user (user)",
+"ja": "役割は管理者（admin）かユーザー（user）だけです",
+"ko": "역할은 관리자(admin) 또는 사용자(user)만 됩니다"
+},
+"disabled 要是 true 或 false": {
+"en": "disabled must be true or false",
+"ja": "disabled は true か false にしてください",
+"ko": "disabled는 true 또는 false여야 합니다"
+},
+"帳號 {0} 已經有了": {
+"en": "Account {0} already exists",
+"ja": "アカウント {0} は既にあります",
+"ko": "계정 {0}은(는) 이미 있습니다"
+},
+"已經有了": {
+"en": "already exists",
+"ja": "は既にあります",
+"ko": "이미 있습니다"
+},
+"沒有這個帳號": {
+"en": "No such account",
+"ja": "そのアカウントはありません",
+"ko": "해당 계정이 없습니다"
+},
+"不能停用或降級自己；請另一位管理員來做": {
+"en": "You cannot disable or demote yourself; ask another administrator",
+"ja": "自分自身を無効化・降格することはできません。別の管理者に依頼してください",
+"ko": "자신을 비활성화하거나 강등할 수 없습니다. 다른 관리자에게 요청하세요"
+},
+"這是最後一位管理員，不能停用或降級": {
+"en": "This is the last administrator and cannot be disabled or demoted",
+"ja": "最後の管理者なので無効化・降格できません",
+"ko": "마지막 관리자라서 비활성화하거나 강등할 수 없습니다"
+},
+"不能刪除自己": {
+"en": "You cannot delete yourself",
+"ja": "自分自身は削除できません",
+"ko": "자신을 삭제할 수 없습니다"
+},
+"這是最後一位管理員，不能刪除": {
+"en": "This is the last administrator and cannot be deleted",
+"ja": "最後の管理者なので削除できません",
+"ko": "마지막 관리자라서 삭제할 수 없습니다"
+},
+"帳號 ": {
+"en": "Account ",
+"ja": "アカウント ",
+"ko": "계정 "
+},
+" 已經有了": {
+"en": " already exists",
+"ja": " は既にあります",
+"ko": " 이미 있습니다"
+},
+"請先改密碼（管理員給的是一次性密碼）": {
+"en": "Change your password first (the administrator gave you a one-time password)",
+"ja": "先にパスワードを変更してください（管理者から渡されたのはワンタイムパスワードです）",
+"ko": "먼저 비밀번호를 바꾸세요(관리자가 준 것은 일회용 비밀번호입니다)"
+},
+"這個功能只有管理員能用": {
+"en": "Only administrators can use this",
+"ja": "この機能は管理者だけが使えます",
+"ko": "이 기능은 관리자만 쓸 수 있습니다"
+},
+"有人正在用 Agent，這台一次只跑一件；請稍後再試": {
+"en": "Someone is using Agent; this machine runs one task at a time, so try again later",
+"ja": "誰かが Agent を使っています。このマシンは一度に 1 件だけ実行するので、後でもう一度お試しください",
+"ko": "누군가 Agent를 쓰고 있습니다. 이 머신은 한 번에 하나만 실행하니 잠시 후 다시 시도하세요"
+},
+"只有管理員能管理帳號": {
+"en": "Only administrators can manage accounts",
+"ja": "アカウントを管理できるのは管理者だけです",
+"ko": "계정은 관리자만 관리할 수 있습니다"
+},
+"沒有這件產出": {
+"en": "No such output",
+"ja": "その生成物はありません",
+"ko": "해당 결과물이 없습니다"
+},
+"新密碼至少 {0} 碼": {
+"en": "New passwords need at least {0} characters",
+"ja": "新しいパスワードは {0} 文字以上にしてください",
+"ko": "새 비밀번호는 {0}자 이상이어야 합니다"
+},
+"碼": {
+"en": "characters",
+"ja": "文字",
+"ko": "자"
+},
+"新密碼不能跟目前的一樣": {
+"en": "The new password cannot be the same as the current one",
+"ja": "新しいパスワードを現在と同じにすることはできません",
+"ko": "새 비밀번호는 지금 비밀번호와 같을 수 없습니다"
+},
+"一次匯入 1～500 個帳號": {
+"en": "Import 1 to 500 accounts at a time",
+"ja": "一度にインポートできるのは 1～500 件です",
+"ko": "한 번에 1~500개 계정을 가져올 수 있습니다"
+},
+"每個人最多 {0} 把有效的金鑰；請先撤銷用不到的": {
+"en": "Each person can have up to {0} active keys; revoke one you no longer need first",
+"ja": "1 人あたり有効なキーは最大 {0} 個です。使わないキーを先に失効させてください",
+"ko": "1인당 유효한 키는 최대 {0}개입니다. 쓰지 않는 키를 먼저 폐기하세요"
+},
+"把有效的金鑰；請先撤銷用不到的": {
+"en": "active keys; revoke one you no longer need first",
+"ja": "個の有効なキーまでです。使わないキーを先に失効させてください",
+"ko": "개의 유효한 키까지입니다. 쓰지 않는 키를 먼저 폐기하세요"
+},
+"新密碼至少 ": {
+"en": "New passwords need at least ",
+"ja": "新しいパスワードは最低 ",
+"ko": "새 비밀번호는 최소 "
+},
+" 碼": {
+"en": " characters",
+"ja": " 文字",
+"ko": "자"
+},
+"每個人最多 ": {
+"en": "Each person can have up to ",
+"ja": "1 人あたり最大 ",
+"ko": "1인당 최대 "
+},
+" 把有效的金鑰；請先撤銷用不到的": {
+"en": " active keys; revoke one you no longer need first",
+"ja": " 個の有効なキーまでです。使わないキーを先に失効させてください",
+"ko": "개의 유효한 키까지입니다. 쓰지 않는 키를 먼저 폐기하세요"
+},
+"（管理員發的金鑰）": {
+"en": "(keys issued by administrators)",
+"ja": "（管理者が発行したキー）",
+"ko": "(관리자가 발급한 키)"
+},
+"你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。": {
+"en": "You are a programming assistant working on the user's own machine; explain things to the user in the user's language. Use only the provided tools; every file path is relative to the work folder \"{0}\". This account cannot run commands and can only read and write files. Approach: first list the steps with update_plan, then do them one by one, updating the plan after each step; use list_files and read_file to understand the current state when needed, and write_file to write whole files. Where running something is needed to verify, state exactly which command the user should run. When everything is done, call finish with a summary.",
+"ja": "あなたはユーザー自身のマシンで作業するプログラミングアシスタントです。ユーザーの言語で説明してください。提供されたツールだけを使い、ファイルパスはすべて作業フォルダー「{0}」からの相対パスです。このアカウントはコマンドを実行できず、ファイルの読み書きだけができます。進め方：まず update_plan で手順を並べ、1 つずつ進めて、終わるたびに計画を更新します。必要に応じて list_files と read_file で現状を確認し、write_file でファイル全体を書きます。実行して確かめる必要がある箇所は、ユーザーが自分で実行するコマンドを明記してください。すべて終わったら finish を呼んで要約を書いてください。",
+"ko": "당신은 사용자 자신의 머신에서 일하는 프로그래밍 도우미입니다. 사용자의 언어로 설명하세요. 제공된 도구만 쓰며, 모든 파일 경로는 작업 폴더 '{0}' 기준의 상대 경로입니다. 이 계정은 명령을 실행할 수 없고 파일 읽기와 쓰기만 할 수 있습니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며, 단계를 마칠 때마다 계획을 갱신합니다. 필요하면 list_files와 read_file로 현재 상태를 확인하고 write_file로 파일 전체를 씁니다. 실행해서 확인해야 하는 부분은 사용자가 직접 실행할 명령을 분명히 적으세요. 모두 끝나면 finish를 호출해 요약을 쓰세요."
+},
+"擁有者": {
+"en": "Owner",
+"ja": "所有者",
+"ko": "소유자"
+},
+"升級時匯入": {
+"en": "Imported at upgrade",
+"ja": "アップグレード時に取り込み",
+"ko": "업그레이드 때 가져옴"
+},
+"管理員發的": {
+"en": "Issued by an administrator",
+"ja": "管理者が発行",
+"ko": "관리자가 발급"
+},
+"第三方 API 用的是單位付費的金鑰，只有管理員能用": {
+"en": "Third-party APIs use keys paid for by the organization; only administrators can use them",
+"ja": "サードパーティ API は組織が費用を払っているキーを使うため、管理者だけが使えます",
+"ko": "서드파티 API는 기관이 비용을 내는 키를 쓰므로 관리자만 쓸 수 있습니다"
+},
+"這把金鑰的帳號已停用": {
+"en": "The account that owns this key is disabled",
+"ja": "このキーのアカウントは無効化されています",
+"ko": "이 키의 계정은 비활성화되었습니다"
 }
 }

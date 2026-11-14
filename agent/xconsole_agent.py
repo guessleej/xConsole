@@ -8172,7 +8172,8 @@ def sd_generate(body):
     j = {"id": jid, "model": body["model"], "title": m["title"], "kind": m["kind"], **prm, "out": out,
          "state": "running", "phase": "載入模型中", "step": 0, "total": prm["steps"], "s_per_it": None,
          "created": int(time.time()), "need_gib": verdict["need_gib"], "offload": verdict["plan"]["offload"],
-         "warnings": verdict["warnings"], "error": None, "_cancel": False}
+         "warnings": verdict["warnings"], "error": None, "_cancel": False,
+         "by": str(body.get("by") or "")[:64]}          # 主控台帶來的帳號：產出清單只給本人與管理員看
     with _GEN_LOCK:
         if _GEN["proc"] is not None or any(x["state"] == "running" for x in _GEN["jobs"]):
             return 409, {"error": "一次只產一件：前一件還在產，等它完成或取消"}

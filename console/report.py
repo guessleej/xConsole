@@ -76,7 +76,12 @@ def build(store, certs, cfg, days=30, now=None):
     users = {}
     for a in ops:
         users[a["user"] or "（未知）"] = users.get(a["user"] or "（未知）", 0) + 1
+    accts = store.user_list()
     people = {
+        "accounts": {"total": len(accts), "admins": sum(1 for u in accts if u["role"] == "admin"),
+                     "users": sum(1 for u in accts if u["role"] == "user"),
+                     "disabled": sum(1 for u in accts if u.get("disabled")),
+                     "never_logged_in": sum(1 for u in accts if not u.get("last_login"))},
         "logins_ok": sum(1 for a in logins if a["ok"]),
         "logins_failed": sum(1 for a in logins if not a["ok"]),
         "distinct_users": len({a["user"] for a in logins if a["ok"]}),
@@ -134,7 +139,15 @@ def build(store, certs, cfg, days=30, now=None):
               "generated": sum(r["generated"] for r in by_key)}
     # 引擎只數到真的送到它那邊的請求：加密入口失敗的（代理連不上等）沒到引擎，不能拿來扣
     gw_ok = sum(r["requests"] - r["errors"] for r in by_key)
+    owners = {}
+    for kid, u in store.usage_by_key(d0).items():
+        o = (names.get(kid) or {}).get("owner") or "（管理員發的金鑰）"
+        r = owners.setdefault(o, {"owner": o, "requests": 0, "prompt": 0, "generated": 0})
+        r["requests"] += u["requests"]
+        r["prompt"] += u["prompt_tokens"]
+        r["generated"] += u["completion_tokens"]
     gateway_use = {
+        "by_owner": sorted(owners.values(), key=lambda r: -r["requests"]),
         "by_key": by_key,
         "total": gw_tot,
         "not_via_gateway": {"requests": max(0, tok["requests"] - gw_ok), "prompt": max(0, tok["prompt"] - gw_tot["prompt"]),
