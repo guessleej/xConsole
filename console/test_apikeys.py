@@ -242,6 +242,41 @@ def main():
     st, o = req("POST", "/api/node/n1/apiinfo/b9/settings", {"model_name": "m1"})
     check("API 設定改成別格已經在用的模型名稱 → 400（不送到代理）", st == 400 and "m1" in o.get("error", ""), (st, o))
 
+    # ---- 舊共用金鑰匯入：只聽本機的格子也匯入（不是主控台換上的內部金鑰）、同一把用在兩格併成一列、太短的不收
+    import hmac as _h
+    hh = lambda k: _h.new(b"xconsole-api-key-v1", k.encode(), "sha256").hexdigest()  # noqa: E731
+    shared, lone, short = "xc-" + "S" * 43, "xc-" + "L" * 43, "short-key"
+    fake = {"/registry": {"slots": [{"id": "s1", "unit": "u", "role": "甲"}, {"id": "s2", "unit": "u", "role": "乙"},
+                                    {"id": "s3", "unit": "u", "role": "丙"}, {"id": "s4", "unit": "u", "role": "丁"}]},
+            "/apikey/s1": {"set": True, "hash": hh(shared), "prefix": shared[:7], "bind": "0.0.0.0", "length": len(shared)},
+            "/apikey/s2": {"set": True, "hash": hh(shared), "prefix": shared[:7], "bind": "0.0.0.0", "length": len(shared)},
+            "/apikey/s3": {"set": True, "hash": hh(lone), "prefix": lone[:7], "bind": "127.0.0.1", "length": len(lone)},
+            "/apikey/s4": {"set": True, "hash": hh(short), "prefix": short[:7], "bind": "0.0.0.0", "length": len(short)}}
+    real_call = x.call_node
+    x.call_node = lambda nid, path, method="GET", body=None, timeout=40: (200, json.loads(json.dumps(fake[path]))) \
+        if path in fake else (404, {"error": "找不到"})
+    x.import_legacy_keys(force=True)
+    leg = {r["hash"]: r for r in x.STORE.key_list() if r.get("source") == "legacy"}
+    check("同一把舊金鑰用在兩格：併成一列、兩格都能用", leg.get(hh(shared), {}).get("slots") == ["n1/s1", "n1/s2"], leg.get(hh(shared)))
+    check("只聽本機的格子：使用者知道的舊金鑰照樣匯入", hh(lone) in leg)
+    check("少於 16 個字的金鑰不匯入，並留一筆稽核要管理者重新產生", hh(short) not in leg
+          and any(a["action"] == "apikey.import" and not a["ok"] for a in x.STORE.audit_list(50)))
+    x.update_fleet(lambda c: c.setdefault("gateway", {}).setdefault("internal", {}).__setitem__("n1/s9", hh("xc-" + "I" * 43)))
+    fake["/registry"]["slots"].append({"id": "s9", "unit": "u", "role": "內"})
+    fake["/apikey/s9"] = {"set": True, "hash": hh("xc-" + "I" * 43), "bind": "127.0.0.1", "length": 46}
+    x.import_legacy_keys(force=True)
+    check("主控台自己換上的內部金鑰不匯入", not x.STORE.key_by_hash(hh("xc-" + "I" * 43)))
+    rid = x.retire_legacy("n1", "s1", hh(shared), "admin")
+    check("在 API 串接頁換掉直連金鑰：舊的那把在加密入口拿掉這一格，另一格照常", x.STORE.key_get(rid)["slots"] == ["n1/s2"])
+    x.retire_legacy("n1", "s2", hh(shared), "admin")
+    check("  最後一格也換掉：整把撤銷", gateway.state(x.STORE.key_get(rid)) == "revoked")
+    x.call_node = real_call
+
+    st, o = req("POST", "/api/node/n1/apiinfo/b2/gateway", {"only": "true"})
+    check("只走加密入口：only 不是布林 → 400（不會被當成重新開放）", st == 400, (st, o))
+    st, o = req("POST", "/api/node/n1/apiinfo/b2/gateway", {})
+    check("  沒帶 only → 400", st == 400, (st, o))
+
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1
 
