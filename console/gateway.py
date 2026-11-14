@@ -1,12 +1,10 @@
 """加密入口：主控台 9400 埠的 /v1，讓 IDE 用個別金鑰呼叫模型（HTTPS，沿用主控台的憑證）。
 
-每把金鑰各自能撤銷、各自記用量。資料庫只存金鑰的 SHA-256 與前 8 個字元，明文只在產生當下回一次。
-金鑰本身有 256 位元亂數，用一般雜湊就夠；每個請求都要驗一次，PBKDF2 這類慢雜湊會讓每次呼叫多出上百毫秒。
+每把金鑰各自能撤銷、各自記用量。資料庫只存金鑰的雜湊（key_hash）與前 8 個字元，明文只在產生當下回一次。
 這個模組只放不碰網路的邏輯（格式、驗證、用量解析），轉送在 xconsole_server.Handler._gateway。
 """
 import datetime as dt
 import hashlib
-import hmac
 import json
 import re
 import secrets
@@ -28,13 +26,18 @@ def new_key():
     return PREFIX + secrets.token_urlsafe(32)
 
 
-# 雜湊加一段固定的用途標記（HMAC）：同一串字拿去別處算的 SHA-256 對不上這裡，彩虹表也得專門為 xConsole 重算。
-# 代理那邊匯入舊金鑰時算的是同一個（agent/xconsole_agent.py 的 KEY_HASH_TAG），兩邊要一致。
+# 雜湊加一段固定的用途標記：同一串字拿去別處算的雜湊對不上這裡，彩虹表也得專門為 xConsole 重算。
+# 代理那邊匯入舊金鑰時算的是同一個（agent/xconsole_agent.py 的 KEY_HASH_TAG、KEY_HASH_ROUNDS），兩邊要一致。
 HASH_TAG = b"xconsole-api-key-v1"
 
 
+HASH_ROUNDS = 10000
+
+
 def key_hash(key):
-    return hmac.new(HASH_TAG, key.encode(), hashlib.sha256).hexdigest()
+    """PBKDF2-SHA256（固定用途標記當鹽、1 萬次）：每個請求都要驗一次，實測每次約 0.7 毫秒（M5），
+    資料庫外流時要逐把猜也比單純的 SHA-256 慢 1 萬倍。鹽固定是因為要拿雜湊直接查表（金鑰本身有 256 位元亂數）。"""
+    return hashlib.pbkdf2_hmac("sha256", key.encode(), HASH_TAG, HASH_ROUNDS).hex()
 
 
 def presented_key(headers):
@@ -47,13 +50,13 @@ def presented_key(headers):
     return k if TOKEN_RX.fullmatch(k) else ""
 
 
-def day(ts=None):
-    """用量依台北時間的日期分天。"""
-    return dt.datetime.fromtimestamp(ts if ts is not None else time.time(), TPE).strftime("%Y-%m-%d")
+def hour(ts=None):
+    """用量依台北時間分小時記（「YYYY-MM-DD HH」）。"""
+    return dt.datetime.fromtimestamp(ts if ts is not None else time.time(), TPE).strftime("%Y-%m-%d %H")
 
 
 def month_start(ts=None):
-    return day(ts)[:8] + "01"
+    return hour(ts)[:8] + "01"
 
 
 def check_fields(body, partial=False):

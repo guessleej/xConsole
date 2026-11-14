@@ -129,16 +129,18 @@ def main():
     check("  過期的狀態是 expired", gateway.state(exp) == "expired")
 
     k2 = out2["item"]["id"]
-    today = gateway.day()
+    today = gateway.hour()
     x.STORE.usage_add(k2, today, "n1", "brain", True, 100, 20)
     x.STORE.usage_add(k2, today, "n1", "brain", False, 5, 0)
-    x.STORE.usage_add(k2, "2000-01-01", "n1", "brain", True, 999, 999)
+    x.STORE.usage_add(k2, "2000-01-01 08", "n1", "brain", True, 999, 999)
     st, lst = req("GET", "/api/keys")
     u = next(i for i in lst["items"] if i["id"] == k2)["usage"]
     check("用量：同一天累加、上個月的不算進本月", u == {"requests": 2, "errors": 1, "prompt_tokens": 105, "completion_tokens": 20}, u)
     bs = x.STORE.usage_by_slot(today)
     check("  依欄位加總（算直連量用）", bs.get(("n1", "brain"), {}).get("requests") == 2, bs)
-    check("  日期用台北時間", gateway.day(0) == "1970-01-01" and gateway.day(16 * 3600) == "1970-01-02")
+    check("  以台北時間分小時", gateway.hour(0) == "1970-01-01 08" and gateway.hour(16 * 3600) == "1970-01-02 00")
+    check("  起點可以給到幾點：前一小時的不算", x.STORE.usage_by_key(gateway.hour(time.time() + 3600)).get(k2) is None
+          and x.STORE.usage_by_key(today)[k2]["requests"] == 2)
 
     st, o = req("GET", "/api/keys")
     check("加密入口網址：沒填就用主控台憑證上的名稱與埠", o["url"].startswith("https://") and o["url"].endswith(f":{x.PORT}/v1")
