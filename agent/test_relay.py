@@ -7,6 +7,7 @@
 不需要 systemd：假引擎直接起，欄位只用來查埠與金鑰。跑法：python3 test_relay.py
 """
 import hashlib
+import hmac
 import json
 import os
 import socket
@@ -74,7 +75,7 @@ def main():
                                    method="GET" if body is None else "POST",
                                    headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})})
         try:
-            resp = urllib.request.build_opener(urllib.request.ProxyHandler({})).open(r, timeout=30)
+            resp = urllib.request.build_opener(urllib.request.ProxyHandler({}), A._NoRedirect()).open(r, timeout=30)
         except urllib.error.HTTPError as e:
             resp = e
         data = resp.read()
@@ -113,13 +114,22 @@ def main():
         case("空欄位 → 404", st == 404, d)
 
         st, d, _ = call("/apikey/brain")
-        case("/apikey：回雜湊與前 7 個字元，不回金鑰", st == 200 and d["set"] and d["hash"] == hashlib.sha256(KEY.encode()).hexdigest()
+        case("/apikey：回雜湊與前 7 個字元，不回金鑰", st == 200 and d["set"] and d["hash"] == hmac.new(b"xconsole-api-key-v1", KEY.encode(), hashlib.sha256).hexdigest()
              and d["prefix"] == KEY[:7] and KEY not in json.dumps(d) and d["port"] == lp, d)
         st, d, _ = call("/apikey/small")
         case("/apikey：沒設金鑰的欄位 set=false、沒有雜湊", st == 200 and not d["set"] and d["hash"] is None and d["bind"] == "0.0.0.0", d)
         st, d, _ = call("/apikey/nope")
         case("/apikey：欄位不存在 → 404", st == 404)
 
+        # 模型回轉址：不跟過去（跟過去會跳出白名單、金鑰跟著送走），原樣回給主控台
+        A.RELAY_PATHS["models"] = ("GET", "/redir/v1")
+        st, raw, h = call("/relay/brain", {"path": "models", "method": "GET"}, raw=True)
+        A.RELAY_PATHS["models"] = ("GET", "/v1/models")
+        case("模型回轉址：不跟過去，30x 原樣回來", st == 302 and h.get("Location") == "/v1/models", (st, dict(h)))
+        A.RELAY_MAX, real_max = 10, A.RELAY_MAX
+        st, d, _ = call("/relay/brain", {"path": "chat/completions", "method": "POST", "body": chat})
+        A.RELAY_MAX = real_max
+        case("回應超過上限：回 502 明講，不送截斷的 JSON", st == 502 and "64 MB" in d.get("error", ""), (st, d))
         eng.terminate()
         eng.wait(5)
         st, d, _ = call("/relay/small", {"path": "models", "method": "GET"})
