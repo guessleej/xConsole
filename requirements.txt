@@ -5,4 +5,4 @@ cffi==2.0.0; python_version < "3.10"      # macOS 命令列工具的 Python 是 
 cryptography==50.0.2
 pycparser==3.12; python_version >= "3.11"
 pycparser==2.23; python_version < "3.11"    # pycparser 3.x 要 Python 3.11 以上
-pypdf==6.21.4                             # 對話附 PDF 時抽文字（console/extract.py，獨立行程、限時）
+pypdf==7.0.1                             # 對話附 PDF 時抽文字（console/extract.py，獨立行程、限時）
