@@ -83,9 +83,17 @@ class Store:
         CREATE TABLE IF NOT EXISTS users(
           username TEXT PRIMARY KEY, display TEXT, role TEXT, source TEXT, salt TEXT, hash TEXT, algo TEXT,
           must_change INTEGER, disabled INTEGER, created REAL, pw_changed REAL, last_login REAL);
+        CREATE TABLE IF NOT EXISTS agent_tasks(
+          id TEXT PRIMARY KEY, user TEXT, node TEXT, state TEXT, created REAL, updated REAL, body TEXT);
+        CREATE INDEX IF NOT EXISTS agent_tasks_user ON agent_tasks(user, created);
         CREATE TABLE IF NOT EXISTS agent_folders(
           node TEXT, folder TEXT, owner TEXT, created REAL, PRIMARY KEY(node, folder));
         """)
+        # 舊版資料庫補欄位：對話的收藏（明文0／1）與分類標籤（使用者寫的字，跟標題一樣加密）
+        have = {r[1] for r in self.db.execute("PRAGMA table_info(chats)")}
+        for col, typ in (("fav", "INTEGER DEFAULT 0"), ("labels", "TEXT")):
+            if col not in have:
+                self.db.execute(f"ALTER TABLE chats ADD COLUMN {col} {typ}")
 
     # ---- 稽核
     def audit(self, user, ip, action, target="", ok=True, detail=None):
@@ -187,7 +195,7 @@ class Store:
 
     # ---- 對話紀錄：body 與附圖都是呼叫端用 tls.seal 加密過的 enc:v1: 密文，這裡只存不解；
     # 每一個查詢都帶 user，別人的對話一律當作不存在
-    CHAT_COLS = ("id", "title", "target", "n_msgs", "created", "updated")
+    CHAT_COLS = ("id", "title", "target", "n_msgs", "created", "updated", "fav", "labels")
 
     def chat_list(self, user, with_body=False):
         cols = self.CHAT_COLS + (("body",) if with_body else ())
@@ -219,7 +227,10 @@ class Store:
             old = self.db.execute("SELECT user, created FROM chats WHERE id=?", (row["id"],)).fetchone()
             if old and old[0] != user:
                 return False
-            self.db.execute("INSERT OR REPLACE INTO chats(id,user,title,target,n_msgs,created,updated,body) VALUES(?,?,?,?,?,?,?,?)",
+            # 收藏與分類標籤另外改（chat_meta），存對話內容時不能把它們洗掉：用upsert不用REPLACE
+            self.db.execute("INSERT INTO chats(id,user,title,target,n_msgs,created,updated,body) VALUES(?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET title=excluded.title, target=excluded.target, "
+                            "n_msgs=excluded.n_msgs, updated=excluded.updated, body=excluded.body",
                             (row["id"], user, row.get("title") or "", row.get("target") or "", int(row.get("n_msgs") or 0),
                              old[1] if old else now, now, body))
             gone = [r[0] for r in self.db.execute("SELECT id FROM chats WHERE user=? ORDER BY updated DESC LIMIT -1 OFFSET ?",
@@ -234,6 +245,22 @@ class Store:
             raise ValueError("對話標題沒有加密，拒絕寫入")
         with self.lock:
             return self.db.execute("UPDATE chats SET title=? WHERE id=? AND user=?", (title, cid, user)).rowcount > 0
+
+    def chat_meta(self, user, cid, fav=None, labels=None):
+        """改收藏（布林）或分類標籤（enc:v1: 密文）；不動updated，列表順序不會因為按收藏而跳。"""
+        if labels is not None and labels and not labels.startswith("enc:v1:"):
+            raise ValueError("分類標籤沒有加密，拒絕寫入")
+        sets, args = [], []
+        if fav is not None:
+            sets.append("fav=?")
+            args.append(1 if fav else 0)
+        if labels is not None:
+            sets.append("labels=?")
+            args.append(labels)
+        if not sets:
+            return self.chat_get(user, cid) is not None
+        with self.lock:
+            return self.db.execute("UPDATE chats SET " + ",".join(sets) + " WHERE id=? AND user=?", (*args, cid, user)).rowcount > 0
 
     def chat_delete(self, user, cid):
         with self.lock:
@@ -317,7 +344,32 @@ class Store:
             self.db.execute("DELETE FROM chats WHERE user=?", (username,))
             self.db.execute("DELETE FROM chat_blobs WHERE user=?", (username,))
             self.db.execute("DELETE FROM sessions WHERE user=?", (username,))
+            self.db.execute("DELETE FROM agent_tasks WHERE user=?", (username,))
         return n > 0
+
+    # ---- Agent任務：body是呼叫端tls.seal加密過的enc:v1: 密文（交代的事、計畫、步驟紀錄都是使用者內容），這裡只存不解
+    def agent_task_put(self, tid, user, node, state, created, body, keep=100):
+        """新增或整筆更新。超過keep則刪掉這個人最舊、已經結束的任務。"""
+        if not body.startswith("enc:v1:"):
+            raise ValueError("Agent任務沒有加密，拒絕寫入")
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO agent_tasks(id,user,node,state,created,updated,body) VALUES(?,?,?,?,?,?,?)",
+                            (tid, user, node, state, created, time.time(), body))
+            gone = [r[0] for r in self.db.execute(
+                "SELECT id FROM agent_tasks WHERE user=? AND state NOT IN ('running','waiting_approval') "
+                "ORDER BY created DESC LIMIT -1 OFFSET ?", (user, keep)).fetchall()]
+            for g in gone:
+                self.db.execute("DELETE FROM agent_tasks WHERE id=?", (g,))
+        return gone
+
+    def agent_task_rows(self):
+        with self.lock:
+            return [dict(zip(("id", "user", "node", "state", "created", "updated", "body"), r)) for r in
+                    self.db.execute("SELECT id,user,node,state,created,updated,body FROM agent_tasks ORDER BY created").fetchall()]
+
+    def agent_task_delete(self, tid, user):
+        with self.lock:
+            return self.db.execute("DELETE FROM agent_tasks WHERE id=? AND user=?", (tid, user)).rowcount > 0
 
     # ---- Agent 資料夾的擁有者（資料夾本身在代理那台；這裡只記是誰建的）
     def folder_owner(self, node, folder):

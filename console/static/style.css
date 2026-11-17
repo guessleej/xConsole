@@ -854,7 +854,7 @@ label.pick .chips { flex: none; justify-content: flex-end; max-width: 45%; }
 /* 表格列尾的按鈕群、手動放入的目錄樹 */
 td.row-acts { white-space: nowrap; }
 td.row-acts .btn + .btn { margin-left: 6px; }
-pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 13.5px; }
+pre.log.tree { max-height: none; white-space: pre; overflow-x: auto; font-size: 14px; }
 
 /* 窄螢幕的表格：欄名與數字不逐字折行，寧可在框內左右捲 */
 .scrollbox th, .scrollbox td.num { white-space: nowrap; }
@@ -874,7 +874,7 @@ td.nowrap, .nowrap { white-space: nowrap; }
 .modal h4.pick-h + .form-row { margin-top: 4px; }
 .check-row { display: flex; margin: 12px 0 4px; }
 .check-row.disabled { opacity: .55; cursor: not-allowed; }
-pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size: 13px; white-space: pre-wrap; }
+pre.log.build-log { height: 240px; max-height: 240px; overflow: auto; font-size: 14px; white-space: pre-wrap; }
 
 /* ---- 推薦模型（參考 LocModel：先讀懂這台 → 推薦 → 一鍵下載 → 換上）
    分層只靠底色，不加框線、不加色條。 */
@@ -1247,7 +1247,7 @@ input.switch:checked::after { transform: translateX(18px); }
 .code-block { background: #0f1820; color: #e8eef3; border-radius: 10px; margin: 8px 0; overflow: hidden; }
 .code-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; background: rgba(255, 255, 255, .06); color: #aebcca; }
 .code-head .btn:not(.primary) { background: rgba(255, 255, 255, .1); color: #e8eef3; }
-.code-block pre { margin: 0; padding: 12px; max-height: 360px; overflow: auto; font-size: 13.5px; line-height: 1.55; white-space: pre; }
+.code-block pre { margin: 0; padding: 12px; max-height: 360px; overflow: auto; font-size: 14px; line-height: 1.55; white-space: pre; }
 .code-pre { background: var(--panel); border-radius: var(--radius-sm); padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .preview-ov { position: fixed; inset: 0; z-index: 80; background: #0d1922; display: flex; flex-direction: column; }
 .preview-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; color: #e8eef3; }
@@ -1272,7 +1272,11 @@ input.switch:checked::after { transform: translateX(18px); }
 .plan-item.done { color: var(--ink-3); text-decoration: line-through; }
 .plan-item.done::before { background: var(--ok); }
 .plan-item.in_progress { font-weight: 700; }
-.plan-item.in_progress::before { background: var(--brand); }
+.plan-item.in_progress::before { background: transparent; border: 2px solid var(--brand); border-right-color: transparent; width: 8px; height: 8px; animation: spin 1s linear infinite; }
+.plan-item.stopped { color: var(--ink-2); }
+.plan-item.stopped::before { background: var(--warn); }
+.plan-count { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .file-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .agent-tree { max-height: 260px; overflow: auto; background: var(--panel); padding: 8px; border-radius: 8px; white-space: pre; }
 .prov-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
@@ -1331,6 +1335,7 @@ input.switch:checked::after { transform: translateX(18px); }
 .chat-sum summary { cursor: pointer; }
 .chat-sum > div { white-space: pre-wrap; margin-top: 6px; max-height: 220px; overflow-y: auto; }
 .btn.toggle[aria-pressed="true"] { background: var(--brand); color: #fff; }
+:root[data-theme="dark"] .btn.toggle[aria-pressed="true"] { background: var(--brand); color: #fff; }   /* 深色的一般按鈕底色規則比較強，按下的開關要蓋回來 */
 .btn.toggle:disabled { opacity: .45; cursor: not-allowed; }
 .msg-acts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
 .link-btn { border: 0; background: none; color: var(--ink-3); font: inherit; font-size: 14px; padding: 3px 6px; border-radius: 6px; cursor: pointer; text-decoration: none; }
@@ -1406,3 +1411,26 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .grp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 15px; }
 .grp-checks label { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 720px) { .grp-form { grid-template-columns: 1fr; } }
+
+/* ---- 對話：收藏、分類、標籤；拖檔進來的提示 */
+.chat-filter { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chat-filter .chip-btn[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.chat-cat { flex: 1 1 110px; min-width: 0; font-size: 14px; padding: 4px 8px; }
+.chat-star { opacity: 1; color: var(--ink-3); padding: 4px; display: inline-flex; }
+.chat-star svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.chat-star.on { color: var(--warn-t); }
+.chat-star.on svg { fill: currentColor; }
+.chat-labels { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.chat-labels .chip { font-size: 14px; padding: 0 6px; }
+.chat-tag { font-size: 14px; color: var(--ink-2); }
+.chat-input.drop { box-shadow: 0 0 0 2px var(--brand) inset; }
+.chat-think { white-space: nowrap; }
+.upd-top { white-space: nowrap; }
+
+/* ---- 執行頁：沒有推理引擎、載入中的最後一行記錄、執行日誌 */
+.run-noeng { margin-top: 12px; }
+.run-noeng p { margin: 4px 0 8px; }
+.load-last { margin-top: 6px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-log { padding: 12px 16px; }
+.run-log summary { cursor: pointer; font-weight: 700; }
+.run-log-pre { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; margin-top: 8px; }

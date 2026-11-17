@@ -347,6 +347,27 @@ async function viewRun() {
   top.appendChild(th);
   holder.appendChild(top);
 
+  // 這台還沒有推理引擎（llama.cpp）：GGUF模型啟動不了，先講清楚、給一鍵安裝與匯入安裝包，不要等按了啟動才出錯
+  const eng = n.state.engine || {};
+  if (eng.llama_server === false && (lib.gguf || []).length) {
+    const e = el("div", "note warn run-noeng");
+    e.appendChild(el("b", null, eng.building ? "推理引擎安裝中" : "先安裝推理引擎"));
+    e.appendChild(el("p", "small", eng.building ? `${n.name}正在安裝llama.cpp，裝好之後就能啟動GGUF模型。`
+      : `${n.name}還沒有llama.cpp，GGUF模型啟動不了。一鍵安裝會依這台的顯示卡挑加速方式；這台不能連外的話，可以在別台下載官方的壓縮檔（.zip）再匯入。`));
+    const acts = el("div", "slot-actions");
+    const ib = el("button", "btn sm primary", eng.building ? "看安裝進度" : "一鍵安裝");
+    ib.onclick = () => openEngineBuild(n.id, "llama", async () => { await refresh(); if (S.view === "run") viewRun(); });
+    acts.appendChild(ib);
+    if (!eng.building) {
+      const zb = el("button", "btn sm", "匯入安裝包（zip）");
+      zb.title = "不能連外的機器：在別台下載llama.cpp官方的.zip或.tar.gz，從這裡送上去安裝";
+      zb.onclick = () => openEngineBuild(n.id, "llama", async () => { await refresh(); if (S.view === "run") viewRun(); }, { importOpen: true });
+      acts.appendChild(zb);
+    }
+    e.appendChild(acts);
+    top.appendChild(e);
+  }
+
   if (!models.length) {
     const e = el("div", "note");
     e.appendChild(document.createTextNode("這台還沒有模型。先到「模型」挑一顆推薦的下載，或匯入你已經有的 GGUF。"));
@@ -371,6 +392,7 @@ async function viewRun() {
   const statusHolder = el("div");
   holder.appendChild(statusHolder);
   if (rs) statusHolder.appendChild(statusBar(n, rs));
+  if (rs) holder.appendChild(runLogBox(n, rs));
 
   // thinking／lan 先顯示欄位現在的設定；使用者沒動過就不送，代理沿用原本的（不會悄悄改成 0.0.0.0）
   // 應用程式的視窗（一般人單機用）：新模型預設只給這台自己用、不先思考，跟代理的桌面版預設一致
@@ -688,7 +710,10 @@ function progressCard(m) {
   const fill = el("i");
   bar.appendChild(fill);
   const msg = el("div", "small mono muted load-msg");
-  c.append(sub, track, bar, msg);
+  const lastLn = el("div", "small mono load-last");
+  lastLn.hidden = true;
+  lastLn.title = "llama-server記錄檔的最後一行";
+  c.append(sub, track, bar, msg, lastLn);
   const t0 = Date.now();
   return {
     el: c,
@@ -704,9 +729,104 @@ function progressCard(m) {
       sub.textContent = [`已用 ${fmtDur(sec)}`, r.read_gib != null && r.total_gib ? `讀了 ${fmt(r.read_gib)} / ${fmt(r.total_gib)} GiB` : null,
         r.eta_sec != null ? `約再 ${fmtDur(r.eta_sec)}` : null].filter(Boolean).join("・");
       msg.textContent = r.state === "failed" ? (r.message || "載入失敗") : (r.message || "");
+      const ll = r.stage === "done" ? "" : (r.last_line || "");
+      if (lastLn.textContent !== ll) lastLn.textContent = ll;
+      lastLn.hidden = !ll;
       if (r.stage === "done") h2.textContent = `已啟動 ${m.name}`;
     },
   };
+}
+
+/* 聯網搜尋端點：對話「工具」裡的 web_search 用。沒設就不給模型這個工具；網址明文、金鑰加密落地，畫面只看得到「已設定」 */
+async function settingsSearch(wrap) {
+  const c = card("聯網搜尋", "對話打開「工具」時，模型可以用這裡設定的搜尋服務找資料；沒設定就沒有聯網搜尋（讀網頁不受影響）");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  loading(body);
+  let cfg;
+  try { cfg = await api("/api/settings/search"); } catch (ex) { errNote(body, ex.message); return; }
+  body.textContent = "";
+  const fUrl = textInput(cfg.url, "例：https://searx.example.com/search?q={q}&format=json");
+  const fHdr = textInput(cfg.header || "Authorization", "Authorization");
+  const fKey = el("input");
+  fKey.type = "password";
+  fKey.autocomplete = "off";
+  fKey.placeholder = cfg.key_set ? "已設定（留空＝不變）" : "選填";
+  const row = el("div", "form-row");
+  row.append(fieldBox("搜尋端點", fUrl, "SearXNG相容、回JSON的網址，{q}會換成搜尋字；常見做法是在內網架一台SearXNG"),
+    fieldBox("金鑰標頭", fHdr, "送金鑰用的標頭名稱；Authorization會加上Bearer"), fieldBox("金鑰", fKey, "搜尋服務要金鑰才填；加密存在主控台"));
+  const msg = el("div");
+  const acts = el("div", "slot-actions");
+  const save = el("button", "btn sm primary", "儲存");
+  const test = el("button", "btn sm", "測試搜尋");
+  const clearK = el("button", "btn sm", "清除金鑰");
+  clearK.hidden = !cfg.key_set;
+  acts.append(save, test, clearK);
+  body.append(row, acts, msg);
+  const put = async (extra) => {
+    msg.textContent = "";
+    try {
+      cfg = await api("/api/settings/search", { method: "POST", body: { url: fUrl.value.trim(), header: fHdr.value.trim(), ...extra } });
+    } catch (ex) { errNote(msg, ex.message); return false; }
+    fKey.value = "";
+    fKey.placeholder = cfg.key_set ? "已設定（留空＝不變）" : "選填";
+    clearK.hidden = !cfg.key_set;
+    return true;
+  };
+  save.onclick = async () => { if (await put(fKey.value.trim() ? { key: fKey.value.trim() } : {})) toast(fUrl.value.trim() ? "已儲存；對話的工具會多出聯網搜尋" : "已清除搜尋端點", "ok"); };
+  clearK.onclick = async () => { if (await put({ clear_key: true })) toast("已清除金鑰", "ok"); };
+  test.onclick = async () => {
+    msg.textContent = "";
+    loading(msg);
+    let r;
+    try { r = await api("/api/settings/search/test", { method: "POST", body: { q: "xConsole" } }); } catch (ex) { msg.textContent = ""; errNote(msg, ex.message); return; }
+    msg.textContent = "";
+    msg.appendChild(el("p", "note ok", `搜尋成功，找到${r.results.length}筆：`));
+    r.results.slice(0, 3).forEach((x) => msg.appendChild(el("p", "small", `${x.title}　${x.url}`)));
+  };
+}
+
+/* 執行日誌：展開時每3秒讀一次這個欄位的記錄，只把新增的那幾行接在後面（不清空重畫、不跳捲軸）；
+   使用者往上捲在看舊的就不拉回底部。收起來就不讀。 */
+const RUN_LOG_MAX = 600;
+function runLogBox(n, s) {
+  const d = el("details", "run-log card");
+  d.appendChild(el("summary", null, "執行日誌"));
+  const pre = el("pre", "log run-log-pre");
+  const note = el("p", "small muted", "讀取中…");
+  d.append(note, pre);
+  let lines = [];
+  let timer = null;
+  const tick = async () => {
+    timer = null;
+    if (!d.isConnected || !d.open) return;
+    let r;
+    try { r = await api(`/api/node/${n.id}/logs/${s.id}`); } catch (ex) { note.textContent = "讀不到：" + ex.message; note.hidden = false; timer = setTimeout(tick, 5000); return; }
+    const now = String(r.text || "").split("\n");
+    // 找上一次最後一行在新內容裡的位置，只接後面的；對不上（記錄檔輪替過）才整份換
+    let add = now;
+    if (lines.length) {
+      const last = lines[lines.length - 1];
+      const at = now.lastIndexOf(last);
+      add = at >= 0 ? now.slice(at + 1) : now;
+      if (at < 0) { pre.textContent = ""; lines = []; }
+    }
+    const near = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+    if (add.length) {
+      pre.appendChild(document.createTextNode((lines.length ? "\n" : "") + add.join("\n")));
+      lines = lines.concat(add);
+      if (lines.length > RUN_LOG_MAX * 1.5) {            // 太長就收成最後600行（偶爾一次，不是每次）
+        lines = lines.slice(-RUN_LOG_MAX);
+        pre.textContent = lines.join("\n");
+      }
+      if (near) pre.scrollTop = pre.scrollHeight;
+    }
+    note.hidden = true;
+    timer = setTimeout(tick, 3000);
+  };
+  d.addEventListener("toggle", () => { if (d.open && !timer) tick(); });
+  return d;
 }
 
 /* 對話頁在 chat.js；下面的 renderRich、codeBlock、openPreview 對話與 Agent 共用。 */
@@ -985,7 +1105,21 @@ async function viewAgent() {
   linkF.title = "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選";
   linkF.onclick = () => openFolderBrowser(n, (name) => { S.agentFolder = name; viewAgent(); });
   const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}）`])], S.agentTask || "");
-  bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel);
+  const delT = el("button", "btn sm danger", "刪除任務");
+  const curTask = tasks.find((t) => t.id === S.agentTask);
+  delT.hidden = !curTask || curTask.user !== S.me?.user || ["running", "waiting_approval"].includes(curTask.state);
+  delT.title = "刪除這個任務的計畫與步驟紀錄；工作資料夾裡的檔案不會動";
+  delT.onclick = () => modal({
+    title: "刪除這個任務", danger: true, confirmText: "刪除", hasInput: false,
+    bodyNode: el("p", "small", "任務的計畫、步驟紀錄與改動清單會一起刪除，刪了就找不回來；工作資料夾裡的檔案不會動。"),
+    onConfirm: async () => {
+      try { await api(`/api/agent/tasks/${S.agentTask}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+      toast("已刪除任務", "ok");
+      S.agentTask = "";
+      viewAgent();
+    },
+  });
+  bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel, delT);
   mainC.appendChild(bar);
   mSel.onchange = () => { S.agentModel = mSel.value; };
   fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(); };
@@ -1025,23 +1159,49 @@ async function viewAgent() {
   const planBox = el("div");
   const filesBox = el("div");
   const treeBox = el("div");
-  side.append(el("h4", "pick-h", "計畫"), planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
+  const planCount = el("span", "plan-count");
+  const planH = el("h4", "pick-h", "計畫");
+  planH.appendChild(planCount);
+  side.append(planH, planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
+  // 輪詢每1.5秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播
+  const seen = { files: null, tree: null };
+  const drawPlan = (plan) => {
+    const done = plan.filter((x) => x.status === "done").length;
+    const cnt = plan.length ? `${done}/${plan.length}` : "";
+    if (planCount.textContent !== cnt) planCount.textContent = cnt;
+    if (!plan.length) {
+      if (!planBox.querySelector("p")) { planBox.textContent = ""; planBox.appendChild(el("p", "small muted", "Agent開始做事後，計畫會顯示在這裡")); }
+      return;
+    }
+    planBox.querySelector("p")?.remove();
+    const rows = [...planBox.children];
+    plan.forEach((x, i) => {
+      const cls = "plan-item " + (x.status || "");
+      let r = rows[i];
+      if (!r) { r = el("div", cls, x.text); planBox.appendChild(r); return; }
+      if (r.className !== cls) r.className = cls;
+      if (r.textContent !== x.text) r.textContent = x.text;
+    });
+    rows.slice(plan.length).forEach((r) => r.remove());
+  };
   const drawSide = (t) => {
-    planBox.textContent = "";
-    filesBox.textContent = "";
-    treeBox.textContent = "";
-    const plan = t?.plan || [];
-    if (!plan.length) planBox.appendChild(el("p", "small muted", "Agent 開始做事後，計畫會顯示在這裡"));
-    plan.forEach((x) => planBox.appendChild(el("div", "plan-item " + (x.status || ""), x.text)));
+    drawPlan(t?.plan || []);
     const files = t?.files || [];
+    const fi = (folders.folders || []).find((f) => f.name === fSel.value);
+    const fk = JSON.stringify(files);
+    const tk = JSON.stringify([t?.tree || [], fSel.value, fi?.path]);
+    if (seen.files !== fk) { seen.files = fk; filesBox.textContent = ""; drawFiles(files); }
+    if (seen.tree !== tk) { seen.tree = tk; treeBox.textContent = ""; drawTree(t?.tree || [], fi); }
+  };
+  const drawFiles = (files) => {
     if (!files.length) filesBox.appendChild(el("p", "small muted", "還沒有改動"));
     files.forEach((f) => {
       const r = el("div", "file-row");
       r.append(el("span", "chip " + (f.action === "created" ? "ok" : "warn"), f.action === "created" ? "新建" : "修改"), el("span", "mono small", f.path));
       filesBox.appendChild(r);
     });
-    const tree = t?.tree || [];
-    const fi = (folders.folders || []).find((f) => f.name === fSel.value);
+  };
+  const drawTree = (tree, fi) => {
     treeBox.appendChild(el("p", "small muted", !fSel.value ? "還沒選資料夾" : fi?.linked ? fi.path : `~/xconsole-agent/${fSel.value}`));
     if (fi?.linked) {
       const un = el("button", "link-btn", "取消連結（資料夾本身不動）");
@@ -1084,6 +1244,7 @@ async function viewAgent() {
     const live = t.state === "running" || t.state === "waiting_approval";
     stopB.hidden = !live;
     send.disabled = live;
+    delT.hidden = live || t.user !== S.me?.user;
   };
 
   const watch = async (id) => {
@@ -1152,7 +1313,7 @@ async function viewAgent() {
   if (S.agentTask && tasks.some((t) => t.id === S.agentTask)) watch(S.agentTask); else { empty(); drawSide(null); }
 }
 
-const TASK_STATE = { running: "進行中", waiting_approval: "等你允許", done: "完成", failed: "失敗", stopped: "已停止" };
+const TASK_STATE = { running: "進行中", waiting_approval: "等你允許", done: "完成", failed: "失敗", stopped: "已停止", interrupted: "已中斷" };
 const fmtBytes = (b) => b >= 1048576 ? `${fmt(b / 1048576)} MB` : b >= 1024 ? `${fmt(b / 1024, 0)} KB` : `${b} B`;
 const TOOL_ZH = { list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", run_command: "執行指令", update_plan: "更新計畫", finish: "完成" };
 
@@ -1246,6 +1407,7 @@ function settingsEngine(wrap) {
 }
 
 async function settingsProviders(wrap) {
+  settingsSearch(wrap);
   const c = card("第三方 API", "本機模型放不下、或要用更強的模型時，接 OpenAI 相容的雲端服務；對話與 Agent 可以在頂部切換本機或這些服務");
   wrap.appendChild(c);
   const head = c.querySelector(".card-head");

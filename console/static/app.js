@@ -1687,7 +1687,7 @@ function recRow(n, it, lib, ctx) {
     const [lbl, cls] = p ? levelOf(p) : LEVEL[it.level] || LEVEL.unknown;
     const line = el("div", "rec-fit-line");
     line.appendChild(el("span", "chip " + cls, lbl));
-    if (p) line.appendChild(el("span", "small muted", p.tok_s != null ? `約 ${fmt(p.tok_s, p.tok_s < 10 ? 1 : 0)} tok/s` : "速度未知"));
+    if (p) line.appendChild(el("span", "small muted", p.tok_s != null ? (p.tok_s < 1 ? "不到1 tok/s" : `約 ${fmt(p.tok_s, p.tok_s < 10 ? 1 : 0)} tok/s`) : "速度未知"));
     fit.appendChild(line);
     if (p) {
       const bar = splitBar(p.split);
@@ -4039,15 +4039,20 @@ async function settingsUpdate(wrap) {
       chk.appendChild(el("p", "small muted", `安裝包 ${r.asset.name}（${fmt((r.asset.size || 0) / 1048576, 1)} MB），sha256 ${r.asset.sha256 ? r.asset.sha256.slice(0, 16) + "…" : "GitHub 沒有提供，不能自動更新"}`));
       const go = el("button", "btn primary", `更新到 ${r.latest}`);
       go.disabled = !r.asset.sha256;
+      const apply = async () => {
+        try { await api("/api/update/apply", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+        drawJob({ state: "checking" });
+        watchJob();
+      };
       go.onclick = () => modal({ title: `更新到 ${r.latest}`, bodyNode: el("p", null, "會先備份目前的檔，換上新版後主控台重新啟動（大約十幾秒，頁面會自動重新載入）。正在跑的模型不受影響。"),
-        confirmText: "開始更新", onConfirm: async () => {
-          try { await api("/api/update/apply", { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
-          drawJob({ state: "checking" });
-          watchJob();
-        } });
+        confirmText: "開始更新", onConfirm: apply });
       chk.appendChild(go);
+      // 從頂列的新版通知按了「立即更新」：已經看過更新內容並確認，這裡直接開始
+      if (S.updateNow === r.latest && !go.disabled) { S.updateNow = null; apply(); }
     }
+    S.updateNow = null;
   };
+  if (S.updateNow) chkBtn.click();
 
   // ---- 手動上傳
   const up = el("details", "upd-manual");
@@ -6009,7 +6014,7 @@ function openProfileEditor(n, key, p) {
 // 在網頁上編譯 llama.cpp：系統套件要 IT 用 sudo 裝，這裡只檢查並列出指令；下載、設定、編譯由代理在背景做
 // 在網頁上編譯推理引擎：kind＝llama（文字模型用的 llama-server）或 sd（畫圖與影片用的 sd-cli）
 const ENGINE = { llama: { name: "llama.cpp", exe: "llama-server" }, sd: { name: "stable-diffusion.cpp", exe: "sd-cli" } };
-async function openEngineBuild(nid, kind = "llama", onDone) {
+async function openEngineBuild(nid, kind = "llama", onDone, opts = {}) {
   const n = S.fleet.nodes.find((x) => x.id === nid);
   const eng = ENGINE[kind];
   const body = el("div");
@@ -6086,6 +6091,7 @@ async function openEngineBuild(nid, kind = "llama", onDone) {
     try { await api(`/api/node/${nid}/${kind}/build/cancel`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); }
   });
   const imp = engineImportBox(nid, kind, eng, () => poll());
+  if (opts.importOpen) imp.open = true;           // 執行頁按「匯入安裝包」進來：直接展開匯入那一段
   body.appendChild(imp);
   draw(b.job, b.log_tail, b.running);
   // 進行中每 3 秒只換掉狀態與記錄的文字，不重畫整個視窗
@@ -6234,6 +6240,8 @@ async function refresh() {
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
     // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
     // 執行、Agent、畫圖、影片也一樣：有選到一半的設定、進行中的載入進度或任務，各自只更新自己那一塊
+    // 剛登入的第一次一定整頁畫：使用者登入後直接落在對話頁，下面那條只換導覽列，頁面會一片空白
+    if (S.firstPaint) { S.firstPaint = false; render(); return; }
     if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
       renderNav();
       S.live?.();                // 有登記局部更新的頁（執行頁的狀態列）只換那一塊
@@ -6247,16 +6255,71 @@ async function refresh() {
 async function start() {
   $("#login").hidden = true;
   $("#app").hidden = false;
+  $("#upd-top").hidden = true;          // 換帳號登入（管理員登出、使用者登入）不能留著上一位的更新按鈕
   try { S.me = await api("/api/me"); } catch (_) { return; }
   if (S.me.must_change) { viewForcePassword(); return; }
   if (!isAdmin() && !USER_NAV.some(([k]) => k === topOf(S.view))) S.view = "chat";
   checkTlsBanner();
+  checkUpdateNotice();
+  S.firstPaint = true;
   refresh();
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!S.busy.size) refresh(); }, 15000);
 }
 
 loadBranding();
+
+/* ---- 有新版要通知（只有管理員）：主控台啟動時與每天問一次GitHub；頂列出現「更新到vX」，
+   每個版本第一次出現時跳一次彈窗列更新內容：跳過這個版本（記在主控台）／稍後／立即更新 */
+const UPD_SEEN_KEY = "xconsole-update-seen";
+async function checkUpdateNotice() {
+  const b = $("#upd-top");
+  if (!b) return;
+  if (!isAdmin()) { b.hidden = true; return; }
+  let n;
+  try { n = await api("/api/update/notice"); } catch (_) { return; }
+  // 主控台剛啟動、還沒問過 GitHub（啟動後約 30 秒才問）：一分鐘後再看一次，不用等下一輪
+  if (!n.checked) { clearTimeout(S.updRetry); S.updRetry = setTimeout(checkUpdateNotice, 60000); }
+  b.hidden = !n.show;
+  if (!n.show) return;
+  b.textContent = `更新到v${n.latest}`;
+  b.onclick = () => updateNoticeModal(n);
+  let seen = "";
+  try { seen = localStorage.getItem(UPD_SEEN_KEY) || ""; } catch (_) { /* 無痕：每次都跳也比漏掉好 */ }
+  if (seen !== n.latest) {
+    try { localStorage.setItem(UPD_SEEN_KEY, n.latest); } catch (_) { /* 無痕 */ }
+    updateNoticeModal(n);
+  }
+}
+if (!S.updTimer) S.updTimer = setInterval(() => { if (S.me && isAdmin()) checkUpdateNotice(); }, 6 * 3600 * 1000);
+
+function updateNoticeModal(n) {
+  const d = el("div");
+  d.appendChild(el("p", null, `有新版v${n.latest}（目前v${n.current}）${n.published ? "，" + new Date(n.published).toLocaleDateString(uiLocale()) + " 發布" : ""}。`));
+  if (n.notes) {
+    d.appendChild(el("h4", "pick-h", "更新內容"));
+    const pre = el("pre", "code-pre small upd-notes");
+    pre.textContent = n.notes;
+    d.appendChild(pre);
+  }
+  d.appendChild(el("p", "small muted", n.desktop ? "立即更新會下載新版安裝檔、核對sha256後打開它。"
+    : "立即更新會先備份目前的檔、核對sha256，換上新版後主控台重新啟動（大約十幾秒）。正在跑的模型不受影響。"));
+  const ov = modal({ title: `有新版v${n.latest}`, bodyNode: d });
+  const actions = ov.querySelector(".actions");
+  actions.textContent = "";
+  const skip = el("button", "btn", "跳過這個版本");
+  skip.onclick = async () => {
+    ov.remove();
+    try { await api("/api/update/skip", { method: "POST", body: { version: n.latest } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    $("#upd-top").hidden = true;
+    toast(`已跳過v${n.latest}；之後有更新的版本會再通知，或到「設定 › 版本與更新」手動檢查`, "ok");
+  };
+  const later = el("button", "btn", "稍後");
+  later.onclick = () => ov.remove();
+  const now = el("button", "btn primary", "立即更新");
+  now.onclick = () => { ov.remove(); S.updateNow = n.latest; S.settingsTab = "update"; go("settings"); };
+  actions.append(skip, el("span", "spacer"), later, now);
+}
 
 // 手動按重新整理：執行與模型頁沒有打到一半的字，直接重畫整頁拿最新狀態；其他頁照自動更新的規則
 $("#refresh").addEventListener("click", async () => {
