@@ -33,6 +33,12 @@ SETTINGS = {
 OPENAI_STD = ("temperature", "top_p", "presence_penalty", "max_tokens", "seed")
 
 
+TOOL_KINDS = ("file_write", "command")
+CATEGORY_MAX = 40
+TAG_MAX = 30
+TAGS_MAX = 10
+
+
 class Bad(ValueError):
     pass
 
@@ -82,6 +88,11 @@ def clean_settings(st):
         out["system"] = sysp
     if st.get("tools") is True:
         out["tools"] = True
+    if isinstance(st.get("think"), bool):
+        out["think"] = st["think"]            # 對話頁的「思考：開／關」；沒有這個鍵＝照模型預設
+    if isinstance(st.get("tool_allow"), list):
+        # 「本次對話不再詢問同類操作」勾過的類別（寫檔、執行指令）
+        out["tool_allow"] = sorted({x for x in st["tool_allow"] if x in TOOL_KINDS})
     return out
 
 
@@ -273,7 +284,67 @@ def load(store, unseal, user, cid):
     if not row:
         return 404, {"error": "沒有這則對話"}
     doc = json.loads(unseal(row["body"])) if row["body"] else {"msgs": []}
-    return 200, {k: row[k] for k in ("id", "target", "created", "updated")} | {"title": open_title(unseal, row["title"])} | doc
+    return 200, {k: row[k] for k in ("id", "target", "created", "updated")} | {"title": open_title(unseal, row["title"]),
+                                                                            "fav": bool(row.get("fav"))} | open_labels(unseal, row.get("labels")) | doc
+
+
+def open_labels(unseal, t):
+    """{"category": 文字, "tags": [文字…]}；讀不到就當沒有。"""
+    if t and t.startswith("enc:v1:"):
+        try:
+            d = json.loads(unseal(t))
+            return {"category": str(d.get("category") or ""), "tags": [str(x) for x in d.get("tags") or []]}
+        except Exception:  # noqa: BLE001
+            pass
+    return {"category": "", "tags": []}
+
+
+def clean_labels(body):
+    """回 (分類, 標籤清單)；沒給的回 None。格式不對丟 Bad。"""
+    cat = tags = None
+    if "category" in body:
+        cat = _s(body.get("category") or "", 200, "分類").strip()
+        if len(cat) > CATEGORY_MAX:
+            raise Bad(f"分類最多 {CATEGORY_MAX} 字")
+    if "tags" in body:
+        raw = body.get("tags") or []
+        if not isinstance(raw, list) or len(raw) > TAGS_MAX:
+            raise Bad(f"標籤最多 {TAGS_MAX} 個")
+        tags = []
+        for x in raw:
+            x = _s(x, 200, "標籤")
+            x = (x or "").strip().lstrip("#")
+            if len(x) > TAG_MAX:
+                raise Bad(f"每個標籤最多 {TAG_MAX} 字")
+            if x and x not in tags:
+                tags.append(x)
+    return cat, tags
+
+
+def meta(store, seal, unseal, user, cid, body):
+    """改一則對話的收藏、分類、標籤。回 (碼, 結果)。"""
+    if not isinstance(cid, str) or not CHAT_ID_RX.fullmatch(cid):
+        return 404, {"error": "沒有這則對話"}
+    row = store.chat_get(user, cid)
+    if not row:
+        return 404, {"error": "沒有這則對話"}
+    fav = body.get("fav")
+    if fav is not None and not isinstance(fav, bool):
+        return 400, {"error": "收藏要是 true 或 false"}
+    try:
+        cat, tags = clean_labels(body)
+    except Bad as exc:
+        return 400, {"error": str(exc)}
+    lab = open_labels(unseal, row.get("labels"))
+    if cat is not None:
+        lab["category"] = cat
+    if tags is not None:
+        lab["tags"] = tags
+    sealed = None
+    if cat is not None or tags is not None:
+        sealed = seal(json.dumps(lab, ensure_ascii=False).encode()) if (lab["category"] or lab["tags"]) else ""
+    store.chat_meta(user, cid, fav=fav, labels=sealed)
+    return 200, {"id": cid, "fav": bool(row.get("fav")) if fav is None else fav, **lab}
 
 
 def open_title(unseal, t):
@@ -300,8 +371,10 @@ def listing(store, unseal, user, q=""):
     for r in rows:
         item = {k: r[k] for k in ("id", "target", "n_msgs", "created", "updated")}
         item["title"] = open_title(unseal, r["title"])
+        item["fav"] = bool(r.get("fav"))
+        item.update(open_labels(unseal, r.get("labels")))
         if q:
-            hit = q in item["title"].lower()
+            hit = q in item["title"].lower() or q in item["category"].lower() or any(q in t.lower() for t in item["tags"])
             snip = None
             if r.get("body"):
                 try:

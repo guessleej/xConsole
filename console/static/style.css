@@ -1272,7 +1272,11 @@ input.switch:checked::after { transform: translateX(18px); }
 .plan-item.done { color: var(--ink-3); text-decoration: line-through; }
 .plan-item.done::before { background: var(--ok); }
 .plan-item.in_progress { font-weight: 700; }
-.plan-item.in_progress::before { background: var(--brand); }
+.plan-item.in_progress::before { background: transparent; border: 2px solid var(--brand); border-right-color: transparent; width: 8px; height: 8px; animation: spin 1s linear infinite; }
+.plan-item.stopped { color: var(--ink-2); }
+.plan-item.stopped::before { background: var(--warn); }
+.plan-count { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .file-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .agent-tree { max-height: 260px; overflow: auto; background: var(--panel); padding: 8px; border-radius: 8px; white-space: pre; }
 .prov-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }

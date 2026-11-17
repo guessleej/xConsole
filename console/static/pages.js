@@ -985,7 +985,21 @@ async function viewAgent() {
   linkF.title = "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選";
   linkF.onclick = () => openFolderBrowser(n, (name) => { S.agentFolder = name; viewAgent(); });
   const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}）`])], S.agentTask || "");
-  bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel);
+  const delT = el("button", "btn sm danger", "刪除任務");
+  const curTask = tasks.find((t) => t.id === S.agentTask);
+  delT.hidden = !curTask || curTask.user !== S.me?.user || ["running", "waiting_approval"].includes(curTask.state);
+  delT.title = "刪除這個任務的計畫與步驟紀錄；工作資料夾裡的檔案不會動";
+  delT.onclick = () => modal({
+    title: "刪除這個任務", danger: true, confirmText: "刪除", hasInput: false,
+    bodyNode: el("p", "small", "任務的計畫、步驟紀錄與改動清單會一起刪除，刪了就找不回來；工作資料夾裡的檔案不會動。"),
+    onConfirm: async () => {
+      try { await api(`/api/agent/tasks/${S.agentTask}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
+      toast("已刪除任務", "ok");
+      S.agentTask = "";
+      viewAgent();
+    },
+  });
+  bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel, delT);
   mainC.appendChild(bar);
   mSel.onchange = () => { S.agentModel = mSel.value; };
   fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(); };
@@ -1025,23 +1039,49 @@ async function viewAgent() {
   const planBox = el("div");
   const filesBox = el("div");
   const treeBox = el("div");
-  side.append(el("h4", "pick-h", "計畫"), planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
+  const planCount = el("span", "plan-count");
+  const planH = el("h4", "pick-h", "計畫");
+  planH.appendChild(planCount);
+  side.append(planH, planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
+  // 輪詢每 1.5 秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播
+  const seen = { files: null, tree: null };
+  const drawPlan = (plan) => {
+    const done = plan.filter((x) => x.status === "done").length;
+    const cnt = plan.length ? `${done}/${plan.length}` : "";
+    if (planCount.textContent !== cnt) planCount.textContent = cnt;
+    if (!plan.length) {
+      if (!planBox.querySelector("p")) { planBox.textContent = ""; planBox.appendChild(el("p", "small muted", "Agent 開始做事後，計畫會顯示在這裡")); }
+      return;
+    }
+    planBox.querySelector("p")?.remove();
+    const rows = [...planBox.children];
+    plan.forEach((x, i) => {
+      const cls = "plan-item " + (x.status || "");
+      let r = rows[i];
+      if (!r) { r = el("div", cls, x.text); planBox.appendChild(r); return; }
+      if (r.className !== cls) r.className = cls;
+      if (r.textContent !== x.text) r.textContent = x.text;
+    });
+    rows.slice(plan.length).forEach((r) => r.remove());
+  };
   const drawSide = (t) => {
-    planBox.textContent = "";
-    filesBox.textContent = "";
-    treeBox.textContent = "";
-    const plan = t?.plan || [];
-    if (!plan.length) planBox.appendChild(el("p", "small muted", "Agent 開始做事後，計畫會顯示在這裡"));
-    plan.forEach((x) => planBox.appendChild(el("div", "plan-item " + (x.status || ""), x.text)));
+    drawPlan(t?.plan || []);
     const files = t?.files || [];
+    const fi = (folders.folders || []).find((f) => f.name === fSel.value);
+    const fk = JSON.stringify(files);
+    const tk = JSON.stringify([t?.tree || [], fSel.value, fi?.path]);
+    if (seen.files !== fk) { seen.files = fk; filesBox.textContent = ""; drawFiles(files); }
+    if (seen.tree !== tk) { seen.tree = tk; treeBox.textContent = ""; drawTree(t?.tree || [], fi); }
+  };
+  const drawFiles = (files) => {
     if (!files.length) filesBox.appendChild(el("p", "small muted", "還沒有改動"));
     files.forEach((f) => {
       const r = el("div", "file-row");
       r.append(el("span", "chip " + (f.action === "created" ? "ok" : "warn"), f.action === "created" ? "新建" : "修改"), el("span", "mono small", f.path));
       filesBox.appendChild(r);
     });
-    const tree = t?.tree || [];
-    const fi = (folders.folders || []).find((f) => f.name === fSel.value);
+  };
+  const drawTree = (tree, fi) => {
     treeBox.appendChild(el("p", "small muted", !fSel.value ? "還沒選資料夾" : fi?.linked ? fi.path : `~/xconsole-agent/${fSel.value}`));
     if (fi?.linked) {
       const un = el("button", "link-btn", "取消連結（資料夾本身不動）");
@@ -1084,6 +1124,7 @@ async function viewAgent() {
     const live = t.state === "running" || t.state === "waiting_approval";
     stopB.hidden = !live;
     send.disabled = live;
+    delT.hidden = live || t.user !== S.me?.user;
   };
 
   const watch = async (id) => {
@@ -1152,7 +1193,7 @@ async function viewAgent() {
   if (S.agentTask && tasks.some((t) => t.id === S.agentTask)) watch(S.agentTask); else { empty(); drawSide(null); }
 }
 
-const TASK_STATE = { running: "進行中", waiting_approval: "等你允許", done: "完成", failed: "失敗", stopped: "已停止" };
+const TASK_STATE = { running: "進行中", waiting_approval: "等你允許", done: "完成", failed: "失敗", stopped: "已停止", interrupted: "已中斷" };
 const fmtBytes = (b) => b >= 1048576 ? `${fmt(b / 1048576)} MB` : b >= 1024 ? `${fmt(b / 1024, 0)} KB` : `${b} B`;
 const TOOL_ZH = { list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", run_command: "執行指令", update_plan: "更新計畫", finish: "完成" };
 

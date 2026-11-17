@@ -166,7 +166,8 @@ def main():
     check("按允許之後做完（done）", t["state"] == "done", t.get("error"))
     files = {f["path"]: f["action"] for f in t["files"]}
     check("  改動的檔案：write_file 建的與指令產生的都列為新建", files.get("index.html") == "created" and files.get("out.txt") == "created", files)
-    check("  計畫照 update_plan", [p["text"] for p in t["plan"]] == ["寫首頁", "產生說明檔"] and t["plan"][0]["status"] == "in_progress", t["plan"])
+    check("  計畫照 update_plan", [p["text"] for p in t["plan"]] == ["寫首頁", "產生說明檔"], t["plan"])
+    check("  做完時計畫裡還在進行中的收成完成，沒開始的不動", [p["status"] for p in t["plan"]] == ["done", "pending"], t["plan"])
     check("  log 有 text、tool、result 三種", {e["type"] for e in t["log"]} >= {"text", "tool", "result"}, {e["type"] for e in t["log"]})
     check("  tree 是資料夾的檔案清單", {r["path"] for r in t["tree"]} >= {"index.html", "out.txt"}, t["tree"])
     check("  總結取自 finish", t["summary"] == "首頁做好了，也產生了 out.txt")
@@ -234,6 +235,8 @@ def main():
     req("POST", f"/api/agent/tasks/{tid}/stop", {})
     t = wait(tid, ("stopped", "failed", "done"))
     check("等核准時按停止 → stopped", t["state"] == "stopped" and t["pending"] is None, t["state"])
+    st, out = req("POST", f"/api/agent/tasks/{tid}/delete", {})
+    check("停止後可以刪除", st == 200 and req("GET", f"/api/agent/tasks/{tid}")[0] == 404, out)
     if os.name != "nt":
         SCRIPT[:] = [say("", call("run_command", command="sleep 120", timeout=300))]
         st, t = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "睡很久"})
@@ -272,6 +275,52 @@ def main():
     check("右側面板可以經主控台讀檔（唯讀）", st == 200 and out["content"] == "本機模型寫的", out)
     st, out = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": {"kind": "x"}, "prompt": "x"})
     check("模型格式不對 → 400", st == 400)
+
+    # ---- 9. 落地：主控台重啟後列得出來；進行中的標成已中斷、計畫收掉
+    SCRIPT[:] = [say("", call("update_plan", steps=[{"text": "第一步", "status": "done"}, {"text": "第二步", "status": "in_progress"}]),
+                     call("run_command", command="echo later"))]
+    st, live = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "重啟前還在做"})
+    live = wait(live["id"], ("waiting_approval",))
+    st, out = req("POST", f"/api/agent/tasks/{live['id']}/delete", {})
+    check("進行中的任務不能刪（要先停）", st == 409 and "停止" in out.get("error", ""), out)
+    rows = x.STORE.agent_task_rows()
+    check("任務存進主控台資料庫，內容是 enc:v1: 密文", rows and all(r["body"].startswith("enc:v1:") for r in rows)
+          and not any("重啟前還在做" in r["body"] for r in rows), len(rows))
+    raw = b"".join(open(p, "rb").read() for p in (x.STORE.path, x.STORE.path + "-wal") if os.path.exists(p))
+    check("  資料庫檔裡找不到交代的事的明文", "重啟前還在做".encode() not in raw)
+    done_id = t["id"]
+    with x._AGENT_LOCK:
+        x.AGENT_TASKS.clear()                    # 模擬主控台重啟：記憶體清空、背景執行緒當作不在了
+    n = x.agent_tasks_load()
+    check("重啟後讀回所有任務", n == len(rows) and done_id in x.AGENT_TASKS, (n, len(rows)))
+    st, back = req("GET", f"/api/agent/tasks/{live['id']}")
+    check("  上次進行中的標成「已中斷」並說明", back.get("state") == "interrupted" and "中斷" in (back.get("error") or "")
+          and back.get("pending") is None, back.get("state"))
+    check("  計畫裡進行中的收成沒做完，已完成的不動", [p["status"] for p in back["plan"]] == ["done", "stopped"], back.get("plan"))
+    st, back2 = req("GET", f"/api/agent/tasks/{done_id}")
+    check("  完成的任務內容（紀錄、改動的檔案）都在", back2.get("state") == "done" and back2.get("log") and back2.get("files"), back2.get("state"))
+    st, lst = req("GET", "/api/agent/tasks")
+    check("  任務清單列得出來", any(i["id"] == live["id"] for i in lst["items"]))
+    live_t = x.AGENT_TASKS[live["id"]]
+    live_t.event.set()                           # 舊的背景執行緒醒來：已經不是進行中，不會再動它
+    SCRIPT[:] = [say("", call("finish", summary="好"))]
+    st, nxt = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "重啟後的新任務"})
+    check("  已中斷的任務不佔「一次一件」的位子", st == 200, nxt)
+    if st == 200:
+        wait(nxt["id"], ("done", "failed"))
+
+    # ---- 10. 刪除：只能刪自己的，連紀錄一起清
+    st, out = req("POST", f"/api/agent/tasks/{live['id']}/delete", {})
+    check("刪除自己的任務", st == 200 and out.get("ok"), out)
+    check("  資料庫裡那一列也刪了", all(r["id"] != live["id"] for r in x.STORE.agent_task_rows()))
+    check("  再讀回 404", req("GET", f"/api/agent/tasks/{live['id']}")[0] == 404)
+    x.AGENT_TASKS[done_id].user = "bob"
+    st, out = req("POST", f"/api/agent/tasks/{done_id}/delete", {})
+    check("管理員看得到別人的任務但不能刪", st == 403, out)
+    x.AGENT_TASKS[done_id].user = "admin"
+    st, au = req("GET", "/api/admin/audit?limit=300")
+    check("刪除寫稽核", any(a["action"] == "agent.task_delete" and a["ok"] for a in au["items"]))
+    check("使用者也能呼叫刪除（路由開放給使用者）", x.user_may("POST", f"/api/agent/tasks/{done_id}/delete"))
 
     srv.shutdown()
     fake.shutdown()
