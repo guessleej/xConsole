@@ -160,6 +160,8 @@ def main():
     check("  載入中顯示 llama-server 最後一行記錄", "r.last_line" in pages and "load-last" in pages)
     check("頂列有「更新到 vX」按鈕（預設藏起來，只有管理員會打開）", 'id="upd-top"' in html and re.search(r'id="upd-top"[^>]*hidden', html)
           and "if (!isAdmin()) { b.hidden = true; return; }" in app)
+    st_ = fn_body(app, "async function start(")
+    check("  換帳號登入時先把更新按鈕藏起來（不留著上一位管理員的）", st_.index('$("#upd-top").hidden = true') < st_.index("api(\"/api/me\")"))
     um = fn_body(app, "function updateNoticeModal(")
     check("  彈窗三個按鈕：跳過這個版本／稍後／立即更新", all(k in um for k in ('"跳過這個版本"', '"稍後"', '"立即更新"')))
     check("Agent 頁：任務可以刪除、計畫顯示 N/M、轉圈不重播（只改有變的那幾列）",

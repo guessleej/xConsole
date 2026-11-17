@@ -6240,6 +6240,8 @@ async function refresh() {
     // 設定頁與記錄頁有表單或捲到一半的內容，自動更新時不重畫，否則選好的檔案、打到一半的密碼會蒸發
     // API 串接頁也一樣：有表單、有實測結果、剛產生的金鑰提示
     // 執行、Agent、畫圖、影片也一樣：有選到一半的設定、進行中的載入進度或任務，各自只更新自己那一塊
+    // 剛登入的第一次一定整頁畫：使用者登入後直接落在對話頁，下面那條只換導覽列，頁面會一片空白
+    if (S.firstPaint) { S.firstPaint = false; render(); return; }
     if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
       renderNav();
       S.live?.();                // 有登記局部更新的頁（執行頁的狀態列）只換那一塊
@@ -6253,11 +6255,13 @@ async function refresh() {
 async function start() {
   $("#login").hidden = true;
   $("#app").hidden = false;
+  $("#upd-top").hidden = true;          // 換帳號登入（管理員登出、使用者登入）不能留著上一位的更新按鈕
   try { S.me = await api("/api/me"); } catch (_) { return; }
   if (S.me.must_change) { viewForcePassword(); return; }
   if (!isAdmin() && !USER_NAV.some(([k]) => k === topOf(S.view))) S.view = "chat";
   checkTlsBanner();
   checkUpdateNotice();
+  S.firstPaint = true;
   refresh();
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!S.busy.size) refresh(); }, 15000);
@@ -6274,6 +6278,8 @@ async function checkUpdateNotice() {
   if (!isAdmin()) { b.hidden = true; return; }
   let n;
   try { n = await api("/api/update/notice"); } catch (_) { return; }
+  // 主控台剛啟動、還沒問過 GitHub（啟動後約 30 秒才問）：一分鐘後再看一次，不用等下一輪
+  if (!n.checked) { clearTimeout(S.updRetry); S.updRetry = setTimeout(checkUpdateNotice, 60000); }
   b.hidden = !n.show;
   if (!n.show) return;
   b.textContent = `更新到v${n.latest}`;

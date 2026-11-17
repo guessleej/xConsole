@@ -23213,5 +23213,80 @@
 "en": "\\1[masked]",
 "ja": "\\1[マスク済み]",
 "ko": "\\1[가려짐]"
+},
+"對話打開「工具」時，模型可以用這裡設定的搜尋服務找資料；沒設定就沒有聯網搜尋（讀網頁不受影響）": {
+"en": "When Tools is on in a chat, the model can search with the service set here; without it there is no web search (reading web pages still works)",
+"ja": "チャットで「ツール」をオンにすると、モデルはここで設定した検索サービスで調べられます。未設定なら Web 検索はありません（Web ページの閲覧は使えます）",
+"ko": "대화에서 도구를 켜면 모델이 여기서 설정한 검색 서비스로 자료를 찾을 수 있습니다. 설정하지 않으면 웹 검색은 없습니다(웹 페이지 읽기는 그대로 됩니다)"
+},
+"例：https://searx.example.com/search?q={q}&format=json": {
+"en": "e.g. https://searx.example.com/search?q={q}&format=json",
+"ja": "例：https://searx.example.com/search?q={q}&format=json",
+"ko": "예: https://searx.example.com/search?q={q}&format=json"
+},
+"已設定（留空＝不變）": {
+"en": "Set (leave blank to keep)",
+"ja": "設定済み（空欄＝変更なし）",
+"ko": "설정됨(비워 두면 그대로)"
+},
+"搜尋端點": {
+"en": "Search endpoint",
+"ja": "検索エンドポイント",
+"ko": "검색 엔드포인트"
+},
+"SearXNG相容、回JSON的網址，{q}會換成搜尋字；常見做法是在內網架一台SearXNG": {
+"en": "A SearXNG-compatible URL that returns JSON; {q} is replaced with the query. A common setup is a SearXNG server on the intranet",
+"ja": "SearXNG 互換で JSON を返す URL。{q} は検索語に置き換わります。社内ネットワークに SearXNG を立てるのが一般的です",
+"ko": "JSON을 반환하는 SearXNG 호환 URL이며 {q}는 검색어로 바뀝니다. 내부망에 SearXNG를 하나 두는 방식이 흔합니다"
+},
+"金鑰標頭": {
+"en": "Key header",
+"ja": "キーのヘッダー",
+"ko": "키 헤더"
+},
+"送金鑰用的標頭名稱；Authorization會加上Bearer": {
+"en": "Header name used to send the key; Authorization gets a Bearer prefix",
+"ja": "キーを送るヘッダー名。Authorization の場合は Bearer を付けます",
+"ko": "키를 보낼 헤더 이름. Authorization이면 Bearer를 붙입니다"
+},
+"搜尋服務要金鑰才填；加密存在主控台": {
+"en": "Only if the search service needs a key; stored encrypted in the console",
+"ja": "検索サービスがキーを必要とする場合のみ。コンソールに暗号化して保存します",
+"ko": "검색 서비스에 키가 필요할 때만 입력. 콘솔에 암호화해 저장합니다"
+},
+"測試搜尋": {
+"en": "Test search",
+"ja": "検索をテスト",
+"ko": "검색 테스트"
+},
+"清除金鑰": {
+"en": "Clear key",
+"ja": "キーを消去",
+"ko": "키 지우기"
+},
+"已儲存；對話的工具會多出聯網搜尋": {
+"en": "Saved; chat tools now include web search",
+"ja": "保存しました。チャットのツールに Web 検索が加わります",
+"ko": "저장했습니다. 대화 도구에 웹 검색이 추가됩니다"
+},
+"已清除搜尋端點": {
+"en": "Search endpoint cleared",
+"ja": "検索エンドポイントを消去しました",
+"ko": "검색 엔드포인트를 지웠습니다"
+},
+"已清除金鑰": {
+"en": "Key cleared",
+"ja": "キーを消去しました",
+"ko": "키를 지웠습니다"
+},
+"搜尋成功，找到{0}筆：": {
+"en": "Search works; {0} results:",
+"ja": "検索に成功しました。{0} 件：",
+"ko": "검색 성공, {0}건:"
+},
+"搜尋成功，找到": {
+"en": "Search works; results:",
+"ja": "検索に成功しました。件数：",
+"ko": "검색 성공, 결과:"
 }
 }

@@ -1335,6 +1335,7 @@ input.switch:checked::after { transform: translateX(18px); }
 .chat-sum summary { cursor: pointer; }
 .chat-sum > div { white-space: pre-wrap; margin-top: 6px; max-height: 220px; overflow-y: auto; }
 .btn.toggle[aria-pressed="true"] { background: var(--brand); color: #fff; }
+:root[data-theme="dark"] .btn.toggle[aria-pressed="true"] { background: var(--brand); color: #fff; }   /* 深色的一般按鈕底色規則比較強，按下的開關要蓋回來 */
 .btn.toggle:disabled { opacity: .45; cursor: not-allowed; }
 .msg-acts { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
 .link-btn { border: 0; background: none; color: var(--ink-3); font: inherit; font-size: 14px; padding: 3px 6px; border-radius: 6px; cursor: pointer; text-decoration: none; }

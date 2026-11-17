@@ -8084,6 +8084,74 @@
 "pattern": false
 },
 {
+"zh": "聯網搜尋",
+"pattern": false
+},
+{
+"zh": "對話打開「工具」時，模型可以用這裡設定的搜尋服務找資料；沒設定就沒有聯網搜尋（讀網頁不受影響）",
+"pattern": false
+},
+{
+"zh": "例：https://searx.example.com/search?q={q}&format=json",
+"pattern": false
+},
+{
+"zh": "已設定（留空＝不變）",
+"pattern": false
+},
+{
+"zh": "搜尋端點",
+"pattern": false
+},
+{
+"zh": "SearXNG相容、回JSON的網址，{q}會換成搜尋字；常見做法是在內網架一台SearXNG",
+"pattern": false
+},
+{
+"zh": "金鑰標頭",
+"pattern": false
+},
+{
+"zh": "送金鑰用的標頭名稱；Authorization會加上Bearer",
+"pattern": false
+},
+{
+"zh": "搜尋服務要金鑰才填；加密存在主控台",
+"pattern": false
+},
+{
+"zh": "測試搜尋",
+"pattern": false
+},
+{
+"zh": "清除金鑰",
+"pattern": false
+},
+{
+"zh": "已儲存；對話的工具會多出聯網搜尋",
+"pattern": false
+},
+{
+"zh": "已清除搜尋端點",
+"pattern": false
+},
+{
+"zh": "已清除金鑰",
+"pattern": false
+},
+{
+"zh": "搜尋成功，找到{0}筆：",
+"pattern": true
+},
+{
+"zh": "搜尋成功，找到",
+"pattern": false
+},
+{
+"zh": "筆",
+"pattern": false
+},
+{
 "zh": "執行日誌",
 "pattern": false
 },
@@ -8621,10 +8689,6 @@
 },
 {
 "zh": "讀網頁",
-"pattern": false
-},
-{
-"zh": "聯網搜尋",
 "pattern": false
 },
 {
@@ -10493,10 +10557,6 @@
 },
 {
 "zh": "最多",
-"pattern": false
-},
-{
-"zh": "筆",
 "pattern": false
 },
 {

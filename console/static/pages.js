@@ -737,6 +737,56 @@ function progressCard(m) {
   };
 }
 
+/* 聯網搜尋端點：對話「工具」裡的 web_search 用。沒設就不給模型這個工具；網址明文、金鑰加密落地，畫面只看得到「已設定」 */
+async function settingsSearch(wrap) {
+  const c = card("聯網搜尋", "對話打開「工具」時，模型可以用這裡設定的搜尋服務找資料；沒設定就沒有聯網搜尋（讀網頁不受影響）");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  loading(body);
+  let cfg;
+  try { cfg = await api("/api/settings/search"); } catch (ex) { errNote(body, ex.message); return; }
+  body.textContent = "";
+  const fUrl = textInput(cfg.url, "例：https://searx.example.com/search?q={q}&format=json");
+  const fHdr = textInput(cfg.header || "Authorization", "Authorization");
+  const fKey = el("input");
+  fKey.type = "password";
+  fKey.autocomplete = "off";
+  fKey.placeholder = cfg.key_set ? "已設定（留空＝不變）" : "選填";
+  const row = el("div", "form-row");
+  row.append(fieldBox("搜尋端點", fUrl, "SearXNG相容、回JSON的網址，{q}會換成搜尋字；常見做法是在內網架一台SearXNG"),
+    fieldBox("金鑰標頭", fHdr, "送金鑰用的標頭名稱；Authorization會加上Bearer"), fieldBox("金鑰", fKey, "搜尋服務要金鑰才填；加密存在主控台"));
+  const msg = el("div");
+  const acts = el("div", "slot-actions");
+  const save = el("button", "btn sm primary", "儲存");
+  const test = el("button", "btn sm", "測試搜尋");
+  const clearK = el("button", "btn sm", "清除金鑰");
+  clearK.hidden = !cfg.key_set;
+  acts.append(save, test, clearK);
+  body.append(row, acts, msg);
+  const put = async (extra) => {
+    msg.textContent = "";
+    try {
+      cfg = await api("/api/settings/search", { method: "POST", body: { url: fUrl.value.trim(), header: fHdr.value.trim(), ...extra } });
+    } catch (ex) { errNote(msg, ex.message); return false; }
+    fKey.value = "";
+    fKey.placeholder = cfg.key_set ? "已設定（留空＝不變）" : "選填";
+    clearK.hidden = !cfg.key_set;
+    return true;
+  };
+  save.onclick = async () => { if (await put(fKey.value.trim() ? { key: fKey.value.trim() } : {})) toast(fUrl.value.trim() ? "已儲存；對話的工具會多出聯網搜尋" : "已清除搜尋端點", "ok"); };
+  clearK.onclick = async () => { if (await put({ clear_key: true })) toast("已清除金鑰", "ok"); };
+  test.onclick = async () => {
+    msg.textContent = "";
+    loading(msg);
+    let r;
+    try { r = await api("/api/settings/search/test", { method: "POST", body: { q: "xConsole" } }); } catch (ex) { msg.textContent = ""; errNote(msg, ex.message); return; }
+    msg.textContent = "";
+    msg.appendChild(el("p", "note ok", `搜尋成功，找到${r.results.length}筆：`));
+    r.results.slice(0, 3).forEach((x) => msg.appendChild(el("p", "small", `${x.title}　${x.url}`)));
+  };
+}
+
 /* 執行日誌：展開時每3秒讀一次這個欄位的記錄，只把新增的那幾行接在後面（不清空重畫、不跳捲軸）；
    使用者往上捲在看舊的就不拉回底部。收起來就不讀。 */
 const RUN_LOG_MAX = 600;
@@ -1357,6 +1407,7 @@ function settingsEngine(wrap) {
 }
 
 async function settingsProviders(wrap) {
+  settingsSearch(wrap);
   const c = card("第三方 API", "本機模型放不下、或要用更強的模型時，接 OpenAI 相容的雲端服務；對話與 Agent 可以在頂部切換本機或這些服務");
   wrap.appendChild(c);
   const head = c.querySelector(".card-head");
