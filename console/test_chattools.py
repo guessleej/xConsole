@@ -157,6 +157,10 @@ def main():
         check("  轉址到雲端中繼資料位址：重新檢查並擋下", "169.254" in str(exc), str(exc))
     check("搜尋端點格式：要有 {q}", chattools.search_config_ok("https://s.example/search?q={q}&format=json")
           and not chattools.search_config_ok("https://s.example/search") and not chattools.search_config_ok("file:///x?{q}"))
+    check("  {q}放在主機或路徑不收（搜尋字不能決定連到哪裡）", not chattools.search_config_ok("https://{q}.example/search?x=1")
+          and not chattools.search_config_ok("https://s.example/{q}?format=json") and not chattools.search_config_ok("https://s.example/s?q=a{q}"))
+    check("  組出來的網址：主機路徑固定、搜尋字編碼在查詢參數裡",
+          chattools.search_url("https://s.example/search?q={q}&format=json", "a&b=c 台灣") == "https://s.example/search?q=a%26b%3Dc+%E5%8F%B0%E7%81%A3&format=json")
 
     admin = Client()
     admin.req("POST", "/api/login", {"username": "admin", "password": "tools-test-pw-1"})

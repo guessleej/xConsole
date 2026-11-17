@@ -181,12 +181,22 @@ def fetch(url, timeout=15, allow=ip_ok):
 
 # ---------------------------------------------------------------- 聯網搜尋
 def search_config_ok(url):
-    """搜尋端點：https://或http://的網址，裡面要有{q}（換成搜尋字）。"""
+    """搜尋端點：https://或http://的網址，{q}只能是查詢字串裡某個參數的值（例：?q={q}&format=json）。
+    {q}放在主機或路徑會讓搜尋字決定連到哪裡，一律不收。"""
     try:
         u = urllib.parse.urlsplit(url)
     except ValueError:
         return False
-    return u.scheme in ("http", "https") and bool(u.hostname) and "{q}" in url and len(url) <= 500 and not u.username
+    return (u.scheme in ("http", "https") and bool(u.hostname) and len(url) <= 500 and not u.username and not u.password
+            and "{q}" not in u.netloc + u.path + u.fragment
+            and any(v == "{q}" for _, v in urllib.parse.parse_qsl(u.query, keep_blank_values=True)))
+
+
+def search_url(template, q):
+    """固定的「協定＋主機＋路徑」接上重新編碼的查詢字串：搜尋字只會出現在查詢參數裡。"""
+    u = urllib.parse.urlsplit(template)
+    pairs = [(k, q if v == "{q}" else v) for k, v in urllib.parse.parse_qsl(u.query, keep_blank_values=True)]
+    return urllib.parse.urlunsplit((u.scheme, u.netloc, u.path, "", "")) + "?" + urllib.parse.urlencode(pairs)
 
 
 def parse_results(d, limit=8):
@@ -209,7 +219,9 @@ def search(cfg, query, key="", timeout=20):
     q = str(query or "").strip()[:300]
     if not q:
         raise FetchError("搜尋字是空的")
-    url = cfg["url"].replace("{q}", urllib.parse.quote(q))
+    if not search_config_ok(cfg.get("url") or ""):
+        raise FetchError("搜尋端點設定不對")
+    url = search_url(cfg["url"], q)
     h = {"User-Agent": UA, "Accept": "application/json"}
     if key:
         hn = cfg.get("header") or "Authorization"

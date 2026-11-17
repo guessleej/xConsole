@@ -12136,6 +12136,10 @@
 "pattern": false
 },
 {
+"zh": "搜尋端點設定不對",
+"pattern": false
+},
+{
 "zh": "指向內網或本機位址（",
 "pattern": false
 },

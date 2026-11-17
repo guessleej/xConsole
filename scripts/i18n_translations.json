@@ -23288,5 +23288,10 @@
 "en": "Search works; results:",
 "ja": "検索に成功しました。件数：",
 "ko": "검색 성공, 결과:"
+},
+"搜尋端點設定不對": {
+"en": "The search endpoint setting is invalid",
+"ja": "検索エンドポイントの設定が正しくありません",
+"ko": "검색 엔드포인트 설정이 올바르지 않습니다"
 }
 }
