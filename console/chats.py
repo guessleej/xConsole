@@ -300,22 +300,22 @@ def open_labels(unseal, t):
 
 
 def clean_labels(body):
-    """回 (分類, 標籤清單)；沒給的回 None。格式不對丟 Bad。"""
+    """回 (分類, 標籤清單)；沒給的回None。格式不對丟Bad。"""
     cat = tags = None
     if "category" in body:
         cat = _s(body.get("category") or "", 200, "分類").strip()
         if len(cat) > CATEGORY_MAX:
-            raise Bad(f"分類最多 {CATEGORY_MAX} 字")
+            raise Bad(f"分類最多{CATEGORY_MAX}字")
     if "tags" in body:
         raw = body.get("tags") or []
         if not isinstance(raw, list) or len(raw) > TAGS_MAX:
-            raise Bad(f"標籤最多 {TAGS_MAX} 個")
+            raise Bad(f"標籤最多{TAGS_MAX}個")
         tags = []
         for x in raw:
             x = _s(x, 200, "標籤")
             x = (x or "").strip().lstrip("#")
             if len(x) > TAG_MAX:
-                raise Bad(f"每個標籤最多 {TAG_MAX} 字")
+                raise Bad(f"每個標籤最多{TAG_MAX}字")
             if x and x not in tags:
                 tags.append(x)
     return cat, tags
@@ -330,7 +330,7 @@ def meta(store, seal, unseal, user, cid, body):
         return 404, {"error": "沒有這則對話"}
     fav = body.get("fav")
     if fav is not None and not isinstance(fav, bool):
-        return 400, {"error": "收藏要是 true 或 false"}
+        return 400, {"error": "收藏要是true或false"}
     try:
         cat, tags = clean_labels(body)
     except Bad as exc:

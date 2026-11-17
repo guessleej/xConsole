@@ -1443,7 +1443,7 @@ def harvest_measurements(slot, reg):
 
 
 def slot_caps(slot):
-    """登錄檔記的能力；舊版換上的 llama.cpp 模型沒記「思考」，照設定檔指的模型檔頭補上（檔頭讀過就快取）。"""
+    """登錄檔記的能力；舊版換上的llama.cpp模型沒記「思考」，照設定檔指的模型檔頭補上（檔頭讀過就快取）。"""
     caps = list(slot.get("caps") or [])
     if slot.get("kind") == "llama" and slot.get("config") and "思考" not in caps:
         model = (load_json(slot["config"], None) or {}).get("model")
@@ -2871,7 +2871,7 @@ def gguf_profile(meta):
     return {"arch": arch, "meta_name": name, "ctx_train": _num(g("context_length", 0)) or None,
             "kv_full_bpt": full_b, "kv_swa_bpt": swa_b, "swa_window": swa if swa_b else 0,
             "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN),
-            # 對話樣板認得 enable_thinking：每次請求帶 chat_template_kwargs 就能開關思考，不必重新載入
+            # 對話樣板認得enable_thinking：每次請求帶chat_template_kwargs就能開關思考，不必重新載入
             "thinking": isinstance(tpl, str) and "enable_thinking" in tpl}
 
 
@@ -3470,7 +3470,8 @@ def llama_config(path):
             # 用硬碟執行（檔案映射）：沒放 GPU 的層，KV 在系統記憶體（admit 照這個比例分到兩個池）
             "kv_ram_frac": float(raw.get("kv_ram_frac") or 0) if raw.get("disk") else 0.0,
             "disk_mode": bool(raw.get("disk")),
-            "_native": raw.get("model"), "_pack": None, "engine": "llama"}
+            "_native": raw.get("model"), "_pack": None, "engine": "llama",
+            "thinking": raw.get("reasoning") or "auto"}     # 啟動時的思考模式：對話頁的「思考：開／關」預設照這個
 
 
 def llama_key(raw):
@@ -4580,7 +4581,7 @@ def chat_request(slot_id, body):
         req[k] = int(v) if typ is int else v
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
-    # 對話頁的「思考：開／關」：只收 enable_thinking 一個布林，其他樣板參數不讓網頁塞進來
+    # 對話頁的「思考：開／關」：只收enable_thinking一個布林，其他樣板參數不讓網頁塞進來
     ctk = body.get("chat_template_kwargs")
     if isinstance(ctk, dict) and isinstance(ctk.get("enable_thinking"), bool):
         req["chat_template_kwargs"] = {"enable_thinking": ctk["enable_thinking"]}

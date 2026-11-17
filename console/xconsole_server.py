@@ -822,7 +822,7 @@ def node_request(node_id, path, data, ctype="application/json"):
         "Authorization": f"Bearer {node_token(node)}", "Content-Type": ctype}), ctx
 
 
-# ---- 對話的「工具」：主控台查詢（管理員）、讀網頁、聯網搜尋（設了搜尋端點才有）、讀寫 Agent 工作資料夾、執行指令（管理員）。
+# ---- 對話的「工具」：主控台查詢（管理員）、讀網頁、聯網搜尋（設了搜尋端點才有）、讀寫Agent工作資料夾、執行指令（管理員）。
 # 會動到電腦的（寫檔、執行指令）一律先停下來問；使用者可以勾「本次對話不再詢問同類操作」（依類別記：file_write、command）。
 def _fn(name, desc, props=None, req=None):
     return {"type": "function", "function": {"name": name, "description": desc,
@@ -841,15 +841,15 @@ CONSOLE_TOOLS = {t["function"]["name"] for t in ASSIST_TOOLS}
 EXTRA_TOOLS = {
     "read_web_page": (_fn("read_web_page", "讀一個公開網頁的文字內容（只能讀網際網路上的網頁，內網與本機位址不行）",
                           {"url": {"type": "string"}}, ["url"]), None),
-    "web_search": (_fn("web_search", "用搜尋引擎找資料，回標題、網址與摘要；要細看再用 read_web_page 讀那一頁",
+    "web_search": (_fn("web_search", "用搜尋引擎找資料，回標題、網址與摘要；要細看再用read_web_page讀那一頁",
                        {"query": {"type": "string"}}, ["query"]), None),
     "list_files": (_fn("list_files", "列出工作資料夾（或其中一個子資料夾）裡的檔案", _FP, ["folder"]), None),
-    "read_file": (_fn("read_file", "讀工作資料夾裡的一個文字檔（最多 1 MB）", _FP, ["folder", "path"]), None),
+    "read_file": (_fn("read_file", "讀工作資料夾裡的一個文字檔（最多1 MB）", _FP, ["folder", "path"]), None),
     "write_file": (_fn("write_file", "在工作資料夾裡建立或覆寫一個檔案（整份內容）；會先問使用者",
                        {**_FP, "content": {"type": "string"}}, ["folder", "path", "content"]), "file_write"),
     "run_command": (_fn("run_command", "在工作資料夾裡執行一條指令；每條都會先問使用者",
                         {"folder": {"type": "string"}, "command": {"type": "string"},
-                         "timeout": {"type": "integer", "description": "秒，預設 120、最多 600"}}, ["folder", "command"]), "command"),
+                         "timeout": {"type": "integer", "description": "秒，預設120、最多600"}}, ["folder", "command"]), "command"),
 }
 TOOL_KIND_LABEL = {"file_write": "寫檔", "command": "執行指令"}
 ASSIST_RUNS = {}
@@ -871,7 +871,7 @@ def search_key():
 
 
 def assist_toolset(user, is_admin, node_id):
-    """這個人在這台能用哪些工具。回 (OpenAI tools 清單, 能用的工作資料夾名稱)。"""
+    """這個人在這台能用哪些工具。回 (OpenAI tools清單, 能用的工作資料夾名稱)。"""
     tools = list(ASSIST_TOOLS) if is_admin else []
     tools.append(EXTRA_TOOLS["read_web_page"][0])
     if search_cfg():
@@ -890,7 +890,7 @@ def assist_toolset(user, is_admin, node_id):
 
 def assist_system(tools, folders, is_admin, extra):
     names = {t["function"]["name"] for t in tools}
-    out = ["你是 xConsole 主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。"]
+    out = ["你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。"]
     if names & CONSOLE_TOOLS:
         out.append("你可以查這個主控台管的機器與模型，但不能替使用者啟動、停止或下載；需要動作時告訴他在網頁哪裡按。")
     if "read_web_page" in names:
@@ -956,7 +956,7 @@ def assist_exec(run, name, args, audit):
     if name in CONSOLE_TOOLS:
         return assist_tool(name, args) if run["admin"] else {"error": "這個帳號不能查主控台"}
     if name not in run["names"]:
-        return {"error": f"沒有 {name} 這個工具"}
+        return {"error": f"沒有{name}這個工具"}
     if name == "read_web_page":
         url = str(args.get("url") or "")
         try:
@@ -1016,7 +1016,7 @@ def assist_exec(run, name, args, audit):
             return {"error": out.get("error")}
         return {"exit_code": out.get("code"), "timed_out": out.get("timed_out"), "stdout": out.get("stdout"),
                 "stderr": out.get("stderr"), "truncated": out.get("truncated")}
-    return {"error": f"沒有 {name} 這個工具"}
+    return {"error": f"沒有{name}這個工具"}
 
 
 def _call_args(c):
@@ -1029,7 +1029,7 @@ def _call_args(c):
 
 
 def _ask_view(name, args):
-    """問使用者時給畫面看的內容：寫檔給路徑與前 4000 字，指令給整條。"""
+    """問使用者時給畫面看的內容：寫檔給路徑與前4000字，指令給整條。"""
     v = {"tool": name, "kind": EXTRA_TOOLS[name][1], "folder": str(args.get("folder") or "")}
     if name == "write_file":
         c = str(args.get("content") or "")
@@ -1043,7 +1043,7 @@ ASSIST_ROUNDS = 8
 
 
 def assist_drive(run, audit, decision=None):
-    """跑對話工具的迴圈：一輪＝呼叫模型一次，最多 ASSIST_ROUNDS 輪。遇到要先問的工具就停下來回 ask，
+    """跑對話工具的迴圈：一輪＝呼叫模型一次，最多ASSIST_ROUNDS輪。遇到要先問的工具就停下來回ask，
     使用者回答後（decision＝{allow, always}）從同一個呼叫接著做。回 (狀態碼, 回應)。"""
     convo, steps = run["convo"], run["steps"]
     while True:
@@ -1073,7 +1073,7 @@ def assist_drive(run, audit, decision=None):
                 result = assist_exec(run, name, args, audit)
                 if not kind:
                     run["seen"][key] = True
-                steps.append({"tool": name, "args": {k: (v if k != "content" else f"（{len(str(v))} 字）") for k, v in args.items()},
+                steps.append({"tool": name, "args": {k: (v if k != "content" else f"（{len(str(v))}字）") for k, v in args.items()},
                               **({"error": result["error"]} if isinstance(result, dict) and result.get("error") else {})})
             run["queue"].pop(0)
             convo.append({"role": "tool", "tool_call_id": c.get("id"), "content": json.dumps(result, ensure_ascii=False)[:24000]})
@@ -1089,15 +1089,15 @@ def assist_drive(run, audit, decision=None):
             convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
         code, out = call_node(run["node"], f"/chat/{run['slot']}", "POST", req, timeout=600)
         if code != 200 and "tools" in req:
-            # 帶工具時 llama.cpp 會用文法限制輸出格式，小模型偶爾產出不合格式的東西就整個 500：改成不帶工具作答
+            # 帶工具時llama.cpp會用文法限制輸出格式，小模型偶爾產出不合格式的東西就整個500：改成不帶工具作答
             last = True
             req.pop("tools")
             convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。"})
             code, out = call_node(run["node"], f"/chat/{run['slot']}", "POST", req, timeout=600)
         if code != 200:
-            return code, {"error": out.get("error") or f"模型回 {code}", "steps": steps}
+            return code, {"error": out.get("error") or f"模型回{code}", "steps": steps}
         msg = ((out.get("choices") or [{}])[0]).get("message") or {}
-        # 一次最多處理 4 個呼叫；回給模型的那則也只留這 4 個，否則下一輪會帶著沒有回覆的呼叫、被伺服器拒絕
+        # 一次最多處理4個呼叫；回給模型的那則也只留這4個，否則下一輪會帶著沒有回覆的呼叫、被伺服器拒絕
         calls = [] if last else [c for c in (msg.get("tool_calls") or []) if isinstance(c, dict)][:4]
         if not calls:
             return 200, {"content": msg.get("content") or "（模型沒有給出回答）", "reasoning": msg.get("reasoning_content"),
@@ -2025,6 +2025,38 @@ def restart_console():
     os._exit(3)
 
 
+# ---- 有新版要通知：啟動時與每天問一次GitHub，結果放記憶體；頂列的「更新到vX」與彈窗從這裡讀（只有管理員看得到）
+UPDATE_NOTICE = {"checked": None}
+UPDATE_EVERY = 86400
+
+
+def update_poll():
+    code, out = updater.check()
+    UPDATE_NOTICE.clear()
+    UPDATE_NOTICE.update(checked=time.time(), ok=code == 200,
+                         **({k: out.get(k) for k in ("current", "latest", "newer", "notes", "published", "url")} if code == 200 else {}))
+    return UPDATE_NOTICE
+
+
+def update_watch():
+    time.sleep(30)                   # 剛開機網路可能還沒好；也不要跟啟動搶時間
+    while True:
+        try:
+            update_poll()
+        except Exception as exc:  # noqa: BLE001
+            print(f"檢查新版失敗：{exc}", flush=True)
+        time.sleep(UPDATE_EVERY)
+
+
+def update_notice():
+    n = dict(UPDATE_NOTICE)
+    skip = str(fleet().get("update_skip") or "")
+    n["skipped"] = skip
+    n["show"] = bool(n.get("ok") and n.get("newer") and n.get("latest") and n["latest"] != skip)
+    n["desktop"] = DESKTOP
+    return n
+
+
 def update_overview():
     job, cur = updater.status()
     _, sha = updater.bundled_agent()
@@ -2490,8 +2522,8 @@ class AgentTask:
         return t
 
     def save(self):
-        """整筆加密寫進主控台資料庫（跟對話一樣 AES-256-GCM）。
-        ponytail: 每記一筆就整份重寫，紀錄上限 400 筆、每步要等模型，寫入量不是瓶頸；真的變慢再改成只追加紀錄。"""
+        """整筆加密寫進主控台資料庫（跟對話一樣AES-256-GCM）。
+        ponytail: 每記一筆就整份重寫，紀錄上限400筆、每步要等模型，寫入量不是瓶頸；真的變慢再改成只追加紀錄。"""
         if self.dropped:
             return
         with self.lock:
@@ -2501,14 +2533,14 @@ class AgentTask:
         try:
             gone = STORE.agent_task_put(self.id, self.user, self.node, state, self.created, chat_seal(raw), keep=AGENT_KEEP)
         except Exception as exc:  # noqa: BLE001  # 存不進去不能讓任務本身停掉
-            print(f"Agent 任務 {self.id} 存不進資料庫：{exc}", flush=True)
+            print(f"Agent任務{self.id}存不進資料庫：{exc}", flush=True)
             return
         with _AGENT_LOCK:
             for g in gone:
                 AGENT_TASKS.pop(g, None)
 
     def close_plan(self, final):
-        """任務結束時把計畫裡還在「進行中」的項目收掉：做完＝完成，其他（停止、出錯、中斷）＝沒做完。呼叫端持有 lock。"""
+        """任務結束時把計畫裡還在「進行中」的項目收掉：做完＝完成，其他（停止、出錯、中斷）＝沒做完。呼叫端持有lock。"""
         for x in self.plan:
             if x.get("status") == "in_progress":
                 x["status"] = "done" if final == "done" else "stopped"
@@ -2781,7 +2813,7 @@ def agent_tasks_load():
             doc = json.loads(chat_unseal(r["body"]))
             t = AgentTask.restore(r["user"], doc)
         except Exception as exc:  # noqa: BLE001  # 一件讀不到不擋其他件
-            print(f"Agent 任務 {r['id']} 讀不回來：{type(exc).__name__}", flush=True)
+            print(f"Agent任務{r['id']}讀不回來：{type(exc).__name__}", flush=True)
             continue
         if t.state in AGENT_LIVE:
             with t.lock:
@@ -3754,6 +3786,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
         if path == "/api/update":
             return self._json(200, update_overview())
+        if path == "/api/update/notice":
+            return self._json(200, update_notice())
         m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})", path)
         if m:
             t = computer.TASKS.get(m.group(1))
@@ -4279,8 +4313,18 @@ class Handler(BaseHTTPRequestHandler):
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
             return self._json(code, out)
+        if path == "/api/update/skip":
+            ver = str(body.get("version") or "").strip()
+            if ver and not updater.VER_RX.fullmatch(ver):
+                return self._json(400, {"error": "版本號格式不對"})
+            update_fleet(lambda c: c.__setitem__("update_skip", ver))
+            self._audit("update.skip", ver, True)
+            return self._json(200, update_notice())
         if path == "/api/update/check":
             code, out = updater.check()
+            if code == 200:
+                UPDATE_NOTICE.clear()
+                UPDATE_NOTICE.update(checked=time.time(), ok=True, **{k: out.get(k) for k in ("current", "latest", "newer", "notes", "published", "url")})
             self._audit("update.check", out.get("latest") or "", code == 200, {"message": out.get("error")})
             return self._json(code, out)
         if path == "/api/update/apply" and DESKTOP:
@@ -4795,11 +4839,11 @@ class Handler(BaseHTTPRequestHandler):
             threading.Timer(0.8, restart_console).start()
             return self._json(200, {"ok": True, "on": on, "restarting": True})
         if path == "/api/settings/search":
-            # 聯網搜尋端點（SearXNG 相容）：網址明文、金鑰加密落地；網址清空＝對話的工具裡就沒有聯網搜尋
+            # 聯網搜尋端點（SearXNG相容）：網址明文、金鑰加密落地；網址清空＝對話的工具裡就沒有聯網搜尋
             url = str(body.get("url") or "").strip()
             header = str(body.get("header") or "Authorization").strip() or "Authorization"
             if url and not chattools.search_config_ok(url):
-                return self._json(400, {"error": "搜尋端點要是 http(s):// 開頭、含 {q} 的網址，例：https://searx.example.com/search?q={q}&format=json"})
+                return self._json(400, {"error": "搜尋端點要是http(s)://開頭、含{q}的網址，例：https://searx.example.com/search?q={q}&format=json"})
             if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{0,63}", header):
                 return self._json(400, {"error": "標頭名稱只能是英數字與連字號"})
             key = body.get("key")
@@ -5005,8 +5049,9 @@ def main():
         print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
     n = agent_tasks_load()
     if n:
-        print(f"讀回 {n} 件 Agent 任務", flush=True)
+        print(f"讀回{n}件Agent任務", flush=True)
     threading.Thread(target=sampler, daemon=True).start()
+    threading.Thread(target=update_watch, daemon=True).start()
     threading.Thread(target=aligner, daemon=True).start()
     ALIGN_WAKE.set()
     cur = CERTS.current()

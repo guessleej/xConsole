@@ -250,7 +250,7 @@ def main():
     SCRIPT[:] = [say("", call("run_command", folder="u1-proj", command="echo hi")), say("不能")]
     st, out = ask(user, "執行")
     tool_msg = [m for m in REQS[-1]["messages"] if m["role"] == "tool"][-1]["content"]
-    check("  一般使用者硬叫執行指令：不問、直接擋", "ask" not in out and "沒有 run_command" in tool_msg, (out, tool_msg))
+    check("  一般使用者硬叫執行指令：不問、直接擋", "ask" not in out and "沒有run_command" in tool_msg, (out, tool_msg))
 
     # ---- 管理員執行指令：每條先問，寫稽核
     SCRIPT[:] = [say("", call("run_command", folder="admin-proj", command="echo hello-tools")), say("跑完了")]

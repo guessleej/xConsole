@@ -347,6 +347,27 @@ async function viewRun() {
   top.appendChild(th);
   holder.appendChild(top);
 
+  // 這台還沒有推理引擎（llama.cpp）：GGUF模型啟動不了，先講清楚、給一鍵安裝與匯入安裝包，不要等按了啟動才出錯
+  const eng = n.state.engine || {};
+  if (eng.llama_server === false && (lib.gguf || []).length) {
+    const e = el("div", "note warn run-noeng");
+    e.appendChild(el("b", null, eng.building ? "推理引擎安裝中" : "先安裝推理引擎"));
+    e.appendChild(el("p", "small", eng.building ? `${n.name}正在安裝llama.cpp，裝好之後就能啟動GGUF模型。`
+      : `${n.name}還沒有llama.cpp，GGUF模型啟動不了。一鍵安裝會依這台的顯示卡挑加速方式；這台不能連外的話，可以在別台下載官方的壓縮檔（.zip）再匯入。`));
+    const acts = el("div", "slot-actions");
+    const ib = el("button", "btn sm primary", eng.building ? "看安裝進度" : "一鍵安裝");
+    ib.onclick = () => openEngineBuild(n.id, "llama", async () => { await refresh(); if (S.view === "run") viewRun(); });
+    acts.appendChild(ib);
+    if (!eng.building) {
+      const zb = el("button", "btn sm", "匯入安裝包（zip）");
+      zb.title = "不能連外的機器：在別台下載llama.cpp官方的.zip或.tar.gz，從這裡送上去安裝";
+      zb.onclick = () => openEngineBuild(n.id, "llama", async () => { await refresh(); if (S.view === "run") viewRun(); }, { importOpen: true });
+      acts.appendChild(zb);
+    }
+    e.appendChild(acts);
+    top.appendChild(e);
+  }
+
   if (!models.length) {
     const e = el("div", "note");
     e.appendChild(document.createTextNode("這台還沒有模型。先到「模型」挑一顆推薦的下載，或匯入你已經有的 GGUF。"));
@@ -371,6 +392,7 @@ async function viewRun() {
   const statusHolder = el("div");
   holder.appendChild(statusHolder);
   if (rs) statusHolder.appendChild(statusBar(n, rs));
+  if (rs) holder.appendChild(runLogBox(n, rs));
 
   // thinking／lan 先顯示欄位現在的設定；使用者沒動過就不送，代理沿用原本的（不會悄悄改成 0.0.0.0）
   // 應用程式的視窗（一般人單機用）：新模型預設只給這台自己用、不先思考，跟代理的桌面版預設一致
@@ -688,7 +710,10 @@ function progressCard(m) {
   const fill = el("i");
   bar.appendChild(fill);
   const msg = el("div", "small mono muted load-msg");
-  c.append(sub, track, bar, msg);
+  const lastLn = el("div", "small mono load-last");
+  lastLn.hidden = true;
+  lastLn.title = "llama-server記錄檔的最後一行";
+  c.append(sub, track, bar, msg, lastLn);
   const t0 = Date.now();
   return {
     el: c,
@@ -704,9 +729,54 @@ function progressCard(m) {
       sub.textContent = [`已用 ${fmtDur(sec)}`, r.read_gib != null && r.total_gib ? `讀了 ${fmt(r.read_gib)} / ${fmt(r.total_gib)} GiB` : null,
         r.eta_sec != null ? `約再 ${fmtDur(r.eta_sec)}` : null].filter(Boolean).join("・");
       msg.textContent = r.state === "failed" ? (r.message || "載入失敗") : (r.message || "");
+      const ll = r.stage === "done" ? "" : (r.last_line || "");
+      if (lastLn.textContent !== ll) lastLn.textContent = ll;
+      lastLn.hidden = !ll;
       if (r.stage === "done") h2.textContent = `已啟動 ${m.name}`;
     },
   };
+}
+
+/* 執行日誌：展開時每3秒讀一次這個欄位的記錄，只把新增的那幾行接在後面（不清空重畫、不跳捲軸）；
+   使用者往上捲在看舊的就不拉回底部。收起來就不讀。 */
+const RUN_LOG_MAX = 600;
+function runLogBox(n, s) {
+  const d = el("details", "run-log card");
+  d.appendChild(el("summary", null, "執行日誌"));
+  const pre = el("pre", "log run-log-pre");
+  const note = el("p", "small muted", "讀取中…");
+  d.append(note, pre);
+  let lines = [];
+  let timer = null;
+  const tick = async () => {
+    timer = null;
+    if (!d.isConnected || !d.open) return;
+    let r;
+    try { r = await api(`/api/node/${n.id}/logs/${s.id}`); } catch (ex) { note.textContent = "讀不到：" + ex.message; note.hidden = false; timer = setTimeout(tick, 5000); return; }
+    const now = String(r.text || "").split("\n");
+    // 找上一次最後一行在新內容裡的位置，只接後面的；對不上（記錄檔輪替過）才整份換
+    let add = now;
+    if (lines.length) {
+      const last = lines[lines.length - 1];
+      const at = now.lastIndexOf(last);
+      add = at >= 0 ? now.slice(at + 1) : now;
+      if (at < 0) { pre.textContent = ""; lines = []; }
+    }
+    const near = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+    if (add.length) {
+      pre.appendChild(document.createTextNode((lines.length ? "\n" : "") + add.join("\n")));
+      lines = lines.concat(add);
+      if (lines.length > RUN_LOG_MAX * 1.5) {            // 太長就收成最後600行（偶爾一次，不是每次）
+        lines = lines.slice(-RUN_LOG_MAX);
+        pre.textContent = lines.join("\n");
+      }
+      if (near) pre.scrollTop = pre.scrollHeight;
+    }
+    note.hidden = true;
+    timer = setTimeout(tick, 3000);
+  };
+  d.addEventListener("toggle", () => { if (d.open && !timer) tick(); });
+  return d;
 }
 
 /* 對話頁在 chat.js；下面的 renderRich、codeBlock、openPreview 對話與 Agent 共用。 */
@@ -1043,14 +1113,14 @@ async function viewAgent() {
   const planH = el("h4", "pick-h", "計畫");
   planH.appendChild(planCount);
   side.append(planH, planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
-  // 輪詢每 1.5 秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播
+  // 輪詢每1.5秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播
   const seen = { files: null, tree: null };
   const drawPlan = (plan) => {
     const done = plan.filter((x) => x.status === "done").length;
     const cnt = plan.length ? `${done}/${plan.length}` : "";
     if (planCount.textContent !== cnt) planCount.textContent = cnt;
     if (!plan.length) {
-      if (!planBox.querySelector("p")) { planBox.textContent = ""; planBox.appendChild(el("p", "small muted", "Agent 開始做事後，計畫會顯示在這裡")); }
+      if (!planBox.querySelector("p")) { planBox.textContent = ""; planBox.appendChild(el("p", "small muted", "Agent開始做事後，計畫會顯示在這裡")); }
       return;
     }
     planBox.querySelector("p")?.remove();

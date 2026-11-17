@@ -89,7 +89,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS agent_folders(
           node TEXT, folder TEXT, owner TEXT, created REAL, PRIMARY KEY(node, folder));
         """)
-        # 舊版資料庫補欄位：對話的收藏（明文 0／1）與分類標籤（使用者寫的字，跟標題一樣加密）
+        # 舊版資料庫補欄位：對話的收藏（明文0／1）與分類標籤（使用者寫的字，跟標題一樣加密）
         have = {r[1] for r in self.db.execute("PRAGMA table_info(chats)")}
         for col, typ in (("fav", "INTEGER DEFAULT 0"), ("labels", "TEXT")):
             if col not in have:
@@ -227,7 +227,7 @@ class Store:
             old = self.db.execute("SELECT user, created FROM chats WHERE id=?", (row["id"],)).fetchone()
             if old and old[0] != user:
                 return False
-            # 收藏與分類標籤另外改（chat_meta），存對話內容時不能把它們洗掉：用 upsert 不用 REPLACE
+            # 收藏與分類標籤另外改（chat_meta），存對話內容時不能把它們洗掉：用upsert不用REPLACE
             self.db.execute("INSERT INTO chats(id,user,title,target,n_msgs,created,updated,body) VALUES(?,?,?,?,?,?,?,?) "
                             "ON CONFLICT(id) DO UPDATE SET title=excluded.title, target=excluded.target, "
                             "n_msgs=excluded.n_msgs, updated=excluded.updated, body=excluded.body",
@@ -247,7 +247,7 @@ class Store:
             return self.db.execute("UPDATE chats SET title=? WHERE id=? AND user=?", (title, cid, user)).rowcount > 0
 
     def chat_meta(self, user, cid, fav=None, labels=None):
-        """改收藏（布林）或分類標籤（enc:v1: 密文）；不動 updated，列表順序不會因為按收藏而跳。"""
+        """改收藏（布林）或分類標籤（enc:v1: 密文）；不動updated，列表順序不會因為按收藏而跳。"""
         if labels is not None and labels and not labels.startswith("enc:v1:"):
             raise ValueError("分類標籤沒有加密，拒絕寫入")
         sets, args = [], []
@@ -347,11 +347,11 @@ class Store:
             self.db.execute("DELETE FROM agent_tasks WHERE user=?", (username,))
         return n > 0
 
-    # ---- Agent 任務：body 是呼叫端 tls.seal 加密過的 enc:v1: 密文（交代的事、計畫、步驟紀錄都是使用者內容），這裡只存不解
+    # ---- Agent任務：body是呼叫端tls.seal加密過的enc:v1: 密文（交代的事、計畫、步驟紀錄都是使用者內容），這裡只存不解
     def agent_task_put(self, tid, user, node, state, created, body, keep=100):
-        """新增或整筆更新。超過 keep 則刪掉這個人最舊、已經結束的任務。"""
+        """新增或整筆更新。超過keep則刪掉這個人最舊、已經結束的任務。"""
         if not body.startswith("enc:v1:"):
-            raise ValueError("Agent 任務沒有加密，拒絕寫入")
+            raise ValueError("Agent任務沒有加密，拒絕寫入")
         with self.lock:
             self.db.execute("INSERT OR REPLACE INTO agent_tasks(id,user,node,state,created,updated,body) VALUES(?,?,?,?,?,?,?)",
                             (tid, user, node, state, created, time.time(), body))
