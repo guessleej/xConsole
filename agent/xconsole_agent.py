@@ -283,7 +283,11 @@ def hw_ids():
 
 def identity_verdict(old, now):
     """回 (判定, 依據)。判定：same／reinstall／clone／unknown；依據：smbios／disk／None。"""
-    if hwid_valid(old.get("smbios")) and hwid_valid(now.get("smbios")):
+    if hwid_valid(old.get("smbios")):
+        if not hwid_valid(now.get("smbios")):
+            # 以前讀得到、這次讀不到（開機時 root 的副本還沒寫好、韌體讀數失敗）：最可信的依據沒有說換了一台，
+            # 不拿優先度較低的碟序號來判複製（同一台換過系統碟也會不一樣）
+            return "unknown", None
         if old["smbios"] != now["smbios"]:
             return "clone", "smbios"
         basis = "smbios"

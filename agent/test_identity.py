@@ -57,7 +57,9 @@ def unit():
     case("UUID 無效：改看系統碟，碟變了＝複製", v(ids(smbios=z), ids(smbios=z, disk="OTHER123")) == ("clone", "disk"))
     case("UUID 無效：碟沒變＝同一台", v(ids(smbios=z), ids(smbios=z)) == ("same", "disk"))
     case("UUID 無效＋碟讀不到：無法判定，照舊", v(ids(smbios=z, disk=None), ids(smbios=z, disk=None)) == ("unknown", None))
-    case("UUID 暫時讀不到（root 的副本還沒寫好）：改看碟，不誤判", v(ids(), ids(smbios=None)) == ("same", "disk"))
+    case("UUID 暫時讀不到（root 的副本還沒寫好）：無法判定，不誤判", v(ids(), ids(smbios=None)) == ("unknown", None))
+    case("  同時換過系統碟：仍然不判複製（不拿碟序號推翻主機板識別碼）", v(ids(), ids(smbios=None, disk="NEWDISK99")) == ("unknown", None))
+    case("  這次讀到的是無效值：一樣不判", v(ids(), ids(smbios="00000000-0000-0000-0000-000000000000", disk="NEWDISK99")) == ("unknown", None))
     case("以前讀不到、現在讀得到：不誤判", v(ids(smbios=None), ids()) == ("same", "disk"))
 
 
@@ -70,7 +72,7 @@ def flow():
     case("重灌：保留身分、記一筆", A.identity_check(ids(os_id="ffeeddccbbaa99887766554433221100")) == "reinstall"
          and A.TOKEN == tok0 and any("重灌" in x["text"] for x in A.IDENTITY["notes"]))
     case("UUID 暫時讀不到：不誤判、也不把讀得到的值蓋掉",
-         A.identity_check(ids(smbios=None, os_id="ffeeddccbbaa99887766554433221100")) == "same"
+         A.identity_check(ids(smbios=None, os_id="ffeeddccbbaa99887766554433221100")) == "unknown" and A.TOKEN == tok0
          and json.load(open(A.IDENTITY_FILE))["ids"]["smbios"] == A._hwnorm(U1))
 
     # 模擬加入過主控台：有憑證、連回設定、群組狀態

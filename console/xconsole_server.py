@@ -756,6 +756,7 @@ def clone_watch(nid, body, ip):
         return None
     info = {"at": int(now), "seen": [{"ip": r["ip"], "at": int(r["last"]), **r["hw"]} for r in rows]}
     update_fleet(lambda cfg: [n.__setitem__("clone", info) for n in cfg["nodes"] if n["id"] == nid])
+    LINK.forget(nid)          # 標之前已經排進佇列的指令也不送：收件的是哪一台分不出來，全部當失敗
     STORE.audit("系統", ip, "node.clone_suspect", nid, True, {"ips": [r["ip"] for r in rows]})
     print(f"{node.get('name')}（{nid}）疑似被複製：同一個身分同時從 {', '.join(r['ip'] for r in rows)} 連回，已停止對它下指令", flush=True)
     return info
@@ -3355,6 +3356,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(413, {"error": "請求內容太大"})
         if path == "/api/agent/poll":
             clone_watch(nid, body, self.ip)
+            if node.get("clone") or (next((n for n in fleet()["nodes"] if n["id"] == nid), {}) or {}).get("clone"):
+                # 疑似複製：照收輪詢（才知道它還在不在），但不交出任何指令
+                time.sleep(5)
+                return self._json(200, {"cmds": [], "clone": True})
             lv = str(body.get("link") or "")
             link_tick(force=RING.ack(nid, int(lv.split("-")[0]) if re.fullmatch(r"\d{1,9}-[0-9a-f]{8}", lv) else 0))
             out = {"cmds": LINK.poll(nid, body.get("seen"), stop=lambda: lv != link_ver())}
