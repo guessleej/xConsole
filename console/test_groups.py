@@ -311,8 +311,8 @@ def overview():
     check("套用到群組版本：就緒", ms(g, True, al(prepared=3, applied=3, phase="done"))["code"] == "ready")
     r = ms(g, True, al(phase="preparing", steps=[{"step": "x：下載並核對 SHA-256", "state": "run", "pct": 42}]))
     check("下載中：準備中，帶百分比", r["code"] == "preparing" and r["pct"] == 42 and "42%" in r["detail"], r)
-    r = ms(g, True, al(phase="failed", error="main：x 放不下", nofit={"spec": "a/b:Q8_0", "slot": "main"}), suggest="a/b:Q4_K_M")
-    check("放不下：帶建議改用的量化", r["code"] == "nofit" and "a/b:Q4_K_M" in r["detail"], r)
+    r = ms(g, True, al(phase="failed", error="main：x 放不下", nofit={"spec": "a/b:Q8_0", "slot": "main", "suggest": "a/b:Q4_K_M"}))
+    check("放不下：帶代理用同一組參數與欄位試算過的建議", r["code"] == "nofit" and "a/b:Q4_K_M" in r["detail"], r)
     r = ms(g, True, al(phase="failed", error="main：x 放不下", nofit={"spec": "a/b:Q8_0", "slot": "main"}))
     check("  找不到能跑的量化：說明改小上下文或換小一點的", r["code"] == "nofit" and "a/b:Q8_0" in r["detail"], r)
     check("其他失敗：失敗，帶原因", ms(g, True, al(phase="failed", error="磁碟滿了"))["detail"] == "磁碟滿了")
@@ -329,6 +329,11 @@ def overview():
     check("需要重新加入：排在放不下前面", ms(g, True, al(phase="failed", nofit={"spec": "a"}), rejoin="複製")["code"] == "rejoin")
     check("疑似複製：最優先（離線也照樣標）", ms(g, False, al(applied=3), clone={"at": 1})["code"] == "clone")
 
+    ap = ms(g, True, al(prepared=3, applied=2, phase="applying", steps=[{"step": "main：換上 a/b", "state": "run"}]))
+    af = ms(g, True, al(prepared=3, applied=2, phase="failed", error="換不上"))
+    s = groups.setup_steps({"id": "g1", "version": 3}, [ap, af])
+    check("套用中、套用失敗：下載核對那一步仍算完成，卡在第 5 步（不會叫人重新準備）",
+          ap["prepared"] and af["prepared"] and s["steps"][3]["state"] == "done" and s["steps"][4]["state"] == "now", s)
     s = groups.setup_steps({"id": "g1", "version": 1}, [])
     check("新群組沒機器：第 2 步加入機器是下一步", s["next"] == {"n": 2, "t": "加入機器"} and s["done"] == 1, s)
     rd = ms(g, True, al(prepared=3, applied=3))

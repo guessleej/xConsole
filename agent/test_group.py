@@ -70,6 +70,7 @@ def case(name, good, detail=""):
 # ---- 換模型那一步用假的：記下呼叫，並把欄位設定檔改成指向那顆（拉回檢查看的是這個）
 CALLS = []
 FAIL = set()                                       # 這些欄位換模型會失敗
+ADMIT = set()                                      # 這些欄位換模型時准入擋下（409＋admit）
 PRE = {"ok": True}
 STOPS = []
 CFG = {sid: os.path.join(A.STATE_DIR, f"{sid}.json") for sid in ("s1", "s2")}
@@ -80,6 +81,8 @@ def fake_set(sid, model_id, ctx=None, force=False, thinking=None, parallel=None,
     CALLS.append((sid, model_id, ctx, thinking, parallel))
     if sid in FAIL:
         return 409, {"error": "記憶體不夠"}
+    if sid in ADMIT:
+        return 409, {"error": "記憶體不夠", "admit": {"allow": False}}
     A.save_json(CFG[sid], {"model": m["path"], "ctx": ctx, "parallel": parallel})
     return 200, {"ok": True}
 
@@ -178,8 +181,18 @@ def main():
     PRE["ok"] = True
     case("准入預檢放不下：準備就失敗（不等到指定時間才發現）", st["phase"] == "failed" and "放不下" in (st["error"] or "")
          and st["prepared"] == 4 and len(CALLS) == n, st["error"])
-    case("  記下是哪一顆、哪一欄放不下（主控台據此建議改用放得下的量化）",
-         A.group_public().get("nofit") == {"spec": TINY, "slot": "s1"}, A.group_public().get("nofit"))
+    nf = A.group_public().get("nofit") or {}
+    case("  記下是哪一顆、哪一欄放不下；沒有更小的量化就不給建議",
+         nf.get("spec") == TINY and nf.get("slot") == "s1" and nf.get("suggest") is None, nf)
+    sizes = []
+
+    def pick_small(sid, m, ctx=None, parallel=None):
+        sizes.append(m.get("size_gib"))
+        return (m["size_gib"] < 0.5, "")
+    A.llama_precheck = pick_small
+    sug = A._group_suggest("acme/tiny-GGUF:Q8_0", "s1", {"size_gib": 99.0}, {"ctx": 4096, "parallel": 2})
+    A.llama_precheck = lambda sid, m, ctx=None, parallel=None: (PRE["ok"], "要 99 GiB，只剩 10 GiB")
+    case("  有更小的量化：用同一欄、同一組上下文與並行數試算，給第一個放得下的", sug == TINY and sizes, (sug, sizes))
 
     # ---- 4c. 指定時間：本機時鐘被調快，也不會提早套用（用單調時鐘往前推）
     sync(6, dict(s1, apply_at={"mode": "at", "at": int(time.time() + 3600)}))
@@ -284,6 +297,18 @@ def main():
                                                                                      allowed_models=[TINY]), "now": time.time()})
     st = tick()
     case("要的模型不在只准用的清單：準備就擋下", code == 200 and st["phase"] == "failed" and "只准用" in (st["error"] or ""), st["error"])
+
+    # ---- 5b. 預檢都過、實際套用時准入才擋下（幾顆加起來超過）：一樣記下是哪一顆、哪一欄
+    ADMIT.add("s1")
+    sync(17, dict(s1, models=[TINY], allowed_models=[], locked=[]))
+    st = tick()
+    ADMIT.discard("s1")
+    nf = A.group_public().get("nofit") or {}
+    case("套用時准入擋下：失敗，記下放不下的那一顆與欄位（不是一般的失敗）",
+         st["phase"] == "failed" and nf.get("spec") == TINY and nf.get("slot") == "s1", (st["phase"], st["error"], nf))
+    sync(18, dict(s1, models=[TINY], allowed_models=[], locked=[]))
+    st = tick()
+    case("  下一版正常套用：放不下的紀錄清掉", st["phase"] == "done" and not A.group_public().get("nofit"), (st["phase"], st["error"]))
 
     # ---- 6. 換群組：版本號各算各的，重新準備與套用
     sync(1, dict(s1, profile={}), gid="ffff0000")

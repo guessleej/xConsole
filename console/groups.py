@@ -163,7 +163,7 @@ def update(g, name=None, kind=None, settings=None, taken=()):
 APPLY_WAIT = {"waiting_boot": "已準備好，等下次開機套用", "waiting_time": "已準備好，等指定時間套用"}
 
 
-def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, suggest=None):
+def member_status(g, online, align, clone=None, rejoin=None, last_seen=None):
     """一台機器在這個群組裡的狀態。依序判斷，越前面越要先處理：
     疑似複製 → 離線 → 需要重新加入 → 放不下 → 失敗 → 就緒 → 準備中 → 設定不同。
     align：代理回報的對齊狀態（group_public），沒有就是主控台還沒送到。回 {"code", "label", "detail", "pct"}。"""
@@ -174,7 +174,7 @@ def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, sug
 
     def out(code, label, detail="", pct=None):
         return {"code": code, "label": label, "detail": detail, "pct": pct,
-                "prepared": bool(same and st.get("prepared", 0) >= v and code in ("ready", "differs"))}
+                "prepared": bool(same and st.get("prepared", 0) >= v)}       # 套用中、套用失敗也已經準備好了
     if clone:
         return out("clone", "疑似複製", "同一個身分同時從兩個地方連回，已停止下指令")
     if not online:
@@ -188,7 +188,7 @@ def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, sug
     if same and st.get("phase") == "failed":
         nf = st.get("nofit")
         if nf:
-            return out("nofit", "放不下", f"建議改用 {suggest}" if suggest else f"{nf.get('spec')} 放不下，請改小上下文或換小一點的量化")
+            return out("nofit", "放不下", f"建議改用 {nf['suggest']}" if nf.get("suggest") else f"{nf.get('spec')} 放不下，請改小上下文或換小一點的量化")
         return out("failed", "失敗", st.get("error") or "")
     if same and st.get("applied", 0) >= v:
         return out("ready", "就緒", f"已套用 v{v}")

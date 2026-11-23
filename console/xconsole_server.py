@@ -985,40 +985,15 @@ def fleet_state():
     return {"ts": time.time(), "nodes": nodes, "groups": out}
 
 
-_SUGGEST = {}                      # (機器, 模型) → (時間, 建議)：放不下時要問一次模型庫，十分鐘內不重問
-
-
-def nofit_suggest(nid, spec, st):
-    """群組設定的某顆模型在這台放不下：從推薦清單找同一個 repo 在這台放得下的量化。找不到回 None。"""
-    key = (nid, spec)
-    hit = _SUGGEST.get(key)
-    if hit and time.time() - hit[0] < 600:
-        return hit[1]
-    repo = spec.split(":", 1)[0]
-    best = None
-    try:
-        lc, lib = call_node(nid, "/library", timeout=30)
-        r = recommend.recommend(st, lib if lc == 200 else {}, CATALOG.load())
-        it = next((x for x in r["items"] if x.get("repo") == repo), None)
-        p = next((x for x in (it or {}).get("plans") or [] if x["stem"] == (it or {}).get("pick")), None)
-        if p and p.get("level") in ("smooth", "ok"):
-            best = f"{repo}:{p['quant']}"
-    except Exception:  # noqa: BLE001
-        best = None
-    _SUGGEST[key] = (time.time(), best)
-    return best
-
-
 def node_ready(n, g, online, st):
     """群組總覽上這台的狀態（groups.member_status）。上次連線：主動連回的看通道，其他看取樣紀錄。"""
     last = LINK.last_seen(n["id"]) if n.get("link") == "push" else None
     last = last or (STORE.last_online(n["id"]) if not online else None)
     seen = time.strftime("%m/%d %H:%M", time.gmtime(last + 8 * 3600)) + "（台北時間）" if last else None
     a = ALIGN_STATE.get(n["id"])
-    nf = (((a or {}).get("state") or {}).get("nofit") or {}).get("spec")
     rejoin = ((st.get("identity") or {}).get("rejoin") or {}).get("reason")
-    return groups.member_status(g, online, a, clone=n.get("clone"), rejoin=rejoin, last_seen=seen,
-                                suggest=nofit_suggest(n["id"], nf, st) if nf and online else None)
+    # 放不下時要改用什麼，由代理用失敗的那組上下文、並行數與欄位（綁卡）實際試算過才給
+    return groups.member_status(g, online, a, clone=n.get("clone"), rejoin=rejoin, last_seen=seen)
 
 
 # ---------------------------------------------------------------- 背景取樣

@@ -9583,9 +9583,9 @@ def group_state():
 class GroupNoFit(RuntimeError):
     """准入預檢放不下：記下是哪一顆、哪一欄，主控台的群組總覽據此建議改用放得下的量化。"""
 
-    def __init__(self, msg, spec, slot):
+    def __init__(self, msg, spec, slot, suggest=None):
         super().__init__(msg)
-        self.spec, self.slot = spec, slot
+        self.spec, self.slot, self.suggest = spec, slot, suggest
 
 
 class GroupSuperseded(Exception):
@@ -9771,10 +9771,30 @@ def _group_prepare(st, s):
     for spec, sl in zip(specs, slots):
         ok, why = llama_precheck(sl["id"], _group_find(spec), p.get("ctx"), p.get("parallel"))
         if not ok:
-            raise GroupNoFit(f"{sl['id']}：{spec} 放不下（{why}），請改小上下文或換小一點的量化", spec, sl["id"])
+            raise GroupNoFit(f"{sl['id']}：{spec} 放不下（{why}），請改小上下文或換小一點的量化", spec, sl["id"],
+                             _group_suggest(spec, sl["id"], _group_find(spec), p))
     if specs:
         _gstep(st, "准入預檢通過（逐欄試算，實際換上時會再算一次）")
     _gstep(st, "準備完成")
+
+
+def _group_suggest(spec, slot_id, m, p):
+    """放不下時，找同一個 repo 更小、用同一組上下文與並行數、同一個欄位（同樣的綁卡）試算放得下的量化。
+    只換權重大小（同一顆模型不同量化，層數與 KV 都一樣）；找不到回 None。"""
+    try:
+        repo, _ = _group_spec(spec)
+        code, info = hf_files(repo, GROUP_HF["token"])
+        if code != 200 or not m or not m.get("size_gib"):
+            return None
+        smaller = sorted((c for c in info.get("choices") or [] if not c["aux"] and c.get("quant") and c["size_gib"] < m["size_gib"]),
+                         key=lambda c: -c["size_gib"])
+        for c in smaller[:8]:
+            ok, _ = llama_precheck(slot_id, dict(m, size_gib=c["size_gib"]), p.get("ctx"), p.get("parallel"))
+            if ok:
+                return f"{repo}:{c['quant']}"
+    except Exception:  # noqa: BLE001  ponytail: 建議只是加分，查不到就不給，不能讓原本的錯誤訊息被蓋掉
+        return None
+    return None
 
 
 def llama_precheck(slot_id, m, ctx=None, parallel=None):
@@ -9873,6 +9893,10 @@ def _group_apply(st, s, only_missing=False):
             set_custom_args(m["path"], keep)
             thinking = None if p.get("thinking") is None else ("on" if p["thinking"] else "off")
             code, out = set_llama_model(sl["id"], m["id"], p.get("ctx"), thinking=thinking, parallel=p.get("parallel"))
+            if code == 409 and out.get("admit"):
+                # 套用時才放不下（幾顆加起來超過、或準備之後記憶體被別的吃掉）：跟預檢一樣記下是哪一顆、建議改用什麼
+                raise GroupNoFit(f"{sl['id']}：換不上 {spec}（{out.get('error')}），這個欄位原本的服務沒動", spec, sl["id"],
+                                 _group_suggest(spec, sl["id"], m, p))
             if code != 200:
                 raise RuntimeError(f"{sl['id']}：換不上 {spec}（{out.get('error')}），這個欄位原本的服務沒動")
             done.append((sl["id"], snap))
@@ -9944,7 +9968,7 @@ def group_tick():
         GROUP_WAKE.set()                              # 有更新的版本：馬上做新的
     except Exception as exc:  # noqa: BLE001
         st.update(phase="failed", error=str(exc)[:300],
-                  nofit={"spec": exc.spec, "slot": exc.slot} if isinstance(exc, GroupNoFit) else None)
+                  nofit={"spec": exc.spec, "slot": exc.slot, "suggest": exc.suggest} if isinstance(exc, GroupNoFit) else None)
         if st["steps"] and st["steps"][-1]["state"] == "run":
             st["steps"][-1]["state"] = "fail"
         try:
