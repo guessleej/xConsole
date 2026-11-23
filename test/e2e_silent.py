@@ -130,6 +130,17 @@ def main():
         check(f"  代理以 {want} 跑（開機自啟、不必有人登入）", agent_user() == want, agent_user())
         _, raw, _ = T.https(cport, ccert, "GET", "/api/fleet", None, ck, raw=True)
         print("記憶體區說明：", sorted(set(re.findall(r'"model_note": ?"([^"]*)"', raw))), flush=True)
+        try:
+            idt = next(n for n in json.loads(raw)["nodes"] if n["id"] == "LAB01")["state"]["identity"]
+        except (ValueError, KeyError, StopIteration, TypeError):
+            idt = {}
+        print("身分：", {k: idt.get(k) for k in ("basis", "smbios_valid", "rejoin")}, flush=True)
+        # 專用帳號讀不到 product_uuid：Linux 要靠開機時 root 寫的副本才有主機板識別碼
+        check("  複製偵測有依據（主機板識別碼或系統碟序號），不是剛加入就要重新加入",
+              idt.get("basis") in ("smbios", "disk") and not idt.get("rejoin"), idt)
+        if not WIN and not MAC:
+            check("  Linux：開機時 root 把主機板識別碼抄到 /run 給專用帳號讀", os.path.exists("/run/xconsole/smbios_uuid")
+                  and idt.get("basis") == "smbios", idt)
 
         pid = agent_pid()
         if WIN:
@@ -158,6 +169,8 @@ def main():
         check("移除", r.returncode == 0, r.stdout + r.stderr)
         time.sleep(3)
         check("  移除後代理不在了", not agent_pid(), agent_pid())
+        if not WIN and not MAC:
+            check("  Linux：主機板識別碼的開機服務也移除了", not os.path.exists("/etc/systemd/system/xconsole-hwid.service"))
         for p in procs:
             p.terminate()
         if FAILS:

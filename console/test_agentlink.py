@@ -325,7 +325,9 @@ def e2e():
     # 主控台的機器名單：一台真的工作站（主動連回）＋ 200 台假的（只用來測連線上限）
     fakes = [{"id": f"fake-{i:03d}", "name": f"fake-{i:03d}", "host": "10.9.0.1", "link": "push",
               "token": secrets.token_urlsafe(24)} for i in range(200)]
-    nodes = [{"id": "ws-01", "name": "教室 01", "host": "127.0.0.1", "group": "教室", "link": "push", "token": token}] + fakes
+    clone_tok = secrets.token_urlsafe(24)          # 複製偵測專用的一台（不跟 200 台的連線上限測試混在一起）
+    nodes = ([{"id": "ws-01", "name": "教室 01", "host": "127.0.0.1", "group": "教室", "link": "push", "token": token}] + fakes
+             + [{"id": "cl-01", "name": "cl-01", "host": "10.9.0.2", "link": "push", "token": clone_tok}])
     with open(os.path.join(chome, ".xconsole", "fleet.json"), "w") as fh:
         json.dump({"nodes": nodes, "auth": {}}, fh)
     srv = os.path.join(HERE, "xconsole_server.py")
@@ -437,7 +439,7 @@ def e2e():
         check("管理網頁埠不收代理連回（對外只開通道埠時兩邊分得開）", st != 200 and b"cmds" not in b, (st, b[:80]))
         code, li = call("/api/link")
         check("設定頁看得到通道：埠、有在聽、一張目前的通道憑證", code == 200 and li["port"] == lport and li["listen"]["ok"]
-              and [k["state"] for k in li["ring"]["keys"]] == ["current"] and li["nodes"] == 201, li)
+              and [k["state"] for k in li["ring"]["keys"]] == ["current"] and li["nodes"] == 202, li)
 
         # 換管理網頁的憑證：通道憑證不動，代理不斷線
         code, out = call("/api/tls/bootstrap", {})
@@ -502,6 +504,55 @@ def e2e():
         check("  同一個位址後面權杖正確的工作站不受影響（NAT 後面有人亂送也擋不掉整群）",
               raw_poll("fake-000", fakes[0]["token"], {"seen": []}) == 200)
 
+        # ---- 複製偵測（清單 #8）：同一個身分的兩個 boot 輪流連回＝兩台同時在跑。link 帶舊版本號讓輪詢立刻回來
+        def boot_poll(boot):
+            return raw_poll("cl-01", clone_tok, {"seen": [], "link": "0-00000000", "boot": boot,
+                                                            "hw": {"fp": "abc123", "basis": "smbios", "smbios": "u" * 32,
+                                                                   "macs": ["aa:bb:cc:dd:ee:01", "not-a-mac"]}})
+        boot_poll("c0ffee01")
+        boot_poll("c0ffee02")
+        boot_poll("c0ffee02")
+        f1 = next(n for n in call("/api/nodes")[1]["nodes"] if n["id"] == "cl-01")
+        check("代理重啟（舊的停了才有新的）：不算複製", not f1.get("clone"), f1.get("clone"))
+        queued = {}
+
+        def ask():
+            t1 = time.time()
+            queued["code"] = call("/api/node/cl-01/library", timeout=90)[0]
+            queued["secs"] = time.time() - t1
+        th = threading.Thread(target=ask)
+        th.start()
+        time.sleep(1.5)                      # 指令先排進 cl-01 的佇列（它剛輪詢過，算在線）
+        boot_poll("c0ffee01")
+        th.join(30)
+        check("  標成疑似複製時，已經排在佇列的指令不交給任何一支、當場失敗",
+              queued.get("code") not in (None, 200) and queued.get("secs", 99) < 20, queued)
+        f1 = next(n for n in call("/api/nodes")[1]["nodes"] if n["id"] == "cl-01")
+        seen = (f1.get("clone") or {}).get("seen") or []
+        check("兩個 boot 輪流連回：標成疑似複製，列出兩支", len(seen) == 2 and all(s["ip"] == "127.0.0.1" for s in seen), f1.get("clone"))
+        check("  網卡只收合法的 MAC", seen and seen[0]["macs"] == ["aa:bb:cc:dd:ee:01"], seen)
+        code, out = call("/api/node/cl-01/library")
+        check("  疑似複製的機器不下指令：409 並說明怎麼處理", code == 409 and "疑似是複製" in (out.get("error") or ""), (code, out))
+        c = http.client.HTTPSConnection("127.0.0.1", lport, context=ctx, timeout=40)
+        c.request("POST", "/api/agent/poll", body=json.dumps({"seen": [], "boot": "c0ffee02"}).encode(),
+                  headers={"Authorization": f"Bearer {clone_tok}", "X-XConsole-Node": "cl-01",
+                           "Content-Type": "application/json"})
+        r = c.getresponse()
+        pb = json.loads(r.read() or b"{}")
+        c.close()
+        check("  輪詢照樣收（才看得到它還在不在），但不交出任何指令", r.status == 200 and pb.get("cmds") == [] and pb.get("clone"), pb)
+        code, st = call("/api/node/ws-01/library")
+        check("  別台不受影響", code == 200, code)
+        code, _ = call("/api/nodes/cl-01/clone-clear", {})
+        f1 = next(n for n in call("/api/nodes")[1]["nodes"] if n["id"] == "cl-01")
+        check("管理者解除之後：不再標示", code == 200 and not f1.get("clone"), f1.get("clone"))
+        boot_poll("c0ffee01")
+        boot_poll("c0ffee02")
+        boot_poll("c0ffee01")
+        f1 = next(n for n in call("/api/nodes")[1]["nodes"] if n["id"] == "cl-01")
+        check("  沒處理就解除：兩支還同時在連回，馬上又標回來", bool(f1.get("clone")), f1.get("clone"))
+        call("/api/nodes/cl-01/clone-clear", {})
+
         # ---- 三、連線上限
         held, results, lock = [], [], threading.Lock()
         lv = json.load(open(alink))["v"]      # 跟真的代理一樣回報手上的通道設定版本：版本對了才會掛著等
@@ -552,9 +603,10 @@ def e2e():
             s.close()
         for th in ths:
             th.join(40)
-        ok200 = sum(1 for st, cmds in results if st == 200 and cmds == [])
+        # 連得上＝200 且有回指令清單；剛輪詢過的 fake-000 可能剛好收到每分鐘一次的群組對齊，也算連得上
+        ok200 = sum(1 for st, cmds in results if st == 200 and isinstance(cmds, list))
         check(f"同一來源 200 支已驗證的代理同時掛著長輪詢：全部連得上（{ok200}/200）",
-              ok200 == 200 and early == 0 and time.time() - t0 >= 20, (ok200, early, [r for r in results if r[0] != 200][:3]))
+              ok200 == 200 and early == 0 and time.time() - t0 >= 20, (ok200, early, [r for r in results if r[0] != 200 or not isinstance(r[1], list)][:3]))
         check(f"同一來源沒登入的連線：仍在第 65 條起被擋（70 條被關 {refused} 條）", refused == 6, refused)
         code, out = call("/api/link/rotate", {})
         code2, out2 = call("/api/link/rotate", {})

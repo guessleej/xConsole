@@ -4447,7 +4447,7 @@ async function settingsMachines(wrap) {
     const push = n.link === "push";   // 工作站：防火牆擋連入，由那台主動連回主控台
     tr.appendChild(Object.assign(el("td", "mono"), { textContent: push ? `${n.host}（由這台連回）` : `${n.host}:${n.agent_port || 9401}` }));
     tr.appendChild(el("td", "nowrap", live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
-    tr.appendChild(el("td", "nowrap " + (live?.online ? "" : "bad-t"), live?.online ? "在線" : (push ? "沒有連回" : "連不上")));
+    tr.appendChild(el("td", "nowrap " + (live?.online && !n.clone ? "" : "bad-t"), n.clone ? "疑似複製" : live?.online ? "在線" : (push ? "沒有連回" : "連不上")));
     tr.appendChild(Object.assign(el("td", "mono small"),
       { textContent: push ? "不需要（連回時驗權杖）" : n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
     const td = el("td", "row-acts");
@@ -4456,6 +4456,11 @@ async function settingsMachines(wrap) {
     const r = el("button", "btn sm danger", "移除");
     r.onclick = () => removeMachine(n);
     td.append(e, r);
+    if (n.clone) {
+      const c = el("button", "btn sm", "解除疑似複製");
+      c.onclick = () => clearClone(n, n.clone);
+      td.prepend(c);
+    }
     tr.appendChild(td);
     body.appendChild(tr);
   });
@@ -5668,6 +5673,7 @@ async function openMachineSettings(nid) {
   tb.onclick = () => importTrust(rec);
   tr.appendChild(tb);
   basic.appendChild(tr);
+  if (n.online && n.state?.identity) basic.appendChild(identityBox(n.state.identity));
 
   let fMM, fRam, fVram, fBw, fRbw, fRoot, fRootC, fLlama, fLlamaC, fSd, fSdC, fNote, fAgent, fGpuMode, fGpuName, fGpuVendor, fGpuVram, fHfMirror, fGhProxy, fDesk;
   if (!info) {
@@ -5829,6 +5835,47 @@ async function openMachineSettings(nid) {
     await refresh();
     render();
   });
+}
+
+// 同一個身分同時從兩個地方連回：列出看到的每一支（位址、主機板識別碼、網卡），管理者處理完才解除
+function clearClone(rec, info) {
+  const d = el("div");
+  d.appendChild(el("p", "note bad", `${rec.name} 的身分同時從下面幾個地方連回，分不出哪一台是原本那台，主控台已停止對它下指令。`));
+  const tb = el("table");
+  tb.innerHTML = "<thead><tr><th>位址</th><th>主機板識別碼</th><th>實體網卡</th><th>最後連回</th></tr></thead>";
+  const body = el("tbody");
+  (info.seen || []).forEach((s) => {
+    const tr = el("tr");
+    tr.appendChild(Object.assign(el("td", "mono"), { textContent: s.ip || "—" }));
+    tr.appendChild(Object.assign(el("td", "mono small"), { textContent: s.smbios || (s.basis === "disk" ? "無效，改看系統碟" : "讀不到") }));
+    tr.appendChild(Object.assign(el("td", "mono small"), { textContent: (s.macs || []).join("、") || "—" }));
+    tr.appendChild(el("td", "nowrap", s.at ? new Date(s.at * 1000).toLocaleString() : "—"));
+    body.appendChild(tr);
+  });
+  tb.appendChild(body);
+  d.appendChild(tb);
+  d.appendChild(el("p", "small", "處理方式：到上面每一台重新跑一次安裝程式（大量部署就再派送一次回應檔）。新版代理一啟動就會發現自己是複製出來的，丟掉舊身分、以新身分加入；原本那台照舊。處理完再按「解除」。"));
+  d.appendChild(el("p", "small muted", "還沒處理就解除，只要兩台還同時在連回，主控台會在兩分鐘內再標一次。"));
+  modal({ title: `解除 ${rec.name} 的疑似複製`, bodyNode: d, confirmText: "解除", onConfirm: async () => {
+    try { await api(`/api/nodes/${rec.id}/clone-clear`, { method: "POST", body: {} }); toast(`已解除 ${rec.name} 的疑似複製`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+    await refresh();
+    render();
+  } });
+}
+
+// 這台的身分：判定依據、主機板識別碼、網卡（只給參考）、重灌與重新加入的紀錄
+function identityBox(idt) {
+  const box = el("div");
+  box.appendChild(el("h4", "pick-h", "身分與複製偵測"));
+  const basis = { smbios: "主機板識別碼（SMBIOS UUID）", disk: "系統碟序號（主機板識別碼無效）" }[idt.basis]
+    || "無法判定（主機板識別碼與系統碟序號都讀不到）";
+  box.appendChild(kvRow("判定依據", basis));
+  if (idt.smbios) box.appendChild(kvRow("主機板識別碼", idt.smbios + (idt.smbios_valid ? "" : "（無效）")));
+  if (idt.macs?.length) box.appendChild(kvRow("實體網卡", idt.macs.join("、")));
+  if (idt.rejoin) box.appendChild(el("p", "note bad", `需要重新加入：${idt.rejoin.reason}`));
+  (idt.notes || []).slice(-3).forEach((x) => box.appendChild(el("p", "small muted", `${new Date(x.at * 1000).toLocaleString()}　${x.text}`)));
+  box.appendChild(el("p", "small muted", "網卡只記下來給你參考：筆電換網路、接擴充座都會變，不拿來判定是不是同一台。"));
+  return box;
 }
 
 function removeMachine(rec) {
