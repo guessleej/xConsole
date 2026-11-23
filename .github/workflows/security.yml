@@ -41,6 +41,8 @@ jobs:
         run: cd agent && python test_link.py
       - name: 群組設定對齊（代理這一側：準備與套用、SHA-256、套用時機、鎖定）
         run: cd agent && python test_group.py
+      - name: 身分與複製偵測（代理這一側：主機板識別碼、重灌、複製後丟掉身分、這台實際讀得到的識別碼）
+        run: cd agent && python test_identity.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
       - name: 群組加入碼（可用次數、有效時間、名稱樣板、限定網段、作廢、主控台重啟後仍有效）

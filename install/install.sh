@@ -69,7 +69,8 @@ mhome() { if [ "$OSN" = Darwin ]; then dscl . -read "/Users/$MU" NFSHomeDirector
 managed_uninstall() {
   mstop
   if [ "$OSN" = Darwin ]; then rm -f "/Library/LaunchDaemons/$LA.plist"
-  else H=$(mhome); [ -n "$H" ] && rm -f "$H/.config/systemd/user/xconsole-agent.service"; loginctl disable-linger "$MU" 2>/dev/null || true; fi
+  else H=$(mhome); [ -n "$H" ] && rm -f "$H/.config/systemd/user/xconsole-agent.service"; loginctl disable-linger "$MU" 2>/dev/null || true
+    systemctl disable --now xconsole-hwid.service >/dev/null 2>&1 || true; rm -f /etc/systemd/system/xconsole-hwid.service; rm -rf /run/xconsole; systemctl daemon-reload 2>/dev/null || true; fi
   echo "已移除大量部署裝的節點代理服務。專用帳號 $MU 與資料（$(mhome)）保留；要整個刪掉請自行刪除帳號與資料夾。"
   echo "記得到主控台把這台從清單移除。"
   exit 0
@@ -181,6 +182,22 @@ PLIST
     launchctl kickstart -k "system/$LA"
     AGENT_LOG="tail -n 50 $DATA/.xconsole/agent.log；launchd 的狀態：sudo launchctl print system/$LA"
   else
+    # 主機板識別碼（product_uuid）只有 root 讀得到：開機時由 root 抄一份到 /run 給代理做複製偵測（/run 每次開機重建，不會跟著映像複製）
+    cat > /etc/systemd/system/xconsole-hwid.service <<'UNIT'
+[Unit]
+Description=xConsole 複製偵測用的主機板識別碼
+Before=systemd-user-sessions.service user@.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'install -d -m 755 /run/xconsole && if [ -r /sys/class/dmi/id/product_uuid ]; then cat /sys/class/dmi/id/product_uuid > /run/xconsole/smbios_uuid.tmp && chmod 644 /run/xconsole/smbios_uuid.tmp && mv /run/xconsole/smbios_uuid.tmp /run/xconsole/smbios_uuid; fi'
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload
+    systemctl enable --now xconsole-hwid.service >/dev/null 2>&1 || echo "提醒：xconsole-hwid.service 沒有啟動成功，複製偵測會改看系統碟序號"
     loginctl enable-linger "$MU"
     local u; u=$(id -u "$MU")
     for i in $(seq 1 30); do [ -S "/run/user/$u/systemd/private" ] && break; sleep 1; done

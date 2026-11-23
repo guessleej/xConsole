@@ -22414,6 +22414,231 @@
 "ja": "外部 URL とプロキシサーバー（ノート PC が外部から接続し直すときだけ必要）",
 "ko": "외부 URL과 프록시 서버(노트북이 외부에서 다시 연결할 때만 필요)"
 },
+"疑似複製": {
+"en": "Suspected clone",
+"ja": "クローンの疑い",
+"ko": "복제 의심"
+},
+"解除疑似複製": {
+"en": "Clear clone flag",
+"ja": "クローンの疑いを解除",
+"ko": "복제 의심 해제"
+},
+"{0} 的身分同時從下面幾個地方連回，分不出哪一台是原本那台，主控台已停止對它下指令。": {
+"en": "The identity of {0} is connecting back from the places below at the same time. The original machine cannot be told apart, so the console has stopped sending it commands.",
+"ja": "{0} の ID が下記の複数の場所から同時に接続しています。元のマシンを判別できないため、コンソールはこのマシンへのコマンド送信を停止しました。",
+"ko": "{0}의 ID가 아래 여러 위치에서 동시에 연결하고 있습니다. 원래 기기를 구분할 수 없어 콘솔이 이 기기에 명령 전송을 중지했습니다."
+},
+"的身分同時從下面幾個地方連回，分不出哪一台是原本那台，主控台已停止對它下指令": {
+"en": " is connecting back from the places below at the same time. The original machine cannot be told apart, so the console has stopped sending it commands",
+"ja": " の ID が下記の複数の場所から同時に接続しています。元のマシンを判別できないため、コンソールはコマンド送信を停止しました",
+"ko": "의 ID가 아래 여러 위치에서 동시에 연결하고 있습니다. 원래 기기를 구분할 수 없어 콘솔이 명령 전송을 중지했습니다"
+},
+"<thead><tr><th>位址</th><th>主機板識別碼</th><th>實體網卡</th><th>最後連回</th></tr></thead>": {
+"en": "<thead><tr><th>Address</th><th>Board ID</th><th>Network adapters</th><th>Last seen</th></tr></thead>",
+"ja": "<thead><tr><th>アドレス</th><th>マザーボード ID</th><th>物理 NIC</th><th>最終接続</th></tr></thead>",
+"ko": "<thead><tr><th>주소</th><th>메인보드 ID</th><th>물리 네트워크 어댑터</th><th>마지막 연결</th></tr></thead>"
+},
+"主機板識別碼": {
+"en": "Board ID",
+"ja": "マザーボード ID",
+"ko": "메인보드 ID"
+},
+"實體網卡": {
+"en": "Network adapters",
+"ja": "物理 NIC",
+"ko": "물리 네트워크 어댑터"
+},
+"最後連回": {
+"en": "Last seen",
+"ja": "最終接続",
+"ko": "마지막 연결"
+},
+"無效，改看系統碟": {
+"en": "Invalid; using system disk instead",
+"ja": "無効のためシステムディスクで判定",
+"ko": "유효하지 않아 시스템 디스크로 판정"
+},
+"處理方式：到上面每一台重新跑一次安裝程式（大量部署就再派送一次回應檔）。新版代理一啟動就會發現自己是複製出來的，丟掉舊身分、以新身分加入；原本那台照舊。處理完再按「解除」。": {
+"en": "What to do: run the installer again on each machine above (for bulk deployment, push the response file again). On start, the new agent notices it is a clone, drops the old identity and joins with a new one; the original machine is unaffected. Press Clear when done.",
+"ja": "対処方法：上記の各マシンでインストーラーをもう一度実行してください（一括展開の場合は応答ファイルを再配布）。新しいエージェントは起動時に自分がクローンだと検出し、古い ID を破棄して新しい ID で参加します。元のマシンはそのままです。完了したら「解除」を押してください。",
+"ko": "처리 방법: 위의 각 기기에서 설치 프로그램을 다시 실행하세요(일괄 배포라면 응답 파일을 다시 배포). 새 에이전트는 시작 시 자신이 복제본임을 감지해 기존 ID를 버리고 새 ID로 가입합니다. 원래 기기는 그대로입니다. 완료되면 \"해제\"를 누르세요."
+},
+"還沒處理就解除，只要兩台還同時在連回，主控台會在兩分鐘內再標一次。": {
+"en": "If you clear it before fixing, the console flags it again within two minutes while both machines keep connecting back.",
+"ja": "対処前に解除しても、2 台が同時に接続している限り、コンソールは 2 分以内に再びフラグを付けます。",
+"ko": "처리 전에 해제해도 두 기기가 동시에 연결하고 있으면 콘솔이 2분 안에 다시 표시합니다."
+},
+"解除 {0} 的疑似複製": {
+"en": "Clear clone flag on {0}",
+"ja": "{0} のクローンの疑いを解除",
+"ko": "{0}의 복제 의심 해제"
+},
+"解除": {
+"en": "Clear",
+"ja": "解除",
+"ko": "해제"
+},
+"的疑似複製": {
+"en": " clone flag",
+"ja": " のクローンの疑い",
+"ko": "의 복제 의심"
+},
+"已解除 {0} 的疑似複製": {
+"en": "Cleared the clone flag on {0}",
+"ja": "{0} のクローンの疑いを解除しました",
+"ko": "{0}의 복제 의심을 해제했습니다"
+},
+"已解除": {
+"en": "Cleared",
+"ja": "解除しました",
+"ko": "해제했습니다"
+},
+"身分與複製偵測": {
+"en": "Identity and clone detection",
+"ja": "ID とクローン検出",
+"ko": "ID 및 복제 감지"
+},
+"主機板識別碼（SMBIOS UUID）": {
+"en": "Board ID (SMBIOS UUID)",
+"ja": "マザーボード ID（SMBIOS UUID）",
+"ko": "메인보드 ID(SMBIOS UUID)"
+},
+"系統碟序號（主機板識別碼無效）": {
+"en": "System disk serial (board ID invalid)",
+"ja": "システムディスクのシリアル（マザーボード ID が無効）",
+"ko": "시스템 디스크 일련번호(메인보드 ID 무효)"
+},
+"無法判定（主機板識別碼與系統碟序號都讀不到）": {
+"en": "Cannot tell (neither board ID nor system disk serial is readable)",
+"ja": "判定不可（マザーボード ID もシステムディスクのシリアルも読めません）",
+"ko": "판정 불가(메인보드 ID와 시스템 디스크 일련번호를 모두 읽을 수 없음)"
+},
+"判定依據": {
+"en": "Based on",
+"ja": "判定基準",
+"ko": "판정 기준"
+},
+"（無效）": {
+"en": " (invalid)",
+"ja": "（無効）",
+"ko": "(무효)"
+},
+"需要重新加入：{0}": {
+"en": "Needs to rejoin: {0}",
+"ja": "再参加が必要：{0}",
+"ko": "다시 가입 필요: {0}"
+},
+"需要重新加入": {
+"en": "Needs to rejoin",
+"ja": "再参加が必要",
+"ko": "다시 가입 필요"
+},
+"網卡只記下來給你參考：筆電換網路、接擴充座都會變，不拿來判定是不是同一台。": {
+"en": "Network adapters are recorded for reference only: they change when a laptop switches networks or docks, so they are not used to tell machines apart.",
+"ja": "NIC は参考として記録するだけです。ノート PC のネットワーク切り替えやドック接続で変わるため、同一マシンかの判定には使いません。",
+"ko": "네트워크 어댑터는 참고용으로만 기록합니다. 노트북이 네트워크를 바꾸거나 도킹하면 바뀌므로 같은 기기인지 판정하는 데 쓰지 않습니다."
+},
+"{0}（{1}）疑似被複製：同一個身分同時從 {2} 連回，已停止對它下指令": {
+"en": "{0} ({1}) looks cloned: the same identity is connecting back from {2} at the same time; commands to it are stopped",
+"ja": "{0}（{1}）はクローンの疑いがあります：同じ ID が {2} から同時に接続しているため、コマンド送信を停止しました",
+"ko": "{0}({1}) 복제 의심: 같은 ID가 {2}에서 동시에 연결해 명령 전송을 중지했습니다"
+},
+"疑似被複製：同一個身分同時從": {
+"en": " looks cloned: the same identity is connecting back from",
+"ja": "はクローンの疑いがあります：同じ ID が",
+"ko": "복제 의심: 같은 ID가"
+},
+"連回，已停止對它下指令": {
+"en": " at the same time; commands to it are stopped",
+"ja": "から同時に接続しているため、コマンド送信を停止しました",
+"ko": "에서 동시에 연결해 명령 전송을 중지했습니다"
+},
+"{0} 疑似是複製出來的：同一個身分同時從 {1} 連回。分不出哪一台是原本那台，已停止對它下指令。請到那幾台重新安裝代理（複製出來的那台會以新身分加入），再到機器頁按「解除疑似複製」": {
+"en": "{0} looks like a clone: the same identity is connecting back from {1} at the same time. The original cannot be told apart, so commands to it are stopped. Reinstall the agent on those machines (the clone joins with a new identity), then press Clear clone flag on the Machines page",
+"ja": "{0} はクローンの疑いがあります：同じ ID が {1} から同時に接続しています。元のマシンを判別できないため、コマンド送信を停止しました。該当マシンにエージェントを再インストールし（クローンは新しい ID で参加します）、マシンのページで「クローンの疑いを解除」を押してください",
+"ko": "{0} 복제 의심: 같은 ID가 {1}에서 동시에 연결하고 있습니다. 원래 기기를 구분할 수 없어 명령 전송을 중지했습니다. 해당 기기들에 에이전트를 다시 설치한 뒤(복제본은 새 ID로 가입) 기기 페이지에서 \"복제 의심 해제\"를 누르세요"
+},
+"疑似是複製出來的：同一個身分同時從": {
+"en": " looks like a clone: the same identity is connecting back from",
+"ja": "はクローンの疑いがあります：同じ ID が",
+"ko": "복제 의심: 같은 ID가"
+},
+"連回。分不出哪一台是原本那台，已停止對它下指令。請到那幾台重新安裝代理（複製出來的那台會以新身分加入），再到機器頁按「解除疑似複製」": {
+"en": " at the same time. The original cannot be told apart, so commands to it are stopped. Reinstall the agent on those machines (the clone joins with a new identity), then press Clear clone flag on the Machines page",
+"ja": "から同時に接続しています。元のマシンを判別できないため、コマンド送信を停止しました。該当マシンにエージェントを再インストールし（クローンは新しい ID で参加します）、マシンのページで「クローンの疑いを解除」を押してください",
+"ko": "에서 동시에 연결하고 있습니다. 원래 기기를 구분할 수 없어 명령 전송을 중지했습니다. 해당 기기들에 에이전트를 다시 설치한 뒤(복제본은 새 ID로 가입) 기기 페이지에서 \"복제 의심 해제\"를 누르세요"
+},
+"）疑似被複製：同一個身分同時從 ": {
+"en": ") looks cloned: the same identity is connecting back from ",
+"ja": "）はクローンの疑いがあります：同じ ID が ",
+"ko": ") 복제 의심: 같은 ID가 "
+},
+" 連回，已停止對它下指令": {
+"en": " at the same time; commands to it are stopped",
+"ja": " から同時に接続しているため、コマンド送信を停止しました",
+"ko": "에서 동시에 연결해 명령 전송을 중지했습니다"
+},
+" 疑似是複製出來的：同一個身分同時從 ": {
+"en": " looks like a clone: the same identity is connecting back from ",
+"ja": " はクローンの疑いがあります：同じ ID が ",
+"ko": " 복제 의심: 같은 ID가 "
+},
+" 連回。分不出哪一台是原本那台，已停止對它下指令。請到那幾台重新安裝代理（複製出來的那台會以新身分加入），再到機器頁按「解除疑似複製」": {
+"en": " at the same time. The original cannot be told apart, so commands to it are stopped. Reinstall the agent on those machines (the clone joins with a new identity), then press Clear clone flag on the Machines page",
+"ja": " から同時に接続しています。元のマシンを判別できないため、コマンド送信を停止しました。該当マシンにエージェントを再インストールし（クローンは新しい ID で参加します）、マシンのページで「クローンの疑いを解除」を押してください",
+"ko": "에서 동시에 연결하고 있습니다. 원래 기기를 구분할 수 없어 명령 전송을 중지했습니다. 해당 기기들에 에이전트를 다시 설치한 뒤(복제본은 새 ID로 가입) 기기 페이지에서 \"복제 의심 해제\"를 누르세요"
+},
+"已用新身分重新加入": {
+"en": "Rejoined with a new identity",
+"ja": "新しい ID で再参加しました",
+"ko": "새 ID로 다시 가입했습니다"
+},
+"系統碟序號": {
+"en": "system disk serial",
+"ja": "システムディスクのシリアル",
+"ko": "시스템 디스크 일련번호"
+},
+"{0}變了：舊身分已丟掉，需要重新加入主控台": {
+"en": "The {0} changed: the old identity was dropped and the machine must rejoin the console",
+"ja": "{0}が変わりました：古い ID を破棄したため、コンソールへの再参加が必要です",
+"ko": "{0}이(가) 바뀌었습니다: 기존 ID를 버렸으므로 콘솔에 다시 가입해야 합니다"
+},
+"變了：舊身分已丟掉，需要重新加入主控台": {
+"en": " changed: the old identity was dropped and the machine must rejoin the console",
+"ja": "が変わりました：古い ID を破棄したため、コンソールへの再参加が必要です",
+"ko": "이(가) 바뀌었습니다: 기존 ID를 버렸으므로 콘솔에 다시 가입해야 합니다"
+},
+"這台的{0}跟當初加入時不同，判定是複製出來的另一台：已丟掉舊身分，請重新加入主控台": {
+"en": "This machine's {0} differs from when it joined, so it is treated as a cloned copy: the old identity was dropped; please rejoin the console",
+"ja": "このマシンの{0}が参加時と異なるため、複製された別のマシンと判定しました：古い ID を破棄しました。コンソールに再参加してください",
+"ko": "이 기기의 {0}이(가) 가입 당시와 달라 복제된 다른 기기로 판정했습니다: 기존 ID를 버렸으니 콘솔에 다시 가입하세요"
+},
+"這台的": {
+"en": "This machine's ",
+"ja": "このマシンの",
+"ko": "이 기기의 "
+},
+"跟當初加入時不同，判定是複製出來的另一台：已丟掉舊身分，請重新加入主控台": {
+"en": " differs from when it joined, so it is treated as a cloned copy: the old identity was dropped; please rejoin the console",
+"ja": "が参加時と異なるため、複製された別のマシンと判定しました：古い ID を破棄しました。コンソールに再参加してください",
+"ko": "이(가) 가입 당시와 달라 복제된 다른 기기로 판정했습니다: 기존 ID를 버렸으니 콘솔에 다시 가입하세요"
+},
+"{0}跟當初加入時不同，判定是複製出來的另一台": {
+"en": "The {0} differs from when it joined, so it is treated as a cloned copy",
+"ja": "{0}が参加時と異なるため、複製された別のマシンと判定しました",
+"ko": "{0}이(가) 가입 당시와 달라 복제된 다른 기기로 판정했습니다"
+},
+"跟當初加入時不同，判定是複製出來的另一台": {
+"en": " differs from when it joined, so it is treated as a cloned copy",
+"ja": "が参加時と異なるため、複製された別のマシンと判定しました",
+"ko": "이(가) 가입 당시와 달라 복제된 다른 기기로 판정했습니다"
+},
+"作業系統識別碼變了（同一台重灌過），身分保留": {
+"en": "The OS ID changed (same machine, reinstalled); identity kept",
+"ja": "OS ID が変わりました（同じマシンの再インストール）。ID は保持します",
+"ko": "OS ID가 바뀌었습니다(같은 기기를 재설치함). ID는 유지합니다"
+},
 "不到1 tok/s": {
 "en": "under 1 tok/s",
 "ja": "1 tok/s 未満",
