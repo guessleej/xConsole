@@ -11460,6 +11460,10 @@
 "pattern": false
 },
 {
+"zh": "維運只能建空欄位；登記這台已經在跑的服務要管理員",
+"pattern": false
+},
+{
 "zh": "一次匯入 1～500 個帳號",
 "pattern": false
 },

@@ -5329,6 +5329,18 @@ function userForm(u, done, pre) {
     sw.appendChild(lb);
     return cb;
   });
+  // 負責的群組被刪了：id 還留在範圍裡（他才會什麼都看不到）。照樣列出來並勾著，改別的欄位時不會被當成「都不勾＝全部」
+  const gone = (v.scope || []).filter((id) => !(S.userGroups || []).some((g) => g.id === id));
+  gone.forEach((id) => {
+    const lb = el("label");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = id;
+    cb.checked = true;
+    lb.append(cb, el("span", null, "（已刪除的群組）"));
+    sw.appendChild(lb);
+    cbs.push(cb);
+  });
   const scopeRow = fld("負責群組", sw, "只看得到、只管得到勾選的群組裡的機器；都不勾＝全部群組");
   const syncScope = () => { scopeRow.parentNode.hidden = fRole.value === "admin"; };
   fRole.addEventListener("change", syncScope);

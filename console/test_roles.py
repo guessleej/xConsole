@@ -155,7 +155,8 @@ EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)",
                     r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
                     r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
 EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
-                      r"POST /api/groups/a{8}/update"]
+                      r"POST /api/groups/a{8}/update",
+                      r"POST /api/node/a/slots/add"]
 
 
 def expected(method, path, role="user"):
@@ -245,6 +246,16 @@ def _roles_and_scope(admin):
     st, o = vw.req("POST", "/api/node/n1/slot/s/start", {})
     check("檢視：範圍內也不能操作 → 403並講清楚", st == 403 and "檢視" in o.get("error", ""), (st, o))
     check("  檢視看得到狀態", vw.req("GET", "/api/node/n1/state")[0] == 200)
+    # 這台還沒有欄位時，「啟動模型」會先建一格空欄位：維運要能建，但只能是空欄位、只帶那幾個欄位
+    sent = []
+    keep_call = x.call_node
+    x.call_node = lambda nid, path, method="GET", body=None, timeout=40: (sent.append((path, body)), (200, {"ok": True}))[1]
+    st, _ = op.req("POST", "/api/node/n1/slots/add", {"type": "empty", "role": "主模型", "tier": "", "caps": ["文字"], "port": 22})
+    check("維運在沒有欄位的機器按啟動：能建空欄位，多帶的欄位丟掉", st == 200 and sent[-1] == ("/slots/add", {"type": "empty", "role": "主模型", "tier": "", "caps": ["文字"]}), sent[-1:])
+    st, o = op.req("POST", "/api/node/n1/slots/add", {"type": "systemd", "unit": "ssh.service"})
+    check("  登記既有服務 → 403", st == 403 and len(sent) == 1, (st, o))
+    check("  範圍外的機器 → 404", op.req("POST", "/api/node/n2/slots/add", {"type": "empty"})[0] == 404)
+    x.call_node = keep_call
     for path in ("/api/nodes/n1/update", "/api/users/create", "/api/node/n1/library/download", "/api/groups"):
         st, o = op.req("POST", path, {})
         check(f"維運不能：{path} → 403", st == 403 and o.get("admin_only"), (st, o))
@@ -265,10 +276,21 @@ def _roles_and_scope(admin):
     check("  範圍內的可以", st == 200, (st, o))
     kid = o["item"]["id"]
     check("  改金鑰也不能改成範圍外", op.req("POST", f"/api/keys/{kid}/update", {"slots": ["n2/s"]})[0] == 400)
+    keep_rows = x.GW_ROUTES.rows
+    x.GW_ROUTES.rows = lambda: [{"name": "a-model", "node": "n1", "slot": "s", "online": True},
+                                {"name": "b-model", "node": "n2", "slot": "s", "online": True}]
+    st, o = op.req("GET", "/api/keys")
+    check("  金鑰頁的「可用模型」只列範圍內的（範圍外的不露）", st == 200 and o["models"] == ["a-model"], o.get("models"))
+    check("  管理員看全部", admin.req("GET", "/api/keys")[1]["models"] == ["a-model", "b-model"])
+    x.GW_ROUTES.rows = keep_rows
     row = x.STORE.key_get(kid)
     check("  加密入口：範圍內的格子用得到", x.key_allowed(row)({"node": "n1", "slot": "s"}))
+    t = x.AgentTask("teacher-a@cloudinfo.com.tw", "", "n1", "f", {"kind": "local", "node": "n1", "slot": "s"}, "p", "l")
+    t.state = "running"
+    x.AGENT_TASKS[t.id] = t
     admin.req("POST", "/api/users/teacher-a@cloudinfo.com.tw/update", {"scope": [gb]})
     check("  管理員把他改到別的群組：舊金鑰馬上用不到原本那台", not x.key_allowed(row)({"node": "n1", "slot": "s"}))
+    check("  他在原本那台進行中的 Agent 任務停掉", t.state == "stopped", t.state)
     check("改了範圍：他現在的登入馬上失效", op.req("GET", "/api/me")[0] == 401)
     op.login("teacher-a@cloudinfo.com.tw", op_pw)
     check("  重新登入後看到的是新範圍", [n["id"] for n in op.req("GET", "/api/fleet")[1]["nodes"]] == ["n2"])
@@ -290,6 +312,10 @@ def _roles_and_scope(admin):
     check("負責的群組被刪了：什麼都看不到（不會變成看全部）", fl["nodes"] == [] and fl["groups"] == [], fl)
     check("  帳號清單照實留著那個群組（畫面標「已刪除的群組」）",
           next(u for u in admin.req("GET", "/api/users")[1]["items"] if u["username"] == "viewer-a@cloudinfo.com.tw")["scope"] == [ga])
+    st, o = admin.req("POST", "/api/users/viewer-a@cloudinfo.com.tw/update", {"display": "改名字", "scope": [ga]})
+    check("  只改顯示名稱（表單把已刪除的群組照樣送回）：照收，範圍不變、不會變成不限", st == 200 and o["user"]["scope"] == [ga], (st, o))
+    st, o = admin.req("POST", "/api/users/teacher-a@cloudinfo.com.tw/update", {"scope": [ga]})
+    check("  別人不能被加進已刪除的群組（只有原本就有的才照收）", st == 400, (st, o))
 
     # 批次匯入收新角色；最後一位管理員不能被降成維運
     st, o = admin.req("POST", "/api/users/import", {"rows": [{"username": "op-imp@cloudinfo.com.tw", "role": "operator"},

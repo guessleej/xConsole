@@ -125,6 +125,7 @@ VIEWER_ROUTES = [
 OPERATOR_ROUTES = [
     ("POST", r"/api/node/[\w.-]+/slot/[\w.-]+/(start|stop|restart|model)"),
     ("POST", r"/api/node/[\w.-]+/(all/(start|stop|restart)|admit/[\w.-]+|profile/[\w.-]+)"),
+    ("POST", r"/api/node/[\w.-]+/slots/add"),         # 只限空欄位：這台還沒有欄位時，按「啟動模型」會先自動建一格
     ("POST", r"/api/groups/[0-9a-f]{8}/update"),
 ]
 ROLES = ("admin", "operator", "viewer", "user")
@@ -477,7 +478,8 @@ def one_time_password():
     return "".join(secrets.choice(abc) for _ in range(16))
 
 
-def user_fields(body, partial=False):
+def user_fields(body, partial=False, keep=()):
+    """keep：這個帳號原本範圍裡的群組id。群組刪了之後仍留在範圍裡（他才會什麼都看不到），存檔時照收，不擋。"""
     out = {}
     if not partial:
         u = str(body.get("username") or "").strip()
@@ -496,7 +498,7 @@ def user_fields(body, partial=False):
         out["role"] = r
     if not partial or "scope" in body:
         sc = body.get("scope") or []
-        ids = {g["id"] for g in fleet().get("groups", [])}
+        ids = {g["id"] for g in fleet().get("groups", [])} | set(keep)
         if not isinstance(sc, list) or any(not isinstance(x, str) or x not in ids for x in sc):
             return None, "群組範圍要是現有群組的清單；空的＝不限群組"
         out["scope"] = json.dumps(sorted(set(sc))) if sc else None
@@ -569,7 +571,7 @@ def _user_change(username, body, me):
     cur = STORE.user_get(username)
     if not cur:
         return 404, {"error": "沒有這個帳號"}
-    f, err = user_fields(body, partial=True)
+    f, err = user_fields(body, partial=True, keep=scope_of(cur) or ())
     if err:
         return 400, {"error": err}
     losing_admin = cur["role"] == "admin" and not cur.get("disabled") and (f.get("role", "admin") != "admin" or f.get("disabled") == 1)
@@ -580,8 +582,8 @@ def _user_change(username, body, me):
     STORE.user_update(username, f)
     if f.get("disabled") == 1 or (f.get("role") or cur["role"]) != cur["role"] or f.get("scope", cur.get("scope")) != cur.get("scope"):
         STORE.session_end_all(username)              # 停用、換角色、改群組範圍：現有的登入馬上失效
+        cut_agent_tasks(username)                    # 進行中的 Agent 任務也停掉：不能在舊的機器與資料夾上繼續跑
     if losing_admin:
-        cut_agent_tasks(username)                    # 進行中的 Agent 任務停掉，也不能再執行指令
         transfer_legacy_auth(username, me)
     return 200, {"ok": True, "user": user_public(STORE.user_get(username))}
 
@@ -2054,11 +2056,14 @@ def key_allowed(row):
 
 
 def keys_overview(owner=None):
+    """owner：使用者看自己的；模型名稱也只列他「目前」範圍內的機器上的，範圍外的不露。"""
+    sc = scope_of(STORE.user_get(owner)) if owner else None
+    ok = scope_nodes(sc) if sc is not None else None
     use = STORE.usage_by_key(gateway.month_start())
     zero = {"requests": 0, "errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
     return {"items": [gateway.public(r, use.get(r["id"], zero)) for r in STORE.key_list(owner)],
             "url": gateway_url(), "url_custom": bool((fleet().get("gateway") or {}).get("public_url")),
-            "models": sorted({r["name"] for r in GW_ROUTES.rows() if r.get("online")}),
+            "models": sorted({r["name"] for r in GW_ROUTES.rows() if r.get("online") and (ok is None or r["node"] in ok)}),
             "limits": {"name": gateway.NAME_MAX, "inflight": gateway.INFLIGHT_MAX, "default_inflight": gateway.DEFAULT_INFLIGHT}}
 
 
@@ -3986,6 +3991,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel|sd/build|sd/build/cancel)", path)
         if m:
+            if m.group(2) == "slots/add" and not self.is_admin:
+                # 維運只能建空欄位（啟動模型時自動建的那一格），不能登記既有服務（那要填服務名稱、埠、記錄檔）
+                if body.get("type") != "empty":
+                    return self._json(403, {"error": "維運只能建空欄位；登記這台已經在跑的服務要管理員"})
+                body = {k: body[k] for k in ("type", "role", "tier", "caps") if k in body}
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
             act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
                    "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel",

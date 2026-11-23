@@ -23408,5 +23408,10 @@
 "en": "cannot be reached. Pick another machine, or ask an administrator to check that it is on and connected",
 "ja": "に接続できません。別のマシンを選ぶか、電源とネットワークを管理者に確認してもらってください",
 "ko": "에 연결할 수 없습니다. 다른 머신을 고르거나 전원과 네트워크를 관리자에게 확인해 달라고 하세요"
+},
+"維運只能建空欄位；登記這台已經在跑的服務要管理員": {
+"en": "Operators can only create an empty slot; registering a service already running on this machine requires an administrator",
+"ja": "運用担当が作成できるのは空のスロットのみです。このマシンで既に動いているサービスの登録は管理者が行います",
+"ko": "운영자는 빈 슬롯만 만들 수 있습니다. 이 머신에서 이미 실행 중인 서비스 등록은 관리자가 해야 합니다"
 }
 }
