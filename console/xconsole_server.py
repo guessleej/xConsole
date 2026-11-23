@@ -1078,7 +1078,8 @@ LAUNCHD_LABEL = "tw.xcloudinfo.xconsole-agent"
 
 
 def install_script(code, j):
-    """Linux 與 macOS 共用的安裝腳本：Linux 建 systemd 使用者服務，macOS 建 launchd 的 LaunchAgent。"""
+    """Linux 與 macOS 共用的安裝腳本：Linux 建 systemd 使用者服務，macOS 建 launchd 的 LaunchAgent。
+    加入碼走 here-string 給 Python 的標準輸入：不放環境變數（會出現在 /proc/<pid>/environ）也不放參數（會出現在 ps）。"""
     url = f"https://{j['console']}"
     return f"""#!/usr/bin/env bash
 # xConsole 節點代理安裝（Linux／macOS）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
@@ -1157,8 +1158,7 @@ for i in $(seq 1 30); do
 done
 [ "$UP" = yes ] || {{ echo "代理沒有起來，請看記錄：$LOGHINT"; exit 1; }}
 echo "== 4/4 加入主控台 =="
-RESP=$(XC_CODE="$CODE" XC_LINGER="$LINGER" "$PY" - <<'PY' | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
-{JOIN_PAYLOAD_PY}PY
+RESP=$(XC_LINGER="$LINGER" "$PY" -c '{JOIN_PAYLOAD_PY}' <<<"$CODE" | curl -sSk -m 150 --pinnedpubkey "$PIN" -H 'Content-Type: application/json' --data-binary @- -w '\\n%{{http_code}}' "$C/api/join"
 ) || {{ echo "連不到主控台 $C"; exit 1; }}
 STATUS=$(printf '%s' "$RESP" | tail -n 1)
 printf '%s' "$RESP" | sed '$d' | XCONSOLE_HOME="$HOME" "$PY" -c '{JOIN_SAVE_PY}'
@@ -1169,7 +1169,8 @@ exit 0
 """
 
 
-# 送回主控台的加入資料：權杖、代理憑證、這台的 IP（UDP connect 不送封包，三個系統都能取到對外網卡的 IP）
+# 送回主控台的加入資料：權杖、代理憑證、這台的 IP（UDP connect 不送封包，三個系統都能取到對外網卡的 IP）。
+# 加入碼從標準輸入讀。給 bash 的 -c '...' 用，所以整段不能有單引號
 JOIN_PAYLOAD_PY = """import json, os, socket, sys
 home = os.environ.get("XCONSOLE_HOME") or os.path.expanduser("~")
 ips = []
@@ -1177,7 +1178,7 @@ try:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("1.1.1.1", 80)); ips.append(s.getsockname()[0]); s.close()
 except OSError:
     pass
-print(json.dumps({"code": os.environ["XC_CODE"], "hostname": socket.gethostname(), "port": 9401, "ips": ips,
+print(json.dumps({"code": sys.stdin.readline().strip(), "hostname": socket.gethostname(), "port": 9401, "ips": ips,
                   "linger": os.environ.get("XC_LINGER", "yes") == "yes", "push": True,
                   "token": open(os.path.join(home, ".xconsole", "token")).read().strip(),
                   "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
@@ -1205,7 +1206,7 @@ if d.get("link") == "push" and c.get("url") and c.get("cert"):
             fh.write(data)
         os.replace(tmp, os.path.join(sd, name))
 """
-assert "'" not in JOIN_SAVE_PY
+assert "'" not in JOIN_SAVE_PY and "'" not in JOIN_PAYLOAD_PY
 
 
 def install_script_ps1(code, j):
@@ -1287,9 +1288,12 @@ Write-Host '== 5/5 加入主控台 =='
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
   $h = [Security.Cryptography.SHA256]::Create().ComputeHash($cert.GetRawCertData())
   ([BitConverter]::ToString($h) -replace '-', '') -eq $FP }}
-$env:XC_CODE = $CODE; $env:XC_LINGER = 'yes'; $env:XCONSOLE_HOME = $base
-$payload = @'
-{JOIN_PAYLOAD_PY}'@ | & $vpy -
+$env:XC_LINGER = 'yes'; $env:XCONSOLE_HOME = $base
+# 加入碼經由管線給 Python 的標準輸入，不放環境變數；程式本身先寫成檔（它不是機密）
+$jp = Join-Path $dir 'join_payload.py'
+[IO.File]::WriteAllText($jp, @'
+{JOIN_PAYLOAD_PY}'@, (New-Object Text.UTF8Encoding $false))
+$payload = $CODE | & $vpy $jp
 $req = New-Object Net.WebClient; $req.Headers.Add('Content-Type', 'application/json'); $req.Encoding = [Text.Encoding]::UTF8
 try {{ $resp = $req.UploadString("$C/api/join", $payload); $ok = $true }} catch [Net.WebException] {{
   $resp = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd(); $ok = $false }}
@@ -3720,7 +3724,13 @@ class Handler(BaseHTTPRequestHandler):
                                                         "minutes": j["minutes"], "cidrs": j["cidrs"]})
             url = f"https://{host}/install/{code}/agent.sh"
             ps = windows_command(f"https://{host}/install/{code}/agent.ps1").replace("{fp}", j["fp"])
+            # 大量部署（Intune、SCCM、Jamf、映像）：安裝包派送到每台，加入碼放回應檔，指令裡只有位址與憑證指紋
+            silent = {"code": code, "fingerprint": j["fp"],
+                      "unix": f"sudo bash install/install.sh --console {host} --fingerprint {j['fp']} --join-code-file /var/tmp/xconsole-join.txt",
+                      "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File install\\install.ps1 "
+                                 f"-Console {host} -Fingerprint {j['fp']} -JoinCodeFile C:\\Windows\\Temp\\xconsole-join.txt"}
             return self._json(200, {"id": j["id"], "expires_at": j["exp"], "uses": j["uses"], "names": j["names"][:j["uses"]],
+                                    "silent": silent,
                                     "command": f"curl -fsSk --pinnedpubkey '{j['pin']}' '{url}' | bash",
                                     "command_windows": "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand "
                                                        + base64.b64encode(ps.encode("utf-16-le")).decode(),
