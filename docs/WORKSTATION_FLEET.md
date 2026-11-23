@@ -140,8 +140,8 @@
   - 加入碼也不寫進環境變數。管理者在主控台看得到每個加入碼加入了哪些機器，可以隨時作廢，也可以限定只收某個網段來的加入。
 - **開機就跑**：受管機器一律裝成開機自動啟動，不能只在使用者登入時才啟動，否則教室裡沒人登入的機器收不到設定。
   - Windows：`SYSTEM` 排程（`install.ps1` 系統管理員模式已有）。
-  - Linux：systemd 系統服務，以專用帳號執行。
-  - **macOS：改成 LaunchDaemon**（`/Library/LaunchDaemons`，以專用帳號執行）。現行安裝的是使用者的 LaunchAgent，登入後才會啟動（`console/xconsole_server.py` 的 `install_script()`），開著機但沒人登入的教室 Mac 會一直離線。Metal 在 LaunchDaemon 底下能不能用要先實測，不行就改用 CPU 跑，並在畫面上標示。
+  - Linux：以專用帳號 `xconsole` 執行，開機由 systemd 帶起它的使用者服務（linger）。不直接寫成系統服務的原因：代理用 `systemctl --user` 管模型服務、用 `systemd-run --user --scope` 讓編譯與產圖跳出代理的資源上限，這兩件事都要在那個帳號自己的 systemd 底下做。
+  - **macOS：大量部署裝成 LaunchDaemon**（`/Library/LaunchDaemons`，以隱藏帳號 `_xconsole` 執行）。「加一台機器」的一行指令仍是使用者的 LaunchAgent，登入後才會啟動，開著機但沒人登入的教室 Mac 請用大量部署。代理啟動時實際向系統要一次 Metal 裝置，拿不到就不列 GPU、模型改用 CPU 跑，機器頁的記憶體區寫明原因。
 - **身分與複製偵測**：
   - 代理第一次啟動時產生節點身分，並記下這幾個識別碼：作業系統識別碼（Windows 的 MachineGuid、Linux 的 `/etc/machine-id`）、SMBIOS UUID、系統碟序號，以及所有實體網卡的 MAC。
   - **網卡不參與判定**：筆電在 Wi-Fi、有線、USB 擴充座之間切換，「主要網卡」就會變。MAC 只記下來給管理者參考，變了也不影響身分。
@@ -342,7 +342,7 @@ xConsole 目前沒有這項，全域規則要求每套交付的系統都要有�
 | 4 | 群組物件、群組設定、版本號 | 一 | 完成（「設定 → 群組」新增、改設定、改名、刪除；設定內容真的變了版本號才加一；舊版的群組名稱啟動時補成群組物件） |
 | 5 | 準備與套用兩段對齊（兩個版本號、依 `apply_at`、以主控台時鐘為準）、逐步回報、鎖定強制 | 一 | 完成（主控台每分鐘、改設定時立即送；模型下載後核對 Hugging Face 公布的 SHA-256；`auto`、同群組互傳與鏡像、存放位置、保留記憶體、功耗上限等後續項目在步驟紀錄裡標「略過」） |
 | 6 | 群組加入碼（限次、限時、名稱樣板） | 一 | 完成（可用 1～1000 次、5 分鐘到 7 天；樣板 `A{01..20}` 依加入順序給名稱並當代號；可限定網段；只存雜湊、主控台重啟後仍有效；「設定／群組」的加入碼清單看加入了哪些機器、可作廢。標準輸入與回應檔歸第 7 項） |
-| 7 | 靜默安裝參數（加入碼只收標準輸入或回應檔）；Windows SYSTEM、Linux 系統服務、macOS LaunchDaemon | 一 | 未開始 |
+| 7 | 靜默安裝參數（加入碼只收標準輸入或回應檔）；Windows SYSTEM、Linux 系統服務、macOS LaunchDaemon | 一 | 完成（`install.sh --console … --fingerprint … --join-code-file …`、`install.ps1 -Console … -Fingerprint … -JoinCodeFile … -DataDrive D:`；`-JoinCode` 一律拒絕；回應檔權限只給 root 或 SYSTEM 與 Administrators、讀完即刪；Linux 專用帳號 `xconsole`＋linger、macOS `_xconsole` 的 LaunchDaemon、Windows SYSTEM；Metal 拿不到時改用 CPU 並標示；主控台產的腳本也不再用環境變數傳加入碼；CI 三個作業系統實裝驗收） |
 | 8 | 複製偵測（SMBIOS 與作業系統識別碼判定、網卡不參與、無效 UUID 改看系統碟序號） | 一 | 未開始 |
 | 9 | 群組總覽、就緒狀態、設定順序軸 | 一 | 未開始 |
 | 10 | 多帳號、三種角色、群組範圍 | 一 | 未開始 |

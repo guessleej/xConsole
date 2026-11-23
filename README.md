@@ -159,6 +159,21 @@
 要把別台機器加進來，在網頁「加一台機器」產生指令：Linux 與 macOS 是同一行 `curl … | bash`，Windows 是一行
 `powershell -EncodedCommand …`（畫面上可以展開原文）。兩種都釘住主控台的憑證，不是關掉驗證。
 
+**大量部署（Intune、SCCM、Jamf、Ansible、映像派送）**：安裝包派送到每台，加入碼寫進回應檔，用 root／系統管理員跑一行，只裝節點代理並加入既有的主控台。
+指令與指紋在「加一台機器 → 大量部署」抄：
+
+| 系統 | 指令 | 裝成什麼 |
+|---|---|---|
+| Linux | `sudo bash install/install.sh --console <主控台:埠> --fingerprint <指紋> --join-code-file <回應檔> [--data-dir <資料夾>]` | 專用帳號 `xconsole`（資料預設 `/var/lib/xconsole`），開機由 systemd 帶起它的服務（linger） |
+| macOS | 同上 | 隱藏帳號 `_xconsole`（資料預設 `/opt/xconsole`），LaunchDaemon；背景服務拿不到 Metal 時改用 CPU 跑，機器頁會標出來 |
+| Windows | `powershell -ExecutionPolicy Bypass -File install\install.ps1 -Console <主控台:埠> -Fingerprint <指紋> -JoinCodeFile <回應檔> [-DataDrive D:]` | SYSTEM 開機自啟，資料放 `C:\ProgramData\xConsole`（或 `D:\xConsole`），開防火牆 9401 與 8090～8289 |
+
+- 加入碼**不收指令列與環境變數**（會留在行程清單與派送紀錄）：`--join-code`／`-JoinCode` 一律拒絕。只收回應檔或標準輸入（回應檔寫 `-`）。
+- 回應檔權限：Linux 與 macOS 擁有者 root、權限 600；Windows 擁有者 Administrators、權限只給 SYSTEM 與 Administrators（`icacls <檔> /setowner *S-1-5-32-544; icacls <檔> /inheritance:r /grant:r *S-1-5-18:F *S-1-5-32-544:F`，擁有者可以自己把權限加回去，所以兩項都驗）。安裝程式讀完就刪；權限不對也會刪掉，並要求到主控台作廢那個碼。
+- 指紋是主控台目前憑證的 SHA-256，只接受這一張；主控台換成正式憑證後可以不給指紋，改用一般驗證。
+- `--data-dir` 只能用英數字與 `. _ - /`（要寫進 systemd 與 launchd 設定）；Windows 的資料夾權限整份換成只有 SYSTEM 與 Administrators，讀回來核對過才放權杖與私鑰。
+- 移除：`sudo bash install/install.sh --uninstall`（Windows `-Uninstall`），專用帳號與資料保留。
+
 **三個系統哪裡不一樣：**
 
 | | Linux | macOS | Windows |
@@ -441,6 +456,8 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_e2e_features.py` | 任何機器（要 cryptography） | 18 | 另起隔離的代理與主控台走 HTTPS：HF 等級（假 Hugging Face）、已安裝等級、進度、預覽、第三方 API、打開 Agent 模式、任務核准到完成 |
 | `console/test_agentlink.py` | 任何 Linux（要 cryptography） | 63 | 代理主動連回：指令配對、逾時回 504 並送取消、沒收到的重送、長的不擋短的、串流、缺片段；通道憑證（私鑰不落明文、輪替要在線的都收到才換、SNI 選憑證、退役 30 天後刪）；另起隔離主控台與代理端對端（通道埠與管理網頁埠分開、換管理網頁憑證不斷線、輪替與對外網址幾秒內送達）；同一來源 200 支已驗證的代理全部連得上、未登入仍在第 65 條被擋 |
 | `console/test_groups.py` | 任何 Linux（要 cryptography） | 46 | 群組：設定檢查（不合法的講人話擋下、全部檢查過才動）、內容真的變了版本號才加一、改名撞名、「未分類」不能改名或刪除；另起隔離主控台端對端：舊版群組名稱補成群組物件、改名成員跟著改、刪除時成員移到未分類、機器改到新群組名稱時自動建群組；主控台把群組設定送給一支真的代理，幾秒內準備並套用、鎖定經主控台也改不了 |
+| `test/test_silent_install.py` | 任何 Linux 或 macOS（要 cryptography） | 29 | 靜默安裝：`install/join.py` 對隔離主控台＋真的代理，加入碼從標準輸入、指紋對才加入（大小寫與冒號不拘）、指紋錯或沒給（自簽）都擋且不用掉名額、碼格式不對擋；`install.sh` 的 `--join-code` 拒絕、大量部署參數沒配 `--console` 擋、不是 root 擋、回應檔權限判定；`install.ps1` 的 `-JoinCode` 實際執行拒絕；主控台產的腳本不再用環境變數傳加入碼 |
+| `test/e2e_silent.py` | CI 三個作業系統（要 root／系統管理員，只在 CI 跑） | 13（Windows 12） | 實裝：權限放寬的回應檔擋下並刪掉、`-JoinCode` 擋下、正確的回應檔裝成開機自啟並加入（名稱照樣板）、回應檔讀完即刪、代理以 `xconsole`／`_xconsole`／SYSTEM 跑、砍掉會自己起來（Linux、macOS）、移除乾淨 |
 | `console/test_joincodes.py` | 任何 Linux 或 macOS（要 cryptography） | 58 | 群組加入碼：名稱樣板展開與不合法寫法、網段解析與 IPv4 對映、可用次數與有效時間的範圍、多台必須用樣板、重新安裝只能一次；兩個同時加入各拿到不同名稱、名額滿了第三個擋下；重新載入後仍有效；用完、網段外、作廢都加入不了；過期 7 天的紀錄自動清掉；另起隔離主控台與一支真的代理端對端：主控台重啟後同一個碼照樣加入 A01～A03、用完擋下、清單不含公鑰、沒登入看不到也不能作廢、磁碟上只有雜湊 |
 | `agent/test_group.py` | Linux／macOS／Windows | 32 | 群組設定對齊代理這一側：準備（下載、核對 SHA-256、只准用的模型）與套用分兩段、指定時間以主控台時鐘為準、下次開機才套用、鎖定時本機 API 回 423、被改掉的模型拉回、換群組重來（本機假的 Hugging Face） |
 | `agent/test_link.py` | Linux／macOS／Windows | 34 | 代理主動連回代理這一側：連回設定、釘住通道憑證、內部位址連不到改走對外網址、經 HTTP 代理伺服器（含帳密）與壞掉時改直連、SNI 選通道憑證與收到新清單、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |
