@@ -130,10 +130,20 @@ def main():
         check(f"  代理以 {want} 跑（開機自啟、不必有人登入）", agent_user() == want, agent_user())
         _, raw, _ = T.https(cport, ccert, "GET", "/api/fleet", None, ck, raw=True)
         print("記憶體區說明：", sorted(set(re.findall(r'"model_note": ?"([^"]*)"', raw))), flush=True)
-        try:
-            idt = next(n for n in json.loads(raw)["nodes"] if n["id"] == "LAB01")["state"]["identity"]
-        except (ValueError, KeyError, StopIteration, TypeError):
-            idt = {}
+        idt, why = {}, ""
+        for _ in range(30):                       # 剛裝好、剛加入：等到主控台查得到這台的狀態再讀身分
+            try:
+                me = next(n for n in json.loads(raw)["nodes"] if n["id"] == "LAB01")
+                why = me.get("error") or ""
+                idt = (me.get("state") or {}).get("identity") or {}
+            except (ValueError, KeyError, StopIteration, TypeError) as exc:
+                why = f"{type(exc).__name__}: {raw[:200]}"
+            if idt:
+                break
+            time.sleep(2)
+            _, raw, _ = T.https(cport, ccert, "GET", "/api/fleet", None, ck, raw=True)
+        if not idt:
+            print("讀不到這台的身分：", why, flush=True)
         print("身分：", {k: idt.get(k) for k in ("basis", "smbios_valid", "rejoin")}, flush=True)
         # 專用帳號讀不到 product_uuid：Linux 要靠開機時 root 寫的副本才有主機板識別碼
         check("  複製偵測有依據（主機板識別碼或系統碟序號），不是剛加入就要重新加入",
