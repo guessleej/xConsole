@@ -724,6 +724,51 @@ def _read_capped(resp, deadline):
 LINK = agentlink.Link(log=lambda m: print(m, flush=True))
 PUSH = "push"            # node_request() 對主動連回的節點回這個當 TLS 設定：agent_open() 認得它
 
+# ---- 複製偵測（清單 #8）：同一個身分（節點權杖）有兩支代理同時在連回，就是有人把裝好的映像複製到別台。
+# 每支代理啟動時產生一個 boot 編號跟著輪詢送來。正常重啟是「舊的停了才有新的」；兩個 boot 輪流出現＝兩台同時在跑。
+# 標成疑似複製之後一律不下指令（權杖在兩台上，分不出哪台是本尊），管理者處理完按「解除」才恢復。
+CLONE_WINDOW = 120
+_CLONE_SEEN = {}           # 節點 → {boot: {"first", "last", "ip", "hw"}}
+_CLONE_LOCK = threading.Lock()
+
+
+def clone_watch(nid, body, ip):
+    boot = str(body.get("boot") or "")[:32]
+    if not re.fullmatch(r"[0-9a-f]{8,32}", boot):
+        return None                              # 舊版代理不送 boot：沒辦法判定
+    hw = body.get("hw") if isinstance(body.get("hw"), dict) else {}
+    hw = {"fp": str(hw.get("fp") or "")[:16] or None, "basis": hw.get("basis") if hw.get("basis") in ("smbios", "disk") else None,
+          "smbios": str(hw.get("smbios") or "")[:64] or None,
+          "macs": [str(x)[:17] for x in (hw.get("macs") or [])[:8] if re.fullmatch(r"[0-9a-f:]{17}", str(x))]}
+    now = time.time()
+    with _CLONE_LOCK:
+        seen = {b: v for b, v in _CLONE_SEEN.get(nid, {}).items() if now - v["last"] < CLONE_WINDOW}
+        me = seen.setdefault(boot, {"first": now, "last": now, "ip": ip, "hw": hw})
+        me.update(last=now, ip=ip, hw=hw)
+        _CLONE_SEEN[nid] = seen
+        # 別的 boot 在「我第一次出現之後」還來過：兩支同時活著
+        twins = [dict(v, boot=b) for b, v in seen.items() if b != boot and v["last"] > me["first"]]
+        if not twins:
+            return None
+        rows = [dict(me, boot=boot)] + twins
+    node = next((n for n in fleet()["nodes"] if n["id"] == nid), None)
+    if not node or node.get("clone"):
+        return None
+    info = {"at": int(now), "seen": [{"ip": r["ip"], "at": int(r["last"]), **r["hw"]} for r in rows]}
+    update_fleet(lambda cfg: [n.__setitem__("clone", info) for n in cfg["nodes"] if n["id"] == nid])
+    STORE.audit("系統", ip, "node.clone_suspect", nid, True, {"ips": [r["ip"] for r in rows]})
+    print(f"{node.get('name')}（{nid}）疑似被複製：同一個身分同時從 {', '.join(r['ip'] for r in rows)} 連回，已停止對它下指令", flush=True)
+    return info
+
+
+def clone_block(node):
+    """疑似複製的機器不下指令：回錯誤字串，正常回 None。"""
+    if node.get("clone"):
+        ips = "、".join(s.get("ip") or "?" for s in node["clone"].get("seen") or [])
+        return (f"{node.get('name')} 疑似是複製出來的：同一個身分同時從 {ips} 連回。分不出哪一台是原本那台，"
+                "已停止對它下指令。請到那幾台重新安裝代理（複製出來的那台會以新身分加入），再到機器頁按「解除疑似複製」")
+    return None
+
 
 def link_cfg():
     c = fleet().get("link") or {}
@@ -813,6 +858,8 @@ def node_request(node_id, path, data, ctype="application/json"):
     node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
     if not node:
         return None, "沒有這台機器"
+    if clone_block(node):
+        return None, clone_block(node)
     ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
     if ctx is None:
         return None, f"還沒信任 {node['name']} 的代理憑證"
@@ -881,6 +928,8 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     node = next((n for n in cfg["nodes"] if n["id"] == node_id), None)
     if not node:
         return 404, {"error": f"沒有這台機器：{node_id}"}
+    if clone_block(node):
+        return 409, {"error": clone_block(node), "clone": True, "offline": True}
     ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
     if ctx is None:
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
@@ -920,6 +969,7 @@ def fleet_state():
                       "group": n.get("group", "未分類"), "online": code == 200,
                       "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
                       "state": body if code == 200 else None,
+                      "clone": n.get("clone"),
                       # 「流暢執行 XB 以內」與分層長條：跟推薦清單同一條公式，畫面不自己算
                       "capacity": recommend.capacity(body) if code == 200 and body.get("pools") else None})
     return {"ts": time.time(), "nodes": nodes}
@@ -3304,6 +3354,7 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return self._json(413, {"error": "請求內容太大"})
         if path == "/api/agent/poll":
+            clone_watch(nid, body, self.ip)
             lv = str(body.get("link") or "")
             link_tick(force=RING.ack(nid, int(lv.split("-")[0]) if re.fullmatch(r"\d{1,9}-[0-9a-f]{8}", lv) else 0))
             out = {"cmds": LINK.poll(nid, body.get("seen"), stop=lambda: lv != link_ver())}
@@ -3742,12 +3793,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "沒有這個加入碼"})
             self._audit("node.join_code_revoke", j["id"], True, {"group": j.get("group"), "used": j["used"], "uses": j["uses"]})
             return self._json(200, {"ok": True, "code": joincodes.public(j)})
-        m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove)", path)
+        m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove|clone-clear)", path)
         if m:
             nid, act = m.group(1), m.group(2)
             node = next((n for n in fleet()["nodes"] if n["id"] == nid), None)
             if not node:
                 return self._json(404, {"error": "沒有這台機器"})
+            if act == "clone-clear":
+                if not node.get("clone"):
+                    return self._json(200, {"ok": True})
+                update_fleet(lambda cfg: [n.pop("clone", None) for n in cfg["nodes"] if n["id"] == nid])
+                with _CLONE_LOCK:
+                    _CLONE_SEEN.pop(nid, None)
+                self._audit("node.clone_clear", nid, True, {"seen": [s.get("ip") for s in node["clone"].get("seen") or []]})
+                return self._json(200, {"ok": True})
             if act == "remove":
                 update_fleet(lambda cfg: cfg.__setitem__("nodes", [n for n in cfg["nodes"] if n["id"] != nid]))
                 if os.path.exists(trust_file(nid)):

@@ -174,6 +174,196 @@ def ensure_token():
 TOKEN = ensure_token()
 
 
+# ---------------------------------------------------------------- 身分與複製偵測（清單 #8）
+# 第一次啟動記下主機板 SMBIOS UUID、作業系統識別碼、系統碟序號與實體網卡 MAC（identity.json）。之後每次啟動比對：
+#   SMBIOS UUID 變了＝換了一台（映像複製、硬碟搬到別台）：丟掉權杖、憑證、連回設定，等重新加入；
+#   只有作業系統識別碼變了＝同一台重灌：保留身分，記一筆；都沒變＝同一台。
+#   UUID 無效（全 0、全 F、廠商預設值）就改看系統碟序號；兩個都讀不到就無法判定，照舊。網卡不參與（換網路就會變）。
+# 主控台那一側另外看「同一個身分有兩支代理同時連回」（console/xconsole_server.py 的 clone_watch）。
+IDENTITY_FILE = os.path.join(STATE_DIR, "identity.json")
+HWID_RUN = "/run/xconsole/smbios_uuid"     # Linux 大量部署：開機時 root 寫的副本（product_uuid 只有 root 讀得到）
+JUNK_IDS = {"03000200040005000006000700080009", "00020003000400050006000700080009",   # 常見主機板沒燒的預設值
+            "123456789abcdef0123456789abcdef0", "tobefilledbyoem", "defaultstring", "systemserialnumber"}
+IDENTITY = {"basis": None, "notes": [], "rejoin": None}
+
+
+def _hwnorm(v):
+    s = re.sub(r"[^0-9a-z]", "", str(v or "").lower())
+    return s or None
+
+
+def hwid_valid(v):
+    """主機板識別碼能不能拿來判定：全 0、全 F、單一字元重複、太短、已知的廠商預設值都不行。"""
+    s = _hwnorm(v)
+    return bool(s) and len(s) >= 8 and len(set(s)) > 2 and s not in JUNK_IDS
+
+
+def disk_valid(v):
+    s = _hwnorm(v)
+    return bool(s) and len(s) >= 4 and len(set(s)) > 1 and s not in JUNK_IDS
+
+
+def _read_text(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read().strip().strip("\x00").strip() or None
+    except OSError:
+        return None
+
+
+def _out(argv, timeout=10):
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace")
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _linux_ids():
+    smbios = (_read_text("/sys/class/dmi/id/product_uuid") or _read_text(HWID_RUN)
+              or _read_text("/proc/device-tree/serial-number"))      # Jetson 沒有 DMI，用板子序號
+    disk = None
+    src = _out(["findmnt", "-no", "SOURCE", "/"]).split("[")[0]
+    if src.startswith("/dev/"):
+        # -s 由分割區往上列到實體碟（LVM、加密也一樣）；取第一個有序號的 disk
+        for row in _out(["lsblk", "-rnso", "TYPE,SERIAL", src]).splitlines():
+            t, _, ser = row.partition(" ")
+            if t == "disk" and ser.strip():
+                disk = ser.strip().replace("\\x20", " ")
+                break
+    macs = []
+    for name in sorted(os.listdir("/sys/class/net")) if os.path.isdir("/sys/class/net") else []:
+        if os.path.exists(f"/sys/class/net/{name}/device"):          # 有 device 才是實體網卡
+            mac = _read_text(f"/sys/class/net/{name}/address")
+            if mac and mac != "00:00:00:00:00:00":
+                macs.append(mac)
+    return {"smbios": smbios, "os": _read_text("/etc/machine-id"), "disk": disk, "macs": macs}
+
+
+def _windows_ids():
+    os_id = None
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography", 0,
+                            winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as k:
+            os_id = str(winreg.QueryValueEx(k, "MachineGuid")[0])
+    except OSError:
+        pass
+    ps = ("$u=(Get-CimInstance Win32_ComputerSystemProduct).UUID;"
+          "$d=$null;try{$d=(Get-Partition -DriveLetter $env:SystemDrive[0] -ErrorAction Stop|Get-Disk).SerialNumber}catch{};"
+          "$m=@(Get-NetAdapter -Physical -ErrorAction SilentlyContinue|ForEach-Object{$_.MacAddress});"
+          "@{smbios=$u;disk=$d;macs=$m}|ConvertTo-Json -Compress")
+    try:
+        d = json.loads(_out(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], 30) or "{}")
+    except ValueError:
+        d = {}
+    macs = d.get("macs") or []
+    return {"smbios": d.get("smbios"), "os": os_id, "disk": (d.get("disk") or "").strip() or None,
+            "macs": [macs] if isinstance(macs, str) else macs}
+
+
+def _mac_ids():
+    m = re.search(r'"IOPlatformUUID" = "([^"]+)"', _out(["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"]))
+    vol = None
+    try:
+        import plistlib
+        vol = plistlib.loads(_out(["diskutil", "info", "-plist", "/"]).encode()).get("VolumeUUID")
+    except Exception:  # noqa: BLE001
+        pass
+    macs = re.findall(r"Ethernet Address: ([0-9a-f:]{17})", _out(["networksetup", "-listallhardwareports"]))
+    # ponytail: Mac 沒有能讀的系統碟序號；IOPlatformUUID 一定有效，用不到備援
+    return {"smbios": m.group(1) if m else None, "os": vol, "disk": None, "macs": macs}
+
+
+def hw_ids():
+    raw = {"linux": _linux_ids, "windows": _windows_ids, "darwin": _mac_ids}[OS]()
+    return {"smbios": _hwnorm(raw.get("smbios")), "os": _hwnorm(raw.get("os")), "disk": _hwnorm(raw.get("disk")),
+            "macs": sorted({str(x).lower().replace("-", ":") for x in raw.get("macs") or [] if x})[:16]}
+
+
+def identity_verdict(old, now):
+    """回 (判定, 依據)。判定：same／reinstall／clone／unknown；依據：smbios／disk／None。"""
+    if hwid_valid(old.get("smbios")) and hwid_valid(now.get("smbios")):
+        if old["smbios"] != now["smbios"]:
+            return "clone", "smbios"
+        basis = "smbios"
+    elif disk_valid(old.get("disk")) and disk_valid(now.get("disk")):
+        if old["disk"] != now["disk"]:
+            return "clone", "disk"
+        basis = "disk"
+    else:
+        return "unknown", None
+    if old.get("os") and now.get("os") and old["os"] != now["os"]:
+        return "reinstall", basis
+    return "same", basis
+
+
+def _id_note(rec, text):
+    rec.setdefault("notes", []).append({"at": int(time.time()), "text": text})
+    rec["notes"] = rec["notes"][-10:]
+
+
+def identity_check(now=None):
+    """代理啟動時做一次。換了一台就丟掉身分（權杖、憑證、連回設定、群組狀態），讓這台以新身分重新加入。"""
+    global TOKEN
+    now = now if now is not None else hw_ids()
+    rec = load_json(IDENTITY_FILE, None)
+    if not rec:
+        rec = {"ids": now, "created": int(time.time()), "notes": [], "rejoin": None}
+        verdict, basis = "same", ("smbios" if hwid_valid(now["smbios"]) else "disk" if disk_valid(now["disk"]) else None)
+    else:
+        verdict, basis = identity_verdict(rec.get("ids") or {}, now)
+    if verdict == "clone":
+        what = "主機板識別碼（SMBIOS UUID）" if basis == "smbios" else "系統碟序號"
+        for f in (TOKEN_FILE, CERT_FILE, KEY_FILE, LINK_FILE, LINK_CERT, GROUP_FILE):
+            try:
+                os.remove(f)
+            except FileNotFoundError:
+                pass
+        TOKEN = ensure_token()
+        rec = {"ids": now, "created": int(time.time()), "notes": rec.get("notes") or [],
+               "rejoin": {"at": int(time.time()), "reason": f"{what}跟當初加入時不同，判定是複製出來的另一台"}}
+        _id_note(rec, f"{what}變了：舊身分已丟掉，需要重新加入主控台")
+        print(f"這台的{what}跟當初加入時不同，判定是複製出來的另一台：已丟掉舊身分，請重新加入主控台", flush=True)
+    else:
+        old = rec.get("ids") or {}
+        if verdict == "reinstall":
+            _id_note(rec, "作業系統識別碼變了（同一台重灌過），身分保留")
+        # 以前讀不到的值補上（例如大量部署後才有 root 寫的 UUID 副本）；讀得到的不拿新值蓋掉
+        rec["ids"] = {k: (now.get(k) or old.get(k)) for k in ("smbios", "disk")} | {
+            "os": now.get("os") or old.get("os"), "macs": now.get("macs") or old.get("macs") or []}
+    rec["basis"] = basis
+    save_json(IDENTITY_FILE, rec)
+    IDENTITY.update(basis=basis, notes=rec.get("notes") or [], rejoin=rec.get("rejoin"), verdict=verdict)
+    return verdict
+
+
+def identity_rejoined():
+    """重新加入之後（主控台用新權杖連進來、或寫好了連回設定）就不再顯示「需要重新加入」。"""
+    if not IDENTITY.get("rejoin"):
+        return
+    rec = load_json(IDENTITY_FILE, None) or {}
+    rec["rejoin"] = None
+    _id_note(rec, "已用新身分重新加入")
+    save_json(IDENTITY_FILE, rec)
+    IDENTITY.update(rejoin=None, notes=rec.get("notes") or [])
+
+
+def _short(v):
+    return hashlib.sha256(v.encode()).hexdigest()[:12] if v else None
+
+
+def identity_public():
+    """給主控台看的：SMBIOS 與 MAC 照實（不是秘密，管理者對資產清冊要用）；作業系統識別碼與碟序號只給雜湊前 12 碼。"""
+    rec = load_json(IDENTITY_FILE, None) or {}
+    ids = rec.get("ids") or {}
+    key = (("smbios:" + ids["smbios"]) if IDENTITY.get("basis") == "smbios"
+           else ("disk:" + ids["disk"]) if IDENTITY.get("basis") == "disk" else "")
+    return {"basis": IDENTITY.get("basis"), "smbios": ids.get("smbios"), "smbios_valid": hwid_valid(ids.get("smbios")),
+            "os": _short(ids.get("os")), "disk": _short(ids.get("disk")), "macs": ids.get("macs") or [],
+            "fp": _short(key), "notes": IDENTITY.get("notes") or [], "rejoin": IDENTITY.get("rejoin")}
+
+
 # ---------------------------------------------------------------- 登錄檔
 
 def default_registry():
@@ -4975,6 +5165,7 @@ def full_state():
         "ts": time.time(),
         "machine": reg["machine"],
         "chip": chip(reg["machine"]),
+        "identity": identity_public(),
         # 總覽的「安裝推理引擎」那一步用：只看檔案在不在，不跑 --version（每 15 秒一次太貴）
         "engine": {"llama_server": bool((reg["machine"].get("llama_server")
                                          and os.path.exists(expand(reg["machine"]["llama_server"])))
@@ -8284,6 +8475,8 @@ class Handler(BaseHTTPRequestHandler):
     def _auth(self):
         got = self.headers.get("Authorization", "")
         if got.startswith("Bearer ") and secrets.compare_digest(got[7:], TOKEN):
+            if IDENTITY.get("rejoin") and self.client_address[0] not in ("127.0.0.1", "::1"):
+                identity_rejoined()          # 主控台用新權杖直接連進來了
             return True
         self._send(401, {"error": "需要 Bearer 權杖"})
         return False
@@ -8411,7 +8604,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         path = self.path.split("?")[0].rstrip("/") or "/"
         if path == "/healthz":
-            return self._send(200, {"ok": True, "service": "xconsole-agent"})
+            # 複製出來、丟掉舊身分的機器：不用登入也看得到「需要重新加入」（沒有機密，只是一個旗標）
+            return self._send(200, {"ok": True, "service": "xconsole-agent", **({"needs_rejoin": True} if IDENTITY.get("rejoin") else {})})
         if not self._auth():
             return None
         if path in ("/", "/state"):
@@ -9942,8 +10136,12 @@ class AgentLink:
             try:
                 if conn is None:
                     conn = self.connect(cfg)
-                st, out = self.post(conn, cfg, "/api/agent/poll", {"seen": self.seen(), "link": cfg["v"]}, 40)
+                idp = identity_public()
+                # boot：這次啟動的編號。主控台看到同一個身分有兩個 boot 同時在連回，就把這台標成疑似複製
+                st, out = self.post(conn, cfg, "/api/agent/poll", {"seen": self.seen(), "link": cfg["v"], "boot": GROUP_BOOT,
+                                                                   "hw": {k: idp[k] for k in ("fp", "basis", "smbios", "macs")}}, 40)
                 if st == 200:
+                    identity_rejoined()
                     if self.last_err:
                         self._log(None)
                         print("已連回主控台", flush=True)
@@ -10118,6 +10316,8 @@ def main():
         os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
         sys.stdout = sys.stderr = open(os.path.join(STATE_DIR, "agent.log"), "a", encoding="utf-8", buffering=1)
     registry()
+    if not DESKTOP_AGENT:            # 桌面版只給同一台用，沒有「加入主控台」這回事
+        identity_check()
     ensure_cert()
     if DESKTOP_AGENT:
         desktop_first_run()
