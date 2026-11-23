@@ -1406,3 +1406,17 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .grp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 15px; }
 .grp-checks label { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 720px) { .grp-form { grid-template-columns: 1fr; } }
+
+/* 群組總覽（清單 #9）：每台一張小卡，狀態靠色底的標籤分，不用描邊 */
+.ready-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 12px; }
+.ready-card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px 14px; border: 0; border-radius: 12px;
+  background: var(--card); box-shadow: 0 4px 14px rgba(22, 32, 42, .08); color: var(--ink); font: inherit; cursor: pointer; min-width: 0; }
+.ready-card:hover { box-shadow: 0 8px 22px rgba(22, 32, 42, .14); transform: translateY(-1px); }
+.ready-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ready-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ready-detail { color: var(--ink-3); overflow-wrap: anywhere; }
+.ready-bar { height: 6px; border-radius: 3px; background: rgba(22, 32, 42, .08); overflow: hidden; }
+.ready-bar.wide { height: 8px; margin-top: 8px; }
+.ready-bar > span { display: block; height: 100%; background: var(--brand); transition: width .6s ease; }
+:root[data-theme="dark"] .ready-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+:root[data-theme="dark"] .ready-bar { background: rgba(255, 255, 255, .1); }

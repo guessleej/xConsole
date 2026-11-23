@@ -73,7 +73,7 @@ function renderNodePick() {
 
 // 某個內部頁屬於頂層哪一格
 function topOf(v) {
-  if (v === "home" || v === "overview") return "home";
+  if (v === "home" || v === "overview" || v.startsWith("group:")) return "home";
   if (v === "models" || v === "lib" || v.startsWith("lib:")) return "models";
   if (v === "run" || v === "apis" || v.startsWith("api:") || v.startsWith("node:")) return "run";
   if (v === "chat" || v === "assist") return "chat";
@@ -142,8 +142,11 @@ const runningSlot = (n) => llmSlots(n).find((s) => s.busy && s.unit);
 /* ================================================================ 概覽
    這台：三步設定順序 → 能跑多大 ＋ 硬體 → 為這台推薦；多台時第二列可切到「全部機器」（原本的機群總覽）。 */
 
+// 多台時概覽預設是群組總覽（清單 #9）；只有一台時畫面完全不變
+const homeAll = () => S.homeAll ?? (S.fleet?.nodes || []).length > 1;
+
 function viewHome() {
-  if (S.homeAll) return viewOverview();
+  if (homeAll()) return viewOverview();
   const main = $("#main");
   const n = curNode();
   if (!n) {

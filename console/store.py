@@ -460,6 +460,12 @@ class Store:
             out.append(d)
         return out
 
+    def last_online(self, node):
+        """最後一次取樣到這台在線的時間（群組總覽的「離線（上次連線時間）」）。"""
+        with self.lock:
+            r = self.db.execute("SELECT MAX(ts) FROM samples WHERE node=? AND online=1", (node,)).fetchone()
+        return r[0] if r else None
+
     def first_sample_ts(self):
         with self.lock:
             r = self.db.execute("SELECT MIN(ts) FROM samples").fetchone()

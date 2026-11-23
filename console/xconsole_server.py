@@ -963,17 +963,37 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
 
 
 def fleet_state():
+    cfg = fleet()
+    gmap = {g["name"]: g for g in cfg.get("groups", [])}
     nodes = []
-    for n in fleet()["nodes"]:
+    for n in cfg["nodes"]:
         code, body = call_node(n["id"], "/state", timeout=30)
+        g = gmap.get(n.get("group") or groups.DEFAULT)
         nodes.append({"id": n["id"], "name": n["name"], "host": n["host"],
                       "group": n.get("group", "未分類"), "online": code == 200,
                       "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
                       "state": body if code == 200 else None,
                       "clone": n.get("clone"),
+                      "ready": node_ready(n, g, code == 200, body if code == 200 else {}) if g else None,
                       # 「流暢執行 XB 以內」與分層長條：跟推薦清單同一條公式，畫面不自己算
                       "capacity": recommend.capacity(body) if code == 200 and body.get("pools") else None})
-    return {"ts": time.time(), "nodes": nodes}
+    out = []
+    for g in cfg.get("groups", []):
+        mine = [x["ready"] for x in nodes if (x["group"] or groups.DEFAULT) == g["name"] and x["ready"]]
+        out.append({"id": g["id"], "name": g["name"], "kind": g.get("kind"), "version": g["version"],
+                    **groups.setup_steps(g, mine)})
+    return {"ts": time.time(), "nodes": nodes, "groups": out}
+
+
+def node_ready(n, g, online, st):
+    """群組總覽上這台的狀態（groups.member_status）。上次連線：主動連回的看通道，其他看取樣紀錄。"""
+    last = LINK.last_seen(n["id"]) if n.get("link") == "push" else None
+    last = last or (STORE.last_online(n["id"]) if not online else None)
+    seen = time.strftime("%m/%d %H:%M", time.gmtime(last + 8 * 3600)) + "（台北時間）" if last else None
+    a = ALIGN_STATE.get(n["id"])
+    rejoin = ((st.get("identity") or {}).get("rejoin") or {}).get("reason")
+    # 放不下時要改用什麼，由代理用失敗的那組上下文、並行數與欄位（綁卡）實際試算過才給
+    return groups.member_status(g, online, a, clone=n.get("clone"), rejoin=rejoin, last_seen=seen)
 
 
 # ---------------------------------------------------------------- 背景取樣
