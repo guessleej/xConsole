@@ -273,6 +273,19 @@ def e2e_align():
         check("  每一步的紀錄回到主控台", any("已套用" in x["step"] for x in m["steps"]), m["steps"])
         st, out = call("/api/node/ws-1/slot/main/model", {"engine": "llama", "model": "x/y"})
         check("群組鎖定了模型：經主控台的機器頁也換不了（要改群組設定）", st == 423 and out.get("group_locked"), (st, out))
+        fl = call("/api/fleet")[1]
+        me = next(n for n in fl["nodes"] if n["id"] == "ws-1")
+        gg = next(x for x in fl["groups"] if x["name"] == "教室")
+        check("群組總覽：這台套用完是「就緒」（狀態由主控台算，畫面不自己判斷）",
+              (me.get("ready") or {}).get("code") == "ready" and me["ready"]["label"] == "就緒", me.get("ready"))
+        check("  群組標題列：1／1 台就緒、五步都完成、沒有下一步",
+              gg["ready"] == 1 and gg["members"] == 1 and gg["done"] == gg["total"] == 5 and gg["next"] is None
+              and [s["state"] for s in gg["steps"]] == ["done"] * 5, gg)
+        un = next(x for x in fl["groups"] if x["name"] == "未分類")
+        check("  沒有機器的群組：下一步是加入機器，後面的還不能做並寫明要先完成第 2 步",
+              un["members"] == 0 and un["next"] == {"n": 2, "t": "加入機器"}
+              and [s["state"] for s in un["steps"]] == ["done", "now", "blocked", "blocked", "blocked"]
+              and un["steps"][3].get("need") == 2, un)
     finally:
         for p in (cons, agent):
             if p is not None:
@@ -288,8 +301,52 @@ def e2e_align():
         shutil.rmtree(W, ignore_errors=True)
 
 
+def overview():
+    """群組總覽（清單 #9）：每台狀態的判斷順序與設定順序軸。"""
+    g = {"id": "g1", "name": "教室 A", "version": 3}
+    ms = groups.member_status
+
+    def al(**st):
+        return {"at": 1, "state": {"group_id": "g1", "version": 3, "prepared": 0, "applied": 0, "phase": "idle", "steps": [], **st}}
+    check("套用到群組版本：就緒", ms(g, True, al(prepared=3, applied=3, phase="done"))["code"] == "ready")
+    r = ms(g, True, al(phase="preparing", steps=[{"step": "x：下載並核對 SHA-256", "state": "run", "pct": 42}]))
+    check("下載中：準備中，帶百分比", r["code"] == "preparing" and r["pct"] == 42 and "42%" in r["detail"], r)
+    r = ms(g, True, al(phase="failed", error="main：x 放不下", nofit={"spec": "a/b:Q8_0", "slot": "main"}), suggest="a/b:Q4_K_M")
+    check("放不下：帶建議改用的量化", r["code"] == "nofit" and "a/b:Q4_K_M" in r["detail"], r)
+    r = ms(g, True, al(phase="failed", error="main：x 放不下", nofit={"spec": "a/b:Q8_0", "slot": "main"}))
+    check("  找不到能跑的量化：說明改小上下文或換小一點的", r["code"] == "nofit" and "a/b:Q8_0" in r["detail"], r)
+    check("其他失敗：失敗，帶原因", ms(g, True, al(phase="failed", error="磁碟滿了"))["detail"] == "磁碟滿了")
+    r = ms(g, True, al(prepared=3, applied=2, phase="waiting_boot"))
+    check("已準備、等下次開機：設定不同，寫明等什麼", r["code"] == "differs" and "開機" in r["detail"] and r["prepared"], r)
+    r = ms(g, True, al(applied=2, prepared=2))
+    check("還在舊版：設定不同、還沒準備", r["code"] == "differs" and not r["prepared"], r)
+    r = ms(g, True, {"at": 1, "state": {"group_id": "other", "applied": 5}})
+    check("還在用別的群組的設定：設定不同", r["code"] == "differs" and "別的群組" in r["detail"], r)
+    check("主控台還沒送到：準備中", ms(g, True, None)["code"] == "preparing")
+    check("代理太舊收不了：設定送不過去", ms(g, True, {"at": 1, "error": "代理版本太舊"})["code"] == "failed")
+    r = ms(g, False, al(applied=3), last_seen="11/24 09:30（台北時間）")
+    check("離線：帶上次連線時間（就算之前就緒）", r["code"] == "offline" and "09:30" in r["detail"], r)
+    check("需要重新加入：排在放不下前面", ms(g, True, al(phase="failed", nofit={"spec": "a"}), rejoin="複製")["code"] == "rejoin")
+    check("疑似複製：最優先（離線也照樣標）", ms(g, False, al(applied=3), clone={"at": 1})["code"] == "clone")
+
+    s = groups.setup_steps({"id": "g1", "version": 1}, [])
+    check("新群組沒機器：第 2 步加入機器是下一步", s["next"] == {"n": 2, "t": "加入機器"} and s["done"] == 1, s)
+    rd = ms(g, True, al(prepared=3, applied=3))
+    pre = ms(g, True, al(prepared=3, applied=2, phase="waiting_time"))
+    s = groups.setup_steps({"id": "g1", "version": 1}, [rd, rd])
+    check("有機器但沒填設定：第 3 步可略過，算完成", s["steps"][2]["state"] == "skip" and s["ready"] == 2 and s["next"] is None, s)
+    s = groups.setup_steps({"id": "g1", "version": 3}, [rd, pre])
+    check("兩台都準備好、一台還沒套用：第 5 步現在做，1／2 台就緒",
+          [x["state"] for x in s["steps"]] == ["done", "done", "done", "done", "now"] and "1／2" in s["steps"][4]["why"], s)
+    off = ms(g, False, al(applied=3))
+    s = groups.setup_steps({"id": "g1", "version": 3}, [rd, off])
+    check("有一台離線：第 4 步卡著，第 5 步要先完成第 4 步",
+          s["steps"][3]["state"] == "now" and s["steps"][4]["state"] == "blocked" and s["steps"][4]["need"] == 4, s)
+
+
 if __name__ == "__main__":
     unit()
+    overview()
     e2e()
     e2e_align()
     print("全部通過" if OK else "有項目失敗")

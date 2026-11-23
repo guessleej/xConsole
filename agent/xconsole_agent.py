@@ -9580,6 +9580,14 @@ def group_state():
     return st
 
 
+class GroupNoFit(RuntimeError):
+    """准入預檢放不下：記下是哪一顆、哪一欄，主控台的群組總覽據此建議改用放得下的量化。"""
+
+    def __init__(self, msg, spec, slot):
+        super().__init__(msg)
+        self.spec, self.slot = spec, slot
+
+
 class GroupSuperseded(Exception):
     """做到一半主控台送來更新的版本（或換了群組）：這一輪不再寫、不再套用，下一輪做新的。"""
 
@@ -9607,7 +9615,7 @@ def _console_now(st):
 
 def group_public(st=None):
     st = st or group_state()
-    return {k: st.get(k) for k in ("group_id", "version", "prepared", "applied", "phase", "error", "steps")} | {
+    return {k: st.get(k) for k in ("group_id", "version", "prepared", "applied", "phase", "error", "steps", "nofit")} | {
         "locked": (st.get("active") or {}).get("locked") or [], "apply_at": (st.get("settings") or {}).get("apply_at")}
 
 
@@ -9709,8 +9717,14 @@ def _group_fetch(st, spec):
         time.sleep(15)                        # 別的下載在跑：一次只下載一個，等它
     if code != 200:
         raise RuntimeError(f"{spec}：{out.get('error')}")
+    last = -1
     while _DL[out["id"]]["state"] in ("queued", "running"):
         time.sleep(2)
+        j = _DL[out["id"]]
+        pct = int(100 * j["done"] / j["total"]) if j.get("total") else 0
+        if pct != last and st["steps"] and st["steps"][-1]["step"] == text:
+            st["steps"][-1]["pct"] = last = pct        # 群組總覽的「準備中（下載 x%）」
+            _gsave(st)
     j = _DL[out["id"]]
     if j["state"] != "done":
         raise RuntimeError(f"{spec}：下載沒完成（{j.get('error') or j['state']}）")
@@ -9757,7 +9771,7 @@ def _group_prepare(st, s):
     for spec, sl in zip(specs, slots):
         ok, why = llama_precheck(sl["id"], _group_find(spec), p.get("ctx"), p.get("parallel"))
         if not ok:
-            raise RuntimeError(f"{sl['id']}：{spec} 放不下（{why}），請改小上下文或換小一點的量化")
+            raise GroupNoFit(f"{sl['id']}：{spec} 放不下（{why}），請改小上下文或換小一點的量化", spec, sl["id"])
     if specs:
         _gstep(st, "准入預檢通過（逐欄試算，實際換上時會再算一次）")
     _gstep(st, "準備完成")
@@ -9906,7 +9920,7 @@ def group_tick():
         return
     try:
         if st["prepared"] < v:
-            st.update(phase="preparing", error=None)
+            st.update(phase="preparing", error=None, nofit=None)
             _gsave(st)
             _group_prepare(st, s)
             st.update(prepared=v, prepared_boot=GROUP_BOOT)
@@ -9929,7 +9943,8 @@ def group_tick():
     except GroupSuperseded:
         GROUP_WAKE.set()                              # 有更新的版本：馬上做新的
     except Exception as exc:  # noqa: BLE001
-        st.update(phase="failed", error=str(exc)[:300])
+        st.update(phase="failed", error=str(exc)[:300],
+                  nofit={"spec": exc.spec, "slot": exc.slot} if isinstance(exc, GroupNoFit) else None)
         if st["steps"] and st["steps"][-1]["state"] == "run":
             st["steps"][-1]["state"] = "fail"
         try:

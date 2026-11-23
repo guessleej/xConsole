@@ -92,11 +92,11 @@
 "pattern": false
 },
 {
-"zh": "這台",
+"zh": "群組總覽",
 "pattern": false
 },
 {
-"zh": "全部機器",
+"zh": "這台",
 "pattern": false
 },
 {
@@ -3748,6 +3748,14 @@
 "pattern": false
 },
 {
+"zh": "就緒",
+"pattern": false
+},
+{
+"zh": "已套用群組設定、在線",
+"pattern": false
+},
+{
 "zh": "模型運作中",
 "pattern": false
 },
@@ -3761,6 +3769,78 @@
 },
 {
 "zh": "每 15 秒自動更新",
+"pattern": false
+},
+{
+"zh": "未分類",
+"pattern": false
+},
+{
+"zh": "在線",
+"pattern": false
+},
+{
+"zh": "離線",
+"pattern": false
+},
+{
+"zh": "{0}／{1} 台就緒",
+"pattern": true
+},
+{
+"zh": "台就緒",
+"pattern": false
+},
+{
+"zh": "還沒有機器",
+"pattern": false
+},
+{
+"zh": "下一步：{0}. {1}",
+"pattern": true
+},
+{
+"zh": "下一步",
+"pattern": false
+},
+{
+"zh": "看這個群組",
+"pattern": false
+},
+{
+"zh": "產生這個群組的加入碼，在每台執行安裝，機器就會出現在這裡。",
+"pattern": false
+},
+{
+"zh": "一般",
+"pattern": false
+},
+{
+"zh": "{0}・設定 v{1}",
+"pattern": true
+},
+{
+"zh": "設定 v",
+"pattern": false
+},
+{
+"zh": "產生加入碼",
+"pattern": false
+},
+{
+"zh": "填群組設定",
+"pattern": false
+},
+{
+"zh": "看各台進度",
+"pattern": false
+},
+{
+"zh": "（要先完成第 {0} 步）",
+"pattern": true
+},
+{
+"zh": "要先完成第",
 "pattern": false
 },
 {
@@ -4572,23 +4652,11 @@
 "pattern": false
 },
 {
-"zh": "就緒",
-"pattern": false
-},
-{
 "zh": "更新時間（台北時間）",
 "pattern": false
 },
 {
 "zh": "編輯設定",
-"pattern": false
-},
-{
-"zh": "產生加入碼",
-"pattern": false
-},
-{
-"zh": "未分類",
 "pattern": false
 },
 {
@@ -4666,10 +4734,6 @@
 {
 "zh": "設定 v{0}；就緒 {1}/{2}、已套用 {3}/{4}",
 "pattern": true
-},
-{
-"zh": "設定 v",
-"pattern": false
 },
 {
 "zh": "重新整理",
@@ -4872,10 +4936,6 @@
 "pattern": false
 },
 {
-"zh": "在線",
-"pattern": false
-},
-{
 "zh": "沒有連回",
 "pattern": false
 },
@@ -4976,14 +5036,6 @@
 "pattern": false
 },
 {
-"zh": "下一步：{0}. {1}",
-"pattern": true
-},
-{
-"zh": "下一步",
-"pattern": false
-},
-{
 "zh": "全部完成",
 "pattern": false
 },
@@ -5009,14 +5061,6 @@
 },
 {
 "zh": "可略過",
-"pattern": false
-},
-{
-"zh": "（要先完成第 {0} 步）",
-"pattern": true
-},
-{
-"zh": "要先完成第",
 "pattern": false
 },
 {
@@ -7505,10 +7549,6 @@
 },
 {
 "zh": "（依這台實測校正）",
-"pattern": false
-},
-{
-"zh": "還沒有機器",
 "pattern": false
 },
 {
@@ -11372,10 +11412,6 @@
 "pattern": false
 },
 {
-"zh": "一般",
-"pattern": false
-},
-{
 "zh": "沒有這個群組",
 "pattern": false
 },
@@ -13552,6 +13588,486 @@
 "pattern": false
 },
 {
+"zh": "教室",
+"pattern": false
+},
+{
+"zh": "部門",
+"pattern": false
+},
+{
+"zh": "已準備好，等下次開機套用",
+"pattern": false
+},
+{
+"zh": "已準備好，等指定時間套用",
+"pattern": false
+},
+{
+"zh": "設定不同",
+"pattern": false
+},
+{
+"zh": "{0} 要是整數",
+"pattern": true
+},
+{
+"zh": "要是整數",
+"pattern": false
+},
+{
+"zh": "{0} 要是清單，最多 32 個",
+"pattern": true
+},
+{
+"zh": "要是清單，最多 32 個",
+"pattern": false
+},
+{
+"zh": "設定要是一個物件",
+"pattern": false
+},
+{
+"zh": "不認得的設定欄位：{0}",
+"pattern": true
+},
+{
+"zh": "不認得的設定欄位",
+"pattern": false
+},
+{
+"zh": "執行參數要是一個物件",
+"pattern": false
+},
+{
+"zh": "不認得的執行參數：{0}",
+"pattern": true
+},
+{
+"zh": "不認得的執行參數",
+"pattern": false
+},
+{
+"zh": "鎖定項目只能是：{0}",
+"pattern": true
+},
+{
+"zh": "鎖定項目只能是",
+"pattern": false
+},
+{
+"zh": "保留給使用者的記憶體（GiB）",
+"pattern": false
+},
+{
+"zh": "模型來源至少選一個：同群組、內部鏡像、Hugging Face",
+"pattern": false
+},
+{
+"zh": "套用時機要是：立即、下次開機或指定時間",
+"pattern": false
+},
+{
+"zh": "顯卡功耗上限（瓦）",
+"pattern": false
+},
+{
+"zh": "群組名稱 1～30 個字，不能有引號、角括號或反斜線",
+"pattern": false
+},
+{
+"zh": "「未分類」是預設群組，不能改名",
+"pattern": false
+},
+{
+"zh": "種類要是：{0}",
+"pattern": true
+},
+{
+"zh": "種類要是",
+"pattern": false
+},
+{
+"zh": "同一個身分同時從兩個地方連回，已停止下指令",
+"pattern": false
+},
+{
+"zh": "設定送不過去",
+"pattern": false
+},
+{
+"zh": "主控台一分鐘內會把群組設定送過去",
+"pattern": false
+},
+{
+"zh": "已套用 v{0}",
+"pattern": true
+},
+{
+"zh": "已套用 v",
+"pattern": false
+},
+{
+"zh": "這台在 v{0}，群組是 v{1}",
+"pattern": true
+},
+{
+"zh": "這台在 v",
+"pattern": false
+},
+{
+"zh": "群組是 v",
+"pattern": false
+},
+{
+"zh": "還在用別的群組的設定",
+"pattern": false
+},
+{
+"zh": "建立群組",
+"pattern": false
+},
+{
+"zh": "一間教室或一個部門一個群組，裡面的機器用同一份設定",
+"pattern": false
+},
+{
+"zh": "加入機器",
+"pattern": false
+},
+{
+"zh": "每台下載並核對模型",
+"pattern": false
+},
+{
+"zh": "{0}／{1} 台已準備好",
+"pattern": true
+},
+{
+"zh": "台已準備好",
+"pattern": false
+},
+{
+"zh": "套用並確認就緒",
+"pattern": false
+},
+{
+"zh": " 要是整數",
+"pattern": false
+},
+{
+"zh": " 要是清單，最多 32 個",
+"pattern": false
+},
+{
+"zh": "{0} 每一項都要是文字（模型名稱）",
+"pattern": true
+},
+{
+"zh": "每一項都要是文字（模型名稱",
+"pattern": false
+},
+{
+"zh": "{0} 的「{1}」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）",
+"pattern": true
+},
+{
+"zh": "」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑",
+"pattern": false
+},
+{
+"zh": "不認得的設定欄位：",
+"pattern": false
+},
+{
+"zh": "不認得的執行參數：",
+"pattern": false
+},
+{
+"zh": "思考開關要是開或關",
+"pattern": false
+},
+{
+"zh": "鎖定項目只能是：",
+"pattern": false
+},
+{
+"zh": "模型存放位置要是完整路徑（例：/data/xconsole 或 D:\\xconsole），不能有 ..",
+"pattern": false
+},
+{
+"zh": "種類要是：",
+"pattern": false
+},
+{
+"zh": "上次連線 {0}",
+"pattern": true
+},
+{
+"zh": "上次連線",
+"pattern": false
+},
+{
+"zh": "還沒連上過",
+"pattern": false
+},
+{
+"zh": "下載 {0}%",
+"pattern": true
+},
+{
+"zh": "已準備 v{0}，還沒套用",
+"pattern": true
+},
+{
+"zh": "已準備 v",
+"pattern": false
+},
+{
+"zh": "還沒套用",
+"pattern": false
+},
+{
+"zh": "，群組是 v",
+"pattern": false
+},
+{
+"zh": "已加入 {0} 台",
+"pattern": true
+},
+{
+"zh": "產生群組加入碼，在每台執行安裝（大量部署用回應檔）",
+"pattern": false
+},
+{
+"zh": "選要放的模型、上下文與鎖定；不填就是每台維持原本的模型",
+"pattern": false
+},
+{
+"zh": "設定在 v{0}",
+"pattern": true
+},
+{
+"zh": "設定在 v",
+"pattern": false
+},
+{
+"zh": " 台已準備好",
+"pattern": false
+},
+{
+"zh": " 台就緒",
+"pattern": false
+},
+{
+"zh": " 每一項都要是文字（模型名稱）",
+"pattern": false
+},
+{
+"zh": " 的「",
+"pattern": false
+},
+{
+"zh": "」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）",
+"pattern": false
+},
+{
+"zh": "上次連線 ",
+"pattern": false
+},
+{
+"zh": "建議改用 {0}",
+"pattern": true
+},
+{
+"zh": "建議改用",
+"pattern": false
+},
+{
+"zh": "{0} 放不下，請改小上下文或換小一點的量化",
+"pattern": true
+},
+{
+"zh": "放不下，請改小上下文或換小一點的量化",
+"pattern": false
+},
+{
+"zh": "下載 ",
+"pattern": false
+},
+{
+"zh": "，還沒套用",
+"pattern": false
+},
+{
+"zh": "已加入 ",
+"pattern": false
+},
+{
+"zh": " 台",
+"pattern": false
+},
+{
+"zh": "建議改用 ",
+"pattern": false
+},
+{
+"zh": " 放不下，請改小上下文或換小一點的量化",
+"pattern": false
+},
+{
+"zh": "名稱樣板只能有一段 {起..迄}，例：A{01..20}",
+"pattern": false
+},
+{
+"zh": "名稱樣板的範圍要由小到大，最多 {0} 個",
+"pattern": true
+},
+{
+"zh": "名稱樣板的範圍要由小到大，最多",
+"pattern": false
+},
+{
+"zh": "限定網段最多 8 個，例：198.51.100.0/24",
+"pattern": false
+},
+{
+"zh": "名稱樣板的範圍要由小到大，最多 ",
+"pattern": false
+},
+{
+"zh": " 個",
+"pattern": false
+},
+{
+"zh": "可用次數要是 1～{0} 的整數",
+"pattern": true
+},
+{
+"zh": "可用次數要是 1～",
+"pattern": false
+},
+{
+"zh": "有效時間要是 {0}～{1} 分鐘（最長 7 天）",
+"pattern": true
+},
+{
+"zh": "有效時間要是",
+"pattern": false
+},
+{
+"zh": "分鐘（最長 7 天",
+"pattern": false
+},
+{
+"zh": "名稱樣板只有 {0} 個名稱，比可用次數 {1} 少",
+"pattern": true
+},
+{
+"zh": "名稱樣板只有",
+"pattern": false
+},
+{
+"zh": "個名稱，比可用次數",
+"pattern": false
+},
+{
+"zh": "少",
+"pattern": false
+},
+{
+"zh": "名稱樣板裡 {0}{1} 已經有機器在用，剩下 {2} 個名稱，不夠可用次數 {3}；請把範圍加大或換個前綴",
+"pattern": true
+},
+{
+"zh": "名稱樣板裡",
+"pattern": false
+},
+{
+"zh": "已經有機器在用，剩下",
+"pattern": false
+},
+{
+"zh": "個名稱，不夠可用次數",
+"pattern": false
+},
+{
+"zh": "請把範圍加大或換個前綴",
+"pattern": false
+},
+{
+"zh": "一個加入碼要加入多台時，名稱請用樣板（例：A{01..20}），或留空用各台的主機名稱",
+"pattern": false
+},
+{
+"zh": "重新安裝某一台時，可用次數只能是 1",
+"pattern": false
+},
+{
+"zh": "「{0}」不是網段，例：198.51.100.0/24",
+"pattern": true
+},
+{
+"zh": "」不是網段，例：198.51.100.0/24",
+"pattern": false
+},
+{
+"zh": " 的整數",
+"pattern": false
+},
+{
+"zh": "有效時間要是 ",
+"pattern": false
+},
+{
+"zh": " 分鐘（最長 7 天）",
+"pattern": false
+},
+{
+"zh": "名稱樣板只有 ",
+"pattern": false
+},
+{
+"zh": " 個名稱，比可用次數 ",
+"pattern": false
+},
+{
+"zh": " 少",
+"pattern": false
+},
+{
+"zh": "名稱樣板裡 ",
+"pattern": false
+},
+{
+"zh": " 已經有機器在用，剩下 ",
+"pattern": false
+},
+{
+"zh": " 個名稱，不夠可用次數 ",
+"pattern": false
+},
+{
+"zh": "；請把範圍加大或換個前綴",
+"pattern": false
+},
+{
+"zh": "加入碼不對、已經用完、過期或被作廢了；請在主控台重新產生加入碼",
+"pattern": false
+},
+{
+"zh": "這個加入碼只收指定網段來的機器",
+"pattern": false
+},
+{
+"zh": "另一台正在用這個加入碼加入，名額已滿；等它完成或請在主控台重新產生",
+"pattern": false
+},
+{
+"zh": "名稱樣板的名稱都被用掉了，請在主控台重新產生加入碼",
+"pattern": false
+},
+{
 "zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死",
 "pattern": false
 },
@@ -15660,14 +16176,6 @@
 "pattern": false
 },
 {
-"zh": "已套用 v{0}",
-"pattern": true
-},
-{
-"zh": "已套用 v",
-"pattern": false
-},
-{
 "zh": "沒有可以試的位址",
 "pattern": false
 },
@@ -16977,10 +17485,6 @@
 },
 {
 "zh": "其他模型資料夾最多 ",
-"pattern": false
-},
-{
-"zh": " 個",
 "pattern": false
 },
 {

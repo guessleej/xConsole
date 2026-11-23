@@ -156,3 +156,72 @@ def update(g, name=None, kind=None, settings=None, taken=()):
         g["version"] = int(g.get("version") or 0) + 1
     g["updated"] = int(time.time())
     return g["name"], changed
+
+
+# ---------------------------------------------------------------- 群組總覽（清單 #9）
+# 每台的就緒狀態與群組的設定順序軸，都由主控台手上的真實資料算：機器在不在線、代理回報的對齊進度、身分。畫面不自己判斷。
+APPLY_WAIT = {"waiting_boot": "已準備好，等下次開機套用", "waiting_time": "已準備好，等指定時間套用"}
+
+
+def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, suggest=None):
+    """一台機器在這個群組裡的狀態。依序判斷，越前面越要先處理：
+    疑似複製 → 離線 → 需要重新加入 → 放不下 → 失敗 → 就緒 → 準備中 → 設定不同。
+    align：代理回報的對齊狀態（group_public），沒有就是主控台還沒送到。回 {"code", "label", "detail", "pct"}。"""
+    st = (align or {}).get("state") or {}
+    err = (align or {}).get("error")
+    same = st.get("group_id") == g["id"]
+    v = g["version"]
+
+    def out(code, label, detail="", pct=None):
+        return {"code": code, "label": label, "detail": detail, "pct": pct,
+                "prepared": bool(same and st.get("prepared", 0) >= v and code in ("ready", "differs"))}
+    if clone:
+        return out("clone", "疑似複製", "同一個身分同時從兩個地方連回，已停止下指令")
+    if not online:
+        return out("offline", "離線", f"上次連線 {last_seen}" if last_seen else "還沒連上過")
+    if rejoin:
+        return out("rejoin", "需要重新加入", rejoin)
+    if err and not st:
+        return out("failed", "設定送不過去", err)
+    if not align:
+        return out("preparing", "準備中", "主控台一分鐘內會把群組設定送過去")
+    if same and st.get("phase") == "failed":
+        nf = st.get("nofit")
+        if nf:
+            return out("nofit", "放不下", f"建議改用 {suggest}" if suggest else f"{nf.get('spec')} 放不下，請改小上下文或換小一點的量化")
+        return out("failed", "失敗", st.get("error") or "")
+    if same and st.get("applied", 0) >= v:
+        return out("ready", "就緒", f"已套用 v{v}")
+    if same and st.get("phase") in ("queued", "preparing", "applying"):
+        run = next((s for s in reversed(st.get("steps") or []) if s.get("state") == "run"), None)
+        pct = run.get("pct") if run else None
+        return out("preparing", "準備中", (run or {}).get("step", "") if pct is None else f"下載 {pct}%", pct)
+    if same and st.get("prepared", 0) >= v:
+        return out("differs", "設定不同", APPLY_WAIT.get(st.get("phase"), f"已準備 v{v}，還沒套用"))
+    return out("differs", "設定不同", f"這台在 v{st.get('applied') or 0}，群組是 v{v}" if same else "還在用別的群組的設定")
+
+
+def setup_steps(g, statuses):
+    """這個群組從零到能用的五步，狀態由真實資料算：done／now／blocked／skip。"""
+    n = len(statuses)
+    ready = sum(1 for s in statuses if s["code"] == "ready")
+    prepared = sum(1 for s in statuses if s["prepared"])
+    edited = g.get("version", 1) > 1
+    steps = [
+        {"key": "create", "t": "建立群組", "why": "一間教室或一個部門一個群組，裡面的機器用同一份設定", "state": "done"},
+        {"key": "join", "t": "加入機器", "why": f"已加入 {n} 台" if n else "產生群組加入碼，在每台執行安裝（大量部署用回應檔）",
+         "state": "done" if n else "now"},
+        {"key": "settings", "t": "填群組設定", "why": "選要放的模型、上下文與鎖定；不填就是每台維持原本的模型" if not edited
+         else f"設定在 v{g['version']}", "state": "done" if edited else ("skip" if n else "blocked")},
+        {"key": "prepare", "t": "每台下載並核對模型", "why": f"{prepared}／{n} 台已準備好", "state":
+         "blocked" if not n else ("done" if prepared == n else "now")},
+        {"key": "ready", "t": "套用並確認就緒", "why": f"{ready}／{n} 台就緒", "state":
+         "blocked" if not n or prepared < n else ("done" if ready == n else "now")},
+    ]
+    for i, s in enumerate(steps):
+        if s["state"] == "blocked":
+            first = next((j for j, x in enumerate(steps[:i]) if x["state"] in ("now", "blocked")), None)
+            s["need"] = (first + 1) if first is not None else None
+    nxt = next((i for i, s in enumerate(steps) if s["state"] == "now"), None)
+    return {"steps": steps, "done": sum(1 for s in steps if s["state"] in ("done", "skip")), "total": len(steps),
+            "next": None if nxt is None else {"n": nxt + 1, "t": steps[nxt]["t"]}, "ready": ready, "members": n}

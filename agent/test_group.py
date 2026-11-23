@@ -138,6 +138,8 @@ def main():
     case("  並行數帶進換模型那一步、溫度寫進這顆的啟動引數", CALLS[-1][4] == 2 and args[-2:] == ["--temp", "0.6"], (CALLS[-1], args))
     case("  每一步都有紀錄", [x["state"] for x in st["steps"]].count("fail") == 0
          and any("SHA-256" in x["step"] for x in st["steps"]), [x["step"] for x in st["steps"]])
+    dls = [x for x in st["steps"] if "下載並核對" in x["step"]]
+    case("  下載那一步記著進度百分比（群組總覽的「準備中（下載 x%）」）", dls and dls[-1].get("pct") == 100, dls)
     n = len(CALLS)
     sync(1, s1)
     tick()
@@ -176,6 +178,8 @@ def main():
     PRE["ok"] = True
     case("准入預檢放不下：準備就失敗（不等到指定時間才發現）", st["phase"] == "failed" and "放不下" in (st["error"] or "")
          and st["prepared"] == 4 and len(CALLS) == n, st["error"])
+    case("  記下是哪一顆、哪一欄放不下（主控台據此建議改用放得下的量化）",
+         A.group_public().get("nofit") == {"spec": TINY, "slot": "s1"}, A.group_public().get("nofit"))
 
     # ---- 4c. 指定時間：本機時鐘被調快，也不會提早套用（用單調時鐘往前推）
     sync(6, dict(s1, apply_at={"mode": "at", "at": int(time.time() + 3600)}))
