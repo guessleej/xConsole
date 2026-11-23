@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""多帳號與角色（管理員／使用者）：
+"""多帳號與角色（管理員／維運／檢視／使用者）與群組範圍（清單 #10）：
 - 守衛：從原始碼抓出每一條 /api 路由，用一般使用者的身分各打一次；沒列在 USER_ROUTES 的一律 403，
   而且使用者能用的路由要剛好等於這裡寫死的清單（放寬權限要改測試，不能悄悄放寬）
 - 一次性密碼：新帳號第一次登入只能改密碼；新密碼至少 12 碼
@@ -9,6 +9,9 @@
 - 刪帳號：對話、附圖、登入一起刪，金鑰撤銷，Agent 資料夾改歸管理員
 - 登入節流：同一來源、不同帳號各打錯 4 次誰都不擋；同一帳號錯 5 次只擋這個帳號
 - 舊版只有 fleet.json 的單一帳號：升級後原密碼登得進去、角色是管理員
+- 維運、檢視：逐條路由各打一次，能用的要剛好等於寫死的清單（檢視只能看、維運能換模型與套用群組設定）
+- 群組範圍：範圍外的機器與群組在清單裡看不到，用id直接打是404；金鑰只能選範圍內的，範圍改了舊金鑰跟著縮；
+  Agent的資料夾與模型都要在範圍內；維運只能改群組設定不能改名；群組刪了範圍不會變成不限；改角色或範圍登入失效
 跑法：python3 test_roles.py（隔離 HOME，不連外）
 """
 import json
@@ -148,8 +151,166 @@ EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/age
                   r"POST /api/keys/[0-9a]{8}/(update|revoke)"]
 
 
-def expected(method, path):
-    return (method, path) in EXPECT_USER or any(re.fullmatch(r, f"{method} {path}") for r in EXPECT_USER_RX)
+EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)",
+                    r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
+                    r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
+EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
+                      r"POST /api/groups/a{8}/update"]
+
+
+def expected(method, path, role="user"):
+    rx = EXPECT_USER_RX + (EXPECT_VIEWER_RX if role in ("viewer", "operator") else []) + (EXPECT_OPERATOR_RX if role == "operator" else [])
+    return (method, path) in EXPECT_USER or any(re.fullmatch(r, f"{method} {path}") for r in rx)
+
+
+ANON = ("/api/login", "/api/logout", "/api/join", "/api/desktop/enter", "/api/account/password", "/api/health")
+
+
+def member(admin, username, role, scope=None):
+    """建一個帳號、改掉一次性密碼、登入。回 (Client, 密碼)。"""
+    st, o = admin.req("POST", "/api/users/create", {"username": username, "display": username.split("@")[0], "role": role,
+                                                    "scope": scope or []})
+    assert st == 200, o
+    c, pw = Client(), f"{role}-pass-{secrets_hex()}"
+    c.login(username, o["password"])
+    c.req("POST", "/api/account/password", {"old": o["password"], "new": pw})
+    c.login(username, pw)
+    return c, pw
+
+
+def secrets_hex():
+    return os.urandom(4).hex()
+
+
+def roles_and_scope(admin):
+    real_call = x.call_node
+    x.call_node = lambda nid, path, method="GET", body=None, timeout=40: (200, {"ok": True})
+    try:
+        _roles_and_scope(admin)
+    finally:
+        x.call_node = real_call
+
+
+def _roles_and_scope(admin):
+    # ---- 守衛：維運與檢視逐條路由（不限群組，只看角色）
+    rs = routes()
+    for role in ("viewer", "operator"):
+        c, _ = member(admin, f"{role}-all@cloudinfo.com.tw", role)
+        wrong, opened = [], []
+        for method, path in sorted(rs):
+            if path in ANON:
+                continue
+            st, out = c.req(method, path, {} if method == "POST" else None)
+            blocked = st == 403 and out.get("admin_only")
+            if expected(method, path, role) and blocked:
+                wrong.append(f"{method} {path}")
+            elif not expected(method, path, role) and not blocked:
+                opened.append(f"{method} {path}（{st}）")
+        name = x.ROLE_NAMES[role]
+        check(f"{name}：能用的路由都沒被擋", not wrong, wrong[:5])
+        check(f"  {name}：其餘每一條都回403", not opened, opened[:8])
+        extra = [f"{m} {p}" for m, p in rs if x.user_may(m, p, role) and not expected(m, p, role)]
+        check(f"  {name}：路由清單沒有比測試寫死的更寬", not extra, extra[:5])
+    check("不認得的角色當成使用者（最少權限）", not x.user_may("GET", "/api/groups", "superuser") and x.user_may("GET", "/api/chats", "superuser"))
+
+    # ---- 群組範圍
+    ga = admin.req("POST", "/api/groups", {"name": "電腦教室A"})[1]["group"]["id"]
+    gb = admin.req("POST", "/api/groups", {"name": "電腦教室B"})[1]["group"]["id"]
+    x.update_fleet(lambda c: c.__setitem__("nodes", [
+        {"id": "n1", "name": "A01", "host": "127.0.0.1", "token": "", "group": "電腦教室A"},
+        {"id": "n2", "name": "B01", "host": "127.0.0.1", "token": "", "group": "電腦教室B"}]))
+    st, o = admin.req("POST", "/api/users/create", {"username": "bad-scope@cloudinfo.com.tw", "role": "operator", "scope": ["ffffffff"]})
+    check("範圍填不存在的群組 → 400", st == 400, (st, o))
+    op, op_pw = member(admin, "teacher-a@cloudinfo.com.tw", "operator", [ga])
+    vw, _ = member(admin, "viewer-a@cloudinfo.com.tw", "viewer", [ga])
+    me = op.req("GET", "/api/me")[1]
+    check("/api/me帶角色與範圍", me.get("role") == "operator" and me.get("scope") == [ga], me)
+    users = {u["username"]: u for u in admin.req("GET", "/api/users")[1]["items"]}
+    check("  帳號清單帶範圍；沒限的是空的", users["teacher-a@cloudinfo.com.tw"]["scope"] == [ga]
+          and users["viewer-all@cloudinfo.com.tw"]["scope"] == [], users.get("teacher-a@cloudinfo.com.tw"))
+
+    fl = op.req("GET", "/api/fleet")[1]
+    check("機器清單：只有範圍內的機器與群組", [n["id"] for n in fl["nodes"]] == ["n1"] and [g["name"] for g in fl["groups"]] == ["電腦教室A"], fl)
+    gl = op.req("GET", "/api/groups")[1]
+    check("  群組清單：只有範圍內的", [g["name"] for g in gl["groups"]] == ["電腦教室A"], gl.get("groups"))
+    check("  管理員看全部", len(admin.req("GET", "/api/fleet")[1]["nodes"]) == 2)
+    st, o = op.req("GET", "/api/node/n2/state")
+    check("範圍外的機器用id直接查 → 404（不洩漏有沒有）", st == 404 and "沒有這台" in o.get("error", ""), (st, o))
+    check("  範圍內的查得到", op.req("GET", "/api/node/n1/state")[0] == 200)
+    check("  維運在範圍內換模型、啟動：可以", op.req("POST", "/api/node/n1/slot/s/start", {})[0] == 200
+          and op.req("POST", "/api/node/n1/slot/s/model", {"model": "m"})[0] == 200)
+    check("  範圍外的不能動 → 404", op.req("POST", "/api/node/n2/slot/s/start", {})[0] == 404)
+    st, o = op.req("POST", "/api/node/n2/chat/s", {"messages": []})
+    check("  範圍外的機器也不能對話（使用者功能一樣套範圍）", st == 404 and o.get("error") == "沒有這台機器", (st, o))
+    st, o = vw.req("POST", "/api/node/n1/slot/s/start", {})
+    check("檢視：範圍內也不能操作 → 403並講清楚", st == 403 and "檢視" in o.get("error", ""), (st, o))
+    check("  檢視看得到狀態", vw.req("GET", "/api/node/n1/state")[0] == 200)
+    for path in ("/api/nodes/n1/update", "/api/users/create", "/api/node/n1/library/download", "/api/groups"):
+        st, o = op.req("POST", path, {})
+        check(f"維運不能：{path} → 403", st == 403 and o.get("admin_only"), (st, o))
+
+    # 群組設定：維運只能改設定，不能改名、改種類；範圍外的群組回404
+    cur = next(g for g in admin.req("GET", "/api/groups")[1]["groups"] if g["id"] == ga)
+    st, o = op.req("POST", f"/api/groups/{ga}/update", {"name": cur["name"], "kind": cur["kind"], "settings": {**cur["settings"], "models": ["auto"]}})
+    check("維運改範圍內群組的設定 → 200，版本加一", st == 200 and o["group"]["version"] == cur["version"] + 1, (st, o))
+    st, o = op.req("POST", f"/api/groups/{ga}/update", {"name": "改掉的名字"})
+    check("  改名 → 403", st == 403, (st, o))
+    check("  範圍外的群組 → 404", op.req("POST", f"/api/groups/{gb}/update", {"settings": cur["settings"]})[0] == 404)
+    check("  檢視不能改群組設定 → 403", vw.req("POST", f"/api/groups/{ga}/update", {"settings": cur["settings"]})[0] == 403)
+
+    # 金鑰：只能選範圍內的；範圍改了舊金鑰馬上跟著縮
+    check("限定群組的帳號產生金鑰：不能選全部", op.req("POST", "/api/keys/create", {"name": "全部"})[0] == 400)
+    check("  不能選範圍外的機器", op.req("POST", "/api/keys/create", {"name": "B", "slots": ["n2/s"]})[0] == 400)
+    st, o = op.req("POST", "/api/keys/create", {"name": "A", "slots": ["n1/s"]})
+    check("  範圍內的可以", st == 200, (st, o))
+    kid = o["item"]["id"]
+    check("  改金鑰也不能改成範圍外", op.req("POST", f"/api/keys/{kid}/update", {"slots": ["n2/s"]})[0] == 400)
+    row = x.STORE.key_get(kid)
+    check("  加密入口：範圍內的格子用得到", x.key_allowed(row)({"node": "n1", "slot": "s"}))
+    admin.req("POST", "/api/users/teacher-a@cloudinfo.com.tw/update", {"scope": [gb]})
+    check("  管理員把他改到別的群組：舊金鑰馬上用不到原本那台", not x.key_allowed(row)({"node": "n1", "slot": "s"}))
+    check("改了範圍：他現在的登入馬上失效", op.req("GET", "/api/me")[0] == 401)
+    op.login("teacher-a@cloudinfo.com.tw", op_pw)
+    check("  重新登入後看到的是新範圍", [n["id"] for n in op.req("GET", "/api/fleet")[1]["nodes"]] == ["n2"])
+    admin.req("POST", "/api/users/teacher-a@cloudinfo.com.tw/update", {"role": "viewer"})
+    check("改了角色：他現在的登入馬上失效", op.req("GET", "/api/me")[0] == 401)
+
+    # Agent：資料夾所在的機器與模型所在的機器都要在範圍內
+    may = lambda n: n == "n1"  # noqa: E731
+    code, _ = x.agent_start("viewer-a@cloudinfo.com.tw", "", {"node": "n2", "folder": "f", "prompt": "做事",
+                                                               "model": {"kind": "local", "slot": "s"}}, can_exec=False, may_node=may)
+    check("Agent：資料夾在範圍外的機器 → 404", code == 404, code)
+    code, _ = x.agent_start("viewer-a@cloudinfo.com.tw", "", {"node": "n1", "folder": "f", "prompt": "做事",
+                                                               "model": {"kind": "local", "node": "n2", "slot": "s"}}, can_exec=False, may_node=may)
+    check("  模型在範圍外的機器 → 擋下", code == 400, code)
+
+    # 群組刪了：範圍不會變成不限
+    admin.req("POST", f"/api/groups/{ga}/delete", {})
+    fl = vw.req("GET", "/api/fleet")[1]
+    check("負責的群組被刪了：什麼都看不到（不會變成看全部）", fl["nodes"] == [] and fl["groups"] == [], fl)
+    check("  帳號清單照實留著那個群組（畫面標「已刪除的群組」）",
+          next(u for u in admin.req("GET", "/api/users")[1]["items"] if u["username"] == "viewer-a@cloudinfo.com.tw")["scope"] == [ga])
+
+    # 批次匯入收新角色；最後一位管理員不能被降成維運
+    st, o = admin.req("POST", "/api/users/import", {"rows": [{"username": "op-imp@cloudinfo.com.tw", "role": "operator"},
+                                                             {"username": "vw-imp@cloudinfo.com.tw", "role": "viewer"}]})
+    check("批次匯入：維運、檢視照建", st == 200 and [c["role"] for c in o["created"]] == ["operator", "viewer"], o)
+    last = [u for u in x.STORE.user_list() if u["role"] == "admin" and not u.get("disabled")]
+    check("最後一位管理員不能被降成維運或檢視", len(last) == 1 and x.user_change(last[0]["username"], {"role": "operator"}, "x")[0] == 409
+          and x.user_change(last[0]["username"], {"role": "viewer"}, "x")[0] == 409, [u["username"] for u in last])
+
+    # 舊版的帳號表沒有範圍欄位：開起來自動補，原本的帳號範圍是空的（不限）
+    import sqlite3
+    from store import Store
+    p = os.path.join(TMP, "old.db")
+    db = sqlite3.connect(p)
+    db.execute("CREATE TABLE users(username TEXT PRIMARY KEY, display TEXT, role TEXT, source TEXT, salt TEXT, hash TEXT, algo TEXT,"
+               " must_change INTEGER, disabled INTEGER, created REAL, pw_changed REAL, last_login REAL)")
+    db.execute("INSERT INTO users(username, role) VALUES('old', 'user')")
+    db.commit()
+    db.close()
+    old = Store(p).user_get("old")
+    check("舊版資料庫升級：補上範圍欄位，原本的帳號不限群組", old and "scope" in old and x.scope_of(old) is None, old)
 
 
 def main():
@@ -188,7 +349,7 @@ def main():
     check(f"從原始碼抓到 {len(rs)} 個路由樣本（每條路由、每個分支）", len(rs) > 150, len(rs))
     wrong, opened = [], []
     for method, path in sorted(rs):
-        if path in ("/api/login", "/api/logout", "/api/join", "/api/desktop/enter", "/api/account/password", "/api/health"):  # 不用登入的
+        if path in ANON:  # 不用登入的
             continue
         st, out = u1.req(method, path, {} if method == "POST" else None)
         blocked = st == 403 and out.get("admin_only")
@@ -410,6 +571,8 @@ def main():
     x.STORE.user_insert({"username": "管理員", "display": "管理員", "role": "user", "disabled": 0})
     st, o = a2.req("POST", "/api/users/" + urllib.parse.quote("管理員") + "/update", {"display": "舊帳號"})
     check("帳號是中文（舊版搬進來的）：改得到", st == 200 and o["user"]["display"] == "舊帳號", (st, o))
+
+    roles_and_scope(a2)
 
     print("全部通過" if OK else "有失敗")
     return 0 if OK else 1
