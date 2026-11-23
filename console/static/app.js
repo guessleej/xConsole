@@ -285,9 +285,9 @@ function renderNav() {
   };
   const cur = curNode();
   // 第二列：概覽在多台時可切「這台／全部機器」
-  if (active === "home" && (S.fleet.nodes || []).length > 1) {
-    subBtn("這台", "home", !S.homeAll, () => { S.homeAll = false; go("home"); });
-    subBtn("全部機器", "home", !!S.homeAll, () => { S.homeAll = true; go("home"); });
+  if (active === "home" && ((S.fleet.nodes || []).length > 1 || v.startsWith("group:"))) {
+    subBtn("群組總覽", "home", homeAll() || v.startsWith("group:"), () => { S.homeAll = true; go("home"); });
+    subBtn("這台", "home", !homeAll() && !v.startsWith("group:"), () => { S.homeAll = false; go("home"); });
   }
   // 第二列：執行（日常）→ 角色欄位（一台跑好幾個模型時才需要）→ API 串接（給 IDE）
   if (active === "run" && cur) {
@@ -3495,6 +3495,8 @@ function viewOverview() {
   };
   tiles.appendChild(tile("機器在線", `${online.length} / ${nodes.length}`,
     nodes.length === online.length ? "全部連得上" : "有機器連不上代理"));
+  const rs = nodes.filter((n) => n.ready);
+  if (rs.length) tiles.appendChild(tile("就緒", `${rs.filter((n) => n.ready.code === "ready").length} / ${rs.length}`, "已套用群組設定、在線"));
   tiles.appendChild(tile("模型運作中", `${slotsOn} / ${slotsTotal}`, "已登錄的欄位"));
   tiles.appendChild(tile("顯示記憶體使用", `${fmt(vram, 0)} GiB`, `共 ${fmt(vramTotal, 0)} GiB`));
   tiles.appendChild(tile("更新於", new Date(S.fleet.ts * 1000).toLocaleTimeString(uiLocale()), "每 15 秒自動更新"));
@@ -3524,20 +3526,106 @@ function viewOverview() {
         .then(([, lib]) => { S.rec[n.id].lib = lib; if (S.view === "home") quietRender(); }).catch(() => {});
     }
   }
-  for (const [gname, gnodes] of groups()) {
-    const card = el("section", "card rv");
-    const head = el("div", "card-head");
-    head.appendChild(el("h2", null, gname));
-    head.appendChild(el("span", "sub", `${gnodes.length} 台`));
-    card.appendChild(head);
-    const grid = el("div", "grid");
-    gnodes.forEach((n) => grid.appendChild(nodeSummary(n)));
-    card.appendChild(grid);
-    wrap.appendChild(card);
-  }
+  // 群組總覽（清單 #9）：每個群組一張卡，標題列「N／M 台就緒」與下一步，裡面每台一張小卡
+  const gs = (S.fleet.groups || []).filter((g) => g.members || g.name !== "未分類");
+  gs.forEach((g) => wrap.appendChild(groupCard(g, nodes.filter((n) => (n.group || "未分類") === g.name), true)));
 
+  const old = main.children;
+  if (S.quiet && old.length === 2 && old[0].matches("section.hero")) {
+    // 每 15 秒的自動更新只換有變的數字與狀態，不重播進場動畫（ui-no-flicker）
+    [old[0], old[1]].forEach((r) => [r, ...r.querySelectorAll(".rv, .in")].forEach((x) => x.classList.remove("rv", "in", "d1", "d2", "d3", "d4")));
+    swapChanged(old[1], wrap);
+    swapChanged(old[0], hero);
+    return;
+  }
   main.textContent = "";
   main.appendChild(hero);
+  main.appendChild(wrap);
+  reveal(main);
+}
+
+const READY_CHIP = { ready: "ok", preparing: "brand", differs: "warn", nofit: "bad", failed: "bad", offline: "bad", rejoin: "bad", clone: "bad" };
+
+// 群組裡一台的小卡：名稱、狀態、原因；準備中有下載進度條。點進去就是「這台」的概覽
+function readyCard(n) {
+  const r = n.ready || { code: n.online ? "ready" : "offline", label: n.online ? "在線" : "離線", detail: "" };
+  const c = el("button", "ready-card " + r.code);
+  c.type = "button";
+  c.setAttribute("aria-label", `${n.name}：${r.label}`);
+  const top = el("div", "ready-top");
+  top.append(el("span", "ready-name", n.name), el("span", "chip " + (READY_CHIP[r.code] || ""), r.label));
+  c.appendChild(top);
+  if (r.detail) c.appendChild(el("div", "ready-detail small", r.detail));
+  if (r.pct != null) {
+    const bar = el("div", "ready-bar");
+    const fill = el("span");
+    fill.style.width = `${Math.max(2, Math.min(100, r.pct))}%`;
+    bar.appendChild(fill);
+    c.appendChild(bar);
+  }
+  c.onclick = () => { setNode(n.id); S.homeAll = false; go("home"); };
+  return c;
+}
+
+function groupCard(g, members, link) {
+  const card = el("section", "card rv");
+  const head = el("div", "card-head");
+  head.appendChild(el("h2", null, g.name));
+  head.appendChild(el("span", "sub", g.members ? `${g.ready}／${g.members} 台就緒` : "還沒有機器"));
+  head.appendChild(el("span", "spacer"));
+  if (g.next) head.appendChild(el("span", "small muted", `下一步：${g.next.n}. ${g.next.t}`));
+  if (link) {
+    const b = el("button", "btn sm", "看這個群組");
+    b.onclick = () => go("group:" + g.id);
+    head.appendChild(b);
+  }
+  card.appendChild(head);
+  if (g.members) {
+    const bar = el("div", "ready-bar wide");
+    const fill = el("span");
+    fill.style.width = `${Math.round(100 * g.ready / g.members)}%`;
+    bar.appendChild(fill);
+    card.appendChild(bar);
+    const grid = el("div", "ready-grid");
+    members.forEach((n) => grid.appendChild(readyCard(n)));
+    card.appendChild(grid);
+  } else {
+    card.appendChild(el("p", "small muted", "產生這個群組的加入碼，在每台執行安裝，機器就會出現在這裡。"));
+  }
+  return card;
+}
+
+// 一個群組的頁面：最上面是從零到能用的五步（狀態由主控台的真實資料算），下面是每台的狀態
+function viewGroup() {
+  const main = $("#main");
+  const g = (S.fleet.groups || []).find((x) => x.id === S.view.slice(6));
+  if (!g) { S.homeAll = true; go("home"); return; }
+  const members = S.fleet.nodes.filter((n) => (n.group || "未分類") === g.name);
+  const wrap = el("div", "wrap");
+  const sc = el("section", "card rv");
+  const sh = el("div", "card-head");
+  sh.appendChild(el("h2", null, g.name));
+  sh.appendChild(el("span", "sub", `${g.kind || "一般"}・設定 v${g.version}`));
+  sc.appendChild(sh);
+  const act = {
+    join: ["產生加入碼", () => openAddMachine(g.name)],
+    settings: ["填群組設定", () => { S.settingsTab = "groups"; S.groupEdit = g.id; go("settings"); }],
+    prepare: ["看各台進度", () => { S.settingsTab = "groups"; S.groupEdit = g.id; go("settings"); }],
+    ready: ["看各台進度", () => { S.settingsTab = "groups"; S.groupEdit = g.id; go("settings"); }],
+  };
+  sc.appendChild(renderSteps(g.steps.map((s) => ({ t: s.t, why: s.why, state: s.state, done: s.state === "done" || s.state === "skip",
+    optional: s.state === "skip", blocked: s.state === "blocked", need: s.need ? `（要先完成第 ${s.need} 步）` : "",
+    go: act[s.key] }))));
+  wrap.appendChild(sc);
+  wrap.appendChild(groupCard(g, members, false));
+
+  const old = main.children;
+  if (S.quiet && old.length === 1 && old[0].matches("div.wrap")) {
+    [...old[0].querySelectorAll(".rv, .in")].forEach((x) => x.classList.remove("rv", "in", "d1", "d2", "d3", "d4"));
+    swapChanged(old[0], wrap);
+    return;
+  }
+  main.textContent = "";
   main.appendChild(wrap);
   reveal(main);
 }
@@ -5388,6 +5476,7 @@ function render() {
   renderNav();
   const v = S.view;
   if (v === "home" || v === "overview") viewHome();
+  else if (v.startsWith("group:")) viewGroup();
   else if (v === "models") viewLib();
   else if (v === "run") viewRun();
   else if (v.startsWith("node:")) viewNode();

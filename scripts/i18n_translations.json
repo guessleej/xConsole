@@ -22639,6 +22639,641 @@
 "ja": "OS ID が変わりました（同じマシンの再インストール）。ID は保持します",
 "ko": "OS ID가 바뀌었습니다(같은 기기를 재설치함). ID는 유지합니다"
 },
+"群組總覽": {
+"en": "Group overview",
+"ja": "グループ一覧",
+"ko": "그룹 개요"
+},
+"已套用群組設定、在線": {
+"en": "Group settings applied and online",
+"ja": "グループ設定を適用済み・オンライン",
+"ko": "그룹 설정 적용됨・온라인"
+},
+"離線": {
+"en": "Offline",
+"ja": "オフライン",
+"ko": "오프라인"
+},
+"{0}／{1} 台就緒": {
+"en": "{0}/{1} ready",
+"ja": "{0}／{1} 台が準備完了",
+"ko": "{0}/{1}대 준비 완료"
+},
+"台就緒": {
+"en": " ready",
+"ja": " 台が準備完了",
+"ko": "대 준비 완료"
+},
+"看這個群組": {
+"en": "Open group",
+"ja": "このグループを見る",
+"ko": "이 그룹 보기"
+},
+"產生這個群組的加入碼，在每台執行安裝，機器就會出現在這裡。": {
+"en": "Generate a join code for this group and run the installer on each machine; the machines will appear here.",
+"ja": "このグループの参加コードを発行し、各マシンでインストールを実行すると、ここに表示されます。",
+"ko": "이 그룹의 가입 코드를 만들고 각 기기에서 설치를 실행하면 여기에 기기가 나타납니다."
+},
+"{0}・設定 v{1}": {
+"en": "{0} · settings v{1}",
+"ja": "{0}・設定 v{1}",
+"ko": "{0}・설정 v{1}"
+},
+"填群組設定": {
+"en": "Fill in group settings",
+"ja": "グループ設定を入力",
+"ko": "그룹 설정 입력"
+},
+"看各台進度": {
+"en": "See progress per machine",
+"ja": "各マシンの進捗を見る",
+"ko": "기기별 진행 상황 보기"
+},
+"教室": {
+"en": "Classroom",
+"ja": "教室",
+"ko": "교실"
+},
+"部門": {
+"en": "Department",
+"ja": "部門",
+"ko": "부서"
+},
+"已準備好，等下次開機套用": {
+"en": "Prepared; will apply at next boot",
+"ja": "準備完了。次回起動時に適用",
+"ko": "준비 완료, 다음 부팅 시 적용"
+},
+"已準備好，等指定時間套用": {
+"en": "Prepared; will apply at the scheduled time",
+"ja": "準備完了。指定時刻に適用",
+"ko": "준비 완료, 지정 시간에 적용"
+},
+"設定不同": {
+"en": "Settings differ",
+"ja": "設定が異なる",
+"ko": "설정 다름"
+},
+"{0} 要是整數": {
+"en": "{0} must be an integer",
+"ja": "{0} は整数にしてください",
+"ko": "{0}은(는) 정수여야 합니다"
+},
+"要是整數": {
+"en": " must be an integer",
+"ja": " は整数にしてください",
+"ko": "은(는) 정수여야 합니다"
+},
+"{0} 要是清單，最多 32 個": {
+"en": "{0} must be a list of at most 32 items",
+"ja": "{0} はリスト（最大 32 個）にしてください",
+"ko": "{0}은(는) 최대 32개의 목록이어야 합니다"
+},
+"要是清單，最多 32 個": {
+"en": " must be a list of at most 32 items",
+"ja": " はリスト（最大 32 個）にしてください",
+"ko": "은(는) 최대 32개의 목록이어야 합니다"
+},
+"設定要是一個物件": {
+"en": "Settings must be an object",
+"ja": "設定はオブジェクトにしてください",
+"ko": "설정은 객체여야 합니다"
+},
+"不認得的設定欄位：{0}": {
+"en": "Unknown settings field: {0}",
+"ja": "不明な設定項目：{0}",
+"ko": "알 수 없는 설정 항목: {0}"
+},
+"不認得的設定欄位": {
+"en": "Unknown settings field",
+"ja": "不明な設定項目",
+"ko": "알 수 없는 설정 항목"
+},
+"執行參數要是一個物件": {
+"en": "Run parameters must be an object",
+"ja": "実行パラメーターはオブジェクトにしてください",
+"ko": "실행 매개변수는 객체여야 합니다"
+},
+"不認得的執行參數：{0}": {
+"en": "Unknown run parameter: {0}",
+"ja": "不明な実行パラメーター：{0}",
+"ko": "알 수 없는 실행 매개변수: {0}"
+},
+"不認得的執行參數": {
+"en": "Unknown run parameter",
+"ja": "不明な実行パラメーター",
+"ko": "알 수 없는 실행 매개변수"
+},
+"鎖定項目只能是：{0}": {
+"en": "Locked items can only be: {0}",
+"ja": "ロック項目は次のみ：{0}",
+"ko": "잠금 항목은 다음만 가능: {0}"
+},
+"鎖定項目只能是": {
+"en": "Locked items can only be",
+"ja": "ロック項目は次のみ",
+"ko": "잠금 항목은 다음만 가능"
+},
+"保留給使用者的記憶體（GiB）": {
+"en": "Memory reserved for the user (GiB)",
+"ja": "ユーザー用に確保するメモリ（GiB）",
+"ko": "사용자용으로 남겨 둘 메모리(GiB)"
+},
+"模型來源至少選一個：同群組、內部鏡像、Hugging Face": {
+"en": "Choose at least one model source: same group, internal mirror, Hugging Face",
+"ja": "モデルの取得元を少なくとも 1 つ選んでください：同じグループ、社内ミラー、Hugging Face",
+"ko": "모델 출처를 하나 이상 선택하세요: 같은 그룹, 내부 미러, Hugging Face"
+},
+"套用時機要是：立即、下次開機或指定時間": {
+"en": "Apply timing must be: now, next boot, or a scheduled time",
+"ja": "適用タイミングは「すぐ」「次回起動時」「指定時刻」のいずれかです",
+"ko": "적용 시점은 즉시, 다음 부팅, 지정 시간 중 하나여야 합니다"
+},
+"顯卡功耗上限（瓦）": {
+"en": "GPU power limit (W)",
+"ja": "GPU 消費電力の上限（W）",
+"ko": "GPU 전력 상한(W)"
+},
+"群組名稱 1～30 個字，不能有引號、角括號或反斜線": {
+"en": "Group name must be 1–30 characters with no quotes, angle brackets or backslashes",
+"ja": "グループ名は 1～30 文字で、引用符・山括弧・バックスラッシュは使えません",
+"ko": "그룹 이름은 1~30자이며 따옴표, 꺾쇠괄호, 백슬래시는 쓸 수 없습니다"
+},
+"「未分類」是預設群組，不能改名": {
+"en": "\"Unassigned\" is the default group and cannot be renamed",
+"ja": "「未分類」は既定のグループのため名前を変更できません",
+"ko": "\"미분류\"는 기본 그룹이라 이름을 바꿀 수 없습니다"
+},
+"種類要是：{0}": {
+"en": "Type must be one of: {0}",
+"ja": "種類は次のいずれか：{0}",
+"ko": "종류는 다음 중 하나여야 합니다: {0}"
+},
+"種類要是": {
+"en": "Type must be one of",
+"ja": "種類は次のいずれか",
+"ko": "종류는 다음 중 하나여야 합니다"
+},
+"同一個身分同時從兩個地方連回，已停止下指令": {
+"en": "The same identity is connecting back from two places; commands are stopped",
+"ja": "同じ ID が 2 か所から同時に接続しているため、コマンド送信を停止しました",
+"ko": "같은 ID가 두 곳에서 동시에 연결해 명령 전송을 중지했습니다"
+},
+"設定送不過去": {
+"en": "Settings can't be delivered",
+"ja": "設定を送れません",
+"ko": "설정을 보낼 수 없음"
+},
+"主控台一分鐘內會把群組設定送過去": {
+"en": "The console will send the group settings within a minute",
+"ja": "コンソールが 1 分以内にグループ設定を送ります",
+"ko": "콘솔이 1분 안에 그룹 설정을 보냅니다"
+},
+"這台在 v{0}，群組是 v{1}": {
+"en": "This machine is on v{0}; the group is on v{1}",
+"ja": "このマシンは v{0}、グループは v{1}",
+"ko": "이 기기는 v{0}, 그룹은 v{1}"
+},
+"這台在 v": {
+"en": "This machine is on v",
+"ja": "このマシンは v",
+"ko": "이 기기는 v"
+},
+"群組是 v": {
+"en": "the group is on v",
+"ja": "グループは v",
+"ko": "그룹은 v"
+},
+"還在用別的群組的設定": {
+"en": "Still using another group's settings",
+"ja": "まだ別のグループの設定を使っています",
+"ko": "아직 다른 그룹의 설정을 쓰고 있습니다"
+},
+"建立群組": {
+"en": "Create the group",
+"ja": "グループを作成",
+"ko": "그룹 만들기"
+},
+"一間教室或一個部門一個群組，裡面的機器用同一份設定": {
+"en": "One group per classroom or department; its machines share one set of settings",
+"ja": "教室や部門ごとに 1 グループ。中のマシンは同じ設定を使います",
+"ko": "교실이나 부서마다 그룹 하나, 그 안의 기기는 같은 설정을 씁니다"
+},
+"加入機器": {
+"en": "Add machines",
+"ja": "マシンを追加",
+"ko": "기기 추가"
+},
+"每台下載並核對模型": {
+"en": "Each machine downloads and verifies models",
+"ja": "各マシンでモデルをダウンロード・検証",
+"ko": "각 기기에서 모델 다운로드 및 검증"
+},
+"{0}／{1} 台已準備好": {
+"en": "{0}/{1} prepared",
+"ja": "{0}／{1} 台が準備済み",
+"ko": "{0}/{1}대 준비됨"
+},
+"台已準備好": {
+"en": " prepared",
+"ja": " 台が準備済み",
+"ko": "대 준비됨"
+},
+"套用並確認就緒": {
+"en": "Apply and confirm ready",
+"ja": "適用して準備完了を確認",
+"ko": "적용 후 준비 완료 확인"
+},
+" 要是整數": {
+"en": " must be an integer",
+"ja": " は整数にしてください",
+"ko": "은(는) 정수여야 합니다"
+},
+" 要是清單，最多 32 個": {
+"en": " must be a list of at most 32 items",
+"ja": " はリスト（最大 32 個）にしてください",
+"ko": "은(는) 최대 32개의 목록이어야 합니다"
+},
+"{0} 每一項都要是文字（模型名稱）": {
+"en": "Every item in {0} must be text (a model name)",
+"ja": "{0} の各項目は文字列（モデル名）にしてください",
+"ko": "{0}의 각 항목은 텍스트(모델 이름)여야 합니다"
+},
+"每一項都要是文字（模型名稱": {
+"en": "every item must be text (a model name",
+"ja": "各項目は文字列（モデル名",
+"ko": "각 항목은 텍스트(모델 이름"
+},
+"{0} 的「{1}」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）": {
+"en": "\"{1}\" in {0} is not a model name (e.g. Org/Model-GGUF:Q4_K_M, or auto to let the console pick by hardware)",
+"ja": "{0} の「{1}」はモデル名ではありません（例：Org/Model-GGUF:Q4_K_M、またはハードウェアに合わせて選ぶ auto）",
+"ko": "{0}의 \"{1}\"은(는) 모델 이름이 아닙니다(예: Org/Model-GGUF:Q4_K_M, 또는 하드웨어에 맞춰 고르는 auto)"
+},
+"」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑": {
+"en": "\" is not a model name (e.g. Org/Model-GGUF:Q4_K_M, or auto to let the console pick by hardware",
+"ja": "」はモデル名ではありません（例：Org/Model-GGUF:Q4_K_M、またはハードウェアに合わせて選ぶ auto",
+"ko": "\"은(는) 모델 이름이 아닙니다(예: Org/Model-GGUF:Q4_K_M, 또는 하드웨어에 맞춰 고르는 auto"
+},
+"不認得的設定欄位：": {
+"en": "Unknown settings field: ",
+"ja": "不明な設定項目：",
+"ko": "알 수 없는 설정 항목: "
+},
+"不認得的執行參數：": {
+"en": "Unknown run parameter: ",
+"ja": "不明な実行パラメーター：",
+"ko": "알 수 없는 실행 매개변수: "
+},
+"思考開關要是開或關": {
+"en": "Thinking must be on or off",
+"ja": "思考モードはオンかオフにしてください",
+"ko": "생각 모드는 켜짐 또는 꺼짐이어야 합니다"
+},
+"鎖定項目只能是：": {
+"en": "Locked items can only be: ",
+"ja": "ロック項目は次のみ：",
+"ko": "잠금 항목은 다음만 가능: "
+},
+"模型存放位置要是完整路徑（例：/data/xconsole 或 D:\\xconsole），不能有 ..": {
+"en": "Model storage must be a full path (e.g. /data/xconsole or D:\\xconsole) without ..",
+"ja": "モデルの保存先は完全なパスにしてください（例：/data/xconsole または D:\\xconsole）。.. は使えません",
+"ko": "모델 저장 위치는 전체 경로여야 합니다(예: /data/xconsole 또는 D:\\xconsole). ..는 쓸 수 없습니다"
+},
+"種類要是：": {
+"en": "Type must be one of: ",
+"ja": "種類は次のいずれか：",
+"ko": "종류는 다음 중 하나여야 합니다: "
+},
+"上次連線 {0}": {
+"en": "Last seen {0}",
+"ja": "最終接続 {0}",
+"ko": "마지막 연결 {0}"
+},
+"上次連線": {
+"en": "Last seen",
+"ja": "最終接続",
+"ko": "마지막 연결"
+},
+"還沒連上過": {
+"en": "Never connected",
+"ja": "まだ接続したことがありません",
+"ko": "아직 연결된 적 없음"
+},
+"下載 {0}%": {
+"en": "Downloading {0}%",
+"ja": "ダウンロード中 {0}%",
+"ko": "다운로드 {0}%"
+},
+"已準備 v{0}，還沒套用": {
+"en": "v{0} prepared, not applied yet",
+"ja": "v{0} を準備済み・未適用",
+"ko": "v{0} 준비됨, 아직 적용 안 됨"
+},
+"已準備 v": {
+"en": "Prepared v",
+"ja": "準備済み v",
+"ko": "준비됨 v"
+},
+"還沒套用": {
+"en": "not applied yet",
+"ja": "未適用",
+"ko": "아직 적용 안 됨"
+},
+"，群組是 v": {
+"en": "; the group is on v",
+"ja": "、グループは v",
+"ko": ", 그룹은 v"
+},
+"已加入 {0} 台": {
+"en": "{0} machines added",
+"ja": "{0} 台を追加済み",
+"ko": "{0}대 추가됨"
+},
+"產生群組加入碼，在每台執行安裝（大量部署用回應檔）": {
+"en": "Generate a group join code and run the installer on each machine (use a response file for bulk deployment)",
+"ja": "グループの参加コードを発行し、各マシンでインストールを実行（一括展開は応答ファイルで）",
+"ko": "그룹 가입 코드를 만들고 각 기기에서 설치를 실행하세요(일괄 배포는 응답 파일 사용)"
+},
+"選要放的模型、上下文與鎖定；不填就是每台維持原本的模型": {
+"en": "Choose models, context and locks; leave empty to keep each machine's current models",
+"ja": "使うモデル、コンテキスト、ロックを選びます。空欄なら各マシンは今のモデルのまま",
+"ko": "쓸 모델, 컨텍스트, 잠금을 고르세요. 비워 두면 각 기기는 지금 모델을 유지합니다"
+},
+"設定在 v{0}": {
+"en": "Settings at v{0}",
+"ja": "設定は v{0}",
+"ko": "설정 v{0}"
+},
+"設定在 v": {
+"en": "Settings at v",
+"ja": "設定は v",
+"ko": "설정 v"
+},
+" 台已準備好": {
+"en": " prepared",
+"ja": " 台が準備済み",
+"ko": "대 준비됨"
+},
+" 台就緒": {
+"en": " ready",
+"ja": " 台が準備完了",
+"ko": "대 준비 완료"
+},
+" 每一項都要是文字（模型名稱）": {
+"en": ": every item must be text (a model name)",
+"ja": " の各項目は文字列（モデル名）にしてください",
+"ko": "의 각 항목은 텍스트(모델 이름)여야 합니다"
+},
+" 的「": {
+"en": ": \"",
+"ja": " の「",
+"ko": "의 \""
+},
+"」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）": {
+"en": "\" is not a model name (e.g. Org/Model-GGUF:Q4_K_M, or auto to let the console pick by hardware)",
+"ja": "」はモデル名ではありません（例：Org/Model-GGUF:Q4_K_M、またはハードウェアに合わせて選ぶ auto）",
+"ko": "\"은(는) 모델 이름이 아닙니다(예: Org/Model-GGUF:Q4_K_M, 또는 하드웨어에 맞춰 고르는 auto)"
+},
+"上次連線 ": {
+"en": "Last seen ",
+"ja": "最終接続 ",
+"ko": "마지막 연결 "
+},
+"建議改用 {0}": {
+"en": "Suggested: {0}",
+"ja": "{0} への変更をおすすめします",
+"ko": "{0}(으)로 바꾸기를 권장"
+},
+"建議改用": {
+"en": "Suggested",
+"ja": "おすすめ",
+"ko": "권장"
+},
+"{0} 放不下，請改小上下文或換小一點的量化": {
+"en": "{0} doesn't fit; reduce the context or pick a smaller quantization",
+"ja": "{0} が収まりません。コンテキストを小さくするか、より小さい量子化を選んでください",
+"ko": "{0}이(가) 들어가지 않습니다. 컨텍스트를 줄이거나 더 작은 양자화를 고르세요"
+},
+"放不下，請改小上下文或換小一點的量化": {
+"en": " doesn't fit; reduce the context or pick a smaller quantization",
+"ja": " が収まりません。コンテキストを小さくするか、より小さい量子化を選んでください",
+"ko": "이(가) 들어가지 않습니다. 컨텍스트를 줄이거나 더 작은 양자화를 고르세요"
+},
+"下載 ": {
+"en": "Downloading ",
+"ja": "ダウンロード中 ",
+"ko": "다운로드 "
+},
+"，還沒套用": {
+"en": ", not applied yet",
+"ja": "・未適用",
+"ko": ", 아직 적용 안 됨"
+},
+"已加入 ": {
+"en": "Added ",
+"ja": "追加済み ",
+"ko": "추가됨 "
+},
+" 台": {
+"en": " machines",
+"ja": " 台",
+"ko": "대"
+},
+"建議改用 ": {
+"en": "Suggested: ",
+"ja": "おすすめ：",
+"ko": "권장: "
+},
+" 放不下，請改小上下文或換小一點的量化": {
+"en": " doesn't fit; reduce the context or pick a smaller quantization",
+"ja": " が収まりません。コンテキストを小さくするか、より小さい量子化を選んでください",
+"ko": "이(가) 들어가지 않습니다. 컨텍스트를 줄이거나 더 작은 양자화를 고르세요"
+},
+"名稱樣板只能有一段 {起..迄}，例：A{01..20}": {
+"en": "A name template can have only one {from..to} range, e.g. A{01..20}",
+"ja": "名前テンプレートの {開始..終了} は 1 か所だけです（例：A{01..20}）",
+"ko": "이름 템플릿에는 {시작..끝} 범위가 하나만 있어야 합니다(예: A{01..20})"
+},
+"名稱樣板的範圍要由小到大，最多 {0} 個": {
+"en": "The name template range must go from low to high, at most {0} names",
+"ja": "名前テンプレートの範囲は小さい順に、最大 {0} 個です",
+"ko": "이름 템플릿 범위는 작은 수에서 큰 수로, 최대 {0}개입니다"
+},
+"名稱樣板的範圍要由小到大，最多": {
+"en": "The name template range must go from low to high, at most",
+"ja": "名前テンプレートの範囲は小さい順に、最大",
+"ko": "이름 템플릿 범위는 작은 수에서 큰 수로, 최대"
+},
+"限定網段最多 8 個，例：198.51.100.0/24": {
+"en": "At most 8 allowed networks, e.g. 198.51.100.0/24",
+"ja": "許可するネットワークは最大 8 個です（例：198.51.100.0/24）",
+"ko": "허용 네트워크는 최대 8개입니다(예: 198.51.100.0/24)"
+},
+"名稱樣板的範圍要由小到大，最多 ": {
+"en": "The name template range must go from low to high, at most ",
+"ja": "名前テンプレートの範囲は小さい順に、最大 ",
+"ko": "이름 템플릿 범위는 작은 수에서 큰 수로, 최대 "
+},
+"可用次數要是 1～{0} 的整數": {
+"en": "Uses must be an integer from 1 to {0}",
+"ja": "使用回数は 1～{0} の整数にしてください",
+"ko": "사용 횟수는 1~{0}의 정수여야 합니다"
+},
+"可用次數要是 1～": {
+"en": "Uses must be an integer from 1 to ",
+"ja": "使用回数は 1～",
+"ko": "사용 횟수는 1~"
+},
+"有效時間要是 {0}～{1} 分鐘（最長 7 天）": {
+"en": "Validity must be {0}–{1} minutes (up to 7 days)",
+"ja": "有効期間は {0}～{1} 分（最長 7 日）にしてください",
+"ko": "유효 시간은 {0}~{1}분(최대 7일)이어야 합니다"
+},
+"有效時間要是": {
+"en": "Validity must be",
+"ja": "有効期間は",
+"ko": "유효 시간은"
+},
+"分鐘（最長 7 天": {
+"en": "minutes (up to 7 days",
+"ja": "分（最長 7 日",
+"ko": "분(최대 7일"
+},
+"名稱樣板只有 {0} 個名稱，比可用次數 {1} 少": {
+"en": "The name template has only {0} names, fewer than the {1} uses",
+"ja": "名前テンプレートの名前は {0} 個だけで、使用回数 {1} より少ないです",
+"ko": "이름 템플릿의 이름이 {0}개뿐이라 사용 횟수 {1}보다 적습니다"
+},
+"名稱樣板只有": {
+"en": "The name template has only",
+"ja": "名前テンプレートの名前は",
+"ko": "이름 템플릿의 이름은"
+},
+"個名稱，比可用次數": {
+"en": "names, fewer than the uses",
+"ja": "個だけで、使用回数",
+"ko": "개뿐이라 사용 횟수"
+},
+"少": {
+"en": "",
+"ja": "より少ないです",
+"ko": "보다 적습니다"
+},
+"名稱樣板裡 {0}{1} 已經有機器在用，剩下 {2} 個名稱，不夠可用次數 {3}；請把範圍加大或換個前綴": {
+"en": "In the name template, {0}{1} are already taken, leaving {2} names, not enough for {3} uses; widen the range or use another prefix",
+"ja": "名前テンプレートの {0}{1} はすでに使われており、残り {2} 個では使用回数 {3} に足りません。範囲を広げるか別の接頭辞にしてください",
+"ko": "이름 템플릿의 {0}{1}은(는) 이미 사용 중이라 남은 이름 {2}개로는 사용 횟수 {3}에 부족합니다. 범위를 넓히거나 다른 접두사를 쓰세요"
+},
+"名稱樣板裡": {
+"en": "In the name template,",
+"ja": "名前テンプレートの",
+"ko": "이름 템플릿의"
+},
+"已經有機器在用，剩下": {
+"en": "are already taken, leaving",
+"ja": "はすでに使われており、残り",
+"ko": "은(는) 이미 사용 중이라 남은 이름"
+},
+"個名稱，不夠可用次數": {
+"en": "names, not enough for the uses",
+"ja": "個では使用回数",
+"ko": "개로는 사용 횟수"
+},
+"請把範圍加大或換個前綴": {
+"en": "widen the range or use another prefix",
+"ja": "範囲を広げるか別の接頭辞にしてください",
+"ko": "범위를 넓히거나 다른 접두사를 쓰세요"
+},
+"一個加入碼要加入多台時，名稱請用樣板（例：A{01..20}），或留空用各台的主機名稱": {
+"en": "When one join code adds several machines, use a name template (e.g. A{01..20}) or leave it empty to use each machine's hostname",
+"ja": "1 つの参加コードで複数台を追加するときは、名前テンプレート（例：A{01..20}）を使うか、空欄にして各マシンのホスト名を使ってください",
+"ko": "가입 코드 하나로 여러 대를 추가할 때는 이름 템플릿(예: A{01..20})을 쓰거나 비워 두어 각 기기의 호스트 이름을 쓰세요"
+},
+"重新安裝某一台時，可用次數只能是 1": {
+"en": "When reinstalling one machine, uses must be 1",
+"ja": "特定のマシンを再インストールするときは、使用回数は 1 だけです",
+"ko": "특정 기기를 다시 설치할 때는 사용 횟수가 1이어야 합니다"
+},
+"「{0}」不是網段，例：198.51.100.0/24": {
+"en": "\"{0}\" is not a network, e.g. 198.51.100.0/24",
+"ja": "「{0}」はネットワークではありません（例：198.51.100.0/24）",
+"ko": "\"{0}\"은(는) 네트워크가 아닙니다(예: 198.51.100.0/24)"
+},
+"」不是網段，例：198.51.100.0/24": {
+"en": "\" is not a network, e.g. 198.51.100.0/24",
+"ja": "」はネットワークではありません（例：198.51.100.0/24）",
+"ko": "\"은(는) 네트워크가 아닙니다(예: 198.51.100.0/24)"
+},
+" 的整數": {
+"en": "",
+"ja": " の整数にしてください",
+"ko": "의 정수여야 합니다"
+},
+"有效時間要是 ": {
+"en": "Validity must be ",
+"ja": "有効期間は ",
+"ko": "유효 시간은 "
+},
+" 分鐘（最長 7 天）": {
+"en": " minutes (up to 7 days)",
+"ja": " 分（最長 7 日）にしてください",
+"ko": "분(최대 7일)이어야 합니다"
+},
+"名稱樣板只有 ": {
+"en": "The name template has only ",
+"ja": "名前テンプレートの名前は ",
+"ko": "이름 템플릿의 이름은 "
+},
+" 個名稱，比可用次數 ": {
+"en": " names, fewer than the ",
+"ja": " 個だけで、使用回数 ",
+"ko": "개뿐이라 사용 횟수 "
+},
+" 少": {
+"en": " uses",
+"ja": " より少ないです",
+"ko": "보다 적습니다"
+},
+"名稱樣板裡 ": {
+"en": "In the name template, ",
+"ja": "名前テンプレートの ",
+"ko": "이름 템플릿의 "
+},
+" 已經有機器在用，剩下 ": {
+"en": " are already taken, leaving ",
+"ja": " はすでに使われており、残り ",
+"ko": "은(는) 이미 사용 중이라 남은 이름 "
+},
+" 個名稱，不夠可用次數 ": {
+"en": " names, not enough for ",
+"ja": " 個では使用回数 ",
+"ko": "개로는 사용 횟수 "
+},
+"；請把範圍加大或換個前綴": {
+"en": " uses; widen the range or use another prefix",
+"ja": " に足りません。範囲を広げるか別の接頭辞にしてください",
+"ko": "에 부족합니다. 범위를 넓히거나 다른 접두사를 쓰세요"
+},
+"加入碼不對、已經用完、過期或被作廢了；請在主控台重新產生加入碼": {
+"en": "The join code is wrong, used up, expired or revoked; generate a new one in the console",
+"ja": "参加コードが正しくないか、使い切り・期限切れ・無効化されています。コンソールで再発行してください",
+"ko": "가입 코드가 틀렸거나 다 썼거나 만료·폐기되었습니다. 콘솔에서 다시 만드세요"
+},
+"這個加入碼只收指定網段來的機器": {
+"en": "This join code only accepts machines from the allowed networks",
+"ja": "この参加コードは指定したネットワークからのマシンだけを受け付けます",
+"ko": "이 가입 코드는 지정한 네트워크에서 오는 기기만 받습니다"
+},
+"另一台正在用這個加入碼加入，名額已滿；等它完成或請在主控台重新產生": {
+"en": "Another machine is joining with this code and no uses are left; wait for it to finish or generate a new code in the console",
+"ja": "別のマシンがこの参加コードで参加中で、残り回数がありません。完了を待つか、コンソールで再発行してください",
+"ko": "다른 기기가 이 가입 코드로 가입 중이라 남은 횟수가 없습니다. 끝날 때까지 기다리거나 콘솔에서 다시 만드세요"
+},
+"名稱樣板的名稱都被用掉了，請在主控台重新產生加入碼": {
+"en": "All names in the template are used up; generate a new join code in the console",
+"ja": "名前テンプレートの名前をすべて使い切りました。コンソールで参加コードを再発行してください",
+"ko": "이름 템플릿의 이름을 모두 썼습니다. 콘솔에서 가입 코드를 다시 만드세요"
+},
 "不到1 tok/s": {
 "en": "under 1 tok/s",
 "ja": "1 tok/s 未満",
