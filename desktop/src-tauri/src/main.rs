@@ -12,7 +12,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -36,7 +36,118 @@ struct Runtime {
     payload: PathBuf,
     ready: AtomicBool,
     quitting: AtomicBool,
+    /// 背景服務一直起不來時的診斷（啟動畫面顯示）：有值就不再重試，免得Windows每兩秒跳一次「已封鎖」通知
+    fault: Mutex<Option<String>>,
 }
+
+/// 連續幾次「起不來或一起來就掉」就停手。啟動後撐過這麼久才算起來了。
+const FAIL_LIMIT: u32 = 3;
+const STARTUP_GRACE: Duration = Duration::from_secs(20);
+
+struct Watch {
+    child: Option<Child>,
+    since: Instant,
+    fails: u32,
+    last_err: Option<std::io::Error>,
+}
+
+impl Watch {
+    fn start(r: std::io::Result<Child>) -> Watch {
+        let mut w = Watch { child: None, since: Instant::now(), fails: 0, last_err: None };
+        w.take(r);
+        w
+    }
+    fn take(&mut self, r: std::io::Result<Child>) {
+        self.since = Instant::now();
+        match r {
+            Ok(c) => self.child = Some(c),
+            Err(e) => {
+                self.child = None;
+                self.fails += 1;
+                self.last_err = Some(e);
+            }
+        }
+    }
+    /// 子行程結束了嗎；一起來就結束（撐不過STARTUP_GRACE）算一次失敗，撐過了就把失敗次數歸零
+    fn dead(&mut self) -> bool {
+        let gone = self.child.as_mut().is_none_or(|p| matches!(p.try_wait(), Ok(Some(_))));
+        if !gone && self.since.elapsed() >= STARTUP_GRACE {
+            self.fails = 0;
+        }
+        if gone && self.child.is_some() {
+            self.child = None;
+            if self.since.elapsed() < STARTUP_GRACE {
+                self.fails += 1;
+            } else {
+                self.fails = 0;
+            }
+        }
+        gone
+    }
+}
+
+/// Windows 11的「智慧型應用程式控制」狀態：0關閉、1開啟（會擋沒有簽章的程式）、2評估模式（只記錄不擋）。
+fn smart_app_control() -> Option<u32> {
+    if !cfg!(windows) {
+        return None;
+    }
+    let mut c = Command::new("reg");
+    c.args(["query", r"HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy", "/v", "VerifiedAndReputablePolicyState"]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000);
+    }
+    let out = c.output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let hex = text.split_whitespace().find(|t| t.starts_with("0x"))?;
+    u32::from_str_radix(hex.trim_start_matches("0x"), 16).ok()
+}
+
+/// 記錄檔最後幾行（給畫面顯示；記錄裡沒有機密：權杖與鑰匙都不寫記錄）
+fn log_tail(data: &Path, name: &str) -> String {
+    let text = fs::read(data.join(".xconsole").join(name)).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    lines[lines.len().saturating_sub(12)..].join("\n")
+}
+
+/// Windows用來表示「被應用程式控制原則擋下」的錯誤碼：4551是智慧型應用程式控制／WDAC，1260是群組原則
+fn blocked_by_policy(e: &Option<std::io::Error>, tail: &str) -> bool {
+    matches!(e.as_ref().and_then(|e| e.raw_os_error()), Some(4551) | Some(1260))
+        || ["4551", "Application Control", "應用程式控制", "has blocked this file"].iter().any(|k| tail.contains(k))
+}
+
+/// 整理成啟動畫面看得懂的診斷：種類|記錄檔位置|最後幾行
+fn diagnose(rt: &Runtime, w: &Watch, log: &str) -> String {
+    let tail = log_tail(&rt.data, log);
+    // 只有錯誤碼或記錄裡真的看得到「被擋」才叫人處理智慧型應用程式控制：它關掉之後要重灌Windows才能再開，
+    // 不能因為這台剛好開著它，就把腳本錯誤、檔案損壞也怪到它頭上。登錄檔狀態只當參考寫在記錄後面
+    let kind = if blocked_by_policy(&w.last_err, &tail) { "sac" } else { "start" };
+    let note = if kind == "start" && smart_app_control() == Some(1) {
+        "\n（這台開著智慧型應用程式控制，但記錄裡沒有看到被它擋下的跡象）"
+    } else {
+        ""
+    };
+    let err = w.last_err.as_ref().map(|e| format!("{}\n", e)).unwrap_or_default();
+    let path = rt.data.join(".xconsole").join(log);
+    format!("{}|{}|{}{}{}", kind, path.display(), err, tail, note)
+}
+
+/// 視窗可能已經切到主控台（主控台短暫起來過）：主控台頁面不認 #fault，所以關掉重開一個啟動畫面的視窗
+fn show_fault(app: &AppHandle, rt: &Runtime) {
+    if rt.fault.lock().unwrap().is_none() {
+        return;
+    }
+    if let Some(w) = app.get_webview_window(MAIN) {
+        let _ = w.destroy();
+    }
+    show(app);
+}
+
+fn url_encode(s: &str) -> String {
+    url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
+}
+
 
 fn random_key() -> String {
     let mut b = [0u8; 32];
@@ -115,7 +226,7 @@ fn spawn_console(rt: &Runtime) -> std::io::Result<Child> {
 }
 
 /// 代理第一次啟動會產生權杖與憑證；等它們出現，再把這台的代理登記進主控台（每次都做：埠可能換過）。
-fn register_agent(rt: &Runtime) {
+fn register_agent(rt: &Runtime) -> bool {
     let st = rt.data.join(".xconsole");
     let end = Instant::now() + Duration::from_secs(60);
     while Instant::now() < end && !(st.join("token").exists() && st.join("agent-cert.pem").exists()) {
@@ -126,7 +237,7 @@ fn register_agent(rt: &Runtime) {
     let name = hostname();
     let mut c = command(rt, &["install/setup_local.py", "--home", &home, "--agent-port", &port, "--name", &name], "console.log");
     c.stdin(Stdio::null());
-    let _ = c.status();
+    c.status().map(|s| s.success()).unwrap_or(false)
 }
 
 fn hostname() -> String {
@@ -156,15 +267,18 @@ fn console_url(rt: &Runtime) -> url::Url {
 
 /// 背景執行緒：帶起代理與主控台、看著它們，掛了就重新帶起（主控台更新完或切換區網存取時會自己結束，也走這條）。
 fn supervise(app: AppHandle, rt: Arc<Runtime>) {
-    let mut agent = spawn_agent(&rt).ok();
-    register_agent(&rt);
-    let mut console = spawn_console(&rt).ok();
+    let mut agent = Watch::start(spawn_agent(&rt));
+    // 代理起來了才登記（起不來時登記也會失敗，還白等60秒才講原因）；第一次沒起來、之後重試起來了再補登記
+    // 登記成功才算數：登記失敗（例如代理一起來就掉、還沒產生憑證）之後每30秒再試，直到登記上
+    let mut registered = agent.child.is_some() && register_agent(&rt);
+    let mut reg_at = Instant::now();
+    let mut console = Watch::start(spawn_console(&rt));
     let mut first = true;
     loop {
         if rt.quitting.load(Ordering::SeqCst) {
             break;
         }
-        if first && wait_port(rt.ports.app, 90) {
+        if first && rt.fault.lock().unwrap().is_none() && wait_port(rt.ports.app, 5) {
             first = false;
             rt.ready.store(true, Ordering::SeqCst);
             if let Some(w) = app.get_webview_window(MAIN) {
@@ -175,18 +289,39 @@ fn supervise(app: AppHandle, rt: Arc<Runtime>) {
         if rt.quitting.load(Ordering::SeqCst) {
             break;
         }
-        let dead = |c: &mut Option<Child>| c.as_mut().map_or(true, |p| matches!(p.try_wait(), Ok(Some(_))));
-        if dead(&mut agent) {
-            thread::sleep(Duration::from_secs(2));
-            agent = spawn_agent(&rt).ok();
+        if rt.fault.lock().unwrap().is_some() {
+            continue; // 已經停手：等使用者處理完重開xConsole，不再重試
         }
-        if dead(&mut console) {
+        // 連續起不來（被Windows擋、少了檔案、一起來就掉）：停手並在啟動畫面講原因
+        for (w, log) in [(&agent, "agent.log"), (&console, "console.log")] {
+            if w.fails >= FAIL_LIMIT {
+                let d = diagnose(&rt, w, log);
+                // 也寫進launcher.log：使用者把記錄檔交給云碩時看得到，CI也靠這行驗證「停手了」
+                if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(rt.data.join(".xconsole").join("launcher.log")) {
+                    let _ = writeln!(f, "背景服務（{}）連續 {} 次起不來，停止重試：{}", log, w.fails, d.replace('\n', " / "));
+                }
+                *rt.fault.lock().unwrap() = Some(d);
+                show_fault(&app, &rt);
+            }
+        }
+        if rt.fault.lock().unwrap().is_some() {
+            continue;
+        }
+        if agent.dead() && agent.fails < FAIL_LIMIT {
+            thread::sleep(Duration::from_secs(2));
+            agent.take(spawn_agent(&rt));
+        }
+        if !registered && agent.child.is_some() && reg_at.elapsed() >= Duration::from_secs(30) {
+            registered = register_agent(&rt);
+            reg_at = Instant::now();
+        }
+        if console.dead() && console.fails < FAIL_LIMIT {
             thread::sleep(Duration::from_secs(1));
-            console = spawn_console(&rt).ok();
+            console.take(spawn_console(&rt));
         }
     }
     // 結束時直接收掉主控台；代理留給它自己看到父行程不在、先停模型服務再結束
-    if let Some(mut c) = console {
+    if let Some(mut c) = console.child {
         let _ = c.kill();
     }
 }
@@ -199,7 +334,10 @@ fn show(app: &AppHandle) {
         let _ = w.set_focus();
         return;
     }
-    let url = if rt.ready.load(Ordering::SeqCst) {
+    let fault = rt.fault.lock().unwrap().clone();
+    let url = if let Some(f) = fault {
+        WebviewUrl::App(format!("index.html#fault={}", url_encode(&f)).into())
+    } else if rt.ready.load(Ordering::SeqCst) {
         WebviewUrl::External(console_url(&rt))
     } else {
         WebviewUrl::App("index.html".into())
@@ -259,6 +397,7 @@ fn main() {
                 payload,
                 ready: AtomicBool::new(false),
                 quitting: AtomicBool::new(false),
+                fault: Mutex::new(None),
             });
             app.manage(rt.clone());
 

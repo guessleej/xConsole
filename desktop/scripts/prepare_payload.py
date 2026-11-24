@@ -3,6 +3,9 @@
 - python/：python-build-standalone 的獨立 Python（不靠這台有沒有裝 Python），核對 GitHub 公布的 sha256 才用，
   再把 requirements.txt 的相依（版本釘死）裝進去
 - app/：主控台、畫面、節點代理、登記代理用的 setup_local.py、VERSION、requirements.txt（不含測試）
+- runtime/（只有Windows）：Visual C++執行階段（含OpenMP的vcomp140.dll），從建置機的System32抄。
+  推理引擎（llama.cpp、stable-diffusion.cpp的官方Windows版）要這幾個檔，新裝的Windows常常沒有；
+  代理在系統沒有時把它們補進引擎資料夾。微軟允許這幾個檔隨程式散布（Visual Studio的Redistributable Code）
 
 跑法：python3 desktop/scripts/prepare_payload.py [--target x86_64-pc-windows-msvc]
 目標沒給就照這台（建置機）。GH_TOKEN 有的話帶上（CI 共用機器不帶權杖很容易被 GitHub 限流）。
@@ -92,6 +95,27 @@ def copy_app(dst):
         shutil.copy2(os.path.join(ROOT, f), os.path.join(dst, "console", f))
 
 
+# 跟代理的WIN_CRT同一份清單（test_win_runtime.py核對兩邊一致）
+WIN_CRT = ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll",
+           "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll", "concrt140.dll", "vcomp140.dll")
+WIN_CRT_MUST = ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "vcomp140.dll")
+
+
+def copy_crt(dst):
+    sysdir = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    os.makedirs(dst, exist_ok=True)
+    got = []
+    for name in WIN_CRT:
+        p = os.path.join(sysdir, name)
+        if os.path.isfile(p):
+            shutil.copy2(p, os.path.join(dst, name))
+            got.append(name)
+    miss = [n for n in WIN_CRT_MUST if n not in got]
+    if miss:
+        raise SystemExit(f"建置機的System32沒有 {', '.join(miss)}，打包出來的桌面版在新裝的Windows上推理引擎會起不來")
+    print("Visual C++執行階段：", ", ".join(got))
+
+
 def slim(py_root):
     """拿掉執行用不到的：測試、IDLE、tkinter、ensurepip 的安裝包，省幾十 MB。"""
     lib = os.path.join(py_root, "Lib") if os.name == "nt" or os.path.isdir(os.path.join(py_root, "Lib")) else None
@@ -131,6 +155,8 @@ def main():
         raise SystemExit("跨平台打包要在目標平台上跑（相依有編譯過的套件）；CI 每個平台各跑一次")
     slim(py_root)
     copy_app(os.path.join(OUT, "app"))
+    if "windows" in a.target:
+        copy_crt(os.path.join(OUT, "runtime"))
     size = sum(os.path.getsize(os.path.join(dp, f)) for dp, _, fs in os.walk(OUT) for f in fs)
     print(f"payload 準備好了：{OUT}（{size / 1e6:.0f} MB，{a.target}）")
 
