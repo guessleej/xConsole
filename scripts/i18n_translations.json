@@ -23274,6 +23274,146 @@
 "ja": "名前テンプレートの名前をすべて使い切りました。コンソールで参加コードを再発行してください",
 "ko": "이름 템플릿의 이름을 모두 썼습니다. 콘솔에서 가입 코드를 다시 만드세요"
 },
+"你是檢視帳號：看得到群組設定與各台進度，改設定要維運或管理員。": {
+"en": "You have a viewer account: you can see group settings and each machine's progress. Changing settings requires an operator or administrator.",
+"ja": "閲覧アカウントです。グループ設定と各マシンの進捗を確認できます。設定の変更は運用担当または管理者が行います。",
+"ko": "조회 계정입니다. 그룹 설정과 각 머신의 진행 상황을 볼 수 있습니다. 설정 변경은 운영자 또는 관리자가 해야 합니다."
+},
+"你是檢視帳號：看得到這台在跑什麼、記憶體夠不夠；啟動、停止、換模型要維運或管理員。": {
+"en": "You have a viewer account: you can see what this machine runs and whether memory is enough. Starting, stopping and switching models requires an operator or administrator.",
+"ja": "閲覧アカウントです。このマシンで何が動いているか、メモリが足りるかを確認できます。起動・停止・モデル切替は運用担当または管理者が行います。",
+"ko": "조회 계정입니다. 이 머신에서 무엇이 실행 중인지, 메모리가 충분한지 볼 수 있습니다. 시작·중지·모델 교체는 운영자 또는 관리자가 해야 합니다."
+},
+"你是維運：可以改群組設定（模型、上下文、套用時機）並套用；新增、刪除群組與加機器要管理員。": {
+"en": "You are an operator: you can change group settings (models, context, when to apply) and apply them. Creating or deleting groups and adding machines requires an administrator.",
+"ja": "あなたは運用担当です。グループ設定（モデル、コンテキスト、適用タイミング）を変更して適用できます。グループの作成・削除とマシンの追加は管理者が行います。",
+"ko": "운영자입니다. 그룹 설정(모델, 컨텍스트, 적용 시점)을 변경하고 적용할 수 있습니다. 그룹 생성·삭제와 머신 추가는 관리자가 해야 합니다."
+},
+"你的帳號限定群組，請勾選要用的模型，不能選全部": {
+"en": "Your account is limited to certain groups. Check the models to use; \"all\" is not allowed.",
+"ja": "このアカウントはグループが限定されています。使うモデルをチェックしてください。「すべて」は選べません。",
+"ko": "계정이 특정 그룹으로 제한되어 있습니다. 사용할 모델을 체크하세요. '전체'는 선택할 수 없습니다."
+},
+"你負責的群組裡還沒有機器；要加機器或調整你負責的群組，請找管理員": {
+"en": "There are no machines in your groups yet. Ask an administrator to add machines or change your groups.",
+"ja": "担当グループにまだマシンがありません。マシンの追加や担当グループの変更は管理者に依頼してください。",
+"ko": "담당 그룹에 아직 머신이 없습니다. 머신 추가나 담당 그룹 변경은 관리자에게 요청하세요."
+},
+"只看得到、只管得到勾選的群組裡的機器；都不勾＝全部群組": {
+"en": "Only machines in the checked groups are visible and manageable; leave all unchecked for every group.",
+"ja": "チェックしたグループのマシンだけを表示・管理できます。すべて未チェックなら全グループです。",
+"ko": "체크한 그룹의 머신만 보고 관리할 수 있습니다. 모두 체크하지 않으면 전체 그룹입니다."
+},
+"已儲存；角色或負責群組改了，他要重新登入": {
+"en": "Saved. The role or groups changed, so this person needs to sign in again.",
+"ja": "保存しました。役割または担当グループが変わったため、再ログインが必要です。",
+"ko": "저장했습니다. 역할 또는 담당 그룹이 바뀌어 다시 로그인해야 합니다."
+},
+"檢視": {
+"en": "Viewer",
+"ja": "閲覧",
+"ko": "조회"
+},
+"檢視帳號只能看，不能操作": {
+"en": "Viewer accounts can only view, not operate",
+"ja": "閲覧アカウントは見るだけで、操作はできません",
+"ko": "조회 계정은 보기만 할 수 있고 조작할 수 없습니다"
+},
+"檢視（再加上看機器狀態與群組設定，不能操作）": {
+"en": "Viewer (plus machine status and group settings, read-only)",
+"ja": "閲覧（加えてマシンの状態とグループ設定を閲覧、操作不可）",
+"ko": "조회(머신 상태와 그룹 설정까지 보기, 조작 불가)"
+},
+"看設定": {
+"en": "View settings",
+"ja": "設定を見る",
+"ko": "설정 보기"
+},
+"維運": {
+"en": "Operator",
+"ja": "運用担当",
+"ko": "운영자"
+},
+"維運只能改群組設定（模型、上下文、套用時機）；改名與種類要管理員": {
+"en": "Operators can only change group settings (models, context, when to apply); renaming and type require an administrator",
+"ja": "運用担当が変更できるのはグループ設定（モデル、コンテキスト、適用タイミング）のみです。名前と種類の変更は管理者が行います",
+"ko": "운영자는 그룹 설정(모델, 컨텍스트, 적용 시점)만 바꿀 수 있습니다. 이름과 종류 변경은 관리자가 해야 합니다"
+},
+"維運（再加上換模型、啟動停止、套用群組設定；不能加機器、改帳號）": {
+"en": "Operator (plus switching models, start/stop, applying group settings; cannot add machines or edit accounts)",
+"ja": "運用担当（加えてモデル切替、起動・停止、グループ設定の適用。マシン追加とアカウント編集は不可）",
+"ko": "운영자(모델 교체, 시작·중지, 그룹 설정 적용까지; 머신 추가와 계정 수정 불가)"
+},
+"群組範圍要是現有群組的清單；空的＝不限群組": {
+"en": "Group scope must be a list of existing groups; empty means all groups",
+"ja": "グループ範囲は既存グループのリストです。空ならすべてのグループです",
+"ko": "그룹 범위는 기존 그룹 목록이어야 합니다. 비우면 전체 그룹입니다"
+},
+"角色只能是管理員（admin）、維運（operator）、檢視（viewer）或使用者（user）": {
+"en": "Role must be admin, operator, viewer or user",
+"ja": "役割は管理者（admin）、運用担当（operator）、閲覧（viewer）、ユーザー（user）のいずれかです",
+"ko": "역할은 관리자(admin), 운영자(operator), 조회(viewer), 사용자(user) 중 하나여야 합니다"
+},
+"負責群組": {
+"en": "Groups in charge",
+"ja": "担当グループ",
+"ko": "담당 그룹"
+},
+"這些機器不在你負責的群組裡": {
+"en": "These machines are not in your groups",
+"ja": "次のマシンは担当グループにありません",
+"ko": "다음 머신은 담당 그룹에 없습니다"
+},
+"這些機器不在你負責的群組裡：": {
+"en": "These machines are not in your groups: ",
+"ja": "次のマシンは担当グループにありません：",
+"ko": "다음 머신은 담당 그룹에 없습니다: "
+},
+"這些機器不在你負責的群組裡：{0}": {
+"en": "These machines are not in your groups: {0}",
+"ja": "次のマシンは担当グループにありません：{0}",
+"ko": "다음 머신은 담당 그룹에 없습니다: {0}"
+},
+"這個功能要管理員；維運能換模型、啟動停止、套用群組設定": {
+"en": "This requires an administrator; operators can switch models, start/stop and apply group settings",
+"ja": "この機能は管理者専用です。運用担当はモデル切替、起動・停止、グループ設定の適用ができます",
+"ko": "이 기능은 관리자가 필요합니다. 운영자는 모델 교체, 시작·중지, 그룹 설정 적용을 할 수 있습니다"
+},
+"（已刪除的群組）": {
+"en": "(deleted group)",
+"ja": "（削除されたグループ）",
+"ko": "(삭제된 그룹)"
+},
+"老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的API金鑰，維運與檢視可以限定只管哪些群組": {
+"en": "One account per teacher and student. Users can only use chat, Agent, images, video and their own API keys; operators and viewers can be limited to specific groups.",
+"ja": "教員と学生にそれぞれアカウントを用意します。ユーザーはチャット、Agent、画像、動画、自分の API キーのみ使えます。運用担当と閲覧は担当グループを限定できます。",
+"ko": "교사와 학생에게 각각 계정을 하나씩 만듭니다. 사용자는 채팅, Agent, 이미지, 동영상, 본인 API 키만 쓸 수 있으며, 운영자와 조회는 담당 그룹을 제한할 수 있습니다."
+},
+"一行一個帳號，格式：帳號,顯示名稱,角色。角色填admin（管理員）、operator（維運）、viewer（檢視），不填或填user是使用者。負責群組匯入後再逐一設定。一次最多500個。": {
+"en": "One account per line: username,display name,role. Role is admin, operator or viewer; leave blank or use user for a regular user. Set groups after importing. Up to 500 at a time.",
+"ja": "1 行に 1 アカウント、形式は「アカウント,表示名,役割」。役割は admin（管理者）、operator（運用担当）、viewer（閲覧）、空欄または user はユーザー。担当グループはインポート後に個別設定します。一度に最大 500 件。",
+"ko": "한 줄에 계정 하나, 형식: 계정,표시 이름,역할. 역할은 admin(관리자), operator(운영자), viewer(조회), 비우거나 user이면 사용자입니다. 담당 그룹은 가져온 뒤 따로 설정합니다. 한 번에 최대 500개."
+},
+"連不上這台：請管理員確認機器有開、網路通": {
+"en": "Cannot reach this machine. Ask an administrator to check that it is on and connected.",
+"ja": "このマシンに接続できません。電源とネットワークを管理者に確認してもらってください。",
+"ko": "이 머신에 연결할 수 없습니다. 전원과 네트워크를 관리자에게 확인해 달라고 하세요."
+},
+"{0} 連不上，換一台，或請管理員確認這台有開、網路通。": {
+"en": "Cannot reach {0}. Pick another machine, or ask an administrator to check that it is on and connected.",
+"ja": "{0} に接続できません。別のマシンを選ぶか、電源とネットワークを管理者に確認してもらってください。",
+"ko": "{0}에 연결할 수 없습니다. 다른 머신을 고르거나 전원과 네트워크를 관리자에게 확인해 달라고 하세요."
+},
+"連不上，換一台，或請管理員確認這台有開、網路通": {
+"en": "cannot be reached. Pick another machine, or ask an administrator to check that it is on and connected",
+"ja": "に接続できません。別のマシンを選ぶか、電源とネットワークを管理者に確認してもらってください",
+"ko": "에 연결할 수 없습니다. 다른 머신을 고르거나 전원과 네트워크를 관리자에게 확인해 달라고 하세요"
+},
+"維運只能建空欄位；登記這台已經在跑的服務要管理員": {
+"en": "Operators can only create an empty slot; registering a service already running on this machine requires an administrator",
+"ja": "運用担当が作成できるのは空のスロットのみです。このマシンで既に動いているサービスの登録は管理者が行います",
+"ko": "운영자는 빈 슬롯만 만들 수 있습니다. 이 머신에서 이미 실행 중인 서비스 등록은 관리자가 해야 합니다"
+},
 "缺少系統元件（Visual C++執行階段或顯示卡驅動附的DLL）。xConsole會自動補Visual C++執行階段；還是不行的話，多半是顯示卡驅動沒裝好，請到顯示卡廠商網站裝最新驅動": {
 "en": "A system component is missing (a Visual C++ runtime DLL or one shipped with the graphics driver). xConsole adds the Visual C++ runtime automatically; if it still fails, the graphics driver is probably not installed correctly. Install the latest driver from the graphics card vendor.",
 "ja": "システムコンポーネントが不足しています（Visual C++ ランタイムまたはグラフィックドライバー付属の DLL）。Visual C++ ランタイムは xConsole が自動で補います。それでも動かない場合はグラフィックドライバーが正しく入っていない可能性が高いので、メーカーのサイトから最新ドライバーを入れてください。",

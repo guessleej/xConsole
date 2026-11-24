@@ -249,7 +249,14 @@ const NAV = [["home", "概覽"], ["models", "模型"], ["run", "執行"], ["chat
   ["image", "畫圖"], ["video", "影片"], ["settings", "設定"]];
 // 一般使用者（學生、老師）：只放用得到的；模型、執行、設定都是管理員的事
 const USER_NAV = [["chat", "對話"], ["agent", "Agent"], ["image", "畫圖"], ["video", "影片"], ["mykeys", "API 金鑰"], ["account", "我的帳號"]];
-const isAdmin = () => S.me?.role !== "user";
+// 維運與檢視（老師、值班人員）：看自己負責群組的機器、維運能換模型與套用群組設定；加機器、帳號、引擎、憑證都是管理員的事
+// 設定只有兩個分頁：群組、我的帳號
+const OPS_NAV = [["home", "概覽"], ["run", "執行"], ["chat", "對話"], ["agent", "Agent"], ["image", "畫圖"], ["video", "影片"],
+  ["mykeys", "API 金鑰"], ["settings", "設定"]];
+const myRole = () => S.me?.role || "admin";
+const isAdmin = () => myRole() === "admin";
+const canOperate = () => isAdmin() || myRole() === "operator";
+const navItems = () => (isAdmin() ? NAV : myRole() === "user" ? USER_NAV : OPS_NAV);
 
 // 頂列放不下（窄螢幕、日文等較長的分頁名）就把分頁收進漢堡，不讓整頁往右溢出
 function fitTopbar() {
@@ -266,7 +273,7 @@ function renderNav() {
   const sub = $("#subnav");
   nav.textContent = "";
   sub.textContent = "";
-  const items = isAdmin() ? NAV : USER_NAV;
+  const items = navItems();
   const v = S.view;
   const active = topOf(v);
   items.forEach(([key, label]) => {
@@ -290,7 +297,7 @@ function renderNav() {
     subBtn("這台", "home", !homeAll() && !v.startsWith("group:"), () => { S.homeAll = false; go("home"); });
   }
   // 第二列：執行（日常）→ 角色欄位（一台跑好幾個模型時才需要）→ API 串接（給 IDE）
-  if (active === "run" && cur) {
+  if (active === "run" && cur && isAdmin()) {
     subBtn("執行模型", "run", v === "run");
     subBtn("角色欄位", "node:" + cur.id, v.startsWith("node:"));
     subBtn("API 串接", "apis", v === "apis" || v.startsWith("api:"));
@@ -4051,6 +4058,7 @@ const SETTINGS_TABS = [
 const DESKTOP_TABS = ["account", "engine", "update", "providers", "logs"];
 
 function settingsTabs() {
+  if (!isAdmin()) return [["groups", "群組"], ["me", "我的帳號"]];
   if (!S.appWindow) return SETTINGS_TABS;
   const keys = DESKTOP_TABS.concat(S.lanOn ? ["tls"] : []);
   return keys.map((k) => SETTINGS_TABS.find(([key]) => key === k));
@@ -4065,7 +4073,7 @@ function viewSettings() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
-     users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand }[tab] || settingsMachines)(wrap);
+     users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand, me: myAccountInto }[tab] || settingsMachines)(wrap);
 }
 
 /* ---------------------------------------------------------------- 版本與更新
@@ -4302,7 +4310,7 @@ async function settingsGroups(wrap) {
   const head = card("群組", "同一群組的機器用同一份設定；設定一改，版本號就加一");
   wrap.appendChild(head);
   try { d = await api("/api/groups"); } catch (ex) { head.appendChild(el("p", "note warn", ex.message)); return; }
-  head.appendChild(el("p", "small muted",
+  if (isAdmin()) head.appendChild(el("p", "small muted",
     "先建群組（例如一間教室、一個部門），再到「機器」把機器放進來，最後在這裡填群組設定。存檔後每台機器會先「準備」（下載並核對模型），到了套用時機才「套用」（換上模型、生效鎖定），上課或上班中改設定不會提早換掉正在用的模型。"));
   const add = el("div", "slot-actions");
   const fName = groupInputBox("text", "", { placeholder: "新群組名稱，例：電腦教室 A" });
@@ -4320,7 +4328,9 @@ async function settingsGroups(wrap) {
     } catch (ex) { toast(ex.message, "bad"); }
   };
   [fName, fKind, ab].forEach((x) => add.appendChild(x));
-  head.appendChild(add);
+  if (isAdmin()) head.appendChild(add);
+  else head.appendChild(el("p", "note", canOperate() ? "你是維運：可以改群組設定（模型、上下文、套用時機）並套用；新增、刪除群組與加機器要管理員。"
+    : "你是檢視帳號：看得到群組設定與各台進度，改設定要維運或管理員。"));
 
   const list = card("全部群組", `${d.groups.length} 個`);
   const tbl = el("table", "api-table");
@@ -4337,13 +4347,15 @@ async function settingsGroups(wrap) {
     tr.appendChild(el("td", "nowrap", g.members ? `${g.done}/${g.members}` : "—"));
     tr.appendChild(el("td", "nowrap", new Date(g.updated * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" })));
     const td = el("td", "nowrap");
-    const eb = el("button", "btn sm" + (S.groupEdit === g.id ? " primary" : ""), "編輯設定");
+    const eb = el("button", "btn sm" + (S.groupEdit === g.id ? " primary" : ""), canOperate() ? "編輯設定" : "看設定");
     eb.onclick = () => { S.groupEdit = S.groupEdit === g.id ? null : g.id; render(); };
     td.appendChild(eb);
-    const jb = el("button", "btn sm", "產生加入碼");
-    jb.onclick = () => openAddMachine(g.name);
-    td.appendChild(jb);
-    if (g.name !== "未分類") {
+    if (isAdmin()) {
+      const jb = el("button", "btn sm", "產生加入碼");
+      jb.onclick = () => openAddMachine(g.name);
+      td.appendChild(jb);
+    }
+    if (g.name !== "未分類" && isAdmin()) {
       const db = el("button", "btn sm", "刪除");
       db.onclick = () => modal({
         title: `刪除群組「${g.name}」`, hasInput: false, danger: true, confirmText: "刪除",
@@ -4372,7 +4384,7 @@ async function settingsGroups(wrap) {
     wrap.appendChild(groupEditor(g, d));
     wrap.appendChild(groupMembers(g));
   }
-  wrap.appendChild(await joinCodesCard());
+  if (isAdmin()) wrap.appendChild(await joinCodesCard());
 }
 
 const GROUP_PHASE = { queued: "收到，排隊中", preparing: "準備中", waiting_boot: "已準備，等下次開機套用", waiting_time: "已準備，等指定時間套用",
@@ -4416,8 +4428,9 @@ function groupEditor(g, d) {
   const p = st.profile || {};
   const c = card(`「${g.name}」的設定`, `目前版本 v${g.version}；內容有變才會加一`);
   const form = el("div", "grp-form");
-  const fName = groupField(form, "群組名稱", groupInputBox("text", g.name, { disabled: g.name === "未分類" }));
+  const fName = groupField(form, "群組名稱", groupInputBox("text", g.name, { disabled: g.name === "未分類" || !isAdmin() }));
   const fKind = el("select");
+  fKind.disabled = !isAdmin();
   d.kinds.forEach((k) => { const o = el("option", null, k); o.value = k; o.selected = k === g.kind; fKind.appendChild(o); });
   groupField(form, "種類（只是標籤）", fKind);
   const lines = (a) => (a || []).join("\n");
@@ -4495,7 +4508,7 @@ function groupEditor(g, d) {
       render();
     } catch (ex) { toast(ex.message, "bad"); }
   };
-  act.appendChild(sb);
+  if (canOperate()) act.appendChild(sb);
   c.appendChild(act);
   return c;
 }
@@ -5196,6 +5209,10 @@ function viewMyAccount() {
   main.textContent = "";
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
+  myAccountInto(wrap);
+}
+
+function myAccountInto(wrap) {
   const c = card(S.me.display || S.me.user, `帳號：${S.me.user}`);
   c.appendChild(el("p", "small muted", "你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。"));
   wrap.appendChild(c);
@@ -5205,18 +5222,27 @@ function viewMyAccount() {
 /* ---------------------------------------------------------------- 使用者帳號（管理員）
    一間教室一次要開幾十個帳號：單筆新增或貼上名單批次匯入，系統產一次性密碼，第一次登入一定要改。
    使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰；管理員看不到他們的對話內容。 */
-const ROLE_LABEL = { admin: "管理員", user: "使用者" };
+const ROLE_LABEL = { admin: "管理員", operator: "維運", viewer: "檢視", user: "使用者" };
+const ROLE_OPTS = [["user", "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）"],
+  ["viewer", "檢視（再加上看機器狀態與群組設定，不能操作）"],
+  ["operator", "維運（再加上換模型、啟動停止、套用群組設定；不能加機器、改帳號）"], ["admin", "管理員（全部）"]];
+// 匯入名單的角色欄：英文代號或中文都收，認不得的當使用者（最少權限）
+const ROLE_IN = { admin: "admin", 管理員: "admin", operator: "operator", 維運: "operator", viewer: "viewer", 檢視: "viewer" };
+const scopeText = (u, gl) => (u.role === "admin" || !(u.scope || []).length ? "全部"
+  : u.scope.map((id) => (gl.find((g) => g.id === id) || {}).name || "（已刪除的群組）").join("、"));
 
 async function settingsUsers(wrap) {
   const v = S.view;
-  const c = card("使用者帳號", "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰");
+  const c = card("使用者帳號", "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的API金鑰，維運與檢視可以限定只管哪些群組");
   wrap.appendChild(c);
   const body = el("div");
   c.appendChild(body);
   const reload = async () => {
     loading(body);
     let d;
-    try { d = await api("/api/users"); } catch (ex) { errNote(body, ex.message); return; }
+    try {
+      [d, S.userGroups] = await Promise.all([api("/api/users"), api("/api/groups").then((r) => r.groups)]);
+    } catch (ex) { errNote(body, ex.message); return; }
     if (S.view !== v) return;
     body.textContent = "";
     const bar = el("div", "slot-actions");
@@ -5229,7 +5255,7 @@ async function settingsUsers(wrap) {
     const sb = el("div", "scrollbox");
     const tb = el("table", "api-table");
     const hr = el("tr");
-    ["帳號", "顯示名稱", "角色", "狀態", "上次登入", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+    ["帳號", "顯示名稱", "角色", "負責群組", "狀態", "上次登入", ""].forEach((h) => hr.appendChild(el("th", null, h)));
     const th = el("thead");
     th.appendChild(hr);
     tb.appendChild(th);
@@ -5237,7 +5263,7 @@ async function settingsUsers(wrap) {
     d.items.forEach((u) => {
       const tr = el("tr");
       const state = u.disabled ? "停用" : u.must_change ? "等他第一次登入改密碼" : "使用中";
-      [u.username, u.display, ROLE_LABEL[u.role] || u.role, state,
+      [u.username, u.display, ROLE_LABEL[u.role] || u.role, scopeText(u, S.userGroups), state,
         u.last_login ? new Date(u.last_login * 1000).toLocaleString(uiLocale(), { hour12: false }) : "還沒登入過"]
         .forEach((x, i) => tr.appendChild(el("td", i === 0 ? "mono" : null, x)));
       const act = el("td");
@@ -5275,7 +5301,7 @@ async function settingsUsers(wrap) {
 }
 
 function userForm(u, done, pre) {
-  const v = pre || (u ? { display: u.display, role: u.role } : { role: "user" });
+  const v = pre || (u ? { display: u.display, role: u.role, scope: u.scope || [] } : { role: "user", scope: [] });
   const d = el("div", "form-row");
   const fld = (label, input, hint) => { const w = el("div"); w.appendChild(el("label", null, label)); w.appendChild(input); if (hint) w.appendChild(el("div", "assume", hint)); d.appendChild(w); return input; };
   let fUser = null;
@@ -5289,15 +5315,45 @@ function userForm(u, done, pre) {
   fDisp.value = v.display || "";
   fDisp.placeholder = "例：王小明";
   fld("顯示名稱", fDisp);
-  const fRole = selectInput([["user", "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）"], ["admin", "管理員（全部）"]], v.role);
+  const fRole = selectInput(ROLE_OPTS, v.role);
   fld("角色", fRole);
+  // 負責群組：老師只管自己那間。都不勾＝不限群組；管理員一律看全部
+  const sw = el("div", "grp-checks");
+  const cbs = (S.userGroups || []).map((g) => {
+    const lb = el("label");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = g.id;
+    cb.checked = (v.scope || []).includes(g.id);
+    lb.append(cb, document.createTextNode(` ${g.name}`));
+    sw.appendChild(lb);
+    return cb;
+  });
+  // 負責的群組被刪了：id 還留在範圍裡（他才會什麼都看不到）。照樣列出來並勾著，改別的欄位時不會被當成「都不勾＝全部」
+  const gone = (v.scope || []).filter((id) => !(S.userGroups || []).some((g) => g.id === id));
+  gone.forEach((id) => {
+    const lb = el("label");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = id;
+    cb.checked = true;
+    lb.append(cb, el("span", null, "（已刪除的群組）"));
+    sw.appendChild(lb);
+    cbs.push(cb);
+  });
+  const scopeRow = fld("負責群組", sw, "只看得到、只管得到勾選的群組裡的機器；都不勾＝全部群組");
+  const syncScope = () => { scopeRow.parentNode.hidden = fRole.value === "admin"; };
+  fRole.addEventListener("change", syncScope);
+  syncScope();
   [fUser, fDisp].filter(Boolean).forEach((i) => imeGuard(i, () => {}));
   modal({ title: u ? `修改 ${u.username}` : "新增帳號", bodyNode: d, hasInput: true, confirmText: u ? "儲存" : "新增", onConfirm: async () => {
-    const body = { display: fDisp.value.trim(), role: fRole.value };
+    const body = { display: fDisp.value.trim(), role: fRole.value,
+      scope: fRole.value === "admin" ? [] : cbs.filter((c) => c.checked).map((c) => c.value).sort() };
     try {
       if (u) {
         await api(`/api/users/${encodeURIComponent(u.username)}/update`, { method: "POST", body });
-        toast(u.role !== body.role ? "已儲存；角色改了，他要重新登入" : "已儲存", "ok");
+        const moved = u.role !== body.role || (u.scope || []).join() !== body.scope.join();
+        toast(moved ? "已儲存；角色或負責群組改了，他要重新登入" : "已儲存", "ok");
       } else {
         const r = await api("/api/users/create", { method: "POST", body: { ...body, username: fUser.value.trim() } });
         showOneTime([{ ...r.user, password: r.password }]);
@@ -5311,7 +5367,7 @@ function userForm(u, done, pre) {
 // 貼上名單：一行一個，「帳號,顯示名稱,角色」（角色可省略＝使用者）。也可以直接選 CSV 檔
 function userImport(done) {
   const d = el("div");
-  d.appendChild(el("p", "small muted", "一行一個帳號，格式：帳號,顯示名稱,角色。角色填 admin 是管理員，不填或填 user 是使用者。一次最多 500 個。"));
+  d.appendChild(el("p", "small muted", "一行一個帳號，格式：帳號,顯示名稱,角色。角色填admin（管理員）、operator（維運）、viewer（檢視），不填或填user是使用者。負責群組匯入後再逐一設定。一次最多500個。"));
   const ta = el("textarea");
   ta.rows = 8;
   ta.placeholder = "s1101,王小明\ns1102,李小華\nt0001,陳老師,admin";
@@ -5324,7 +5380,7 @@ function userImport(done) {
   modal({ title: "批次匯入帳號", bodyNode: d, hasInput: true, confirmText: "匯入", onConfirm: async () => {
     const rows = ta.value.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^帳號|^username/i.test(l)).map((l) => {
       const [username, display, role] = l.split(/[,\t]/).map((x) => (x || "").trim());
-      return { username, display, role: role === "admin" ? "admin" : "user" };
+      return { username, display, role: ROLE_IN[role] || "user" };
     });
     if (!rows.length) { toast("沒有讀到任何一行", "bad"); return; }
     try {
@@ -6402,7 +6458,7 @@ async function start() {
   $("#app").hidden = false;
   try { S.me = await api("/api/me"); } catch (_) { return; }
   if (S.me.must_change) { viewForcePassword(); return; }
-  if (!isAdmin() && !USER_NAV.some(([k]) => k === topOf(S.view))) S.view = "chat";
+  if (!isAdmin() && !navItems().some(([k]) => k === topOf(S.view))) S.view = myRole() === "user" ? "chat" : "home";
   checkTlsBanner();
   refresh();
   if (S.timer) clearInterval(S.timer);
