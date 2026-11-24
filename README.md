@@ -152,12 +152,14 @@
 | macOS（Apple Silicon） | `bash install/install.sh` | launchd 的 LaunchAgent（登入後自動啟動） |
 | Windows 10／11／Server | 「Windows PowerShell（系統管理員）」執行 `powershell -ExecutionPolicy Bypass -File install\install.ps1` | 工作排程器，開機自啟（SYSTEM 帳號，資料放 `C:\ProgramData\xConsole`、權限只給 SYSTEM 與系統管理員），並開防火牆 9400／9401／9402（工作站連回）／8090～8289 |
 
-需要 Python 3.9 以上（macOS 沒有的話先 `xcode-select --install`；Windows 沒有會問要不要用 winget 裝）。
+需要 Python 3.9 以上（macOS 沒有的話先 `xcode-select --install`）。**Windows用正式版附的`xconsole-<版本>-windows-x64.zip`（Windows完整包）就不必先裝任何東西**：裡面的`winrt\`內附Python、全部相依套件與Visual C++執行階段，安裝程式直接用它，不建虛擬環境、不連pypi.org；只有用原始碼包時才會問要不要用winget裝Python。
 安裝時會問管理者帳號與密碼；自動化安裝用 `--password-file <檔>`（Windows `-PasswordFile`），檔案第一行帳號、第二行密碼。
 移除：`--uninstall`（Windows `-Uninstall`），資料保留。
 
 要把別台機器加進來，在網頁「加一台機器」產生指令：Linux 與 macOS 是同一行 `curl … | bash`，Windows 是一行
 `powershell -EncodedCommand …`（畫面上可以展開原文）。兩種都釘住主控台的憑證，不是關掉驗證。
+Windows那台不必先裝Python：主控台備妥「Windows工作站執行環境包」（`xconsole-runtime-<版本>-win-x64.zip`）之後，腳本從主控台下載它、核對sha256再解開。
+主控台啟動時會依自己的版本從GitHub下載一次（核對GitHub公布的sha256）；不能連外的主控台，到「加一台機器 → Windows」上傳同一個檔即可。
 
 **大量部署（Intune、SCCM、Jamf、Ansible、映像派送）**：安裝包派送到每台，加入碼寫進回應檔，用 root／系統管理員跑一行，只裝節點代理並加入既有的主控台。
 指令與指紋在「加一台機器 → 大量部署」抄：
@@ -460,6 +462,7 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `test/test_silent_install.py` | 任何 Linux 或 macOS（要 cryptography） | 29 | 靜默安裝：`install/join.py` 對隔離主控台＋真的代理，加入碼從標準輸入、指紋對才加入（大小寫與冒號不拘）、指紋錯或沒給（自簽）都擋且不用掉名額、碼格式不對擋；`install.sh` 的 `--join-code` 拒絕、大量部署參數沒配 `--console` 擋、不是 root 擋、回應檔權限判定；`install.ps1` 的 `-JoinCode` 實際執行拒絕；主控台產的腳本不再用環境變數傳加入碼 |
 | `test/e2e_silent.py` | CI 三個作業系統（要 root／系統管理員，只在 CI 跑） | Linux 16、macOS 14、Windows 13 | 實裝：權限放寬的回應檔擋下並刪掉、`-JoinCode` 擋下、正確的回應檔裝成開機自啟並加入（名稱照樣板）、回應檔讀完即刪、代理以 `xconsole`／`_xconsole`／SYSTEM 跑、複製偵測有依據（Linux 靠開機時 root 抄到 `/run` 的主機板識別碼）、砍掉會自己起來（Linux、macOS）、移除乾淨 |
 | `console/test_joincodes.py` | 任何 Linux 或 macOS（要 cryptography） | 58 | 群組加入碼：名稱樣板展開與不合法寫法、網段解析與 IPv4 對映、可用次數與有效時間的範圍、多台必須用樣板、重新安裝只能一次；兩個同時加入各拿到不同名稱、名額滿了第三個擋下；重新載入後仍有效；用完、網段外、作廢都加入不了；過期 7 天的紀錄自動清掉；另起隔離主控台與一支真的代理端對端：主控台重啟後同一個碼照樣加入 A01～A03、用完擋下、清單不含公鑰、沒登入看不到也不能作廢、磁碟上只有雜湊 |
+| `console/test_winrt.py` | 任何機器（要 cryptography） | 32 | Windows工作站執行環境包：不是zip、路徑往上跳、python／runtime以外的檔、連結檔、少了必要的檔一律擋下；上傳不合格的不動原本那一包；從GitHub只拿同一版的附件並核對公布的sha256，對不上丟掉；加入碼才拿得到；腳本寫死這一包的sha256、沒有就改用那台的Python |
 | `agent/test_group.py` | Linux／macOS／Windows | 37 | 群組設定對齊代理這一側：準備（下載、核對 SHA-256、只准用的模型）與套用分兩段、指定時間以主控台時鐘為準、下次開機才套用、鎖定時本機 API 回 423、被改掉的模型拉回、換群組重來（本機假的 Hugging Face）；下載那一步記進度百分比、放不下（預檢或套用時准入擋下）記下是哪一顆哪一欄，並用同一組參數與欄位試算更小的量化給建議 |
 | `agent/test_identity.py` | Linux／macOS／Windows | 38 | 身分與複製偵測代理這一側：無效的主機板識別碼（全 0、全 F、廠商預設值）不拿來判定；主機板識別碼變了判複製、只有作業系統識別碼變了判重灌、網卡不參與、無效時改看系統碟、暫時讀不到不誤判；複製後丟掉權杖、憑證、連回設定與群組狀態，`/healthz` 顯示需要重新加入、重新加入後清掉；給主控台的作業系統識別碼與碟序號只有雜湊；這台實際讀得到的識別碼 |
 | `agent/test_link.py` | Linux／macOS／Windows | 34 | 代理主動連回代理這一側：連回設定、釘住通道憑證、內部位址連不到改走對外網址、經 HTTP 代理伺服器（含帳密）與壞掉時改直連、SNI 選通道憑證與收到新清單、一般／大檔分片／串流、同一個編號不重做、取消關掉本機連線 |

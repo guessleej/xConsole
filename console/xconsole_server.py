@@ -52,6 +52,7 @@ import agentlink  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
+import winrt  # noqa: E402
 import gateway  # noqa: E402
 from store import Store  # noqa: E402
 
@@ -133,7 +134,7 @@ ROLE_NAMES = {"admin": "管理員", "operator": "維運", "viewer": "檢視", "u
 _ROLE_ROUTES = {r: [(m, re.compile(rx)) for m, rx in routes] for r, routes in {
     "user": USER_ROUTES, "viewer": USER_ROUTES + VIEWER_ROUTES,
     "operator": USER_ROUTES + VIEWER_ROUTES + OPERATOR_ROUTES}.items()}
-UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload")
+UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload|/api/winrt/upload")
 USER_KEYS_MAX = 3                  # 使用者自己能產生的有效金鑰上限（管理員發的不算）
 _KEY_LOCK = threading.Lock()
 
@@ -1339,10 +1340,13 @@ def install_script_ps1(code, j):
     用系統管理員身分執行：裝成開機自啟（SYSTEM 帳號，資料放 C:\\ProgramData\\xConsole，權限只給 SYSTEM 與系統管理員）並開防火牆；
     一般身分執行：裝成這個帳號登入後自啟，防火牆要另外請系統管理員開。"""
     url = f"https://{j['console']}"
+    rt = winrt.meta(STATE_DIR) or {}
     return f"""# xConsole 節點代理安裝（Windows）：由主控台 {url} 產生。加入碼 30 分鐘內有效、只能用一次。
 # 不用 Stop：Windows PowerShell 5.1 會把原生程式（python、pip）寫到 stderr 的任何一行當成致命錯誤直接中斷
 $ErrorActionPreference = 'Continue'
 $C = '{url}'; $CODE = '{code}'; $FP = '{j["fp"]}'
+# 主控台備妥的Windows執行環境包（內附Python與相依、Visual C++執行階段）的sha256；空的＝沒有，改用這台的Python
+$RT = '{rt.get("sha256", "")}'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 # 只接受主控台那一張憑證（比對整張憑證的 SHA-256），不是關掉驗證
 [Net.ServicePointManager]::ServerCertificateValidationCallback = {{ param($s, $cert)
@@ -1352,6 +1356,7 @@ $wc = New-Object Net.WebClient
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 Write-Host '== 1/5 檢查這台 =='
 $py = $null
+if (-not $RT) {{
 $probe = "import sys;print(sys.executable if sys.version_info>=(3,9) else '')"
 # py 啟動器優先；python 可能只是 Microsoft Store 的捷徑（執行會開商店），問不出版本就當沒有
 try {{ $v = & py -3 -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) {{ $py = $v.Trim() }} }} catch {{}}
@@ -1364,6 +1369,7 @@ if (-not $py) {{
   $py = (Get-ChildItem 'C:\\Program Files\\Python3*\\python.exe', "$env:LOCALAPPDATA\\Programs\\Python\\Python3*\\python.exe" -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
   if (-not $py) {{ Write-Host 'Python 裝好了但找不到，請重新開一個 PowerShell 視窗再貼一次'; exit 1 }}
 }}
+}}
 if ($admin) {{ $base = Join-Path $env:ProgramData 'xConsole' }} else {{ $base = $env:USERPROFILE }}
 $dir = Join-Path $base 'xconsole'
 New-Item -ItemType Directory -Force -Path (Join-Path $base '.xconsole') | Out-Null
@@ -1372,11 +1378,40 @@ if ($admin) {{
   # ProgramData 預設一般使用者讀得到：權杖與私鑰放在這裡，只留給 SYSTEM 與系統管理員
   icacls $base /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 }}
-Write-Host '== 2/5 準備 Python 環境 =='
-& $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) {{ Write-Host '建不了 Python 虛擬環境'; exit 1 }}
-$vpy = Join-Path $dir '.venv\\Scripts\\python.exe'
-$vpyw = Join-Path $dir '.venv\\Scripts\\pythonw.exe'
-& $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'; if ($LASTEXITCODE) {{ Write-Host '裝不了 cryptography；這台要能連 pypi.org'; exit 1 }}
+if ($RT) {{
+  Write-Host '== 2/5從主控台下載內附的Python（不必先裝Python、不必連pypi.org） =='
+  # 先下載、核對、解到暫存資料夾並試跑，最後要換的那一刻才停舊的代理：中途任何一步失敗，這台原本的代理照常在跑
+  $zip = Join-Path $env:TEMP ('xconsole-winrt-' + [guid]::NewGuid().ToString('N') + '.zip')
+  $stage = Join-Path $dir 'winrt.staging'
+  try {{ $wc.DownloadFile("$C/install/$CODE/winrt.zip", $zip) }} catch {{ Write-Host "下載不了執行環境包：$($_.Exception.Message)"; exit 1 }}
+  if ((Get-FileHash -Algorithm SHA256 $zip).Hash -ne $RT.ToUpper()) {{ Remove-Item -Force $zip; Write-Host '執行環境包的sha256對不上主控台公布的，不安裝'; exit 1 }}
+  if (Test-Path $stage) {{ Remove-Item -Recurse -Force $stage }}
+  try {{ Expand-Archive -LiteralPath $zip -DestinationPath $stage -Force }} catch {{ Remove-Item -Force $zip; Write-Host "解不開執行環境包：$($_.Exception.Message)"; exit 1 }}
+  Remove-Item -Force $zip
+  & (Join-Path $stage 'python\\python.exe') -c 'import cryptography'
+  if ($LASTEXITCODE) {{ Remove-Item -Recurse -Force $stage; Write-Host '內附的Python不完整，請在主控台重新準備Windows執行環境'; exit 1 }}
+  $had = [bool](Get-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue)
+  Stop-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue
+  foreach ($n in 'python', 'runtime') {{
+    $dst = Join-Path $dir $n
+    if (Test-Path $dst) {{ Remove-Item -Recurse -Force $dst -ErrorAction SilentlyContinue }}
+    if (Test-Path $dst) {{
+      Remove-Item -Recurse -Force $stage
+      if ($had) {{ Start-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue }}
+      Write-Host "$dst還有程式在用（模型服務還在跑），原本的代理已重新啟動；請重新開機後再貼一次"; exit 1
+    }}
+    Move-Item -LiteralPath (Join-Path $stage $n) -Destination $dst
+  }}
+  Remove-Item -Recurse -Force $stage
+  $vpy = Join-Path $dir 'python\\python.exe'
+  $vpyw = Join-Path $dir 'python\\pythonw.exe'
+}} else {{
+  Write-Host '== 2/5準備Python環境 =='
+  & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) {{ Write-Host '建不了Python虛擬環境'; exit 1 }}
+  $vpy = Join-Path $dir '.venv\\Scripts\\python.exe'
+  $vpyw = Join-Path $dir '.venv\\Scripts\\pythonw.exe'
+  & $vpy -m pip install --disable-pip-version-check -q 'cryptography>=42'; if ($LASTEXITCODE) {{ Write-Host '裝不了cryptography；這台要能連pypi.org'; exit 1 }}
+}}
 Write-Host '== 3/5 下載節點代理 =='
 $agent = Join-Path $dir 'xconsole_agent.py'
 $wc.DownloadFile("$C/install/$CODE/xconsole_agent.py", "$agent.new")
@@ -2770,6 +2805,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_file(self, full, ctype):
+        """大檔分塊送，不一次讀進記憶體（Windows執行環境包幾十MB）。"""
+        size = os.path.getsize(full)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "no-store")
+        self._sec_headers()
+        self.end_headers()
+        with open(full, "rb") as fh:
+            for b in iter(lambda: fh.read(1 << 20), b""):
+                self.wfile.write(b)
+        return None
+
     def _json(self, code, obj, cookie=None):
         self._send(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8",
                    {"Set-Cookie": cookie} if cookie else None)
@@ -3162,7 +3211,7 @@ class Handler(BaseHTTPRequestHandler):
             if 0 <= n <= MAX_ANON_BODY:
                 self.rfile.read(n)
             self.close_connection = True
-            return self._json(415, {"error": "只接受 application/octet-stream，並要帶 X-XConsole-Upload"})
+            return self._json(415, {"error": "只接受application/octet-stream，並要帶X-XConsole-Upload"})
         if not 0 < n <= updater.MAX_PKG:
             self.close_connection = True
             return self._json(413, {"error": "更新包要在 64 MB 以內"})
@@ -3171,6 +3220,30 @@ class Handler(BaseHTTPRequestHandler):
         sha = (parse_qs(urlparse(self.path).query).get("sha256") or [""])[0]
         code, out = updater.start_update(STATE_DIR, restart_console, data=data, sha256=sha, version="手動上傳")
         self._audit("update.upload", hashlib.sha256(data).hexdigest()[:16], code == 200, {"bytes": n, "message": out.get("error")})
+        return self._json(code, out)
+
+    def _winrt_upload(self, ctype):
+        """主控台不能連外時：管理者把Windows執行環境包（xconsole-runtime-<版本>-win-x64.zip）從別台下載後在這裡上傳。"""
+        if not self.user:
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._json(401, {"error": "請先登入"})
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1":
+            if 0 <= n <= MAX_ANON_BODY:
+                self.rfile.read(n)
+            self.close_connection = True
+            return self._json(415, {"error": "只接受application/octet-stream，並要帶X-XConsole-Upload"})
+        if not 0 < n <= winrt.MAX_ZIP:
+            self.close_connection = True
+            return self._json(413, {"error": f"執行環境包要在 {winrt.MAX_ZIP >> 20} MB以內"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        code, out = winrt.upload(STATE_DIR, data)
+        self._audit("winrt.upload", out.get("sha256", "")[:16], code == 200, {"bytes": n, "message": out.get("error")})
         return self._json(code, out)
 
     def _preview(self, pid):
@@ -3512,6 +3585,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, branding())
         if path == "/branding/logo":
             return self._logo()
+        m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/winrt\.zip", path)
+        if m:
+            # Windows執行環境包：一樣要帶有效的加入碼；內容不是機密（公開的Python與套件），腳本裡寫死sha256讓那台核對
+            if not JOINS.usable(m.group(1), self.ip) or not winrt.meta(STATE_DIR):
+                return self._send(404, "加入碼不對、已經用完或過期，或主控台還沒準備好Windows執行環境。\n".encode(), "text/plain; charset=utf-8")
+            return self._send_file(winrt.path(STATE_DIR), "application/zip")
         m = re.fullmatch(r"/install/([A-Za-z0-9_-]{20,64})/(agent\.sh|agent\.ps1|xconsole_agent\.py)", path)
         if m:
             # 不需要登入，但一定要帶有效的加入碼；腳本與代理程式本身都不含機密
@@ -3625,6 +3704,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
         if path == "/api/update":
             return self._json(200, update_overview())
+        if path == "/api/winrt":
+            return self._json(200, winrt.status(STATE_DIR))
         m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})", path)
         if m:
             t = computer.TASKS.get(m.group(1))
@@ -3783,6 +3864,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/import", path)
         if m:
             return self._upload(m.group(1), ctype, f"/{m.group(2)}/import", ("name", "offset", "total"), f"{m.group(2)}.import.upload")
+        if path == "/api/winrt/upload":
+            return self._winrt_upload(ctype)
         if path == "/api/update/upload":
             if DESKTOP:
                 # 桌面版換的是整個應用程式（含內附的 Python 與外殼），不能只換原始碼包
@@ -3914,7 +3997,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "command": f"curl -fsSk --pinnedpubkey '{j['pin']}' '{url}' | bash",
                                     "command_windows": "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand "
                                                        + base64.b64encode(ps.encode("utf-16-le")).decode(),
-                                    "command_windows_text": ps})
+                                    "command_windows_text": ps,
+                                    "winrt": winrt.status(STATE_DIR)})
         m = re.fullmatch(r"/api/nodes/join-code/([0-9a-f]{12})/revoke", path)
         if m:
             j = JOINS.revoke(m.group(1))
@@ -4159,6 +4243,10 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/winrt/fetch":
+            code, out = winrt.fetch(STATE_DIR)
+            self._audit("winrt.fetch", winrt.updater.current_version(), code == 200, {"message": out.get("error")})
             return self._json(code, out)
         if path == "/api/update/check":
             code, out = updater.check()
@@ -4856,6 +4944,9 @@ def main():
     threading.Thread(target=sampler, daemon=True).start()
     threading.Thread(target=aligner, daemon=True).start()
     ALIGN_WAKE.set()
+    if not DESKTOP and not winrt.meta(STATE_DIR):
+        winrt.fetch(STATE_DIR, quiet=True)      # 「加一台機器」的Windows腳本要用：啟動時先試著抓一次，抓不到畫面上有按鈕
+
     cur = CERTS.current()
     kind = "暫用自簽（請到「設定 → HTTPS 與憑證」換成正式憑證）" if cur["selfSigned"] else cur["issuer"]
     print(f"xConsole 聽在 https://{bind}:{PORT}；憑證：{kind}"

@@ -33,3 +33,4 @@ dist-report/
 desktop/build/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+winrt/
