@@ -4304,6 +4304,98 @@
 "pattern": false
 },
 {
+"zh": "企業版模組",
+"pattern": false
+},
+{
+"zh": "教育包、企業包等企業功能。沒有模組時就是一般版，所有核心功能照常",
+"pattern": false
+},
+{
+"zh": "，含畫面",
+"pattern": false
+},
+{
+"zh": "已載入：{0} {1}（{2}條路由{3}）",
+"pattern": true
+},
+{
+"zh": "已載入",
+"pattern": false
+},
+{
+"zh": "條路由",
+"pattern": false
+},
+{
+"zh": "沒有載入，主控台以一般版執行：{0}",
+"pattern": true
+},
+{
+"zh": "沒有載入，主控台以一般版執行",
+"pattern": false
+},
+{
+"zh": "怎麼處理：{0}",
+"pattern": true
+},
+{
+"zh": "怎麼處理",
+"pattern": false
+},
+{
+"zh": "還沒有安裝企業版模組，主控台以一般版執行。",
+"pattern": false
+},
+{
+"zh": "核心API第{0}版；內建的云碩公鑰{1}把。簽章是防止被竄改的模組被載入，授權由模組自己檢查。",
+"pattern": true
+},
+{
+"zh": "核心API第",
+"pattern": false
+},
+{
+"zh": "版；內建的云碩公鑰",
+"pattern": false
+},
+{
+"zh": "把。簽章是防止被竄改的模組被載入，授權由模組自己檢查",
+"pattern": false
+},
+{
+"zh": "上傳模組套件",
+"pattern": false
+},
+{
+"zh": "先選云碩給的模組套件（.zip）",
+"pattern": false
+},
+{
+"zh": "（已換回原本的模組）",
+"pattern": false
+},
+{
+"zh": "模組已驗證並載入；重新整理頁面就會出現模組的畫面",
+"pattern": false
+},
+{
+"zh": "重新載入",
+"pattern": false
+},
+{
+"zh": "移除模組",
+"pattern": false
+},
+{
+"zh": "移除企業版模組",
+"pattern": false
+},
+{
+"zh": "移除後主控台以一般版執行。模組存的資料留在資料庫裡，之後重新安裝同一個模組會接著用。",
+"pattern": false
+},
+{
 "zh": "主控台與各機代理的版本；更新前一律核對 sha256 並先備份",
 "pattern": false
 },
@@ -10508,6 +10600,10 @@
 "pattern": false
 },
 {
+"zh": "模組",
+"pattern": false
+},
+{
 "zh": "換新",
 "pattern": false
 },
@@ -11180,6 +11276,10 @@
 "pattern": false
 },
 {
+"zh": "企業版模組：{0} {1}（{2} 條路由）",
+"pattern": true
+},
+{
 "zh": "；涵蓋 {0}",
 "pattern": true
 },
@@ -11536,15 +11636,31 @@
 "pattern": false
 },
 {
+"zh": "模組套件要在{0} MB以內",
+"pattern": true
+},
+{
+"zh": "模組套件要在",
+"pattern": false
+},
+{
+"zh": "MB以內",
+"pattern": false
+},
+{
+"zh": "個人版（桌面版）不載入企業版模組",
+"pattern": false
+},
+{
+"zh": "權限不夠",
+"pattern": false
+},
+{
 "zh": "執行環境包要在 {0} MB以內",
 "pattern": true
 },
 {
 "zh": "執行環境包要在",
-"pattern": false
-},
-{
-"zh": "MB以內",
 "pattern": false
 },
 {
@@ -11585,6 +11701,22 @@
 },
 {
 "zh": "已變更，請用新密碼重新登入",
+"pattern": false
+},
+{
+"zh": "企業版模組：",
+"pattern": false
+},
+{
+"zh": " 條路由）",
+"pattern": false
+},
+{
+"zh": "企業版模組沒有載入，以開源核心啟動：{0}",
+"pattern": true
+},
+{
+"zh": "企業版模組沒有載入，以開源核心啟動",
 "pattern": false
 },
 {
@@ -11784,11 +11916,11 @@
 "pattern": false
 },
 {
-"zh": "執行環境包要在 ",
+"zh": " MB以內",
 "pattern": false
 },
 {
-"zh": " MB以內",
+"zh": "執行環境包要在 ",
 "pattern": false
 },
 {
@@ -12017,6 +12149,10 @@
 },
 {
 "zh": "聽不起來",
+"pattern": false
+},
+{
+"zh": "企業版模組沒有載入，以開源核心啟動：",
 "pattern": false
 },
 {
@@ -14948,11 +15084,451 @@
 "pattern": false
 },
 {
+"zh": "查不了權限：{0}",
+"pattern": true
+},
+{
+"zh": "查不了權限",
+"pattern": false
+},
+{
 "zh": "檔案數太多",
 "pattern": false
 },
 {
 "zh": "解開後太大",
+"pattern": false
+},
+{
+"zh": "資料表名稱不合法：{0}",
+"pattern": true
+},
+{
+"zh": "資料表名稱不合法",
+"pattern": false
+},
+{
+"zh": "資料編號只能用英數字與 . _ -，最多64字",
+"pattern": false
+},
+{
+"zh": "範圍外的群組",
+"pattern": false
+},
+{
+"zh": "只能在register(api)裡註冊",
+"pattern": false
+},
+{
+"zh": "只收GET與POST：{0}",
+"pattern": true
+},
+{
+"zh": "只收GET與POST",
+"pattern": false
+},
+{
+"zh": "路由只能掛在/api/ent/底下：{0}",
+"pattern": true
+},
+{
+"zh": "路由只能掛在/api/ent/底下",
+"pattern": false
+},
+{
+"zh": "{0} 要宣告角色（{1}）",
+"pattern": true
+},
+{
+"zh": "要宣告角色",
+"pattern": false
+},
+{
+"zh": "{0} 沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查",
+"pattern": true
+},
+{
+"zh": "沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查",
+"pattern": false
+},
+{
+"zh": "{0} 的handler不是函式",
+"pattern": true
+},
+{
+"zh": "的handler不是函式",
+"pattern": false
+},
+{
+"zh": "{0} 的scope要的「{1}」不在網址的命名群組裡",
+"pattern": true
+},
+{
+"zh": "的scope要的「",
+"pattern": false
+},
+{
+"zh": "」不在網址的命名群組裡",
+"pattern": false
+},
+{
+"zh": "{0}：scope.body只能用在POST",
+"pattern": true
+},
+{
+"zh": "scope.body只能用在POST",
+"pattern": false
+},
+{
+"zh": "重複註冊：{0} {1}",
+"pattern": true
+},
+{
+"zh": "重複註冊",
+"pattern": false
+},
+{
+"zh": "找不到前端資料夾：{0}",
+"pattern": true
+},
+{
+"zh": "找不到前端資料夾",
+"pattern": false
+},
+{
+"zh": "namespace不合法：{0}",
+"pattern": true
+},
+{
+"zh": "namespace不合法",
+"pattern": false
+},
+{
+"zh": "{0} 是連結",
+"pattern": true
+},
+{
+"zh": "是連結",
+"pattern": false
+},
+{
+"zh": "查不了權限：",
+"pattern": false
+},
+{
+"zh": "這一版核心還沒有內建云碩的模組公鑰",
+"pattern": false
+},
+{
+"zh": "請把主控台更新到有內建公鑰的版本",
+"pattern": false
+},
+{
+"zh": "模組的簽章驗不過：不是云碩簽的，或檔案被改過",
+"pattern": false
+},
+{
+"zh": "請向云碩重新取得模組套件，不要自行修改裡面的檔案",
+"pattern": false
+},
+{
+"zh": "模組缺少{0}",
+"pattern": true
+},
+{
+"zh": "模組缺少",
+"pattern": false
+},
+{
+"zh": "請向云碩重新取得模組套件",
+"pattern": false
+},
+{
+"zh": "只留給系統管理員（Windows：SYSTEM與Administrators；Linux、macOS：root或主控台的帳號，權限不能讓群組或其他人寫）",
+"pattern": false
+},
+{
+"zh": "模組要的核心API是{0}，這一版核心是{1}",
+"pattern": true
+},
+{
+"zh": "模組要的核心API是",
+"pattern": false
+},
+{
+"zh": "這一版核心是",
+"pattern": false
+},
+{
+"zh": "請把主控台與模組更新到相容的版本",
+"pattern": false
+},
+{
+"zh": "不是zip檔",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有不安全的路徑",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有連結檔：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有連結檔",
+"pattern": false
+},
+{
+"zh": "模組資料一定要加密才寫入",
+"pattern": false
+},
+{
+"zh": "資料表名稱不合法：",
+"pattern": false
+},
+{
+"zh": "核心API第{0}版還沒開放api.{1}",
+"pattern": true
+},
+{
+"zh": "版還沒開放api.",
+"pattern": false
+},
+{
+"zh": "只收GET與POST：",
+"pattern": false
+},
+{
+"zh": "路由只能掛在/api/ent/底下：",
+"pattern": false
+},
+{
+"zh": " 要宣告角色（",
+"pattern": false
+},
+{
+"zh": " 沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查",
+"pattern": false
+},
+{
+"zh": " 的handler不是函式",
+"pattern": false
+},
+{
+"zh": " 的scope要的「",
+"pattern": false
+},
+{
+"zh": "：scope.body只能用在POST",
+"pattern": false
+},
+{
+"zh": "重複註冊：",
+"pattern": false
+},
+{
+"zh": "找不到前端資料夾：",
+"pattern": false
+},
+{
+"zh": "namespace不合法：",
+"pattern": false
+},
+{
+"zh": " 是連結",
+"pattern": false
+},
+{
+"zh": "{0} 的擁有者不是root或主控台的帳號",
+"pattern": true
+},
+{
+"zh": "的擁有者不是root或主控台的帳號",
+"pattern": false
+},
+{
+"zh": "讀不到manifest.json，或格式不對",
+"pattern": false
+},
+{
+"zh": "請重新上傳云碩提供的完整模組套件",
+"pattern": false
+},
+{
+"zh": "讀不到manifest.sig（模組沒有簽章）",
+"pattern": false
+},
+{
+"zh": "清單裡有不合法的項目：{0}",
+"pattern": true
+},
+{
+"zh": "清單裡有不合法的項目",
+"pattern": false
+},
+{
+"zh": "少了檔案：{0}",
+"pattern": true
+},
+{
+"zh": "少了檔案",
+"pattern": false
+},
+{
+"zh": "請重新上傳完整的模組套件",
+"pattern": false
+},
+{
+"zh": "{0} 跟清單的sha256不一樣（被改過）",
+"pattern": true
+},
+{
+"zh": "跟清單的sha256不一樣（被改過",
+"pattern": false
+},
+{
+"zh": "請重新上傳云碩提供的模組套件，不要自行修改裡面的檔案",
+"pattern": false
+},
+{
+"zh": "模組資料夾別的帳號也能寫：",
+"pattern": false
+},
+{
+"zh": "，這一版核心是",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有連結檔：",
+"pattern": false
+},
+{
+"zh": " 的擁有者不是root或主控台的帳號",
+"pattern": false
+},
+{
+"zh": "{0} 別的帳號也能寫（權限{1}）",
+"pattern": true
+},
+{
+"zh": "別的帳號也能寫（權限",
+"pattern": false
+},
+{
+"zh": "清單裡有不合法的項目：",
+"pattern": false
+},
+{
+"zh": "少了檔案：",
+"pattern": false
+},
+{
+"zh": " 跟清單的sha256不一樣（被改過）",
+"pattern": false
+},
+{
+"zh": "模組沒有register(api)",
+"pattern": false
+},
+{
+"zh": "模組載入時出錯：{0}",
+"pattern": true
+},
+{
+"zh": "模組載入時出錯",
+"pattern": false
+},
+{
+"zh": "請向云碩回報，並附上主控台的記錄",
+"pattern": false
+},
+{
+"zh": "這個功能要能管全部群組的管理員",
+"pattern": false
+},
+{
+"zh": "企業版模組 {0} {1} 出錯：\n",
+"pattern": true
+},
+{
+"zh": "出錯：\n",
+"pattern": false
+},
+{
+"zh": "模組發生錯誤，已記錄",
+"pattern": false
+},
+{
+"zh": " 別的帳號也能寫（權限",
+"pattern": false
+},
+{
+"zh": "有清單外的資料夾：{0}",
+"pattern": true
+},
+{
+"zh": "有清單外的資料夾",
+"pattern": false
+},
+{
+"zh": "請刪掉它，或重新上傳完整的模組套件",
+"pattern": false
+},
+{
+"zh": "有清單外的檔案：{0}",
+"pattern": true
+},
+{
+"zh": "有清單外的檔案",
+"pattern": false
+},
+{
+"zh": "企業版模組載入失敗：\n",
+"pattern": false
+},
+{
+"zh": "模組載入時出錯：",
+"pattern": false
+},
+{
+"zh": "企業版模組 ",
+"pattern": false
+},
+{
+"zh": " 出錯：\n",
+"pattern": false
+},
+{
+"zh": "有清單外的資料夾：",
+"pattern": false
+},
+{
+"zh": "有清單外的檔案：",
+"pattern": false
+},
+{
+"zh": "本文要帶{0}（群組編號）",
+"pattern": true
+},
+{
+"zh": "本文要帶",
+"pattern": false
+},
+{
+"zh": "群組編號",
+"pattern": false
+},
+{
+"zh": "（群組編號）",
 "pattern": false
 },
 {
@@ -14972,31 +15548,11 @@
 "pattern": false
 },
 {
-"zh": "不是zip檔",
-"pattern": false
-},
-{
-"zh": "壓縮檔裡有不安全的路徑：{0}",
-"pattern": true
-},
-{
-"zh": "壓縮檔裡有不安全的路徑",
-"pattern": false
-},
-{
 "zh": "壓縮檔裡有python／runtime以外的東西：{0}",
 "pattern": true
 },
 {
 "zh": "壓縮檔裡有python／runtime以外的東西",
-"pattern": false
-},
-{
-"zh": "壓縮檔裡有連結檔：{0}",
-"pattern": true
-},
-{
-"zh": "壓縮檔裡有連結檔",
 "pattern": false
 },
 {
@@ -15032,15 +15588,7 @@
 "pattern": false
 },
 {
-"zh": "壓縮檔裡有不安全的路徑：",
-"pattern": false
-},
-{
 "zh": "壓縮檔裡有python／runtime以外的東西：",
-"pattern": false
-},
-{
-"zh": "壓縮檔裡有連結檔：",
 "pattern": false
 },
 {
