@@ -6300,6 +6300,50 @@
 "pattern": false
 },
 {
+"zh": "Windows執行環境已備妥（{0}，{1} MB）：那台不必先裝Python，也不必連pypi.org",
+"pattern": true
+},
+{
+"zh": "Windows執行環境已備妥",
+"pattern": false
+},
+{
+"zh": "MB）：那台不必先裝Python，也不必連pypi.org",
+"pattern": false
+},
+{
+"zh": "正在從GitHub下載Windows執行環境…{0}",
+"pattern": true
+},
+{
+"zh": "正在從GitHub下載Windows執行環境…",
+"pattern": false
+},
+{
+"zh": "主控台還沒備妥Windows執行環境：那台要先有Python 3.9以上並能連pypi.org。按「從GitHub下載」，或把正式版附的xconsole-runtime-<版本>-win-x64.zip上傳到這裡",
+"pattern": false
+},
+{
+"zh": "（上次下載失敗：{0}）",
+"pattern": true
+},
+{
+"zh": "上次下載失敗",
+"pattern": false
+},
+{
+"zh": "從GitHub下載",
+"pattern": false
+},
+{
+"zh": "上傳執行環境包",
+"pattern": false
+},
+{
+"zh": "先選xconsole-runtime-<版本>-win-x64.zip",
+"pattern": false
+},
+{
 "zh": "主控台會產生一行安裝指令。到要加入的機器上貼上執行，它會裝好節點代理、自動出現在這裡。一間教室可以共用同一行指令：設好可用次數與名稱樣板，每台貼上同一行就好。",
 "pattern": false
 },
@@ -6384,7 +6428,11 @@
 "pattern": false
 },
 {
-"zh": "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
+"zh": "那台不必先裝Python，也不必連pypi.org：腳本從主控台下載內附Python的執行環境，核對sha256後才解開",
+"pattern": false
+},
+{
+"zh": "主控台還沒備妥Windows執行環境時，那台要有Python 3.9以上並能連pypi.org（沒有的話會問要不要用winget安裝）；上面備妥之後再貼指令就不必",
 "pattern": false
 },
 {
@@ -9732,6 +9780,10 @@
 "pattern": false
 },
 {
+"zh": "'\n# 主控台備妥的Windows執行環境包（內附Python與相依、Visual C++執行階段）的sha256；空的＝沒有，改用這台的Python\n$RT = '",
+"pattern": false
+},
+{
 "zh": "'@ | & $vpy - $tf\nRemove-Item -Force $tf -ErrorAction SilentlyContinue\nif (-not $ok) { exit 1 }\nif (-not $admin) { Write-Host '提醒：這次不是用系統管理員身分執行，代理只在這個帳號登入後才會跑，防火牆也沒開 9401 埠。請系統管理員再執行一次這段指令' }\n",
 "pattern": false
 },
@@ -10956,7 +11008,19 @@
 "pattern": false
 },
 {
-"zh": "只接受 application/octet-stream，並要帶 X-XConsole-Upload",
+"zh": "只接受application/octet-stream，並要帶X-XConsole-Upload",
+"pattern": false
+},
+{
+"zh": "執行環境包要在 {0} MB以內",
+"pattern": true
+},
+{
+"zh": "執行環境包要在",
+"pattern": false
+},
+{
+"zh": "MB以內",
 "pattern": false
 },
 {
@@ -11165,6 +11229,14 @@
 },
 {
 "zh": "模型的回應超過 64 MB，沒有轉送；請把一次的量改小（例如 embeddings 分批送）",
+"pattern": false
+},
+{
+"zh": "執行環境包要在 ",
+"pattern": false
+},
+{
+"zh": " MB以內",
 "pattern": false
 },
 {
@@ -11433,6 +11505,10 @@
 },
 {
 "zh": "伺服器內部錯誤，已記錄",
+"pattern": false
+},
+{
+"zh": "加入碼不對、已經用完或過期，或主控台還沒準備好Windows執行環境。\n",
 "pattern": false
 },
 {
@@ -14164,6 +14240,118 @@
 "pattern": false
 },
 {
+"zh": "檔案數太多",
+"pattern": false
+},
+{
+"zh": "解開後太大",
+"pattern": false
+},
+{
+"zh": "這不是xConsole的Windows執行環境包（少了 {0}）",
+"pattern": true
+},
+{
+"zh": "這不是xConsole的Windows執行環境包（少了",
+"pattern": false
+},
+{
+"zh": "不是zip檔",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有不安全的路徑",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有python／runtime以外的東西：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有python／runtime以外的東西",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有連結檔：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔裡有連結檔",
+"pattern": false
+},
+{
+"zh": "這不是xConsole的Windows執行環境包（少了 ",
+"pattern": false
+},
+{
+"zh": "上傳",
+"pattern": false
+},
+{
+"zh": "GitHub的v{0} 沒有 {1}（這一版還沒有Windows執行環境包）",
+"pattern": true
+},
+{
+"zh": "GitHub的v",
+"pattern": false
+},
+{
+"zh": "這一版還沒有Windows執行環境包",
+"pattern": false
+},
+{
+"zh": "{0} 沒有GitHub公布的sha256，不下載",
+"pattern": true
+},
+{
+"zh": "沒有GitHub公布的sha256，不下載",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有不安全的路徑：",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有python／runtime以外的東西：",
+"pattern": false
+},
+{
+"zh": "壓縮檔裡有連結檔：",
+"pattern": false
+},
+{
+"zh": " 沒有 ",
+"pattern": false
+},
+{
+"zh": "（這一版還沒有Windows執行環境包）",
+"pattern": false
+},
+{
+"zh": " 沒有GitHub公布的sha256，不下載",
+"pattern": false
+},
+{
+"zh": "已經在下載了",
+"pattern": false
+},
+{
+"zh": "不知道主控台的版本，無法對應GitHub正式版；請改用上傳",
+"pattern": false
+},
+{
+"zh": "下載的檔sha256跟GitHub公布的不一樣，已丟掉",
+"pattern": false
+},
+{
+"zh": "執行環境包太大",
+"pattern": false
+},
+{
 "zh": "這台是 BIOS 把記憶體切成兩塊的機器（例 AI 395）：放不下的專家層從 SSD 讀，經過系統那一小塊。頁快取作業系統隨時可以丟掉，不會佔死；萬一系統那塊快被吃光，看門狗會自動停掉這個模型，不讓整台卡死",
 "pattern": false
 },
@@ -16732,14 +16920,6 @@
 "pattern": false
 },
 {
-"zh": "壓縮檔裡有不安全的路徑：{0}",
-"pattern": true
-},
-{
-"zh": "壓縮檔裡有不安全的路徑",
-"pattern": false
-},
-{
 "zh": " 的 sha256 跟官方公布的不一樣，已刪除，不安裝",
 "pattern": false
 },
@@ -17513,10 +17693,6 @@
 },
 {
 "zh": "有 Intel 顯示卡但沒有 Vulkan 開發套件，會編成只用 CPU。要用 GPU 請 IT 執行：sudo apt install libvulkan-dev glslc mesa-vulkan-drivers",
-"pattern": false
-},
-{
-"zh": "壓縮檔裡有不安全的路徑：",
 "pattern": false
 },
 {
