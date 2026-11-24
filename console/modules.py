@@ -251,10 +251,11 @@ def _perm_problems(d):
 
 _PS_ACL = r"""
 $ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $ok = @('S-1-5-18', 'S-1-5-32-544', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464', $me)
 $mask = 0xD0156 -bor 0x40000000 -bor 0x10000000
-$root = $args[0]
+$root = $env:XC_MODULE_DIR
 $items = @((Get-Item -LiteralPath (Split-Path -Parent $root)), (Get-Item -LiteralPath $root)) + @(Get-ChildItem -LiteralPath $root -Recurse -Force)
 foreach ($i in $items) {
   if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { "$($i.FullName) 是連結"; continue }
@@ -270,8 +271,10 @@ foreach ($i in $items) {
 
 def _win_acl_problems(d):
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_ACL, d],
-                           capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace")
+        # 路徑走環境變數：-Command模式不會把後面的參數放進$args
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_ACL],
+                           capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace",
+                           env={**os.environ, "XC_MODULE_DIR": os.path.abspath(d)})
     except (OSError, subprocess.TimeoutExpired) as ex:
         return [f"查不了權限：{ex}"]
     if r.returncode != 0:
