@@ -120,28 +120,34 @@ fn blocked_by_policy(e: &Option<std::io::Error>, tail: &str) -> bool {
 /// 整理成啟動畫面看得懂的診斷：種類|記錄檔位置|最後幾行
 fn diagnose(rt: &Runtime, w: &Watch, log: &str) -> String {
     let tail = log_tail(&rt.data, log);
-    let sac = smart_app_control();
-    let kind = if blocked_by_policy(&w.last_err, &tail) || sac == Some(1) { "sac" } else { "start" };
+    // 只有錯誤碼或記錄裡真的看得到「被擋」才叫人處理智慧型應用程式控制：它關掉之後要重灌Windows才能再開，
+    // 不能因為這台剛好開著它，就把腳本錯誤、檔案損壞也怪到它頭上。登錄檔狀態只當參考寫在記錄後面
+    let kind = if blocked_by_policy(&w.last_err, &tail) { "sac" } else { "start" };
+    let note = if kind == "start" && smart_app_control() == Some(1) {
+        "\n（這台開著智慧型應用程式控制，但記錄裡沒有看到被它擋下的跡象）"
+    } else {
+        ""
+    };
     let err = w.last_err.as_ref().map(|e| format!("{}\n", e)).unwrap_or_default();
     let path = rt.data.join(".xconsole").join(log);
-    format!("{}|{}|{}{}", kind, path.display(), err, tail)
+    format!("{}|{}|{}{}{}", kind, path.display(), err, tail, note)
 }
 
+/// 視窗可能已經切到主控台（主控台短暫起來過）：主控台頁面不認 #fault，所以關掉重開一個啟動畫面的視窗
 fn show_fault(app: &AppHandle, rt: &Runtime) {
-    let Some(f) = rt.fault.lock().unwrap().clone() else { return };
-    if let Some(w) = app.get_webview_window(MAIN) {
-        let _ = w.eval(format!("location.hash = 'fault=' + {}", js_string(&url_encode(&f))));
+    if rt.fault.lock().unwrap().is_none() {
+        return;
     }
+    if let Some(w) = app.get_webview_window(MAIN) {
+        let _ = w.destroy();
+    }
+    show(app);
 }
 
 fn url_encode(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes()).collect()
 }
 
-fn js_string(s: &str) -> String {
-    // 已經URL編碼過，只剩英數與 % +等字元；保險起見仍跳脫引號與反斜線
-    format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
-}
 
 fn random_key() -> String {
     let mut b = [0u8; 32];
@@ -220,7 +226,7 @@ fn spawn_console(rt: &Runtime) -> std::io::Result<Child> {
 }
 
 /// 代理第一次啟動會產生權杖與憑證；等它們出現，再把這台的代理登記進主控台（每次都做：埠可能換過）。
-fn register_agent(rt: &Runtime) {
+fn register_agent(rt: &Runtime) -> bool {
     let st = rt.data.join(".xconsole");
     let end = Instant::now() + Duration::from_secs(60);
     while Instant::now() < end && !(st.join("token").exists() && st.join("agent-cert.pem").exists()) {
@@ -231,7 +237,7 @@ fn register_agent(rt: &Runtime) {
     let name = hostname();
     let mut c = command(rt, &["install/setup_local.py", "--home", &home, "--agent-port", &port, "--name", &name], "console.log");
     c.stdin(Stdio::null());
-    let _ = c.status();
+    c.status().map(|s| s.success()).unwrap_or(false)
 }
 
 fn hostname() -> String {
@@ -263,10 +269,9 @@ fn console_url(rt: &Runtime) -> url::Url {
 fn supervise(app: AppHandle, rt: Arc<Runtime>) {
     let mut agent = Watch::start(spawn_agent(&rt));
     // 代理起來了才登記（起不來時登記也會失敗，還白等60秒才講原因）；第一次沒起來、之後重試起來了再補登記
-    let mut registered = agent.child.is_some();
-    if registered {
-        register_agent(&rt);
-    }
+    // 登記成功才算數：登記失敗（例如代理一起來就掉、還沒產生憑證）之後每30秒再試，直到登記上
+    let mut registered = agent.child.is_some() && register_agent(&rt);
+    let mut reg_at = Instant::now();
     let mut console = Watch::start(spawn_console(&rt));
     let mut first = true;
     loop {
@@ -305,10 +310,10 @@ fn supervise(app: AppHandle, rt: Arc<Runtime>) {
         if agent.dead() && agent.fails < FAIL_LIMIT {
             thread::sleep(Duration::from_secs(2));
             agent.take(spawn_agent(&rt));
-            if !registered && agent.child.is_some() {
-                registered = true;
-                register_agent(&rt);
-            }
+        }
+        if !registered && agent.child.is_some() && reg_at.elapsed() >= Duration::from_secs(30) {
+            registered = register_agent(&rt);
+            reg_at = Instant::now();
         }
         if console.dead() && console.fails < FAIL_LIMIT {
             thread::sleep(Duration::from_secs(1));

@@ -23434,11 +23434,6 @@
 "ja": "エンジン起動時にメモリアクセスエラーが発生しました。多くはグラフィックドライバーが古いためです。ドライバーを更新してから再試行してください。",
 "ko": "엔진 시작 중 메모리 접근 오류가 발생했습니다. 대개 그래픽 드라이버가 오래되어서입니다. 드라이버를 업데이트한 뒤 다시 시도하세요."
 },
-"被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章。請改裝xConsole簽章版附的引擎，或到「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制（關掉之後要重灌Windows才能再打開，公司或學校的電腦請先問資訊人員）": {
-"en": "Blocked by Windows Smart App Control, which only runs digitally signed programs. This inference engine is the open-source project's official build and is not signed. Install the engine that comes with the signed xConsole build, or turn off Smart App Control under Windows Security → App & browser control (once off, it can only be turned back on by reinstalling Windows; on a company or school PC, ask IT first).",
-"ja": "Windows の「スマート アプリ コントロール」によってブロックされました。デジタル署名のあるプログラムしか実行できず、この推論エンジンはオープンソースの公式版で署名がありません。署名版 xConsole に付属するエンジンを入れるか、「Windows セキュリティ → アプリとブラウザーの制御」でスマート アプリ コントロールをオフにしてください（オフにすると Windows を再インストールしないと戻せません。会社や学校の PC は先に IT 担当に確認してください）。",
-"ko": "Windows '스마트 앱 컨트롤'에 의해 차단되었습니다. 디지털 서명이 있는 프로그램만 실행되며, 이 추론 엔진은 오픈소스 프로젝트의 공식 빌드라 서명이 없습니다. 서명된 xConsole에 포함된 엔진을 설치하거나 'Windows 보안 → 앱 및 브라우저 컨트롤'에서 스마트 앱 컨트롤을 끄세요(끄면 Windows를 다시 설치해야만 다시 켤 수 있습니다. 회사나 학교 PC는 먼저 IT 담당자에게 확인하세요)."
-},
 "這台沒有Visual C++執行階段，已從xConsole內附的那份補上：{0}": {
 "en": "This machine has no Visual C++ runtime; added the copy bundled with xConsole: {0}",
 "ja": "このマシンには Visual C++ ランタイムがないため、xConsole 同梱のものを補いました：{0}",
@@ -23523,5 +23518,10 @@
 "en": "\n[xConsole] Engine exited (0x",
 "ja": "\n[xConsole] エンジンが終了しました（0x",
 "ko": "\n[xConsole] 엔진 종료(0x"
+},
+"被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章，所以在開著這項功能的電腦上目前無法執行。云碩正在改為提供簽章過的引擎；在那之前，要用就只能到「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制（關掉之後要重灌Windows才能再打開，公司或學校的電腦請先問資訊人員）": {
+"en": "Blocked by Windows Smart App Control, which only runs digitally signed programs. This inference engine is the open-source project's official build and is not signed, so it cannot run on a PC with this feature on. xCloudinfo is moving to a signed engine; until then, the only way to use it is to turn off Smart App Control under Windows Security → App & browser control (once off, it can only be turned back on by reinstalling Windows; on a company or school PC, ask IT first).",
+"ja": "Windows の「スマート アプリ コントロール」によってブロックされました。デジタル署名のあるプログラムしか実行できず、この推論エンジンはオープンソースの公式版で署名がないため、この機能がオンの PC では現在実行できません。xCloudinfo は署名済みエンジンの提供を進めています。それまでは「Windows セキュリティ → アプリとブラウザーの制御」でスマート アプリ コントロールをオフにするしかありません（オフにすると Windows を再インストールしないと戻せません。会社や学校の PC は先に IT 担当に確認してください）。",
+"ko": "Windows '스마트 앱 컨트롤'에 의해 차단되었습니다. 디지털 서명된 프로그램만 실행되며, 이 추론 엔진은 오픈소스 공식 빌드라 서명이 없어 이 기능이 켜진 PC에서는 현재 실행할 수 없습니다. xCloudinfo가 서명된 엔진 제공을 준비 중이며, 그 전까지는 'Windows 보안 → 앱 및 브라우저 컨트롤'에서 스마트 앱 컨트롤을 꺼야만 사용할 수 있습니다(끄면 Windows를 다시 설치해야 다시 켤 수 있습니다. 회사나 학교 PC는 먼저 IT 담당자에게 확인하세요)."
 }
 }

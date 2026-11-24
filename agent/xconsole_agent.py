@@ -5660,12 +5660,14 @@ def win_exit_hint(rc):
 
 
 def win_block_hint(ex):
-    """被Windows的應用程式控制擋下（智慧型應用程式控制4551、群組原則1260）：講清楚是誰擋、怎麼處理。"""
+    """被Windows的應用程式控制擋下（智慧型應用程式控制4551、群組原則1260）：講清楚是誰擋、現在能怎麼做。
+    不叫人去裝不存在的東西：xConsole目前下載的是開源專案的官方引擎，沒有簽章版可以改裝。"""
     code = getattr(ex, "winerror", None)
     if code in (4551, 1260):
-        return ("被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章。"
-                "請改裝xConsole簽章版附的引擎，或到「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制"
-                "（關掉之後要重灌Windows才能再打開，公司或學校的電腦請先問資訊人員）")
+        return ("被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章，"
+                "所以在開著這項功能的電腦上目前無法執行。云碩正在改為提供簽章過的引擎；在那之前，要用就只能到"
+                "「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制（關掉之後要重灌Windows才能再打開，"
+                "公司或學校的電腦請先問資訊人員）")
     return None
 
 
@@ -8160,7 +8162,8 @@ def _gen_run(j, argv, env, mm, fl):
         j.update(state="cancelled" if killed == "已取消" else "failed", error=killed)
     elif rc != 0 or not os.path.isfile(out) or not os.path.getsize(out):
         tail = [x for x in tail_lines(log, 12) if x.strip()]
-        j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
+        hint = win_exit_hint(rc)
+        j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (hint or (tail[-1][-240:] if tail else "沒有輸出")))
     else:
         peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
         j["phase"] = "檢查產出中"         # 檢查完才改 done：網頁看到 done 就停止輪詢，要一起拿到 suspect

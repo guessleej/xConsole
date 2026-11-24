@@ -75,6 +75,7 @@ def hints():
         winerror = 4551
     b = A.win_block_hint(Blocked("應用程式控制原則已封鎖此檔案"))
     case("被智慧型應用程式控制擋下（4551）：講是誰擋、怎麼處理", b and "智慧型應用程式控制" in b and "重灌" in b, b)
+    case("  不叫人去裝不存在的簽章版引擎", b and "改裝" not in b and "簽章版附的" not in b, b)
     p = OSError("blocked")
     p.winerror = 1260
     case("  群組原則擋下（1260）也認得", A.win_block_hint(p) is not None)
