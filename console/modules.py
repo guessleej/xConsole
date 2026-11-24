@@ -263,8 +263,13 @@ foreach ($i in $items) {
   if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { "$($i.FullName) 是連結"; continue }
   # 用.NET讀ACL，不靠Get-Acl（Microsoft.PowerShell.Security模組在某些環境載不起來）
   $acl = if ($i.PSIsContainer) { (New-Object IO.DirectoryInfo $i.FullName).GetAccessControl() } else { (New-Object IO.FileInfo $i.FullName).GetAccessControl() }
+  # 擁有者本身要是系統管理員或主控台的帳號：OWNER RIGHTS（S-1-3-4）與CREATOR OWNER（S-1-3-0）給的權限落在擁有者身上
+  $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+  if ($ok -notcontains $owner) { "$($i.FullName) 的擁有者 $owner 不是系統管理員或主控台的帳號" }
   foreach ($a in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
     if ($a.AccessControlType -ne 'Allow') { continue }
+    if ($a.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) { continue }   # 只給之後新建的子項，不作用在這一項
+    if (@('S-1-3-4', 'S-1-3-0') -contains $a.IdentityReference.Value) { continue }
     $sid = $a.IdentityReference.Value
     if ($ok -contains $sid) { continue }
     if (([int64]$a.FileSystemRights -band $mask) -ne 0) { "$($i.FullName) $($a.IdentityReference) 能寫" }
