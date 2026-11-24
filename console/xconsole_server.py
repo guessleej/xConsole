@@ -1380,20 +1380,31 @@ if ($admin) {{
 }}
 if ($RT) {{
   Write-Host '== 2/5從主控台下載內附的Python（不必先裝Python、不必連pypi.org） =='
-  Stop-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue
+  # 先下載、核對、解到暫存資料夾並試跑，最後要換的那一刻才停舊的代理：中途任何一步失敗，這台原本的代理照常在跑
   $zip = Join-Path $env:TEMP ('xconsole-winrt-' + [guid]::NewGuid().ToString('N') + '.zip')
-  $wc.DownloadFile("$C/install/$CODE/winrt.zip", $zip)
+  $stage = Join-Path $dir 'winrt.staging'
+  try {{ $wc.DownloadFile("$C/install/$CODE/winrt.zip", $zip) }} catch {{ Write-Host "下載不了執行環境包：$($_.Exception.Message)"; exit 1 }}
   if ((Get-FileHash -Algorithm SHA256 $zip).Hash -ne $RT.ToUpper()) {{ Remove-Item -Force $zip; Write-Host '執行環境包的sha256對不上主控台公布的，不安裝'; exit 1 }}
+  if (Test-Path $stage) {{ Remove-Item -Recurse -Force $stage }}
+  try {{ Expand-Archive -LiteralPath $zip -DestinationPath $stage -Force }} catch {{ Remove-Item -Force $zip; Write-Host "解不開執行環境包：$($_.Exception.Message)"; exit 1 }}
+  Remove-Item -Force $zip
+  & (Join-Path $stage 'python\\python.exe') -c 'import cryptography'
+  if ($LASTEXITCODE) {{ Remove-Item -Recurse -Force $stage; Write-Host '內附的Python不完整，請在主控台重新準備Windows執行環境'; exit 1 }}
+  $had = [bool](Get-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue)
+  Stop-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue
   foreach ($n in 'python', 'runtime') {{
     $dst = Join-Path $dir $n
     if (Test-Path $dst) {{ Remove-Item -Recurse -Force $dst -ErrorAction SilentlyContinue }}
-    if (Test-Path $dst) {{ Remove-Item -Force $zip; Write-Host "$dst還有程式在用，請重新開機後再貼一次"; exit 1 }}
+    if (Test-Path $dst) {{
+      Remove-Item -Recurse -Force $stage
+      if ($had) {{ Start-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue }}
+      Write-Host "$dst還有程式在用（模型服務還在跑），原本的代理已重新啟動；請重新開機後再貼一次"; exit 1
+    }}
+    Move-Item -LiteralPath (Join-Path $stage $n) -Destination $dst
   }}
-  Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-  Remove-Item -Force $zip
+  Remove-Item -Recurse -Force $stage
   $vpy = Join-Path $dir 'python\\python.exe'
   $vpyw = Join-Path $dir 'python\\pythonw.exe'
-  & $vpy -c 'import cryptography'; if ($LASTEXITCODE) {{ Write-Host '內附的Python不完整，請在主控台重新準備Windows執行環境'; exit 1 }}
 }} else {{
   Write-Host '== 2/5準備Python環境 =='
   & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) {{ Write-Host '建不了Python虛擬環境'; exit 1 }}

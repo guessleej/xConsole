@@ -69,6 +69,22 @@ def unit():
     check("上傳不合格的：400，原本那一包不動", code == 400 and winrt.meta(d)["sha256"] == hashlib.sha256(good).hexdigest(), out)
     st = winrt.status(d)
     check("狀態：備妥、來源是上傳", st["ready"] and st["source"] == "上傳" and st["size"] == len(good), st)
+    good2 = pack(extra={"python/extra.txt": b"y"})
+    res = []
+    th = [threading.Thread(target=lambda g=g: res.append(winrt.upload(d, g))) for g in (good, good2) * 3]
+    [t.start() for t in th]
+    [t.join() for t in th]
+    m = winrt.meta(d)
+    check("同時存好幾次：都成功，包與說明檔描述同一包", all(r[0] == 200 for r in res) and m
+          and hashlib.sha256(open(winrt.path(d), "rb").read()).hexdigest() == m["sha256"], [r[0] for r in res])
+    real = updater.current_version
+    updater.current_version = lambda: "2099.1.1"
+    check("主控台升級過：舊版準備的包當作沒有（要重新準備）", winrt.meta(d) is None)
+    updater.current_version = real
+    raw = bytearray(pack(extra={"python/big.txt": b"z" * 4000}))
+    i = raw.find(b"z" * 100)
+    raw[i:i + 50] = b"Q" * 50
+    check("壓縮內容在傳輸中損壞（CRC對不上）：擋下", "損壞" in (winrt.check(bytes(raw)) or ""), winrt.check(bytes(raw)))
     open(winrt.path(d), "ab").write(b"x")
     check("檔案被動過（大小不對）：當作沒有", winrt.meta(d) is None)
 

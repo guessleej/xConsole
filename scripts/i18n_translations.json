@@ -23748,5 +23748,20 @@
 "en": "The runtime package is too large",
 "ja": "実行環境パッケージが大きすぎます",
 "ko": "실행 환경 패키지가 너무 큽니다"
+},
+"壓縮檔內容損壞：{0}": {
+"en": "The archive contents are corrupted: {0}",
+"ja": "アーカイブの内容が破損しています：{0}",
+"ko": "압축 파일 내용이 손상되었습니다: {0}"
+},
+"壓縮檔內容損壞": {
+"en": "The archive contents are corrupted",
+"ja": "アーカイブの内容が破損しています",
+"ko": "압축 파일 내용이 손상되었습니다"
+},
+"壓縮檔內容損壞：": {
+"en": "The archive contents are corrupted: ",
+"ja": "アーカイブの内容が破損しています：",
+"ko": "압축 파일 내용이 손상되었습니다: "
 }
 }

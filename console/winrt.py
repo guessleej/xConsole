@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+import tempfile
 import threading
 import time
 import urllib.request
@@ -23,8 +24,10 @@ NAME = "xconsole-runtime-win-x64.zip"
 MAX_ZIP = 200 * 1024 * 1024
 MAX_UNPACKED = 600 * 1024 * 1024
 MAX_FILES = 20000
-MUST = ("python/python.exe", "python/pythonw.exe", "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcomp140.dll")
+MUST = ("python/python.exe", "python/pythonw.exe", "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcruntime140_1.dll",
+        "runtime/vcomp140.dll")
 _LOCK = threading.Lock()
+_SAVE_LOCK = threading.Lock()
 _JOB = {"state": None}
 
 
@@ -45,6 +48,8 @@ def meta(state_dir):
     p = path(state_dir)
     if not os.path.isfile(p) or os.path.getsize(p) != m.get("size"):
         return None
+    if m.get("for_version") != updater.current_version():
+        return None                    # 主控台升級過：舊版的Python與相依可能對不上新版，要重新準備
     return m
 
 
@@ -81,6 +86,12 @@ def check(data):
     miss = [m for m in MUST if m not in names]
     if miss:
         return f"這不是xConsole的Windows執行環境包（少了 {', '.join(miss)}）"
+    try:
+        bad = z.testzip()                # 逐檔解壓核對CRC：傳輸中損壞的包在這裡就擋下，不會讓每台工作站解到一半才失敗
+    except Exception:  # noqa: BLE001
+        bad = "?"
+    if bad:
+        return f"壓縮檔內容損壞：{str(bad)[:80]}"
     return None
 
 
@@ -90,13 +101,18 @@ def _save(state_dir, data, version, source):
         raise ValueError(err)
     d = _dir(state_dir)
     os.makedirs(d, mode=0o700, exist_ok=True)
-    tmp = path(state_dir) + ".part"
-    with open(tmp, "wb") as fh:
-        fh.write(data)
-    os.replace(tmp, path(state_dir))
-    m = {"version": version, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "source": source, "at": int(time.time())}
-    with open(os.path.join(d, "winrt.json"), "w", encoding="utf-8") as fh:
-        json.dump(m, fh)
+    m = {"version": version, "sha256": hashlib.sha256(data).hexdigest(), "size": len(data), "source": source, "at": int(time.time()),
+         "for_version": updater.current_version()}
+    # 上傳與背景下載可能同時存：各寫各的暫存檔，換上包與說明檔這一步一次只讓一個做，兩個檔永遠描述同一包
+    with _SAVE_LOCK:
+        fd, tmp = tempfile.mkstemp(prefix=".winrt-", dir=d)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, path(state_dir))
+        fd, tmpm = tempfile.mkstemp(prefix=".winrt-", suffix=".json", dir=d)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(m, fh)
+        os.replace(tmpm, os.path.join(d, "winrt.json"))
     return m
 
 

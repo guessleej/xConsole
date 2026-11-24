@@ -14256,6 +14256,14 @@
 "pattern": false
 },
 {
+"zh": "壓縮檔內容損壞：{0}",
+"pattern": true
+},
+{
+"zh": "壓縮檔內容損壞",
+"pattern": false
+},
+{
 "zh": "不是zip檔",
 "pattern": false
 },
@@ -14285,6 +14293,10 @@
 },
 {
 "zh": "這不是xConsole的Windows執行環境包（少了 ",
+"pattern": false
+},
+{
+"zh": "壓縮檔內容損壞：",
 "pattern": false
 },
 {

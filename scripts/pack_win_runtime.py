@@ -22,7 +22,8 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAYLOAD = os.path.join(ROOT, "desktop", "build", "payload")
-MUST = ("python/python.exe", "python/pythonw.exe", "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcomp140.dll")
+MUST = ("python/python.exe", "python/pythonw.exe", "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcruntime140_1.dll",
+        "runtime/vcomp140.dll")
 
 
 def runtime_files():
