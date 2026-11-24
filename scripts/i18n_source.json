@@ -14124,6 +14124,22 @@
 "pattern": false
 },
 {
+"zh": "缺少系統元件（Visual C++執行階段或顯示卡驅動附的DLL）。xConsole會自動補Visual C++執行階段；還是不行的話，多半是顯示卡驅動沒裝好，請到顯示卡廠商網站裝最新驅動",
+"pattern": false
+},
+{
+"zh": "系統元件的版本太舊（找不到需要的函式）。請執行Windows Update，並更新顯示卡驅動",
+"pattern": false
+},
+{
+"zh": "這顆CPU不支援引擎用到的指令集。請到「設定 → 推理引擎」改裝CPU相容版",
+"pattern": false
+},
+{
+"zh": "引擎啟動時記憶體存取錯誤，多半是顯示卡驅動太舊。請更新顯示卡驅動後再試",
+"pattern": false
+},
+{
 "zh": "先停掉一個模型、改小尺寸，或換小一級的量化",
 "pattern": false
 },
@@ -14233,6 +14249,10 @@
 },
 {
 "zh": "C++ 編譯器",
+"pattern": false
+},
+{
+"zh": "被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章。請改裝xConsole簽章版附的引擎，或到「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制（關掉之後要重灌Windows才能再打開，公司或學校的電腦請先問資訊人員）",
 "pattern": false
 },
 {
@@ -15604,11 +15624,27 @@
 "pattern": false
 },
 {
-"zh": "裝好了但跑不起來（{0} 失敗）：{1}",
+"zh": "這台沒有Visual C++執行階段，已從xConsole內附的那份補上：{0}",
+"pattern": true
+},
+{
+"zh": "這台沒有Visual C++執行階段，已從xConsole內附的那份補上",
+"pattern": false
+},
+{
+"zh": "結束碼 {0}",
+"pattern": true
+},
+{
+"zh": "裝好了但跑不起來：{0}",
 "pattern": true
 },
 {
 "zh": "裝好了但跑不起來",
+"pattern": false
+},
+{
+"zh": "裝好了，但引擎找不到可用的顯示卡（驅動沒裝或太舊），模型會用CPU跑。裝好或更新顯示卡驅動後重新啟動模型即可",
 "pattern": false
 },
 {
@@ -15680,11 +15716,11 @@
 "pattern": false
 },
 {
-"zh": "裝好了但跑不起來（{0} 失敗），可能不是這台系統或顯示卡用的版本：{1}",
+"zh": "裝好了但跑不起來，可能不是這台系統或顯示卡用的版本：{0}",
 "pattern": true
 },
 {
-"zh": "失敗），可能不是這台系統或顯示卡用的版本",
+"zh": "裝好了但跑不起來，可能不是這台系統或顯示卡用的版本",
 "pattern": false
 },
 {
@@ -16620,11 +16656,15 @@
 "pattern": false
 },
 {
-"zh": "裝好了但跑不起來（",
+"zh": "這台沒有Visual C++執行階段，已從xConsole內附的那份補上：",
 "pattern": false
 },
 {
-"zh": " 失敗）：",
+"zh": "結束碼 ",
+"pattern": false
+},
+{
+"zh": "裝好了但跑不起來：",
 "pattern": false
 },
 {
@@ -16692,7 +16732,7 @@
 "pattern": false
 },
 {
-"zh": " 失敗），可能不是這台系統或顯示卡用的版本：",
+"zh": "裝好了但跑不起來，可能不是這台系統或顯示卡用的版本：",
 "pattern": false
 },
 {
@@ -17792,6 +17832,10 @@
 "pattern": false
 },
 {
+"zh": "找到的顯示卡：",
+"pattern": false
+},
+{
 "zh": "這台正在安裝 ",
 "pattern": false
 },
@@ -17848,11 +17892,11 @@
 "pattern": false
 },
 {
-"zh": "sd-cli 啟動失敗：{0}",
+"zh": "sd-cli啟動失敗：{0}",
 "pattern": true
 },
 {
-"zh": "sd-cli 啟動失敗",
+"zh": "sd-cli啟動失敗",
 "pattern": false
 },
 {
@@ -18004,7 +18048,7 @@
 "pattern": false
 },
 {
-"zh": "sd-cli 啟動失敗：",
+"zh": "sd-cli啟動失敗：",
 "pattern": false
 },
 {
@@ -18029,6 +18073,14 @@
 },
 {
 "zh": "，經代理伺服器 ",
+"pattern": false
+},
+{
+"zh": "\n[xConsole] 引擎結束（0x{0}）：{1}\n",
+"pattern": true
+},
+{
+"zh": "\n[xConsole] 引擎結束（0x",
 "pattern": false
 },
 {
