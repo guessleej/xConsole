@@ -383,15 +383,15 @@ def safe_extract(data, dest):
         if (i.external_attr >> 16) & 0o170000 == 0o120000:
             raise ValueError(f"壓縮檔裡有連結檔：{n[:80]}")
         p = os.path.join(dest, *parts)
-        os.makedirs(os.path.dirname(p), mode=0o755, exist_ok=True)
+        os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
         with z.open(i) as src, open(p, "wb") as out:
             shutil.copyfileobj(src, out)
         if os.name != "nt":
-            os.chmod(p, 0o644)
+            os.chmod(p, 0o600)                # 模組檔只有主控台自己要讀
     if os.name != "nt":
         for dp, dn, _ in os.walk(dest):
             for x in dn:
-                os.chmod(os.path.join(dp, x), 0o755)
+                os.chmod(os.path.join(dp, x), 0o700)
 
 
 # ---------------------------------------------------------------- 載入器
@@ -467,7 +467,7 @@ class Modules:
         with self.lock:
             stage, prev = self.dir + ".staging", self.dir + ".prev"
             shutil.rmtree(stage, ignore_errors=True)
-            os.makedirs(stage, mode=0o755)
+            os.makedirs(stage, mode=0o700)
             try:
                 safe_extract(data, stage)
             except ValueError as ex:

@@ -41,7 +41,7 @@ FAKE = os.path.join(HERE, "fake_module")
 KEY = Ed25519PrivateKey.generate()
 PUB = KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
 INSTALL = os.path.join(TMP, "install")
-os.makedirs(INSTALL, mode=0o755)
+os.makedirs(INSTALL, mode=0o700)
 
 
 def check(name, cond, detail=""):
@@ -67,10 +67,10 @@ def build(dest, src_patch=None, key=KEY, core_api=None, sign=True, after=None):
     if os.name != "nt":
         for dp, dn, fs in os.walk(dest):
             for d in dn:
-                os.chmod(os.path.join(dp, d), 0o755)
+                os.chmod(os.path.join(dp, d), 0o700)
             for f in fs:
-                os.chmod(os.path.join(dp, f), 0o644)
-        os.chmod(dest, 0o755)
+                os.chmod(os.path.join(dp, f), 0o600)
+        os.chmod(dest, 0o700)
     if after:
         after(dest)
     return dest
@@ -100,10 +100,10 @@ def loading():
               after=lambda d: (os.makedirs(os.path.join(d, "__pycache__")), open(os.path.join(d, "__pycache__", "x.pyc"), "wb").write(b"x")))
     load_case("核心API不相容：不載入", "核心API", core_api=[99])
     if os.name != "nt":
-        load_case("別的帳號也能寫：不載入", "別的帳號也能寫", after=lambda d: os.chmod(os.path.join(d, "__init__.py"), 0o666))
+        load_case("別的帳號也能寫：不載入", "別的帳號也能寫", after=lambda d: os.chmod(os.path.join(d, "__init__.py"), 0o620))
         load_case("上一層資料夾別人能寫（能把整個模組換掉）：不載入", "別的帳號也能寫",
-                  after=lambda d: os.chmod(os.path.dirname(d), 0o777))
-        os.chmod(INSTALL, 0o755)
+                  after=lambda d: os.chmod(os.path.dirname(d), 0o770))
+        os.chmod(INSTALL, 0o700)
     else:
         load_case("別的帳號也能寫（Everyone）：不載入", "能寫",
                   after=lambda d: subprocess.run(["icacls", d, "/grant", "*S-1-1-0:(OI)(CI)M"], capture_output=True))
