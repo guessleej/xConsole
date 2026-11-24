@@ -97,6 +97,10 @@ jobs:
           $bad = Get-ChildItem desktop\build\payload -Recurse -Include *.exe,*.dll,*.pyd | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
           if ($bad) { $bad | Select-Object -First 10 | ForEach-Object { Write-Host "沒簽到：$($_.FullName)" }; throw "還有 $($bad.Count) 個檔沒有有效簽章" }
           Write-Host '內附的執行檔與DLL全部有有效簽章' 
+      - name: Windows執行環境包（伺服器版安裝與「加一台機器」用：不必先裝Python、不必連pypi.org）
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python scripts/pack_win_runtime.py dist
       - name: 建安裝檔
         shell: bash
         working-directory: desktop/src-tauri

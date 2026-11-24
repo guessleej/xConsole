@@ -53,6 +53,21 @@ function FindPy {
   try { $v = & python -c $probe 2>$null; if ($v -and (Test-Path $v.Trim())) { return $v.Trim() } } catch {}
   $null
 }
+# Windows完整包（xconsole-<版本>-windows-x64.zip）內附Python與相依套件、Visual C++執行階段（有憑證時都已簽章）：
+# 有就用它，不必先裝Python、不必連pypi.org。只有原始碼包（tar.gz）時才照舊找這台的Python、建虛擬環境、上網裝套件
+$WINRT = Join-Path $SRC 'winrt'
+$BUNDLED = Test-Path (Join-Path $WINRT 'python\python.exe')
+function UseBundled($dir) {
+  foreach ($n in 'python', 'runtime') {
+    $dst = Join-Path $dir $n
+    if (Test-Path $dst) { Remove-Item -Recurse -Force $dst -ErrorAction SilentlyContinue }
+    if (Test-Path $dst) { Die "$dst還有程式在用（舊的代理、主控台或模型服務還在跑）：請重新開機後再執行一次" }
+    Copy-Item -Recurse -Force (Join-Path $WINRT $n) $dst
+  }
+  $script:vpy = Join-Path $dir 'python\python.exe'; $script:vpyw = Join-Path $dir 'python\pythonw.exe'
+  & $script:vpy -c "import cryptography" 2>$null
+  if ($LASTEXITCODE) { Die '內附的Python不完整（缺cryptography），請重新下載Windows完整包' }
+}
 function WaitAgent($st) {
   $tok = Join-Path $st 'token'; $crt = Join-Path $st 'agent-cert.pem'
   for ($i = 0; $i -lt 40; $i++) {
@@ -108,8 +123,10 @@ if ($Console) {
   $dir = Join-Path $base 'xconsole'; $st = Join-Path $base '.xconsole'
 
   Say '1/5 檢查這台'
-  $py = FindPy
-  if (-not $py) { Die '這台沒有 Python 3.9 以上。請先派送 Python（例：winget install -e --id Python.Python.3.12 --scope machine），再跑一次' }
+  if (-not $BUNDLED) {
+    $py = FindPy
+    if (-not $py) { Die '這台沒有Python 3.9以上。請改用Windows完整包（xconsole-<版本>-windows-x64.zip，內附Python），或先派送Python（例：winget install -e --id Python.Python.3.12 --scope machine）再跑一次' }
+  }
   Stop-ScheduledTask -TaskName 'xConsole Agent' -ErrorAction SilentlyContinue
 
   Say "2/5 複製代理到 $dir"
@@ -119,11 +136,16 @@ if ($Console) {
   Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'xconsole_agent.py')
   Copy-Item -Force (Join-Path $SRC 'install\join.py') (Join-Path $dir 'join.py')
 
-  Say '3/5 準備 Python 環境（cryptography）'
-  $vpy = Join-Path $dir '.venv\Scripts\python.exe'; $vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
-  if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了 Python 虛擬環境' } }
-  & $vpy -m pip install -q --disable-pip-version-check 'cryptography>=42'
-  if ($LASTEXITCODE) { Die '裝不了 cryptography；這台要能連 pypi.org，或請 IT 先放行' }
+  if ($BUNDLED) {
+    Say '3/5使用內附的Python（不必連網）'
+    UseBundled $dir
+  } else {
+    Say '3/5準備Python環境（cryptography）'
+    $vpy = Join-Path $dir '.venv\Scripts\python.exe'; $vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
+    if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了Python虛擬環境' } }
+    & $vpy -m pip install -q --disable-pip-version-check 'cryptography>=42'
+    if ($LASTEXITCODE) { Die '裝不了cryptography；這台要能連pypi.org，或請IT先放行；也可以改用內附Python的Windows完整包' }
+  }
 
   Say '4/5 開機自啟（SYSTEM）並啟動'
   $agent = Join-Path $dir 'xconsole_agent.py'
@@ -164,8 +186,9 @@ if ($Uninstall) {
 Say '1/6 檢查這台'
 if (-not (Test-Path (Join-Path $SRC 'console\xconsole_server.py'))) { Die '請在解開的 xConsole 安裝包資料夾裡執行（找不到 console\）' }
 if (-not $admin) { Write-Host '提醒：不是用系統管理員身分執行，會裝成「登入後才啟動」，防火牆也不會開。' -ForegroundColor Yellow }
-$py = FindPy
-if (-not $py) {
+foreach ($t in 'xConsole', 'xConsole Agent', 'xConsole Desktop') { Stop-ScheduledTask -TaskName $t -ErrorAction SilentlyContinue }
+$py = if ($BUNDLED) { $null } else { FindPy }
+if (-not $BUNDLED -and -not $py) {
   $ans = Read-Host '這台沒有 Python 3.9 以上。要用 winget 安裝 Python 3.12 嗎？(Y/n)'
   if ($ans -match '^(n|N)') { Die '請先安裝 Python 3（https://www.python.org），再執行一次' }
   $scope = if ($admin) { 'machine' } else { 'user' }   # 一般身分裝不了全機版，改裝到自己的帳號底下
@@ -180,7 +203,7 @@ if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
   ProtectDir $base
 }
-foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'linkcert.py', 'groups.py', 'joincodes.py', 'gateway.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'chattools.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
+foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'linkcert.py', 'groups.py', 'joincodes.py', 'winrt.py', 'gateway.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'chattools.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
 }
 Copy-Item -Force (Join-Path $SRC 'console\static\*') (Join-Path $dir 'static')
@@ -189,12 +212,17 @@ Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $dir 'xco
 Copy-Item -Force (Join-Path $SRC 'requirements.txt') (Join-Path $dir 'requirements.txt')
 Copy-Item -Force (Join-Path $SRC 'VERSION') (Join-Path $dir 'VERSION')
 
-Say '3/6 準備 Python 環境（主控台與代理都需要 cryptography）'
-$vpy = Join-Path $dir '.venv\Scripts\python.exe'
-$vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
-if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了 Python 虛擬環境' } }
-& $vpy -m pip install -q --disable-pip-version-check -r (Join-Path $dir 'requirements.txt')
-if ($LASTEXITCODE) { Die '裝不了相依套件；這台要能連 pypi.org，或請 IT 先放行' }
+if ($BUNDLED) {
+  Say '3/6使用內附的Python與相依套件（不必連網）'
+  UseBundled $dir
+} else {
+  Say '3/6準備Python環境（主控台與代理都需要cryptography）'
+  $vpy = Join-Path $dir '.venv\Scripts\python.exe'
+  $vpyw = Join-Path $dir '.venv\Scripts\pythonw.exe'
+  if (-not (Test-Path $vpy)) { & $py -m venv (Join-Path $dir '.venv'); if ($LASTEXITCODE) { Die '建不了Python虛擬環境' } }
+  & $vpy -m pip install -q --disable-pip-version-check -r (Join-Path $dir 'requirements.txt')
+  if ($LASTEXITCODE) { Die '裝不了相依套件；這台要能連pypi.org，或請IT先放行；也可以改用內附Python的Windows完整包' }
+}
 
 Say '4/6 管理者帳號'
 $env:XCONSOLE_HOME = $base
@@ -248,8 +276,19 @@ if ($admin) {
   New-Item -ItemType Directory -Force -Path $hd | Out-Null
   Copy-Item -Force (Join-Path $SRC 'agent\xconsole_agent.py') (Join-Path $hd 'xconsole_agent.py')
   Set-Content -LiteralPath (Join-Path $st 'desktop-user.txt') -Value $env:USERNAME -Encoding ASCII
-  $pyw = Join-Path (Split-Path -Parent $py) 'pythonw.exe'
-  if (-not (Test-Path $pyw)) { $pyw = $py }
+  if ($BUNDLED) {
+    # 程式資料夾只給SYSTEM與系統管理員，使用者身分的小幫手讀不到裡面的Python：另外複製一份到使用者自己的資料夾
+    foreach ($n in 'python', 'runtime') {
+      $d2 = Join-Path $hd $n
+      Stop-ScheduledTask -TaskName 'xConsole Desktop' -ErrorAction SilentlyContinue
+      if (Test-Path $d2) { Remove-Item -Recurse -Force $d2 -ErrorAction SilentlyContinue }
+      Copy-Item -Recurse -Force (Join-Path $WINRT $n) $d2
+    }
+    $pyw = Join-Path $hd 'python\pythonw.exe'
+  } else {
+    $pyw = Join-Path (Split-Path -Parent $py) 'pythonw.exe'
+    if (-not (Test-Path $pyw)) { $pyw = $py }
+  }
   $dn = 'xConsole Desktop'
   Stop-ScheduledTask -TaskName $dn -ErrorAction SilentlyContinue
   Unregister-ScheduledTask -TaskName $dn -Confirm:$false -ErrorAction SilentlyContinue
