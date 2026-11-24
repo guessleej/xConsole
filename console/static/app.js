@@ -4052,14 +4052,26 @@ function hfRepoOf(text) {
 const SETTINGS_TABS = [
   ["machines", "機器"], ["groups", "群組"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
   ["logs", "記錄"], ["users", "使用者帳號"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
+  ["modules", "企業版模組"],
 ];
+// 企業版模組的頁面：模組的前端檔呼叫XC.registerPage({key, label, render(wrap)}) 加在設定頁（只給管理員）
+const ENT_PAGES = [];
+window.XC = Object.freeze({
+  registerPage(p) {
+    if (!p || !/^[a-z][a-z0-9_]{0,31}$/.test(p.key || "") || typeof p.render !== "function" || ENT_PAGES.some((x) => x.key === p.key)) return false;
+    ENT_PAGES.push({ key: "ent_" + p.key, label: String(p.label || p.key).slice(0, 20), render: p.render });
+    if (S.view === "settings") render();
+    return true;
+  },
+  api: (path, opt) => api(path, opt), el, card, toast,
+});
 // 桌面版（一般人單機用）：只留會用到的，照先後排；機群、使用報告、品牌是管理一群機器才用的。
 // HTTPS 與憑證只在打開區網存取（別台電腦要連進來）時才有意義
 const DESKTOP_TABS = ["account", "engine", "update", "providers", "logs"];
 
 function settingsTabs() {
   if (!isAdmin()) return [["groups", "群組"], ["me", "我的帳號"]];
-  if (!S.appWindow) return SETTINGS_TABS;
+  if (!S.appWindow) return SETTINGS_TABS.concat(ENT_PAGES.map((p) => [p.key, p.label]));
   const keys = DESKTOP_TABS.concat(S.lanOn ? ["tls"] : []);
   return keys.map((k) => SETTINGS_TABS.find(([key]) => key === k));
 }
@@ -4073,7 +4085,67 @@ function viewSettings() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
-     users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand, me: myAccountInto }[tab] || settingsMachines)(wrap);
+     users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand, me: myAccountInto,
+     modules: settingsModules, ...Object.fromEntries(ENT_PAGES.map((p) => [p.key, p.render])) }[tab] || settingsMachines)(wrap);
+}
+
+/* ---------------------------------------------------------------- 企業版模組
+   云碩給的模組套件（zip）在這裡上傳：主控台驗過簽章、逐檔sha256、資料夾權限、核心API版本才換上並熱載入；
+   沒通過就維持原本的（沒有模組就是一般版），並寫出原因與修法。 */
+async function settingsModules(wrap) {
+  const v = S.view;
+  const c = card("企業版模組", "教育包、企業包等企業功能。沒有模組時就是一般版，所有核心功能照常");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  const draw = (st) => {
+    body.textContent = "";
+    if (st.loaded) {
+      body.appendChild(el("p", "note", `已載入：${st.name} ${st.version}（${st.routes}條路由${st.static ? "，含畫面" : ""}）`));
+    } else if (st.reason) {
+      body.appendChild(el("p", "note warn", `沒有載入，主控台以一般版執行：${st.reason}`));
+      if (st.fix) body.appendChild(el("p", "small muted", `怎麼處理：${st.fix}`));
+    } else {
+      body.appendChild(el("p", "note", "還沒有安裝企業版模組，主控台以一般版執行。"));
+    }
+    body.appendChild(el("p", "small muted", `核心API第${st.core_api}版；內建的云碩公鑰${st.keys}把。簽章是防止被竄改的模組被載入，授權由模組自己檢查。`));
+    const bar = el("div", "slot-actions");
+    const fFile = el("input");
+    fFile.type = "file";
+    fFile.accept = ".zip,application/zip";
+    const err = el("div");
+    const up = el("button", "btn sm primary", "上傳模組套件");
+    up.onclick = async () => {
+      const f = fFile.files[0];
+      if (!f) { errNote(err, "先選云碩給的模組套件（.zip）"); return; }
+      up.disabled = true;
+      try {
+        const res = await fetch("/api/modules/upload", { method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" }, body: f });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((j.error || `伺服器回 ${res.status}`) + (j.fix ? `。${j.fix}` : "") + (j.kept_previous ? "（已換回原本的模組）" : ""));
+        toast("模組已驗證並載入；重新整理頁面就會出現模組的畫面", "ok");
+        draw(j);
+      } catch (ex) { errNote(err, ex.message); }
+      up.disabled = false;
+    };
+    const re = el("button", "btn sm", "重新載入");
+    re.onclick = async () => { try { draw(await api("/api/modules/reload", { method: "POST", body: {} })); } catch (ex) { errNote(err, ex.message); } };
+    bar.append(fFile, up, re);
+    if (st.loaded || st.reason) {
+      const rm = el("button", "btn sm", "移除模組");
+      rm.onclick = () => modal({ title: "移除企業版模組", danger: true, confirmText: "移除", hasInput: true,
+        bodyNode: el("p", "small muted", "移除後主控台以一般版執行。模組存的資料留在資料庫裡，之後重新安裝同一個模組會接著用。"),
+        onConfirm: async () => { try { draw(await api("/api/modules/remove", { method: "POST", body: {} })); } catch (ex) { errNote(err, ex.message); } } });
+      bar.appendChild(rm);
+    }
+    body.append(bar, err);
+  };
+  loading(body);
+  let st;
+  try { st = await api("/api/modules"); } catch (ex) { errNote(body, ex.message); return; }
+  if (S.view !== v) return;
+  draw(st);
 }
 
 /* ---------------------------------------------------------------- 版本與更新
@@ -6518,6 +6590,13 @@ async function start() {
   if (S.me.must_change) { viewForcePassword(); return; }
   if (!isAdmin() && !navItems().some(([k]) => k === topOf(S.view))) S.view = myRole() === "user" ? "chat" : "home";
   checkTlsBanner();
+  // 企業版模組的畫面：模組有前端檔才載入（同源、CSP script-src 'self' 照舊）
+  if (S.me.ent?.loaded && S.me.ent.static && !document.getElementById("ent-js")) {
+    const sc = document.createElement("script");
+    sc.id = "ent-js";
+    sc.src = "/ent/static/main.js";
+    document.head.appendChild(sc);
+  }
   refresh();
   if (S.timer) clearInterval(S.timer);
   S.timer = setInterval(() => { if (!S.busy.size) refresh(); }, 15000);

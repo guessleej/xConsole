@@ -50,6 +50,8 @@ jobs:
         run: python agent/test_identity.py
       - name: Windows推理引擎的系統元件與錯誤（Visual C++執行階段、結束碼、智慧型應用程式控制）
         run: python agent/test_win_runtime.py
+      - name: 企業版模組的擴充合約（簽章、sha256、權限、core_api、路由scope、資料範圍與加密、網頁上傳）
+        run: python test/test_module_contract.py
       - name: Windows工作站執行環境包（檢查、上傳、從GitHub下載核對sha256、加入碼才拿得到、腳本寫死sha256）
         run: python console/test_winrt.py
       - name: 推薦清單

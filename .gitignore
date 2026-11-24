@@ -33,4 +33,7 @@ dist-report/
 desktop/build/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+console/enterprise/
+console/enterprise.staging/
+console/enterprise.prev/
 winrt/
