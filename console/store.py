@@ -94,6 +94,9 @@ class Store:
         for col, typ in (("fav", "INTEGER DEFAULT 0"), ("labels", "TEXT")):
             if col not in have:
                 self.db.execute(f"ALTER TABLE chats ADD COLUMN {col} {typ}")
+        # 舊版的帳號表沒有群組範圍：補欄位，空的＝不限群組（升級後每個人看到的跟以前一樣）
+        if "scope" not in {r[1] for r in self.db.execute("PRAGMA table_info(users)")}:
+            self.db.execute("ALTER TABLE users ADD COLUMN scope TEXT")
 
     # ---- 稽核
     def audit(self, user, ip, action, target="", ok=True, detail=None):
@@ -303,7 +306,7 @@ class Store:
 
     # ---- 帳號：密碼只存 PBKDF2 雜湊；角色每個請求重新查，降級或停用馬上生效
     USER_COLS = ("username", "display", "role", "source", "salt", "hash", "algo", "must_change", "disabled",
-                 "created", "pw_changed", "last_login")
+                 "created", "pw_changed", "last_login", "scope")
 
     def user_get(self, username):
         with self.lock:

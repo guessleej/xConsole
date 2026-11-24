@@ -152,10 +152,13 @@ function viewHome() {
   if (!n) {
     main.textContent = "";
     const wrap = el("div", "wrap");
-    const c = card("還沒有機器", "先把一台機器加進來，主控台會讀出它的顯示卡、記憶體與磁碟，算出能跑多大的模型");
-    const b = el("button", "btn primary", "加一台機器");
-    b.onclick = openAddMachine;
-    c.appendChild(b);
+    const c = isAdmin() ? card("還沒有機器", "先把一台機器加進來，主控台會讀出它的顯示卡、記憶體與磁碟，算出能跑多大的模型")
+      : card("還沒有機器", "你負責的群組裡還沒有機器；要加機器或調整你負責的群組，請找管理員");
+    if (isAdmin()) {
+      const b = el("button", "btn primary", "加一台機器");
+      b.onclick = openAddMachine;
+      c.appendChild(b);
+    }
     wrap.appendChild(c);
     main.appendChild(wrap);
     return;
@@ -168,10 +171,10 @@ function viewHome() {
   const ht = el("div", "hero-title");
   const rn = el("button", "hero-edit", "改名稱");
   rn.onclick = () => renameMachine(n);
-  ht.append(el("h1", null, n.name), rn);
+  ht.append(el("h1", null, n.name), ...(isAdmin() ? [rn] : []));
   hw.appendChild(ht);
   hw.appendChild(el("p", null, n.online ? [st.chip?.gpu, st.chip?.cpu].filter(Boolean).join("・") || "已連線"
-    : "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址"));
+    : isAdmin() ? "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址" : "連不上這台：請管理員確認機器有開、網路通"));
   const tiles = el("div", "tiles");
   const pool = st.pools?.unified || st.pools?.vram;
   tiles.append(
@@ -302,9 +305,10 @@ async function viewRun() {
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
   if (!n || !n.online) {
-    wrap.appendChild(el("p", "note warn", n ? `${n.name} 連不上，換一台或到設定看這台的位址。` : "還沒有機器。"));
+    wrap.appendChild(el("p", "note warn", !n ? "還沒有機器。" : isAdmin() ? `${n.name} 連不上，換一台或到設定看這台的位址。` : `${n.name} 連不上，換一台，或請管理員確認這台有開、網路通。`));
     return;
   }
+  if (!canOperate()) wrap.appendChild(el("p", "note", "你是檢視帳號：看得到這台在跑什麼、記憶體夠不夠；啟動、停止、換模型要維運或管理員。"));
   const holder = el("div", "stack");
   wrap.appendChild(holder);
   loading(holder);

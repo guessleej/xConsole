@@ -115,15 +115,53 @@ USER_ROUTES = [
     ("POST", r"/api/node/[\w.-]+/sd/jobs/[0-9a-f]{8}/(cancel|delete)"),
     ("POST", r"/api/keys/[0-9a-f]{8}/(update|revoke)"),
 ]
-_USER_ROUTES = [(m, re.compile(rx)) for m, rx in USER_ROUTES]
+# 檢視（清單 #10）：使用者能用的，再加上看得到機器狀態與群組（唯讀）。檔案瀏覽、API串接、記錄頁不給
+VIEWER_ROUTES = [
+    ("GET", r"/api/(groups|catalog)"),
+    ("GET", r"/api/node/[\w.-]+/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)"),
+    ("GET", r"/api/node/[\w.-]+/(logs|catalog)/[\w.-]+"),
+    ("GET", r"/api/node/[\w.-]+/slot/[\w.-]+/progress"),
+]
+# 維運：檢視能用的，再加上換模型、啟動停止重啟、套用情境、改群組設定。不能加機器、不能改帳號、不能下載或刪模型、不能改欄位
+OPERATOR_ROUTES = [
+    ("POST", r"/api/node/[\w.-]+/slot/[\w.-]+/(start|stop|restart|model)"),
+    ("POST", r"/api/node/[\w.-]+/(all/(start|stop|restart)|admit/[\w.-]+|profile/[\w.-]+)"),
+    ("POST", r"/api/node/[\w.-]+/slots/add"),         # 只限空欄位：這台還沒有欄位時，按「啟動模型」會先自動建一格
+    ("POST", r"/api/groups/[0-9a-f]{8}/update"),
+]
+ROLES = ("admin", "operator", "viewer", "user")
+ROLE_NAMES = {"admin": "管理員", "operator": "維運", "viewer": "檢視", "user": "使用者"}
+_ROLE_ROUTES = {r: [(m, re.compile(rx)) for m, rx in routes] for r, routes in {
+    "user": USER_ROUTES, "viewer": USER_ROUTES + VIEWER_ROUTES,
+    "operator": USER_ROUTES + VIEWER_ROUTES + OPERATOR_ROUTES}.items()}
 UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload")
 USER_KEYS_MAX = 3                  # 使用者自己能產生的有效金鑰上限（管理員發的不算）
 _KEY_LOCK = threading.Lock()
 
 
-def user_may(method, path):
-    return any(m == method and rx.fullmatch(path) for m, rx in _USER_ROUTES)
-ROLES = ("admin", "user")
+def user_may(method, path, role="user"):
+    """非管理員的這個角色能不能用這條路由。管理員不經過這裡；不認得的角色當成使用者（最少權限）。"""
+    return any(m == method and rx.fullmatch(path) for m, rx in _ROLE_ROUTES.get(role, _ROLE_ROUTES["user"]))
+
+
+def scope_of(row):
+    """這個帳號能管哪些群組（群組id的集合）。None＝不限；管理員一律不限。存的是id，群組改名不影響。"""
+    if not row or row.get("role") == "admin" or not row.get("scope"):
+        return None
+    try:
+        v = json.loads(row["scope"])
+    except ValueError:
+        return set()                        # 壞掉的值：什麼都不給，不要反而變成不限
+    return {str(x) for x in v} if isinstance(v, list) and v else None
+
+
+def node_group_id(node_id, cfg=None):
+    cfg = cfg or fleet()
+    n = next((x for x in cfg["nodes"] if x["id"] == node_id), None)
+    if n is None:
+        return None
+    name = n.get("group") or groups.DEFAULT
+    return next((g["id"] for g in cfg.get("groups", []) if g["name"] == name), None)
 _LOGIN_LOCK = threading.Lock()
 _THROTTLE_LOGGED = {}
 
@@ -429,7 +467,10 @@ def session_user(sid):
 
 
 def user_public(r):
-    return {k: r.get(k) for k in ("username", "display", "role", "must_change", "disabled", "created", "pw_changed", "last_login")}
+    out = {k: r.get(k) for k in ("username", "display", "role", "must_change", "disabled", "created", "pw_changed", "last_login")}
+    sc = scope_of(r)
+    out["scope"] = sorted(sc) if sc is not None else []
+    return out
 
 
 def one_time_password():
@@ -438,7 +479,8 @@ def one_time_password():
     return "".join(secrets.choice(abc) for _ in range(16))
 
 
-def user_fields(body, partial=False):
+def user_fields(body, partial=False, keep=()):
+    """keep：這個帳號原本範圍裡的群組id。群組刪了之後仍留在範圍裡（他才會什麼都看不到），存檔時照收，不擋。"""
     out = {}
     if not partial:
         u = str(body.get("username") or "").strip()
@@ -453,8 +495,14 @@ def user_fields(body, partial=False):
     if not partial or "role" in body:
         r = body.get("role", "user")
         if r not in ROLES:
-            return None, "角色只能是管理員（admin）或使用者（user）"
+            return None, "角色只能是管理員（admin）、維運（operator）、檢視（viewer）或使用者（user）"
         out["role"] = r
+    if not partial or "scope" in body:
+        sc = body.get("scope") or []
+        ids = {g["id"] for g in fleet().get("groups", [])} | set(keep)
+        if not isinstance(sc, list) or any(not isinstance(x, str) or x not in ids for x in sc):
+            return None, "群組範圍要是現有群組的清單；空的＝不限群組"
+        out["scope"] = json.dumps(sorted(set(sc))) if sc else None
     if partial and "disabled" in body:
         if not isinstance(body["disabled"], bool):
             return None, "disabled 要是 true 或 false"
@@ -470,7 +518,7 @@ def user_create(body, by):
         return 409, {"error": f"帳號 {f['username']} 已經有了"}
     pw = one_time_password()
     set_credentials(f["username"], pw, role=f["role"], must_change=True)
-    STORE.user_update(f["username"], {"display": f["display"]})
+    STORE.user_update(f["username"], {"display": f["display"], "scope": f["scope"]})
     return 200, {"ok": True, "user": user_public(STORE.user_get(f["username"])), "password": pw}
 
 
@@ -525,18 +573,19 @@ def _user_change(username, body, me):
     cur = STORE.user_get(username)
     if not cur:
         return 404, {"error": "沒有這個帳號"}
-    f, err = user_fields(body, partial=True)
+    f, err = user_fields(body, partial=True, keep=scope_of(cur) or ())
     if err:
         return 400, {"error": err}
-    losing_admin = cur["role"] == "admin" and not cur.get("disabled") and (f.get("role") == "user" or f.get("disabled") == 1)
+    losing_admin = cur["role"] == "admin" and not cur.get("disabled") and (f.get("role", "admin") != "admin" or f.get("disabled") == 1)
     if losing_admin and username == me:
         return 409, {"error": "不能停用或降級自己；請另一位管理員來做"}
     if losing_admin and STORE.admin_count() <= 1:
         return 409, {"error": "這是最後一位管理員，不能停用或降級"}
     STORE.user_update(username, f)
-    if f.get("disabled") == 1 or f.get("role") == "user":
-        STORE.session_end_all(username)              # 停用或降級：現有的登入馬上失效
-        cut_agent_tasks(username)                    # 進行中的 Agent 任務停掉，也不能再執行指令
+    if f.get("disabled") == 1 or (f.get("role") or cur["role"]) != cur["role"] or f.get("scope", cur.get("scope")) != cur.get("scope"):
+        STORE.session_end_all(username)              # 停用、換角色、改群組範圍：現有的登入馬上失效
+        cut_agent_tasks(username)                    # 進行中的 Agent 任務也停掉：不能在舊的機器與資料夾上繼續跑
+    if losing_admin:
         transfer_legacy_auth(username, me)
     return 200, {"ok": True, "user": user_public(STORE.user_get(username))}
 
@@ -1195,8 +1244,13 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
         return 502, {"error": f"連不上 {node['name']} 的代理：{msg}", "offline": True}
 
 
-def fleet_state():
+def fleet_state(scope=None):
+    """scope：限定群組的帳號只拿得到範圍內的機器與群組（None＝全部）。範圍外的連查都不查。"""
     cfg = fleet()
+    if scope is not None:
+        cfg = dict(cfg, groups=[g for g in cfg.get("groups", []) if g["id"] in scope])
+        names = {g["name"] for g in cfg["groups"]}
+        cfg["nodes"] = [n for n in cfg["nodes"] if (n.get("group") or groups.DEFAULT) in names]
     gmap = {g["name"]: g for g in cfg.get("groups", [])}
     nodes = []
     for n in cfg["nodes"]:
@@ -2236,30 +2290,54 @@ def gateway_url_ok(u):
     return bool(p.hostname) and (port is None or 1 <= port <= 65535) and not p.username and not p.password
 
 
-def key_slots_ok(slots):
-    """金鑰能用的模型：每一格的機器都要在納管清單裡（格子可以還沒建，之後建了就能用）。"""
+def key_slots_ok(slots, scope=None):
+    """金鑰能用的模型：每一格的機器都要在納管清單裡（格子可以還沒建，之後建了就能用）。
+    scope：限定群組的帳號只能選範圍內的機器，也不能選「全部」（之後加進來的機器會自動算進去）。"""
     if slots == "*":
+        return "你的帳號限定群組，請勾選要用的模型，不能選全部" if scope is not None else None
+    ok = scope_nodes(scope)
+    bad = [s for s in slots if s.split("/", 1)[0] not in ok]
+    if not bad:
         return None
-    ids = {n["id"] for n in fleet()["nodes"]}
-    bad = [s for s in slots if s.split("/", 1)[0] not in ids]
-    return f"這些機器不在納管清單裡：{', '.join(bad)[:120]}" if bad else None
+    lst = ", ".join(bad)[:120]
+    return f"這些機器不在你負責的群組裡：{lst}" if scope is not None else f"這些機器不在納管清單裡：{lst}"
+
+
+def scope_nodes(scope):
+    """範圍內的機器id。None＝全部納管的機器。"""
+    cfg = fleet()
+    if scope is None:
+        return {n["id"] for n in cfg["nodes"]}
+    names = {g["name"] for g in cfg.get("groups", []) if g["id"] in scope}
+    return {n["id"] for n in cfg["nodes"] if (n.get("group") or groups.DEFAULT) in names}
+
+
+def key_allowed(row):
+    """這把金鑰現在能用哪些格子（node/slot → True）。使用者自己的金鑰再套他「目前」的群組範圍：
+    管理員改了範圍，舊金鑰馬上跟著縮，不用等撤銷。"""
+    owner = STORE.user_get(row["owner"]) if row.get("owner") else None
+    ok = scope_nodes(scope_of(owner)) if owner and scope_of(owner) is not None else None
+    return lambda r: gateway.allows(row, f"{r['node']}/{r['slot']}") and (ok is None or r["node"] in ok)
 
 
 def keys_overview(owner=None):
+    """owner：使用者看自己的；模型名稱也只列他「目前」範圍內的機器上的，範圍外的不露。"""
+    sc = scope_of(STORE.user_get(owner)) if owner else None
+    ok = scope_nodes(sc) if sc is not None else None
     use = STORE.usage_by_key(gateway.month_start())
     zero = {"requests": 0, "errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
     return {"items": [gateway.public(r, use.get(r["id"], zero)) for r in STORE.key_list(owner)],
             "url": gateway_url(), "url_custom": bool((fleet().get("gateway") or {}).get("public_url")),
-            "models": sorted({r["name"] for r in GW_ROUTES.rows() if r.get("online")}),
+            "models": sorted({r["name"] for r in GW_ROUTES.rows() if r.get("online") and (ok is None or r["node"] in ok)}),
             "limits": {"name": gateway.NAME_MAX, "inflight": gateway.INFLIGHT_MAX, "default_inflight": gateway.DEFAULT_INFLIGHT}}
 
 
-def key_create(body, by, owner=None):
+def key_create(body, by, owner=None, scope=None):
     """回 (狀態碼, 回應, 稽核細節)。完整金鑰只在這次回傳，資料庫只留雜湊。"""
     f, err = gateway.check_fields(body)
     if err:
         return 400, {"error": err}, None
-    err = key_slots_ok(f["slots"])
+    err = key_slots_ok(f["slots"], scope)
     if err:
         return 400, {"error": err}, None
     key = gateway.new_key()
@@ -2271,7 +2349,7 @@ def key_create(body, by, owner=None):
         {"id": row["id"], "name": f["name"], "slots": f["slots"], "max_inflight": f["max_inflight"], "expires": f["expires"]}
 
 
-def key_update(kid, body):
+def key_update(kid, body, scope=None):
     cur = STORE.key_get(kid)
     if not cur:
         return 404, {"error": "沒有這把金鑰"}, None
@@ -2281,7 +2359,7 @@ def key_update(kid, body):
     if err:
         return 400, {"error": err}, None
     if "slots" in f:
-        err = key_slots_ok(f["slots"])
+        err = key_slots_ok(f["slots"], scope)
         if err:
             return 400, {"error": err}, None
     if not STORE.key_update(kid, f):            # 同時有人撤銷了它：條件式更新沒有改到任何一列
@@ -2960,12 +3038,13 @@ def computer_start(user, ip, body, audit):
     return computer.start(user, ip, node, model, body.get("goal"), label, cn, mc, audit)
 
 
-def agent_start(user, ip, body, can_exec=True):
-    """回 (狀態碼, 回應)。can_exec＝能不能用 run_command：一般使用者不能（服務帳號的命令列讀得到整台的金鑰與憑證）。"""
+def agent_start(user, ip, body, can_exec=True, may_node=lambda _n: True):
+    """回 (狀態碼, 回應)。can_exec＝能不能用 run_command：一般使用者不能（服務帳號的命令列讀得到整台的金鑰與憑證）。
+    may_node：限定群組的帳號，工作資料夾所在的機器與用的模型所在的機器都要在範圍內（範圍外當作沒有）。"""
     node = str(body.get("node") or "")
     folder = str(body.get("folder") or "")
     prompt = str(body.get("prompt") or "").strip()
-    if not any(n["id"] == node for n in fleet()["nodes"]):
+    if not any(n["id"] == node for n in fleet()["nodes"]) or not may_node(node):
         return 404, {"error": "沒有這台機器"}
     if not 1 <= len(prompt) <= 8000:
         return 400, {"error": "請寫要交代的事（最多 8000 字）"}
@@ -2981,7 +3060,7 @@ def agent_start(user, ip, body, can_exec=True):
     if m["kind"] == "local":
         slot = str(m.get("slot") or "")
         mnode = str(m.get("node") or node)
-        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]):
+        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]) or not may_node(mnode):
             return 400, {"error": "本機模型要指定欄位"}
         model, label = {"kind": "local", "node": mnode, "slot": slot}, f"本機 {mnode}/{slot}"
     else:
@@ -3129,13 +3208,33 @@ class Handler(BaseHTTPRequestHandler):
                 self._headers_done()
             self._json(403, {"error": "請先改密碼（管理員給的是一次性密碼）", "must_change": True})
             return True
-        if w and not self.is_admin and not user_may(method, path):
+        if w and not self.is_admin and not user_may(method, path, w.get("role")):
             if drain:
                 self._body(MAX_ANON_BODY)
                 self._headers_done()
-            self._json(403, {"error": "這個功能只有管理員能用", "admin_only": True})
+            msg = {"viewer": "檢視帳號只能看，不能操作", "operator": "這個功能要管理員；維運能換模型、啟動停止、套用群組設定"}
+            self._json(403, {"error": msg.get(w.get("role"), "這個功能只有管理員能用"), "admin_only": True})
             return True
+        # 物件層：限定群組的帳號，範圍外的機器與群組當作不存在（跟查別人的東西一樣回404，不洩漏有沒有）
+        sc = self.scope
+        if sc is not None:
+            m = re.match(r"/api/node/([\w.-]+)/", path)
+            g = re.match(r"/api/groups/([0-9a-f]{8})/", path)
+            if (m and node_group_id(m.group(1)) not in sc) or (g and g.group(1) not in sc):
+                if drain:
+                    self._body(MAX_ANON_BODY)
+                    self._headers_done()
+                self._json(404, {"error": "沒有這台機器" if m else "沒有這個群組"})
+                return True
         return False
+
+    @property
+    def scope(self):
+        return scope_of(self.who)
+
+    def _in_scope(self, node_id):
+        sc = self.scope
+        return sc is None or node_group_id(str(node_id or "")) in sc
 
     def _mine_folder(self, node_id, folder):
         """非管理員只能碰自己建的 Agent 資料夾（升級前建的、管理員連結的外部資料夾都沒有擁有者＝只有管理員能用）。"""
@@ -3297,7 +3396,8 @@ class Handler(BaseHTTPRequestHandler):
         if sub == "models":
             if row.get("source") != "selftest":
                 gateway_touch(row["id"], self.ip)
-            rows = [r for r in GW_ROUTES.rows() if r.get("online") and gateway.allows(row, f"{r['node']}/{r['slot']}")]
+            may = key_allowed(row)
+            rows = [r for r in GW_ROUTES.rows() if r.get("online") and may(r)]
             names = [r["name"] for r in rows]
             return self._json(200, {"object": "list", "data": [
                 {"id": r["name"], "object": "model", "created": 0, "owned_by": "xconsole",
@@ -3315,7 +3415,7 @@ class Handler(BaseHTTPRequestHandler):
         so = body.get("stream_options")
         if so is not None and not isinstance(so, dict):
             return self._oai(400, "stream_options 要是 JSON 物件", "invalid_request")
-        hit, err = GW_ROUTES.find(body["model"], allowed=lambda r: gateway.allows(row, f"{r['node']}/{r['slot']}"))
+        hit, err = GW_ROUTES.find(body["model"], allowed=key_allowed(row))
         if err:
             return self._oai(err[0], err[1], err[2])
         if sub in gateway.STRATA_PATHS and hit.get("kind") != "strata":
@@ -3506,7 +3606,7 @@ class Handler(BaseHTTPRequestHandler):
         msgs = [m for m in (body.get("messages") or []) if isinstance(m, dict) and m.get("role") in ("user", "assistant")][-20:]
         if not msgs:
             return self._json(400, {"error": "沒有問題"})
-        if not any(n["id"] == node_id for n in fleet()["nodes"]) or not re.fullmatch(r"[\w.-]{1,64}", slot_id):
+        if not any(n["id"] == node_id for n in fleet()["nodes"]) or not self._in_scope(node_id) or not re.fullmatch(r"[\w.-]{1,64}", slot_id):
             return self._json(404, {"error": "沒有這台機器或欄位"})
         extra = str(body.get("system") or "")[:8000].strip()
         try:
@@ -3788,6 +3888,7 @@ class Handler(BaseHTTPRequestHandler):
             w = self.who or {}
             return self._json(200, {"user": self.user, "role": w.get("role") or "admin", "display": w.get("display") or self.user,
                                     "must_change": bool(w.get("must_change")),
+                                    "scope": sorted(scope_of(w) or []),
                                     "app_window": bool(getattr(self, "loopback", False)),
                                     "lan_access": bool(fleet().get("lan_access")) if DESKTOP else True, "tls": {
                 "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
@@ -3804,7 +3905,7 @@ class Handler(BaseHTTPRequestHandler):
                             "trusted": os.path.exists(tf), "trust_fingerprint": fp})
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
-            return self._json(200, fleet_state())
+            return self._json(200, fleet_state(self.scope))
         if path == "/api/nodes/join-codes":
             return self._json(200, {"codes": JOINS.listing()})
         m = re.fullmatch(r"/api/nodes/join-code/([0-9a-f]{12})", path)
@@ -3959,7 +4060,10 @@ class Handler(BaseHTTPRequestHandler):
             for n in cfg["nodes"]:
                 count[n.get("group") or groups.DEFAULT] = count.get(n.get("group") or groups.DEFAULT, 0) + 1
             out = []
+            sc = self.scope
             for g in cfg.get("groups", []):
+                if sc is not None and g["id"] not in sc:
+                    continue
                 ms = group_members(g, cfg["nodes"])
                 out.append(dict(g, members=count.get(g["name"], 0), nodes=ms,
                                 ready=sum(1 for m in ms if m["prepared"] >= g["version"]),
@@ -4010,7 +4114,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"url": c.get("url") or "", "header": c.get("header") or "Authorization", "key_set": bool(c.get("key"))})
         if path == "/api/assistant/tools":
             node_id = (q.get("node") or [""])[0]
-            if not any(n["id"] == node_id for n in fleet()["nodes"]):
+            if not any(n["id"] == node_id for n in fleet()["nodes"]) or not self._in_scope(node_id):
                 return self._json(404, {"error": "沒有這台機器"})
             tools, folders = assist_toolset(self.user, self.is_admin, node_id)
             return self._json(200, {"tools": [t["function"]["name"] for t in tools], "folders": folders,
@@ -4241,6 +4345,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/(machine|slots/add|slot/[\w.-]+/(?:edit|delete)|profiles/save|profiles/[a-z][a-z0-9_-]{0,31}/delete|llama/build|llama/build/cancel|sd/build|sd/build/cancel)", path)
         if m:
+            if m.group(2) == "slots/add" and not self.is_admin:
+                # 維運只能建空欄位（啟動模型時自動建的那一格），不能登記既有服務（那要填服務名稱、埠、記錄檔）
+                if body.get("type") != "empty":
+                    return self._json(403, {"error": "維運只能建空欄位；登記這台已經在跑的服務要管理員"})
+                body = {k: body[k] for k in ("type", "role", "tier", "caps") if k in body}
             code, out = call_node(m.group(1), "/" + m.group(2), "POST", body, timeout=60)
             act = {"machine": "machine.settings", "slots/add": "slot.add", "profiles/save": "profile.save",
                    "llama/build": "llama.build", "llama/build/cancel": "llama.build_cancel",
@@ -4326,7 +4435,7 @@ class Handler(BaseHTTPRequestHandler):
                 code, out = (user_change(u, body, self.user) if act == "update" else user_reset(u) if act == "reset"
                              else user_remove(u, self.user))
                 self._audit("user." + act, u, code == 200,
-                            {k: body.get(k) for k in ("role", "disabled", "display") if k in body} | {"message": out.get("error")})
+                            {k: body.get(k) for k in ("role", "disabled", "display", "scope") if k in body} | {"message": out.get("error")})
                 return self._json(code, out)
             return self._json(404, {"error": "找不到"})
         # ---- 加密入口的金鑰
@@ -4335,14 +4444,14 @@ class Handler(BaseHTTPRequestHandler):
             with _KEY_LOCK:                              # 數有幾把與新增要一起做：同時送好幾個請求也超不過上限
                 if owner and sum(1 for k in STORE.key_list(owner=owner) if gateway.state(k) == "active") >= USER_KEYS_MAX:
                     return self._json(409, {"error": f"每個人最多 {USER_KEYS_MAX} 把有效的金鑰；請先撤銷用不到的"})
-                code, out, det = key_create(body, self.user, owner=owner)
+                code, out, det = key_create(body, self.user, owner=owner, scope=self.scope)
             self._audit("apikey.create", (det or {}).get("id", ""), code == 200, det or {"message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/keys/([0-9a-f]{8})/(update|revoke)", path)
         if m:
             if not self.is_admin and (STORE.key_get(m.group(1)) or {}).get("owner") != self.user:
                 return self._json(404, {"error": "沒有這把金鑰"})            # 別人的金鑰當作不存在
-            code, out, det = key_update(m.group(1), body) if m.group(2) == "update" else key_revoke(m.group(1), self.user)
+            code, out, det = key_update(m.group(1), body, self.scope) if m.group(2) == "update" else key_revoke(m.group(1), self.user)
             self._audit("apikey." + m.group(2), m.group(1), code == 200, det or {"message": out.get("error")})
             return self._json(code, out)
         if path == "/api/keys/settings":
@@ -4402,7 +4511,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/agent/tasks":
             if not self._mine_folder(str(body.get("node") or ""), body.get("folder")):
                 return self._json(404, {"error": "沒有這個工作資料夾"})
-            code, out = agent_start(self.user, self.ip, body, can_exec=self.is_admin)
+            code, out = agent_start(self.user, self.ip, body, can_exec=self.is_admin, may_node=self._in_scope)
             self._audit("agent.task_start", f"{body.get('node')}/{body.get('folder')}", code == 200,
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
@@ -4803,6 +4912,9 @@ class Handler(BaseHTTPRequestHandler):
                             n["group"] = groups.DEFAULT     # 機器不刪，移到「未分類」
                     groups.ensure(cfg)
                     out.update(code=200, name=old, moved=moved, revoked=JOINS.revoke_group(gid))
+                    return
+                if not self.is_admin and (body.get("name") not in (None, g["name"]) or body.get("kind") not in (None, g.get("kind"))):
+                    out.update(code=403, error="維運只能改群組設定（模型、上下文、套用時機）；改名與種類要管理員")
                     return
                 try:
                     name, changed = groups.update(g, body.get("name"), body.get("kind"), body.get("settings"),

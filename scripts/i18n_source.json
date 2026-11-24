@@ -4644,6 +4644,14 @@
 "pattern": false
 },
 {
+"zh": "你是維運：可以改群組設定（模型、上下文、套用時機）並套用；新增、刪除群組與加機器要管理員。",
+"pattern": false
+},
+{
+"zh": "你是檢視帳號：看得到群組設定與各台進度，改設定要維運或管理員。",
+"pattern": false
+},
+{
 "zh": "全部群組",
 "pattern": false
 },
@@ -4661,6 +4669,10 @@
 },
 {
 "zh": "編輯設定",
+"pattern": false
+},
+{
+"zh": "看設定",
 "pattern": false
 },
 {
@@ -5952,11 +5964,39 @@
 "pattern": false
 },
 {
+"zh": "維運",
+"pattern": false
+},
+{
+"zh": "檢視",
+"pattern": false
+},
+{
 "zh": "使用者",
 "pattern": false
 },
 {
-"zh": "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的 API 金鑰",
+"zh": "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）",
+"pattern": false
+},
+{
+"zh": "檢視（再加上看機器狀態與群組設定，不能操作）",
+"pattern": false
+},
+{
+"zh": "維運（再加上換模型、啟動停止、套用群組設定；不能加機器、改帳號）",
+"pattern": false
+},
+{
+"zh": "管理員（全部）",
+"pattern": false
+},
+{
+"zh": "（已刪除的群組）",
+"pattern": false
+},
+{
+"zh": "老師與學生各一個帳號；使用者只能用對話、Agent、畫圖、影片與自己的API金鑰，維運與檢視可以限定只管哪些群組",
 "pattern": false
 },
 {
@@ -5969,6 +6009,10 @@
 },
 {
 "zh": "角色",
+"pattern": false
+},
+{
+"zh": "負責群組",
 "pattern": false
 },
 {
@@ -6072,11 +6116,7 @@
 "pattern": false
 },
 {
-"zh": "使用者（對話、Agent、畫圖、影片、自己的 API 金鑰）",
-"pattern": false
-},
-{
-"zh": "管理員（全部）",
+"zh": "只看得到、只管得到勾選的群組裡的機器；都不勾＝全部群組",
 "pattern": false
 },
 {
@@ -6088,11 +6128,11 @@
 "pattern": false
 },
 {
-"zh": "已儲存；角色改了，他要重新登入",
+"zh": "已儲存；角色或負責群組改了，他要重新登入",
 "pattern": false
 },
 {
-"zh": "一行一個帳號，格式：帳號,顯示名稱,角色。角色填 admin 是管理員，不填或填 user 是使用者。一次最多 500 個。",
+"zh": "一行一個帳號，格式：帳號,顯示名稱,角色。角色填admin（管理員）、operator（維運）、viewer（檢視），不填或填user是使用者。負責群組匯入後再逐一設定。一次最多500個。",
 "pattern": false
 },
 {
@@ -7620,6 +7660,10 @@
 "pattern": false
 },
 {
+"zh": "你負責的群組裡還沒有機器；要加機器或調整你負責的群組，請找管理員",
+"pattern": false
+},
+{
 "zh": "改名稱",
 "pattern": false
 },
@@ -7629,6 +7673,10 @@
 },
 {
 "zh": "連不上這台的代理：確認機器有開、網路通，或到設定看這台的位址",
+"pattern": false
+},
+{
+"zh": "連不上這台：請管理員確認機器有開、網路通",
 "pattern": false
 },
 {
@@ -7704,6 +7752,10 @@
 "pattern": false
 },
 {
+"zh": "還沒有機器。",
+"pattern": false
+},
+{
 "zh": "{0} 連不上，換一台或到設定看這台的位址。",
 "pattern": true
 },
@@ -7712,7 +7764,15 @@
 "pattern": false
 },
 {
-"zh": "還沒有機器。",
+"zh": "{0} 連不上，換一台，或請管理員確認這台有開、網路通。",
+"pattern": true
+},
+{
+"zh": "連不上，換一台，或請管理員確認這台有開、網路通",
+"pattern": false
+},
+{
+"zh": "你是檢視帳號：看得到這台在跑什麼、記憶體夠不夠；啟動、停止、換模型要維運或管理員。",
 "pattern": false
 },
 {
@@ -10156,6 +10216,14 @@
 "pattern": false
 },
 {
+"zh": "這些機器不在你負責的群組裡：{0}",
+"pattern": true
+},
+{
+"zh": "這些機器不在你負責的群組裡",
+"pattern": false
+},
+{
 "zh": "這些機器不在納管清單裡：{0}",
 "pattern": true
 },
@@ -10392,6 +10460,14 @@
 "pattern": false
 },
 {
+"zh": "你的帳號限定群組，請勾選要用的模型，不能選全部",
+"pattern": false
+},
+{
+"zh": "這些機器不在你負責的群組裡：",
+"pattern": false
+},
+{
 "zh": "這些機器不在納管清單裡：",
 "pattern": false
 },
@@ -10528,7 +10604,11 @@
 "pattern": false
 },
 {
-"zh": "角色只能是管理員（admin）或使用者（user）",
+"zh": "角色只能是管理員（admin）、維運（operator）、檢視（viewer）或使用者（user）",
+"pattern": false
+},
+{
+"zh": "群組範圍要是現有群組的清單；空的＝不限群組",
 "pattern": false
 },
 {
@@ -10944,6 +11024,14 @@
 "pattern": false
 },
 {
+"zh": "檢視帳號只能看，不能操作",
+"pattern": false
+},
+{
+"zh": "這個功能要管理員；維運能換模型、啟動停止、套用群組設定",
+"pattern": false
+},
+{
 "zh": "金鑰不能放在網址裡，請放在 Authorization 標頭（Bearer）",
 "pattern": false
 },
@@ -11348,10 +11436,6 @@
 "pattern": false
 },
 {
-"zh": "這個功能只有管理員能用",
-"pattern": false
-},
-{
 "zh": "分塊的位置或大小不對",
 "pattern": false
 },
@@ -11425,6 +11509,10 @@
 },
 {
 "zh": "請求內容太大",
+"pattern": false
+},
+{
+"zh": "這個功能只有管理員能用",
 "pattern": false
 },
 {
@@ -11900,6 +11988,10 @@
 "pattern": false
 },
 {
+"zh": "沒有這個群組",
+"pattern": false
+},
+{
 "zh": "沒帶金鑰",
 "pattern": false
 },
@@ -11933,6 +12025,10 @@
 },
 {
 "zh": "新位址連不到這台的代理，已改回原本的位址",
+"pattern": false
+},
+{
+"zh": "維運只能建空欄位；登記這台已經在跑的服務要管理員",
 "pattern": false
 },
 {
@@ -11980,7 +12076,7 @@
 "pattern": false
 },
 {
-"zh": "沒有這個群組",
+"zh": "維運只能改群組設定（模型、上下文、套用時機）；改名與種類要管理員",
 "pattern": false
 },
 {
