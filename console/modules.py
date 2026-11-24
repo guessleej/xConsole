@@ -261,9 +261,11 @@ $root = $env:XC_MODULE_DIR
 $items = @((Get-Item -LiteralPath (Split-Path -Parent $root)), (Get-Item -LiteralPath $root)) + @(Get-ChildItem -LiteralPath $root -Recurse -Force)
 foreach ($i in $items) {
   if ($i.Attributes -band [IO.FileAttributes]::ReparsePoint) { "$($i.FullName) 是連結"; continue }
-  foreach ($a in (Get-Acl -LiteralPath $i.FullName).Access) {
+  # 用.NET讀ACL，不靠Get-Acl（Microsoft.PowerShell.Security模組在某些環境載不起來）
+  $acl = if ($i.PSIsContainer) { (New-Object IO.DirectoryInfo $i.FullName).GetAccessControl() } else { (New-Object IO.FileInfo $i.FullName).GetAccessControl() }
+  foreach ($a in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
     if ($a.AccessControlType -ne 'Allow') { continue }
-    try { $sid = $a.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $sid = "$($a.IdentityReference)" }
+    $sid = $a.IdentityReference.Value
     if ($ok -contains $sid) { continue }
     if (([int64]$a.FileSystemRights -band $mask) -ne 0) { "$($i.FullName) $($a.IdentityReference) 能寫" }
   }
@@ -276,7 +278,8 @@ def _win_acl_problems(d):
         # 路徑走環境變數：-Command模式不會把後面的參數放進$args
         r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", _PS_ACL],
                            capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace",
-                           env={**os.environ, "XC_MODULE_DIR": os.path.abspath(d)})
+                           # 拿掉PSModulePath：從PowerShell 7帶起的行程會傳下7版的模組路徑，Windows PowerShell 5.1吃到就載不了自己的模組
+                           env={**{k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}, "XC_MODULE_DIR": os.path.abspath(d)})
     except (OSError, subprocess.TimeoutExpired) as ex:
         return [f"查不了權限：{ex}"]
     if r.returncode != 0:
