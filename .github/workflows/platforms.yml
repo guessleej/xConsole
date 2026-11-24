@@ -184,7 +184,8 @@ jobs:
         run: powershell -NoProfile -ExecutionPolicy Bypass -File install\install.ps1 -PasswordFile "$env:RUNNER_TEMP\pw"
       - name: Windows：確認主控台、代理、桌面小幫手用的都是內附的Python
         if: runner.os == 'Windows'
-        shell: powershell
+        # pwsh（PowerShell 7）用UTF-8讀腳本；Windows PowerShell 5.1會把含中文的臨時腳本當ANSI讀，語法直接壞掉
+        shell: pwsh
         run: |
           foreach ($t in 'xConsole', 'xConsole Agent', 'xConsole Desktop') {
             $a = (Get-ScheduledTask -TaskName $t).Actions[0].Execute
