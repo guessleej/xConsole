@@ -99,10 +99,11 @@ def loading():
     load_case("有__pycache__（可能被換成別的位元碼）：不載入", "清單外",
               after=lambda d: (os.makedirs(os.path.join(d, "__pycache__")), open(os.path.join(d, "__pycache__", "x.pyc"), "wb").write(b"x")))
     load_case("核心API不相容：不載入", "核心API", core_api=[99])
+    # 故意做寬鬆權限的反例：用chmod指令，不用os.chmod常數（CodeQL連測試裡帶群組位元的常數也會報）
     if os.name != "nt":
-        load_case("別的帳號也能寫：不載入", "別的帳號也能寫", after=lambda d: os.chmod(os.path.join(d, "__init__.py"), 0o620))
+        load_case("別的帳號也能寫：不載入", "別的帳號也能寫", after=lambda d: subprocess.run(["chmod", "620", os.path.join(d, "__init__.py")], check=True))
         load_case("上一層資料夾別人能寫（能把整個模組換掉）：不載入", "別的帳號也能寫",
-                  after=lambda d: os.chmod(os.path.dirname(d), 0o770))
+                  after=lambda d: subprocess.run(["chmod", "770", os.path.dirname(d)], check=True))
         os.chmod(INSTALL, 0o700)
     else:
         load_case("別的帳號也能寫（Everyone）：不載入", "能寫",
