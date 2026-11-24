@@ -23524,6 +23524,246 @@
 "ja": "Windows の「スマート アプリ コントロール」によってブロックされました。デジタル署名のあるプログラムしか実行できず、この推論エンジンはオープンソースの公式版で署名がないため、この機能がオンの PC では現在実行できません。xCloudinfo は署名済みエンジンの提供を進めています。それまでは「Windows セキュリティ → アプリとブラウザーの制御」でスマート アプリ コントロールをオフにするしかありません（オフにすると Windows を再インストールしないと戻せません。会社や学校の PC は先に IT 担当に確認してください）。",
 "ko": "Windows '스마트 앱 컨트롤'에 의해 차단되었습니다. 디지털 서명된 프로그램만 실행되며, 이 추론 엔진은 오픈소스 공식 빌드라 서명이 없어 이 기능이 켜진 PC에서는 현재 실행할 수 없습니다. xCloudinfo가 서명된 엔진 제공을 준비 중이며, 그 전까지는 'Windows 보안 → 앱 및 브라우저 컨트롤'에서 스마트 앱 컨트롤을 꺼야만 사용할 수 있습니다(끄면 Windows를 다시 설치해야 다시 켤 수 있습니다. 회사나 학교 PC는 먼저 IT 담당자에게 확인하세요)."
 },
+"Windows執行環境已備妥（{0}，{1} MB）：那台不必先裝Python，也不必連pypi.org": {
+"en": "Windows runtime is ready ({0}, {1} MB): that PC needs no Python and no access to pypi.org",
+"ja": "Windows 実行環境の準備ができています（{0}、{1} MB）：そのマシンに Python は不要で、pypi.org への接続も不要です",
+"ko": "Windows 실행 환경이 준비되었습니다({0}, {1} MB): 그 PC에 Python을 설치할 필요도, pypi.org에 연결할 필요도 없습니다"
+},
+"Windows執行環境已備妥": {
+"en": "Windows runtime is ready",
+"ja": "Windows 実行環境の準備ができています",
+"ko": "Windows 실행 환경이 준비되었습니다"
+},
+"MB）：那台不必先裝Python，也不必連pypi.org": {
+"en": "MB): that PC needs no Python and no access to pypi.org",
+"ja": "MB）：そのマシンに Python は不要で、pypi.org への接続も不要です",
+"ko": "MB): 그 PC에 Python 설치나 pypi.org 연결이 필요 없습니다"
+},
+"正在從GitHub下載Windows執行環境…{0}": {
+"en": "Downloading the Windows runtime from GitHub… {0}",
+"ja": "GitHub から Windows 実行環境をダウンロード中…{0}",
+"ko": "GitHub에서 Windows 실행 환경을 다운로드하는 중… {0}"
+},
+"正在從GitHub下載Windows執行環境…": {
+"en": "Downloading the Windows runtime from GitHub…",
+"ja": "GitHub から Windows 実行環境をダウンロード中…",
+"ko": "GitHub에서 Windows 실행 환경을 다운로드하는 중…"
+},
+"主控台還沒備妥Windows執行環境：那台要先有Python 3.9以上並能連pypi.org。按「從GitHub下載」，或把正式版附的xconsole-runtime-<版本>-win-x64.zip上傳到這裡": {
+"en": "The console has no Windows runtime yet, so that PC needs Python 3.9+ and access to pypi.org. Click \"Download from GitHub\", or upload the release asset xconsole-runtime-<version>-win-x64.zip here.",
+"ja": "コンソールに Windows 実行環境がまだありません。そのマシンには Python 3.9 以上と pypi.org への接続が必要です。「GitHub からダウンロード」を押すか、正式版に付属の xconsole-runtime-<バージョン>-win-x64.zip をここにアップロードしてください",
+"ko": "콘솔에 아직 Windows 실행 환경이 없어 그 PC에 Python 3.9 이상과 pypi.org 연결이 필요합니다. 'GitHub에서 다운로드'를 누르거나 정식 버전에 포함된 xconsole-runtime-<버전>-win-x64.zip을 여기에 업로드하세요"
+},
+"（上次下載失敗：{0}）": {
+"en": " (last download failed: {0})",
+"ja": "（前回のダウンロードに失敗：{0}）",
+"ko": " (지난 다운로드 실패: {0})"
+},
+"上次下載失敗": {
+"en": "last download failed",
+"ja": "前回のダウンロードに失敗",
+"ko": "지난 다운로드 실패"
+},
+"從GitHub下載": {
+"en": "Download from GitHub",
+"ja": "GitHub からダウンロード",
+"ko": "GitHub에서 다운로드"
+},
+"上傳執行環境包": {
+"en": "Upload runtime package",
+"ja": "実行環境パッケージをアップロード",
+"ko": "실행 환경 패키지 업로드"
+},
+"先選xconsole-runtime-<版本>-win-x64.zip": {
+"en": "Choose xconsole-runtime-<version>-win-x64.zip first",
+"ja": "先に xconsole-runtime-<バージョン>-win-x64.zip を選んでください",
+"ko": "먼저 xconsole-runtime-<버전>-win-x64.zip을 선택하세요"
+},
+"那台不必先裝Python，也不必連pypi.org：腳本從主控台下載內附Python的執行環境，核對sha256後才解開": {
+"en": "That PC needs no Python and no access to pypi.org: the script downloads the runtime with bundled Python from the console and checks its SHA-256 before unpacking",
+"ja": "そのマシンに Python は不要で、pypi.org への接続も不要です：スクリプトがコンソールから Python 同梱の実行環境をダウンロードし、SHA-256 を照合してから展開します",
+"ko": "그 PC에 Python 설치나 pypi.org 연결이 필요 없습니다: 스크립트가 콘솔에서 Python이 포함된 실행 환경을 내려받아 SHA-256을 확인한 뒤 압축을 풉니다"
+},
+"主控台還沒備妥Windows執行環境時，那台要有Python 3.9以上並能連pypi.org（沒有的話會問要不要用winget安裝）；上面備妥之後再貼指令就不必": {
+"en": "Until the console has the Windows runtime, that PC needs Python 3.9+ and access to pypi.org (it offers to install Python with winget); once it is ready above, neither is needed",
+"ja": "コンソールに Windows 実行環境がない間は、そのマシンに Python 3.9 以上と pypi.org への接続が必要です（なければ winget でのインストールを提案します）。上で準備できた後は不要です",
+"ko": "콘솔에 Windows 실행 환경이 없는 동안에는 그 PC에 Python 3.9 이상과 pypi.org 연결이 필요합니다(없으면 winget 설치를 제안). 위에서 준비되면 필요 없습니다"
+},
+"只接受application/octet-stream，並要帶X-XConsole-Upload": {
+"en": "Only application/octet-stream with X-XConsole-Upload is accepted",
+"ja": "application/octet-stream と X-XConsole-Upload のみ受け付けます",
+"ko": "application/octet-stream과 X-XConsole-Upload만 허용됩니다"
+},
+"執行環境包要在 {0} MB以內": {
+"en": "The runtime package must be at most {0} MB",
+"ja": "実行環境パッケージは {0} MB 以内にしてください",
+"ko": "실행 환경 패키지는 {0} MB 이하여야 합니다"
+},
+"執行環境包要在": {
+"en": "The runtime package must be at most",
+"ja": "実行環境パッケージは",
+"ko": "실행 환경 패키지는"
+},
+"MB以內": {
+"en": "MB",
+"ja": "MB 以内",
+"ko": "MB 이하"
+},
+"執行環境包要在 ": {
+"en": "The runtime package must be at most ",
+"ja": "実行環境パッケージは ",
+"ko": "실행 환경 패키지는 "
+},
+" MB以內": {
+"en": " MB",
+"ja": " MB 以内",
+"ko": " MB 이하"
+},
+"加入碼不對、已經用完或過期，或主控台還沒準備好Windows執行環境。\n": {
+"en": "The join code is wrong, used up or expired, or the console has no Windows runtime yet.\n",
+"ja": "参加コードが違う、使い切った、期限切れ、またはコンソールに Windows 実行環境がまだありません。\n",
+"ko": "참가 코드가 틀렸거나 소진·만료되었거나, 콘솔에 아직 Windows 실행 환경이 없습니다.\n"
+},
+"檔案數太多": {
+"en": "Too many files",
+"ja": "ファイル数が多すぎます",
+"ko": "파일이 너무 많습니다"
+},
+"解開後太大": {
+"en": "Too large when unpacked",
+"ja": "展開後のサイズが大きすぎます",
+"ko": "압축을 풀면 너무 큽니다"
+},
+"這不是xConsole的Windows執行環境包（少了 {0}）": {
+"en": "This is not an xConsole Windows runtime package (missing {0})",
+"ja": "xConsole の Windows 実行環境パッケージではありません（{0} がありません）",
+"ko": "xConsole Windows 실행 환경 패키지가 아닙니다({0} 없음)"
+},
+"這不是xConsole的Windows執行環境包（少了": {
+"en": "This is not an xConsole Windows runtime package (missing",
+"ja": "xConsole の Windows 実行環境パッケージではありません（不足：",
+"ko": "xConsole Windows 실행 환경 패키지가 아닙니다(없음:"
+},
+"這不是xConsole的Windows執行環境包（少了 ": {
+"en": "This is not an xConsole Windows runtime package (missing ",
+"ja": "xConsole の Windows 実行環境パッケージではありません（不足：",
+"ko": "xConsole Windows 실행 환경 패키지가 아닙니다(없음: "
+},
+"不是zip檔": {
+"en": "Not a zip file",
+"ja": "zip ファイルではありません",
+"ko": "zip 파일이 아닙니다"
+},
+"壓縮檔裡有python／runtime以外的東西：{0}": {
+"en": "The archive has files outside python/ and runtime/: {0}",
+"ja": "アーカイブに python／runtime 以外のものがあります：{0}",
+"ko": "압축 파일에 python/runtime 외의 항목이 있습니다: {0}"
+},
+"壓縮檔裡有python／runtime以外的東西": {
+"en": "The archive has files outside python/ and runtime/",
+"ja": "アーカイブに python／runtime 以外のものがあります",
+"ko": "압축 파일에 python/runtime 외의 항목이 있습니다"
+},
+"壓縮檔裡有python／runtime以外的東西：": {
+"en": "The archive has files outside python/ and runtime/: ",
+"ja": "アーカイブに python／runtime 以外のものがあります：",
+"ko": "압축 파일에 python/runtime 외의 항목이 있습니다: "
+},
+"壓縮檔裡有連結檔：{0}": {
+"en": "The archive contains a link: {0}",
+"ja": "アーカイブにリンクファイルがあります：{0}",
+"ko": "압축 파일에 링크 파일이 있습니다: {0}"
+},
+"壓縮檔裡有連結檔": {
+"en": "The archive contains a link",
+"ja": "アーカイブにリンクファイルがあります",
+"ko": "압축 파일에 링크 파일이 있습니다"
+},
+"壓縮檔裡有連結檔：": {
+"en": "The archive contains a link: ",
+"ja": "アーカイブにリンクファイルがあります：",
+"ko": "압축 파일에 링크 파일이 있습니다: "
+},
+"上傳": {
+"en": "Upload",
+"ja": "アップロード",
+"ko": "업로드"
+},
+"GitHub的v{0} 沒有 {1}（這一版還沒有Windows執行環境包）": {
+"en": "GitHub release v{0} has no {1} (this version has no Windows runtime package yet)",
+"ja": "GitHub の v{0} に {1} がありません（このバージョンにはまだ Windows 実行環境パッケージがありません）",
+"ko": "GitHub v{0}에 {1}이(가) 없습니다(이 버전에는 아직 Windows 실행 환경 패키지가 없습니다)"
+},
+"GitHub的v": {
+"en": "GitHub release v",
+"ja": "GitHub の v",
+"ko": "GitHub v"
+},
+"這一版還沒有Windows執行環境包": {
+"en": "this version has no Windows runtime package yet",
+"ja": "このバージョンにはまだ Windows 実行環境パッケージがありません",
+"ko": "이 버전에는 아직 Windows 실행 환경 패키지가 없습니다"
+},
+"（這一版還沒有Windows執行環境包）": {
+"en": " (this version has no Windows runtime package yet)",
+"ja": "（このバージョンにはまだ Windows 実行環境パッケージがありません）",
+"ko": "(이 버전에는 아직 Windows 실행 환경 패키지가 없습니다)"
+},
+"{0} 沒有GitHub公布的sha256，不下載": {
+"en": "{0} has no SHA-256 published by GitHub; not downloading",
+"ja": "{0} には GitHub 公開の sha256 がないため、ダウンロードしません",
+"ko": "{0}에 GitHub가 공개한 sha256이 없어 다운로드하지 않습니다"
+},
+"沒有GitHub公布的sha256，不下載": {
+"en": "has no SHA-256 published by GitHub; not downloading",
+"ja": "GitHub 公開の sha256 がないため、ダウンロードしません",
+"ko": "GitHub가 공개한 sha256이 없어 다운로드하지 않습니다"
+},
+" 沒有GitHub公布的sha256，不下載": {
+"en": " has no SHA-256 published by GitHub; not downloading",
+"ja": " には GitHub 公開の sha256 がないため、ダウンロードしません",
+"ko": "에 GitHub가 공개한 sha256이 없어 다운로드하지 않습니다"
+},
+" 沒有 ": {
+"en": " has no ",
+"ja": " に次がありません：",
+"ko": " 에 없음: "
+},
+"已經在下載了": {
+"en": "Already downloading",
+"ja": "すでにダウンロード中です",
+"ko": "이미 다운로드 중입니다"
+},
+"不知道主控台的版本，無法對應GitHub正式版；請改用上傳": {
+"en": "The console version is unknown, so it cannot match a GitHub release; please upload instead",
+"ja": "コンソールのバージョンが不明なため GitHub の正式版に対応できません。アップロードを使ってください",
+"ko": "콘솔 버전을 알 수 없어 GitHub 정식 버전과 맞출 수 없습니다. 업로드를 사용하세요"
+},
+"下載的檔sha256跟GitHub公布的不一樣，已丟掉": {
+"en": "The downloaded file's SHA-256 does not match GitHub's; discarded",
+"ja": "ダウンロードしたファイルの sha256 が GitHub 公開のものと一致しないため破棄しました",
+"ko": "다운로드한 파일의 sha256이 GitHub 공개 값과 달라 폐기했습니다"
+},
+"執行環境包太大": {
+"en": "The runtime package is too large",
+"ja": "実行環境パッケージが大きすぎます",
+"ko": "실행 환경 패키지가 너무 큽니다"
+},
+"壓縮檔內容損壞：{0}": {
+"en": "The archive contents are corrupted: {0}",
+"ja": "アーカイブの内容が破損しています：{0}",
+"ko": "압축 파일 내용이 손상되었습니다: {0}"
+},
+"壓縮檔內容損壞": {
+"en": "The archive contents are corrupted",
+"ja": "アーカイブの内容が破損しています",
+"ko": "압축 파일 내용이 손상되었습니다"
+},
+"壓縮檔內容損壞：": {
+"en": "The archive contents are corrupted: ",
+"ja": "アーカイブの内容が破損しています：",
+"ko": "압축 파일 내용이 손상되었습니다: "
+},
 "企業版模組": {
 "en": "Enterprise module",
 "ja": "エンタープライズモジュール",
@@ -23649,11 +23889,6 @@
 "ja": "エンタープライズモジュール：{0} {1}（{2}件のルート）",
 "ko": "엔터프라이즈 모듈: {0} {1} ({2}개 라우트)"
 },
-"只接受application/octet-stream，並要帶X-XConsole-Upload": {
-"en": "Only application/octet-stream is accepted, and X-XConsole-Upload must be included",
-"ja": "application/octet-stream のみ受け付けます。X-XConsole-Upload を付ける必要があります",
-"ko": "application/octet-stream만 허용하며 X-XConsole-Upload를 포함해야 합니다"
-},
 "模組套件要在{0} MB以內": {
 "en": "The module package must be within {0} MB",
 "ja": "モジュールパッケージは {0} MB 以内にしてください",
@@ -23663,11 +23898,6 @@
 "en": "The module package must be within ",
 "ja": "モジュールパッケージは ",
 "ko": "모듈 패키지는 "
-},
-"MB以內": {
-"en": "MB",
-"ja": "MB 以内にしてください",
-"ko": "MB 이내여야 합니다"
 },
 "個人版（桌面版）不載入企業版模組": {
 "en": "The personal edition (desktop) does not load enterprise modules",
@@ -23699,11 +23929,6 @@
 "ja": "エンタープライズモジュールは読み込まれず、オープンソースコアで起動しました",
 "ko": "엔터프라이즈 모듈이 로드되지 않아 오픈소스 코어로 시작했습니다"
 },
-" MB以內": {
-"en": " MB",
-"ja": "MB 以内にしてください",
-"ko": " MB 이내여야 합니다"
-},
 "企業版模組沒有載入，以開源核心啟動：": {
 "en": "The enterprise module was not loaded; started with the open-source core: ",
 "ja": "エンタープライズモジュールは読み込まれず、オープンソースコアで起動しました：",
@@ -23718,16 +23943,6 @@
 "en": "Unable to check permissions",
 "ja": "権限を確認できません",
 "ko": "권한을 확인할 수 없습니다"
-},
-"檔案數太多": {
-"en": "Too many files",
-"ja": "ファイル数が多すぎます",
-"ko": "파일 수가 너무 많습니다"
-},
-"解開後太大": {
-"en": "Too large after extraction",
-"ja": "展開後のサイズが大きすぎます",
-"ko": "압축 해제 후 크기가 너무 큽니다"
 },
 "資料表名稱不合法：{0}": {
 "en": "Invalid table name: {0}",
@@ -23929,21 +24144,6 @@
 "ja": "コンソールとモジュールを互換性のあるバージョンに更新してください",
 "ko": "콘솔과 모듈을 호환되는 버전으로 업데이트하세요"
 },
-"不是zip檔": {
-"en": "Not a zip file",
-"ja": "zip ファイルではありません",
-"ko": "zip 파일이 아닙니다"
-},
-"壓縮檔裡有連結檔：{0}": {
-"en": "The archive contains a symbolic link: {0}",
-"ja": "アーカイブ内にリンクファイルがあります：{0}",
-"ko": "압축 파일 안에 링크 파일이 있습니다: {0}"
-},
-"壓縮檔裡有連結檔": {
-"en": "The archive contains a symbolic link",
-"ja": "アーカイブ内にリンクファイルがあります",
-"ko": "압축 파일 안에 링크 파일이 있습니다"
-},
 "模組資料一定要加密才寫入": {
 "en": "Module data must be encrypted before it is written",
 "ja": "モジュールのデータは暗号化してから書き込む必要があります",
@@ -24103,11 +24303,6 @@
 "en": "; this core version is ",
 "ja": "、このコアのバージョンは ",
 "ko": ", 이 코어 버전은 "
-},
-"壓縮檔裡有連結檔：": {
-"en": "The archive contains a symbolic link: ",
-"ja": "アーカイブ内にリンクファイルがあります：",
-"ko": "압축 파일 안에 링크 파일이 있습니다: "
 },
 " 的擁有者不是root或主控台的帳號": {
 "en": " is not owned by root or the console's account",

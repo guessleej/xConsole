@@ -51,6 +51,8 @@ jobs:
         run: cd console && python test_groups.py
       - name: 群組加入碼（可用次數、有效時間、名稱樣板、限定網段、作廢、主控台重啟後仍有效）
         run: cd console && python test_joincodes.py
+      - name: Windows工作站執行環境包（檢查、上傳、從GitHub下載核對sha256、加入碼才拿得到、腳本寫死sha256）
+        run: cd console && python test_winrt.py
       - name: 靜默安裝（加入碼只收標準輸入或回應檔、釘主控台憑證、-JoinCode 一律拒絕）
         run: python test/test_silent_install.py
       - name: 服務使用報告

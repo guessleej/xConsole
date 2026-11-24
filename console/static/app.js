@@ -5669,6 +5669,62 @@ async function machineInfo(nid, fresh) {
   return S.minfo[nid];
 }
 
+// Windows工作站執行環境（內附Python與相依、Visual C++執行階段）：主控台備妥之後，「加一台機器」的Windows腳本從主控台拿，
+// 那台不必先裝Python、不必連pypi.org。來源：依主控台版本從GitHub下載（核對sha256），或在這裡上傳（主控台不能連外時）
+function winrtBox(rt) {
+  const box = el("div");
+  const line = el("p", "note");
+  const acts = el("div", "slot-actions");
+  const err = el("p", "small");
+  box.append(line, acts, err);
+  let timer = null;
+  const draw = (s) => {
+    const job = s.job || {};
+    line.className = "note" + (s.ready ? "" : " warn");
+    line.textContent = s.ready ? `Windows執行環境已備妥（${s.version}，${fmt((s.size || 0) / 1048576, 0)} MB）：那台不必先裝Python，也不必連pypi.org`
+      : job.state === "downloading" ? `正在從GitHub下載Windows執行環境…${job.got ? fmt(job.got / 1048576, 0) + " MB" : ""}`
+        : "主控台還沒備妥Windows執行環境：那台要先有Python 3.9以上並能連pypi.org。按「從GitHub下載」，或把正式版附的xconsole-runtime-<版本>-win-x64.zip上傳到這裡"
+          + (job.state === "failed" ? `（上次下載失敗：${job.error}）` : "");
+    acts.hidden = !!s.ready || job.state === "downloading";
+  };
+  const poll = async () => {
+    clearTimeout(timer);
+    if (!box.isConnected) return;
+    let s;
+    try { s = await api("/api/winrt"); } catch (_) { return; }
+    draw(s);
+    if (s.job?.state === "downloading") timer = setTimeout(poll, 2000);
+  };
+  const dl = el("button", "btn sm", "從GitHub下載");
+  dl.onclick = async () => {
+    errNote(err, "");
+    try { await api("/api/winrt/fetch", { method: "POST", body: {} }); } catch (ex) { errNote(err, ex.message); }
+    poll();
+  };
+  const fFile = el("input");
+  fFile.type = "file";
+  fFile.accept = ".zip,application/zip";
+  const ub = el("button", "btn sm", "上傳執行環境包");
+  ub.onclick = async () => {
+    const f = fFile.files[0];
+    if (!f) { errNote(err, "先選xconsole-runtime-<版本>-win-x64.zip"); return; }
+    ub.disabled = true;
+    try {
+      const res = await fetch("/api/winrt/upload", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1" }, body: f });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `伺服器回 ${res.status}`);
+      errNote(err, "");
+    } catch (ex) { errNote(err, ex.message); }
+    ub.disabled = false;
+    poll();
+  };
+  acts.append(dl, fFile, ub);
+  draw(rt || {});
+  if (rt?.job?.state === "downloading") timer = setTimeout(poll, 2000);
+  return box;
+}
+
 function openAddMachine(group) {
   const body = el("div");
   body.appendChild(el("p", "small muted",
@@ -5719,9 +5775,11 @@ function openAddMachine(group) {
         det.appendChild(el("summary", null, "這行指令實際做什麼（解碼後的原文）"));
         det.appendChild(el("pre", "log", r.command_windows_text));
         osBox.appendChild(det);
+        osBox.appendChild(winrtBox(r.winrt));
         ["以系統管理員身分執行：裝成開機自動啟動（不必有人登入），並在防火牆開 9401（主控台連代理）與 8090～8289（模型 API）；"
           + "一般身分執行：只在這個帳號登入後才跑，防火牆要另外請管理員開",
-        "那台要有 Python 3.9 以上；沒有的話會問要不要用 winget 自動安裝",
+        r.winrt?.ready ? "那台不必先裝Python，也不必連pypi.org：腳本從主控台下載內附Python的執行環境，核對sha256後才解開"
+          : "主控台還沒備妥Windows執行環境時，那台要有Python 3.9以上並能連pypi.org（沒有的話會問要不要用winget安裝）；上面備妥之後再貼指令就不必",
         "llama.cpp 不用自己編：加入後在「這台的設定」按一鍵安裝，會依顯示卡下載官方預編譯版（NVIDIA 用 CUDA、AMD／Intel 用 Vulkan）",
         "下載時只接受主控台這一張憑證（比對整張憑證的 SHA-256），不是關掉驗證"].forEach((t) => need.appendChild(el("li", null, t)));
       } else if (k === "silent") {
