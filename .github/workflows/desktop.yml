@@ -73,7 +73,30 @@ jobs:
           $cfg = @{ bundle = @{ windows = @{ certificateThumbprint = $c.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5 -Compress
           Set-Content -Path (Join-Path $env:RUNNER_TEMP 'sign.json') -Value $cfg -Encoding ascii
           "config=$env:RUNNER_TEMP\sign.json" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "thumbprint=$($c.Thumbprint)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "會用這張憑證簽章：$($c.Subject)（到期 $($c.NotAfter)）"
+      - name: 內附的每個執行檔與DLL都簽章（Windows 11的智慧型應用程式控制會擋沒有簽章的python.exe與套件的 .pyd）
+        if: runner.os == 'Windows' && steps.sign.outputs.thumbprint != ''
+        shell: pwsh
+        env:
+          THUMB: ${{ steps.sign.outputs.thumbprint }}
+        run: |
+          $st = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          if (-not $st) { throw '找不到signtool.exe' }
+          $files = Get-ChildItem desktop\build\payload -Recurse -Include *.exe,*.dll,*.pyd
+          $todo = $files | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }   # 微軟的執行階段本來就有簽章，不重簽
+          Write-Host "內附 $($files.Count) 個執行檔與DLL，要簽 $($todo.Count) 個"
+          $todo | ForEach-Object { $_.FullName } | Set-Content -Path "$env:RUNNER_TEMP\sign-list.txt" -Encoding utf8
+          # 一次簽一批（signtool一次可以收很多檔），時間戳記讓憑證到期後簽章仍有效
+          $batch = @()
+          foreach ($f in $todo) {
+            $batch += $f.FullName
+            if ($batch.Count -ge 50) { & $st.FullName sign /sha1 $env:THUMB /fd sha256 /tr http://timestamp.digicert.com /td sha256 $batch; if ($LASTEXITCODE) { throw '簽章失敗' }; $batch = @() }
+          }
+          if ($batch.Count) { & $st.FullName sign /sha1 $env:THUMB /fd sha256 /tr http://timestamp.digicert.com /td sha256 $batch; if ($LASTEXITCODE) { throw '簽章失敗' } }
+          $bad = Get-ChildItem desktop\build\payload -Recurse -Include *.exe,*.dll,*.pyd | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
+          if ($bad) { $bad | Select-Object -First 10 | ForEach-Object { Write-Host "沒簽到：$($_.FullName)" }; throw "還有 $($bad.Count) 個檔沒有有效簽章" }
+          Write-Host '內附的執行檔與DLL全部有有效簽章' 
       - name: 建安裝檔
         shell: bash
         working-directory: desktop/src-tauri
@@ -123,6 +146,11 @@ jobs:
           Start-Process $setup.FullName -ArgumentList '/S' -Wait
           $exe = Join-Path $env:LOCALAPPDATA 'xConsole\xConsole.exe'
           if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA 'xConsole') -EA SilentlyContinue; throw "裝完找不到 $exe" }
+          $rt = Join-Path $env:LOCALAPPDATA 'xConsole\payload\runtime'
+          foreach ($n in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'vcomp140.dll') {
+            if (-not (Test-Path (Join-Path $rt $n))) { throw "裝好的程式少了Visual C++執行階段 $n（推理引擎在新裝的Windows上會起不來）" }
+          }
+          Write-Host '內附Visual C++執行階段：' ((Get-ChildItem $rt).Name -join ', ')
           $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
           if ((Get-MpComputerStatus -ErrorAction SilentlyContinue).AntivirusEnabled) {
             & $mp -Scan -ScanType 3 -File (Join-Path $env:LOCALAPPDATA 'xConsole') -DisableRemediation | Out-Host
@@ -147,6 +175,19 @@ jobs:
           $left = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*xconsole_server.py*' -or $_.CommandLine -like '*xconsole_agent.py*' }
           if ($left) { $left | Select-Object ProcessId, CommandLine | Format-List; throw '應用程式結束後還留著主控台或代理' }
           Write-Host '應用程式結束後，主控台與代理都跟著結束'
+          # 背景服務起不來（例如被智慧型應用程式控制擋下）：啟動器要停手並寫下原因，不能每兩秒重試一次讓Windows一直跳通知
+          $py = Join-Path $env:LOCALAPPDATA 'xConsole\payload\python\python.exe'
+          Rename-Item $py 'python.exe.off'
+          $ll = Join-Path $env:LOCALAPPDATA 'tw.xcloudinfo.xconsole\.xconsole\launcher.log'
+          Remove-Item $ll -EA SilentlyContinue
+          $p = Start-Process $exe -ArgumentList '--hidden' -PassThru
+          $stopped = $false
+          foreach ($i in 1..30) { Start-Sleep 2; if ((Test-Path $ll) -and (Select-String -Path $ll -Pattern '停止重試' -Quiet)) { $stopped = $true; break } }
+          Get-Content $ll -EA SilentlyContinue
+          Stop-Process -Id $p.Id -Force -EA SilentlyContinue
+          Rename-Item "$py.off" 'python.exe'
+          if (-not $stopped) { throw '背景服務起不來時，啟動器沒有停止重試' }
+          Write-Host '背景服務起不來：啟動器停止重試並寫下原因'
           $un = Join-Path $env:LOCALAPPDATA 'xConsole\uninstall.exe'
           Start-Process $un -ArgumentList '/S' -Wait
           if (Test-Path $exe) { throw '解除安裝後程式還在' }

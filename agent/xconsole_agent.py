@@ -1328,9 +1328,17 @@ class Supervisor:
         env = llama_launch_env(raw["exe"], reg, raw.get("gpus"))
         kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
               else {"start_new_session": True})
+        win_crt_fill(os.path.dirname(raw["exe"]))      # 舊版裝的引擎沒補過執行階段：啟動前補
         with open(m["log"], "ab") as log:
-            p = subprocess.Popen([str(a) for a in argv], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                 env=env, cwd=os.path.dirname(raw["exe"]) or None, **kw)
+            try:
+                p = subprocess.Popen([str(a) for a in argv], stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                     env=env, cwd=os.path.dirname(raw["exe"]) or None, **kw)
+            except OSError as ex:
+                hint = win_block_hint(ex)
+                if hint:
+                    log.write(f"\n[xConsole] {hint}\n".encode("utf-8"))
+                    raise OSError(hint) from ex
+                raise
         self.procs[unit] = p
         self._put(unit, pid=p.pid, image=proc_image(p.pid) or None)
         self.st.setdefault(unit, {}).update(want=True, failed=False, restart_at=None)
@@ -1437,6 +1445,13 @@ class Supervisor:
                     if p.returncode == 0:
                         st["want"] = False                     # Restart=on-failure：正常結束不重開
                         continue
+                    hint = win_exit_hint(p.returncode)
+                    if hint:                                   # 記錄頁看得到原因，不只是一個結束碼
+                        try:
+                            with open((self._meta().get(unit) or {}).get("log") or os.devnull, "a", encoding="utf-8") as fh:
+                                fh.write(f"\n[xConsole] 引擎結束（0x{p.returncode & 0xFFFFFFFF:08X}）：{hint}\n")
+                        except OSError:
+                            pass
                     self._crashed(unit, st, now)
                 # 代理重開後認回來的（不是這次帶起來的，拿不到結束碼）：不見了就當成異常結束
                 for unit, m in self._meta().items():
@@ -5595,6 +5610,71 @@ def _build_run(st, pre, log, kind="llama"):
         _BUILD["thread_alive"] = False
 
 
+# ---- Windows：推理引擎要的系統元件與看得懂的錯誤
+# llama.cpp／stable-diffusion.cpp的Windows版要Visual C++執行階段（CPU版另外要OpenMP的vcomp140.dll）。
+# 新裝的Windows常常沒有，引擎直接起不來（結束碼0xC0000135，沒有任何訊息）。LocModel這類一鍵安裝的軟體都自己帶著：
+# 桌面版把這幾個檔放在payload/runtime/（建置時從建置機的System32抄，微軟允許隨程式散布），這裡在系統沒有時補進引擎資料夾。
+WIN_CRT = ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll",
+           "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll", "concrt140.dll", "vcomp140.dll")
+
+
+def win_crt_dirs():
+    """內附的執行階段檔可能放在哪：桌面版的payload/runtime/，以及內附Python自己的資料夾（有vcruntime140）。"""
+    py = os.path.dirname(os.path.abspath(sys.executable))
+    return [os.path.join(os.path.dirname(py), "runtime"), py]
+
+
+def win_crt_fill(folder, system=None, sources=None):
+    """系統（System32）沒有的執行階段檔，從內附的那份補進引擎資料夾。系統有的不動（系統那份比較新）。回補了哪些檔。"""
+    if OS != "windows" and system is None:
+        return []
+    system = system or os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    added = []
+    for name in WIN_CRT:
+        if os.path.exists(os.path.join(system, name)) or os.path.exists(os.path.join(folder, name)):
+            continue
+        src = next((os.path.join(d, name) for d in (sources or win_crt_dirs()) if os.path.isfile(os.path.join(d, name))), None)
+        if src:
+            try:
+                shutil.copy2(src, os.path.join(folder, name))
+                added.append(name)
+            except OSError:
+                pass
+    return added
+
+
+# Windows的結束碼與錯誤碼翻成人話（引擎起不來時畫面上只有一個數字，使用者不知道要裝什麼）
+WIN_EXIT = {
+    0xC0000135: "缺少系統元件（Visual C++執行階段或顯示卡驅動附的DLL）。xConsole會自動補Visual C++執行階段；"
+                "還是不行的話，多半是顯示卡驅動沒裝好，請到顯示卡廠商網站裝最新驅動",
+    0xC0000139: "系統元件的版本太舊（找不到需要的函式）。請執行Windows Update，並更新顯示卡驅動",
+    0xC000001D: "這顆CPU不支援引擎用到的指令集。請到「設定 → 推理引擎」改裝CPU相容版",
+    0xC0000005: "引擎啟動時記憶體存取錯誤，多半是顯示卡驅動太舊。請更新顯示卡驅動後再試",
+}
+
+
+def win_exit_hint(rc):
+    if rc is None or OS != "windows":
+        return None
+    return WIN_EXIT.get(rc & 0xFFFFFFFF)
+
+
+def win_block_hint(ex):
+    """被Windows的應用程式控制擋下（智慧型應用程式控制4551、群組原則1260）：講清楚是誰擋、現在能怎麼做。
+    不叫人去裝不存在的東西：xConsole目前下載的是開源專案的官方引擎，沒有簽章版可以改裝。"""
+    code = getattr(ex, "winerror", None)
+    if code in (4551, 1260):
+        return ("被Windows的「智慧型應用程式控制」擋下：它只讓有數位簽章的程式執行，這個推理引擎是開源專案的官方版，沒有簽章，"
+                "所以在開著這項功能的電腦上目前無法執行。云碩正在改為提供簽章過的引擎；在那之前，要用就只能到"
+                "「Windows安全性 → 應用程式與瀏覽器控制」關閉智慧型應用程式控制（關掉之後要重灌Windows才能再打開，"
+                "公司或學校的電腦請先問資訊人員）")
+    return None
+
+
+def explain_oserror(ex):
+    return win_block_hint(ex) or str(ex)
+
+
 # ---- macOS／Windows：裝官方預編譯版（不必裝編譯工具）。Linux 照舊在這台編譯（CUDA／ROCm 版本跟著這台的驅動走）
 GH_API = os.environ.get("XCONSOLE_GH_API", "https://api.github.com")      # 測試時指到本機假站
 
@@ -5821,15 +5901,32 @@ def _prebuilt_run(st, log, kind="llama"):
             raise RuntimeError(f"壓縮檔裡找不到 {eng['target']}，官方的檔案結構可能改了")
         if OS != "windows":
             os.chmod(exe, 0o700)               # 只有代理自己（同一個使用者）要執行它
+        crt = win_crt_fill(src)
+        if crt:
+            note(f"這台沒有Visual C++執行階段，已從xConsole內附的那份補上：{'、'.join(crt)}")
         flag = "--version" if kind == "llama" else "--help"
         try:
             vp = subprocess.run([exe, flag], capture_output=True, text=True, **CMD_TEXT, timeout=60,
                                 env=llama_launch_env(exe) if kind == "llama" else None)
             rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
         except (OSError, subprocess.TimeoutExpired) as ex:
-            rc, out, err = 1, "", str(ex)
+            rc, out, err = 1, "", explain_oserror(ex)
         if rc != 0:
-            raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗）：{(err or out)[-200:]}")
+            why = win_exit_hint(rc) or (err or out)[-200:] or f"結束碼 {rc}"
+            raise RuntimeError(f"裝好了但跑不起來：{why}")
+        if kind == "llama" and "cpu" not in str(st.get("backend") or "cpu"):
+            # 顯示卡版裝好了，但驅動沒裝或太舊時引擎會默默改用CPU：先講清楚，不要等使用者覺得很慢才發現
+            try:
+                ld = subprocess.run([exe, "--list-devices"], capture_output=True, text=True, **CMD_TEXT, timeout=60,
+                                    env=llama_launch_env(exe))
+                devs = [ln.strip() for ln in (ld.stdout + ld.stderr).splitlines() if re.match(r"\s*(CUDA|Vulkan|ROCm|Metal)\d*:", ln)]
+            except (OSError, subprocess.TimeoutExpired):
+                devs = None
+            if devs == []:
+                st["gpu_warning"] = "裝好了，但引擎找不到可用的顯示卡（驅動沒裝或太舊），模型會用CPU跑。裝好或更新顯示卡驅動後重新啟動模型即可"
+                note(st["gpu_warning"])
+            elif devs:
+                note("找到的顯示卡：" + "；".join(devs))
         note(f"[100%] 完成：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.join(dest, eng['target'] + EXE)}")
         if os.path.exists(dest):
             shutil.rmtree(dest)
@@ -6010,15 +6107,19 @@ def _import_run(st, log, kind):
             os.chmod(exe, 0o700)
         st["phase"] = "試跑"
         save_json(eng["file"], st)
+        crt = win_crt_fill(os.path.dirname(exe))
+        if crt:
+            note(f"這台沒有Visual C++執行階段，已從xConsole內附的那份補上：{'、'.join(crt)}")
         flag = "--version" if kind == "llama" else "--help"
         try:
             vp = subprocess.run([exe, flag], capture_output=True, text=True, **CMD_TEXT, timeout=60,
                                 env=llama_launch_env(exe) if kind == "llama" else None)
             rc, out, err = vp.returncode, vp.stdout.strip(), vp.stderr.strip()
         except (OSError, subprocess.TimeoutExpired) as ex:
-            rc, out, err = 1, "", str(ex)
+            rc, out, err = 1, "", explain_oserror(ex)
         if rc != 0:
-            raise RuntimeError(f"裝好了但跑不起來（{flag} 失敗），可能不是這台系統或顯示卡用的版本：{(err or out)[-200:]}")
+            why = win_exit_hint(rc) or (err or out)[-200:] or f"結束碼 {rc}"
+            raise RuntimeError(f"裝好了但跑不起來，可能不是這台系統或顯示卡用的版本：{why}")
         note(f"試跑成功：{(out + err).splitlines()[-1] if kind == 'llama' and (out + err) else os.path.basename(exe)}")
         stop_if_cancelled()
         # 整包搬過去（不是只搬執行檔那一層）：有的包把函式庫或執行期資料放在旁邊的資料夾。
@@ -8013,9 +8114,10 @@ def _gen_run(j, argv, env, mm, fl):
         try:
             kw = ({"creationflags": 0x08000000 | 0x00000200} if OS == "windows"     # 不開視窗＋自己一個行程群組
                   else {"start_new_session": True})
+            win_crt_fill(os.path.dirname(str(argv[0])))
             proc = subprocess.Popen(own_scope(argv), stdout=fh, stderr=subprocess.STDOUT, env={**os.environ, **env}, **kw)
         except OSError as ex:                  # 執行檔被刪掉、沒有執行權限：不能讓這件一直停在「產生中」擋住後面
-            j.update(state="failed", error=f"sd-cli 啟動失敗：{ex}"[:240], ended=int(time.time()))
+            j.update(state="failed", error=f"sd-cli啟動失敗：{explain_oserror(ex)}"[:400], ended=int(time.time()))
             _sd_jobs_save()
             return
         with _GEN_LOCK:
@@ -8060,7 +8162,8 @@ def _gen_run(j, argv, env, mm, fl):
         j.update(state="cancelled" if killed == "已取消" else "failed", error=killed)
     elif rc != 0 or not os.path.isfile(out) or not os.path.getsize(out):
         tail = [x for x in tail_lines(log, 12) if x.strip()]
-        j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (tail[-1][-240:] if tail else "沒有輸出"))
+        hint = win_exit_hint(rc)
+        j.update(state="failed", error=f"sd-cli 結束碼 {rc}：" + (hint or (tail[-1][-240:] if tail else "沒有輸出")))
     else:
         peak = peak_r if mm == "unified_single" else peak_g if mm == "unified_split" else max(peak_g, 0.0)
         j["phase"] = "檢查產出中"         # 檢查完才改 done：網頁看到 done 就停止輪詢，要一起拿到 suspect

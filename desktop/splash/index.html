@@ -9,11 +9,22 @@
          background: linear-gradient(158deg, #0d1922, #13242f 56%, #1a3040); }
   .box { text-align: center; }
   h1 { font-size: 30px; margin: 18px 0 6px; letter-spacing: .02em; }
-  p { margin: 0; color: #9fb0bd; font-size: 15px; }
+  p { margin: 0; color: #b8c2ce; font-size: 16px; }
   .bar { width: 220px; height: 4px; margin: 26px auto 0; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
   .bar i { display: block; width: 40%; height: 100%; background: #e0484f; border-radius: 4px; animation: run 1.3s ease-in-out infinite; }
   @keyframes run { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
   @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; } }
+  /* 背景服務起不來：講原因與做法，不再一直重試 */
+  .fault { display: none; max-width: 640px; margin: 0 24px; text-align: left; }
+  .fault h2 { font-size: 24px; margin: 0 0 12px; }
+  .fault p { margin: 0 0 12px; line-height: 1.7; }
+  .fault ol { margin: 0 0 14px; padding-left: 22px; color: #e9eef2; font-size: 16px; line-height: 1.8; }
+  .fault .warn { background: rgba(224,72,79,.16); color: #ffd7d9; padding: 10px 14px; border-radius: 10px; }
+  .fault pre { background: rgba(0,0,0,.35); color: #d4dde4; padding: 12px; border-radius: 10px; font-size: 14px;
+               max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .fault .path { font-family: Consolas, monospace; font-size: 14px; color: #d4dde4; word-break: break-all; }
+  body.has-fault .box { display: none; }
+  body.has-fault .fault { display: block; }
 </style>
 </head>
 <body>
@@ -23,5 +34,38 @@
     <p>正在啟動模型主控台，第一次開會久一點</p>
     <div class="bar"><i></i></div>
   </div>
+  <div class="fault" id="sac">
+    <h2>Windows擋下了xConsole的背景服務</h2>
+    <p>這台電腦開著「智慧型應用程式控制」，它只讓有數位簽章、或微軟已經認得的程式執行。這一版xConsole內附的元件還沒有簽章，所以被擋下。xConsole已經停止重試，不會再一直跳通知。</p>
+    <ol>
+      <li>建議做法：先聯絡云碩。云碩正在為xConsole取得數位簽章，簽章版推出後不必改Windows設定。</li>
+      <li>急著用：到「設定 → 隱私權與安全性 → Windows安全性 → 應用程式與瀏覽器控制 → 智慧型應用程式控制設定」選「關閉」，再重新開啟xConsole。</li>
+    </ol>
+    <p class="warn">注意：智慧型應用程式控制關掉之後，就沒辦法再自己打開，要重灌Windows才能恢復。公司或學校的電腦，請先問資訊人員。</p>
+    <p>記錄檔：<span class="path" data-path></span></p>
+    <pre data-tail></pre>
+  </div>
+  <div class="fault" id="start">
+    <h2>xConsole的背景服務起不來</h2>
+    <p>連續試了幾次都沒有成功，xConsole已經停止重試。請把下面這段記錄與記錄檔交給云碩，我們會依記錄找出原因。修好之後重新開啟xConsole即可。</p>
+    <p>記錄檔：<span class="path" data-path></span></p>
+    <pre data-tail></pre>
+  </div>
+<script>
+  // 啟動器把診斷放在網址 # 後面：fault=種類|記錄檔位置|最後幾行（URL編碼）。只用textContent填，不解讀成HTML
+  function showFault() {
+    var m = /(?:^#|&)fault=([^&]*)/.exec(location.hash);
+    if (!m) return;
+    var raw = decodeURIComponent(m[1].replace(/\+/g, " "));
+    var parts = raw.split("|");
+    var kind = parts[0] === "sac" ? "sac" : "start";
+    var box = document.getElementById(kind);
+    box.querySelector("[data-path]").textContent = parts[1] || "";
+    box.querySelector("[data-tail]").textContent = parts.slice(2).join("|") || "（記錄是空的）";
+    document.body.classList.add("has-fault");
+  }
+  window.addEventListener("hashchange", showFault);
+  showFault();
+</script>
 </body>
 </html>
