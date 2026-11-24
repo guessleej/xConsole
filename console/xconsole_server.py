@@ -52,6 +52,7 @@ import agentlink  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
+import modules  # noqa: E402
 import gateway  # noqa: E402
 from store import Store  # noqa: E402
 
@@ -133,7 +134,7 @@ ROLE_NAMES = {"admin": "管理員", "operator": "維運", "viewer": "檢視", "u
 _ROLE_ROUTES = {r: [(m, re.compile(rx)) for m, rx in routes] for r, routes in {
     "user": USER_ROUTES, "viewer": USER_ROUTES + VIEWER_ROUTES,
     "operator": USER_ROUTES + VIEWER_ROUTES + OPERATOR_ROUTES}.items()}
-UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload")
+UPLOAD_RX = re.compile(r"/api/node/[\w.-]+/(library/upload|(llama|sd)/import)|/api/update/upload|/api/modules/upload")
 USER_KEYS_MAX = 3                  # 使用者自己能產生的有效金鑰上限（管理員發的不算）
 _KEY_LOCK = threading.Lock()
 
@@ -1946,6 +1947,32 @@ def chat_unseal(token: str) -> bytes:
     return tls.unseal(CERTS.p, token)
 
 
+class _ModCore:
+    """企業版模組載入器拿得到的核心功能：資料庫、加密、稽核、群組清單。其他一律拿不到。"""
+    db, lock = STORE.db, STORE.lock
+    desktop = DESKTOP
+
+    @staticmethod
+    def seal(data):
+        return chat_seal(data)
+
+    @staticmethod
+    def unseal(token):
+        return chat_unseal(token)
+
+    @staticmethod
+    def audit(action, target, ok, detail):
+        STORE.audit("模組", "", action, target, ok, detail)
+
+    @staticmethod
+    def group_ids():
+        return {g["id"] for g in fleet().get("groups", [])}
+
+
+# 企業版模組放在主控台程式的資料夾底下（<安裝目錄>/enterprise/）；載入在main() 裡做
+MODULES = modules.Modules(_ModCore, os.path.dirname(os.path.abspath(__file__)))
+
+
 def provider_public(p):
     return {"id": p["id"], "name": p["name"], "base_url": p["base_url"], "default_model": p.get("default_model") or "",
             "key_set": bool(p.get("api_key")), "ca_set": bool(p.get("ca_pem")),
@@ -2861,7 +2888,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._headers_done()
             self._json(403, {"error": "請先改密碼（管理員給的是一次性密碼）", "must_change": True})
             return True
-        if w and not self.is_admin and not user_may(method, path, w.get("role")):
+        if w and not self.is_admin and not path.startswith("/api/ent/") and not user_may(method, path, w.get("role")):
             if drain:
                 self._body(MAX_ANON_BODY)
                 self._headers_done()
@@ -3172,6 +3199,67 @@ class Handler(BaseHTTPRequestHandler):
         code, out = updater.start_update(STATE_DIR, restart_console, data=data, sha256=sha, version="手動上傳")
         self._audit("update.upload", hashlib.sha256(data).hexdigest()[:16], code == 200, {"bytes": n, "message": out.get("error")})
         return self._json(code, out)
+
+    def _module_upload(self, ctype):
+        """管理者在「設定 → 企業版模組」上傳云碩給的模組套件（zip）：驗過簽章、sha256、權限、core_api才換上並熱載入。"""
+        if not self.user:
+            self._body(MAX_ANON_BODY)
+            self._headers_done()
+            return self._json(401, {"error": "請先登入"})
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1":
+            if 0 <= n <= MAX_ANON_BODY:
+                self.rfile.read(n)
+            self.close_connection = True
+            return self._json(415, {"error": "只接受application/octet-stream，並要帶X-XConsole-Upload"})
+        if not 0 < n <= modules.MAX_ZIP:
+            self.close_connection = True
+            return self._json(413, {"error": f"模組套件要在{modules.MAX_ZIP >> 20} MB以內"})
+        if DESKTOP:
+            self.rfile.read(n)
+            self._headers_done()
+            return self._json(400, {"error": "個人版（桌面版）不載入企業版模組"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        code, out = MODULES.install(data)
+        self._audit("module.upload", out.get("name") or "", code == 200,
+                    {"bytes": n, "sha256": hashlib.sha256(data).hexdigest()[:16], "message": out.get("error")})
+        return self._json(code, out)
+
+    def _ent(self, method, path, body, q):
+        """企業版模組的路由：登入、角色、群組範圍都在這裡先驗，模組的handler拿到的請求已經過檢查。"""
+        hit = MODULES.match(method, path)
+        if not hit:
+            return self._json(404, {"error": "找不到"})
+        r, m = hit
+        role = (self.who or {}).get("role") or "admin"
+        if modules.ROLE_RANK.get(role, 0) < modules.ROLE_RANK[r.role]:
+            return self._json(403, {"error": "權限不夠", "admin_only": r.role == "admin"})
+        sc = self.scope
+        gid, err = MODULES.resolve(r, m, body, sc, self.is_admin)
+        if err:
+            return self._json(*err)
+        req = modules.Request(method, path, m.groupdict(), {k: v[0] for k, v in (q or {}).items()}, body,
+                              self.user, role, gid, sc)
+        code, out = MODULES.call(r, req, sc)
+        if method == "POST":
+            self._audit("ent." + r.name, gid or "", code < 400, {"route": r.pattern, "code": code})
+        return self._json(code, out)
+
+    def _ent_static(self, rel):
+        """模組的前端檔（/ent/static/…）：要登入；只給模組宣告的資料夾裡的檔。"""
+        self._headers_done()
+        if not self.user:
+            return self._json(401, {"error": "請先登入"})
+        full = MODULES.static_file(rel)
+        if not full:
+            return self._json(404, {"error": "找不到"})
+        with open(full, "rb") as fh:
+            body = fh.read()
+        return self._send(200, body, MIME.get(os.path.splitext(full)[1], "application/octet-stream"))
 
     def _preview(self, pid):
         """執行預覽：只回給建立者那一個登入；標頭把它關進 sandbox（不透明來源），只准被主控台自己的頁面嵌入。"""
@@ -3534,12 +3622,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._preview(m.group(1))
         if path == "/v1" or path.startswith("/v1/"):
             return self._gateway("GET")
+        if path.startswith("/ent/static/"):
+            return self._ent_static(path[len("/ent/static/"):])
         if not path.startswith("/api/"):
             return self._static(path)
         if self._need_auth():
             return None
         if self._gate("GET", path):
             return None
+        if path.startswith("/api/ent/"):
+            return self._ent("GET", path, None, q)
 
         if path == "/api/me":
             cur = CERTS.current() or {}
@@ -3547,6 +3639,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"user": self.user, "role": w.get("role") or "admin", "display": w.get("display") or self.user,
                                     "must_change": bool(w.get("must_change")),
                                     "scope": sorted(scope_of(w) or []),
+                                    "ent": {"loaded": MODULES.state["loaded"], "static": bool(MODULES.static_dir)},
                                     "app_window": bool(getattr(self, "loopback", False)),
                                     "lan_access": bool(fleet().get("lan_access")) if DESKTOP else True, "tls": {
                 "level": cur.get("level"), "daysLeft": cur.get("daysLeft"),
@@ -3625,6 +3718,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "limits": {"steps": AGENT_MAX_STEPS, "seconds": AGENT_MAX_SEC}})
         if path == "/api/update":
             return self._json(200, update_overview())
+        if path == "/api/modules":
+            return self._json(200, MODULES.status())
         m = re.fullmatch(r"/api/computer/tasks/([0-9a-f]{12})", path)
         if m:
             t = computer.TASKS.get(m.group(1))
@@ -3783,6 +3878,8 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/api/node/([\w.-]+)/(llama|sd)/import", path)
         if m:
             return self._upload(m.group(1), ctype, f"/{m.group(2)}/import", ("name", "offset", "total"), f"{m.group(2)}.import.upload")
+        if path == "/api/modules/upload":
+            return self._module_upload(ctype)
         if path == "/api/update/upload":
             if DESKTOP:
                 # 桌面版換的是整個應用程式（含內附的 Python 與外殼），不能只換原始碼包
@@ -3860,6 +3957,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True}, cookie="xconsole=; Path=/; HttpOnly; Max-Age=0; Secure")
         if self._need_auth():
             return None
+        if path.startswith("/api/ent/"):
+            return self._ent("POST", path, body, {})
 
         # ---- 納管的機器：加入、改名與位址、移除
         if path == "/api/nodes/join-code":
@@ -4160,6 +4259,14 @@ class Handler(BaseHTTPRequestHandler):
                         {"task": out.get("id"), "model": out.get("model"), "prompt_chars": len(str(body.get("prompt") or "")),
                          "message": out.get("error")})
             return self._json(code, out)
+        if path in ("/api/modules/reload", "/api/modules/remove"):
+            if path.endswith("remove"):
+                MODULES.remove()
+            else:
+                MODULES.load()
+            st = MODULES.status()
+            self._audit("module." + path.rsplit("/", 1)[1], st.get("name") or "", True, {"loaded": st["loaded"], "reason": st.get("reason")})
+            return self._json(200, st)
         if path == "/api/update/check":
             code, out = updater.check()
             self._audit("update.check", out.get("latest") or "", code == 200, {"message": out.get("error")})
@@ -4853,6 +4960,13 @@ def main():
         loop.daemon_threads = True
         threading.Thread(target=loop.serve_forever, daemon=True).start()
         print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
+    if not DESKTOP:
+        MODULES.load()
+        st = MODULES.status()
+        if st["loaded"]:
+            print(f"企業版模組：{st['name']} {st['version']}（{st['routes']} 條路由）", flush=True)
+        elif st.get("reason"):
+            print(f"企業版模組沒有載入，以開源核心啟動：{st['reason']}", flush=True)
     threading.Thread(target=sampler, daemon=True).start()
     threading.Thread(target=aligner, daemon=True).start()
     ALIGN_WAKE.set()

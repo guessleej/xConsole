@@ -23413,5 +23413,745 @@
 "en": "Operators can only create an empty slot; registering a service already running on this machine requires an administrator",
 "ja": "運用担当が作成できるのは空のスロットのみです。このマシンで既に動いているサービスの登録は管理者が行います",
 "ko": "운영자는 빈 슬롯만 만들 수 있습니다. 이 머신에서 이미 실행 중인 서비스 등록은 관리자가 해야 합니다"
+},
+"企業版模組": {
+"en": "Enterprise module",
+"ja": "エンタープライズモジュール",
+"ko": "엔터프라이즈 모듈"
+},
+"教育包、企業包等企業功能。沒有模組時就是一般版，所有核心功能照常": {
+"en": "Enterprise features such as the education pack and enterprise pack. Without a module this is the standard edition, and all core features work as usual",
+"ja": "教育パックやエンタープライズパックなどのエンタープライズ機能です。モジュールがない場合は標準版となり、すべてのコア機能は通常どおり動作します",
+"ko": "교육 패키지, 엔터프라이즈 패키지 등의 엔터프라이즈 기능입니다. 모듈이 없으면 일반 버전으로 동작하며 모든 핵심 기능은 그대로 사용할 수 있습니다"
+},
+"，含畫面": {
+"en": ", including screens",
+"ja": "、画面を含む",
+"ko": ", 화면 포함"
+},
+"已載入：{0} {1}（{2}條路由{3}）": {
+"en": "Loaded: {0} {1} ({2} routes{3})",
+"ja": "読み込み済み：{0} {1}（{2}件のルート{3}）",
+"ko": "로드됨: {0} {1} ({2}개 라우트{3})"
+},
+"已載入": {
+"en": "Loaded",
+"ja": "読み込み済み",
+"ko": "로드됨"
+},
+"條路由": {
+"en": " routes",
+"ja": "件のルート",
+"ko": "개 라우트"
+},
+"沒有載入，主控台以一般版執行：{0}": {
+"en": "Not loaded; the console is running as the standard edition: {0}",
+"ja": "読み込まれていません。コンソールは標準版で動作しています：{0}",
+"ko": "로드되지 않았습니다. 콘솔은 일반 버전으로 실행 중입니다: {0}"
+},
+"沒有載入，主控台以一般版執行": {
+"en": "Not loaded; the console is running as the standard edition",
+"ja": "読み込まれていません。コンソールは標準版で動作しています",
+"ko": "로드되지 않았습니다. 콘솔은 일반 버전으로 실행 중입니다"
+},
+"怎麼處理：{0}": {
+"en": "What to do: {0}",
+"ja": "対処方法：{0}",
+"ko": "해결 방법: {0}"
+},
+"怎麼處理": {
+"en": "What to do",
+"ja": "対処方法",
+"ko": "해결 방법"
+},
+"還沒有安裝企業版模組，主控台以一般版執行。": {
+"en": "No enterprise module is installed. The console is running as the standard edition.",
+"ja": "エンタープライズモジュールはインストールされていません。コンソールは標準版で動作しています。",
+"ko": "엔터프라이즈 모듈이 설치되어 있지 않습니다. 콘솔은 일반 버전으로 실행 중입니다."
+},
+"核心API第{0}版；內建的云碩公鑰{1}把。簽章是防止被竄改的模組被載入，授權由模組自己檢查。": {
+"en": "Core API version {0}; built-in xCloudinfo public keys: {1}. Signatures prevent tampered modules from being loaded; licensing is checked by the module itself.",
+"ja": "コアAPI第{0}版；内蔵のxCloudinfo公開鍵{1}個。署名は改ざんされたモジュールの読み込みを防ぎ、ライセンスはモジュール自身が確認します。",
+"ko": "코어 API 제{0}판; 내장 xCloudinfo 공개 키 {1}개. 서명은 변조된 모듈이 로드되는 것을 막고, 라이선스는 모듈이 직접 확인합니다."
+},
+"核心API第": {
+"en": "Core API version ",
+"ja": "コアAPI第",
+"ko": "코어 API 제"
+},
+"版；內建的云碩公鑰": {
+"en": "; built-in xCloudinfo public keys: ",
+"ja": "版；内蔵のxCloudinfo公開鍵",
+"ko": "판; 내장 xCloudinfo 공개 키 "
+},
+"把。簽章是防止被竄改的模組被載入，授權由模組自己檢查": {
+"en": ". Signatures prevent tampered modules from being loaded; licensing is checked by the module itself",
+"ja": "個。署名は改ざんされたモジュールの読み込みを防ぎ、ライセンスはモジュール自身が確認します",
+"ko": "개. 서명은 변조된 모듈이 로드되는 것을 막고, 라이선스는 모듈이 직접 확인합니다"
+},
+"上傳模組套件": {
+"en": "Upload module package",
+"ja": "モジュールパッケージをアップロード",
+"ko": "모듈 패키지 업로드"
+},
+"先選云碩給的模組套件（.zip）": {
+"en": "First choose the module package (.zip) provided by xCloudinfo",
+"ja": "まず xCloudinfo から提供されたモジュールパッケージ（.zip）を選択してください",
+"ko": "먼저 xCloudinfo에서 받은 모듈 패키지(.zip)를 선택하세요"
+},
+"（已換回原本的模組）": {
+"en": "(restored the previous module)",
+"ja": "（元のモジュールに戻しました）",
+"ko": "(이전 모듈로 되돌렸습니다)"
+},
+"模組已驗證並載入；重新整理頁面就會出現模組的畫面": {
+"en": "The module was verified and loaded; refresh the page to see its screens",
+"ja": "モジュールを検証して読み込みました。ページを再読み込みするとモジュールの画面が表示されます",
+"ko": "모듈을 검증하고 로드했습니다. 페이지를 새로 고치면 모듈 화면이 나타납니다"
+},
+"重新載入": {
+"en": "Reload",
+"ja": "再読み込み",
+"ko": "다시 로드"
+},
+"移除模組": {
+"en": "Remove module",
+"ja": "モジュールを削除",
+"ko": "모듈 제거"
+},
+"移除企業版模組": {
+"en": "Remove enterprise module",
+"ja": "エンタープライズモジュールを削除",
+"ko": "엔터프라이즈 모듈 제거"
+},
+"移除後主控台以一般版執行。模組存的資料留在資料庫裡，之後重新安裝同一個模組會接著用。": {
+"en": "After removal the console runs as the standard edition. Data stored by the module stays in the database and will be picked up again if the same module is reinstalled.",
+"ja": "削除後、コンソールは標準版で動作します。モジュールが保存したデータはデータベースに残り、同じモジュールを再インストールすると引き続き使われます。",
+"ko": "제거하면 콘솔은 일반 버전으로 실행됩니다. 모듈이 저장한 데이터는 데이터베이스에 남으며, 같은 모듈을 다시 설치하면 이어서 사용됩니다."
+},
+"模組": {
+"en": "Module",
+"ja": "モジュール",
+"ko": "모듈"
+},
+"企業版模組：{0} {1}（{2} 條路由）": {
+"en": "Enterprise module: {0} {1} ({2} routes)",
+"ja": "エンタープライズモジュール：{0} {1}（{2}件のルート）",
+"ko": "엔터프라이즈 모듈: {0} {1} ({2}개 라우트)"
+},
+"只接受application/octet-stream，並要帶X-XConsole-Upload": {
+"en": "Only application/octet-stream is accepted, and X-XConsole-Upload must be included",
+"ja": "application/octet-stream のみ受け付けます。X-XConsole-Upload を付ける必要があります",
+"ko": "application/octet-stream만 허용하며 X-XConsole-Upload를 포함해야 합니다"
+},
+"模組套件要在{0} MB以內": {
+"en": "The module package must be within {0} MB",
+"ja": "モジュールパッケージは {0} MB 以内にしてください",
+"ko": "모듈 패키지는 {0} MB 이내여야 합니다"
+},
+"模組套件要在": {
+"en": "The module package must be within ",
+"ja": "モジュールパッケージは ",
+"ko": "모듈 패키지는 "
+},
+"MB以內": {
+"en": "MB",
+"ja": "MB 以内にしてください",
+"ko": "MB 이내여야 합니다"
+},
+"個人版（桌面版）不載入企業版模組": {
+"en": "The personal edition (desktop) does not load enterprise modules",
+"ja": "個人版（デスクトップ版）はエンタープライズモジュールを読み込みません",
+"ko": "개인 버전(데스크톱 버전)은 엔터프라이즈 모듈을 로드하지 않습니다"
+},
+"權限不夠": {
+"en": "Insufficient permissions",
+"ja": "権限が不足しています",
+"ko": "권한이 부족합니다"
+},
+"企業版模組：": {
+"en": "Enterprise module: ",
+"ja": "エンタープライズモジュール：",
+"ko": "엔터프라이즈 모듈: "
+},
+" 條路由）": {
+"en": " routes)",
+"ja": "件のルート）",
+"ko": "개 라우트)"
+},
+"企業版模組沒有載入，以開源核心啟動：{0}": {
+"en": "The enterprise module was not loaded; started with the open-source core: {0}",
+"ja": "エンタープライズモジュールは読み込まれず、オープンソースコアで起動しました：{0}",
+"ko": "엔터프라이즈 모듈이 로드되지 않아 오픈소스 코어로 시작했습니다: {0}"
+},
+"企業版模組沒有載入，以開源核心啟動": {
+"en": "The enterprise module was not loaded; started with the open-source core",
+"ja": "エンタープライズモジュールは読み込まれず、オープンソースコアで起動しました",
+"ko": "엔터프라이즈 모듈이 로드되지 않아 오픈소스 코어로 시작했습니다"
+},
+" MB以內": {
+"en": " MB",
+"ja": "MB 以内にしてください",
+"ko": " MB 이내여야 합니다"
+},
+"企業版模組沒有載入，以開源核心啟動：": {
+"en": "The enterprise module was not loaded; started with the open-source core: ",
+"ja": "エンタープライズモジュールは読み込まれず、オープンソースコアで起動しました：",
+"ko": "엔터프라이즈 모듈이 로드되지 않아 오픈소스 코어로 시작했습니다: "
+},
+"查不了權限：{0}": {
+"en": "Unable to check permissions: {0}",
+"ja": "権限を確認できません：{0}",
+"ko": "권한을 확인할 수 없습니다: {0}"
+},
+"查不了權限": {
+"en": "Unable to check permissions",
+"ja": "権限を確認できません",
+"ko": "권한을 확인할 수 없습니다"
+},
+"檔案數太多": {
+"en": "Too many files",
+"ja": "ファイル数が多すぎます",
+"ko": "파일 수가 너무 많습니다"
+},
+"解開後太大": {
+"en": "Too large after extraction",
+"ja": "展開後のサイズが大きすぎます",
+"ko": "압축 해제 후 크기가 너무 큽니다"
+},
+"資料表名稱不合法：{0}": {
+"en": "Invalid table name: {0}",
+"ja": "テーブル名が不正です：{0}",
+"ko": "테이블 이름이 올바르지 않습니다: {0}"
+},
+"資料表名稱不合法": {
+"en": "Invalid table name",
+"ja": "テーブル名が不正です",
+"ko": "테이블 이름이 올바르지 않습니다"
+},
+"資料編號只能用英數字與 . _ -，最多64字": {
+"en": "A record ID may only use letters, digits and . _ - (up to 64 characters)",
+"ja": "データ ID に使えるのは英数字と . _ - のみで、最大 64 文字です",
+"ko": "데이터 ID에는 영문자, 숫자와 . _ -만 사용할 수 있으며 최대 64자입니다"
+},
+"範圍外的群組": {
+"en": "Group outside the allowed scope",
+"ja": "範囲外のグループ",
+"ko": "범위 밖의 그룹"
+},
+"只能在register(api)裡註冊": {
+"en": "Can only be registered inside register(api)",
+"ja": "register(api) の中でのみ登録できます",
+"ko": "register(api) 안에서만 등록할 수 있습니다"
+},
+"只收GET與POST：{0}": {
+"en": "Only GET and POST are accepted: {0}",
+"ja": "GET と POST のみ受け付けます：{0}",
+"ko": "GET과 POST만 허용합니다: {0}"
+},
+"只收GET與POST": {
+"en": "Only GET and POST are accepted",
+"ja": "GET と POST のみ受け付けます",
+"ko": "GET과 POST만 허용합니다"
+},
+"路由只能掛在/api/ent/底下：{0}": {
+"en": "Routes can only be mounted under /api/ent/: {0}",
+"ja": "ルートは /api/ent/ の下にのみ設定できます：{0}",
+"ko": "라우트는 /api/ent/ 아래에만 둘 수 있습니다: {0}"
+},
+"路由只能掛在/api/ent/底下": {
+"en": "Routes can only be mounted under /api/ent/",
+"ja": "ルートは /api/ent/ の下にのみ設定できます",
+"ko": "라우트는 /api/ent/ 아래에만 둘 수 있습니다"
+},
+"{0} 要宣告角色（{1}）": {
+"en": "{0} must declare a role ({1})",
+"ja": "{0} にはロールの宣言が必要です（{1}）",
+"ko": "{0}에는 역할 선언이 필요합니다({1})"
+},
+"要宣告角色": {
+"en": "Must declare a role",
+"ja": "ロールの宣言が必要です",
+"ko": "역할 선언이 필요합니다"
+},
+"{0} 沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查": {
+"en": "{0} does not declare a scope: every route must state which group it touches, and the core checks it",
+"ja": "{0} に scope が宣言されていません。各ルートは対象のグループを明示する必要があり、コアが検査します",
+"ko": "{0}에 scope가 선언되어 있지 않습니다. 모든 라우트는 어떤 그룹을 다루는지 밝혀야 하며 코어가 검사합니다"
+},
+"沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查": {
+"en": "No scope declared: every route must state which group it touches, and the core checks it",
+"ja": "scope が宣言されていません。各ルートは対象のグループを明示する必要があり、コアが検査します",
+"ko": "scope가 선언되어 있지 않습니다. 모든 라우트는 어떤 그룹을 다루는지 밝혀야 하며 코어가 검사합니다"
+},
+"{0} 的handler不是函式": {
+"en": "The handler of {0} is not a function",
+"ja": "{0} の handler が関数ではありません",
+"ko": "{0}의 handler가 함수가 아닙니다"
+},
+"的handler不是函式": {
+"en": "'s handler is not a function",
+"ja": "の handler が関数ではありません",
+"ko": "의 handler가 함수가 아닙니다"
+},
+"{0} 的scope要的「{1}」不在網址的命名群組裡": {
+"en": "The scope of {0} asks for \"{1}\", which is not among the named groups in the URL",
+"ja": "{0} の scope が要求する「{1}」は、URL の名前付きグループにありません",
+"ko": "{0}의 scope가 요구하는 \"{1}\"이(가) URL의 이름 있는 그룹에 없습니다"
+},
+"的scope要的「": {
+"en": "'s scope asks for \"",
+"ja": "の scope が要求する「",
+"ko": "의 scope가 요구하는 \""
+},
+"{0}：scope.body只能用在POST": {
+"en": "{0}: scope.body can only be used with POST",
+"ja": "{0}：scope.body は POST でのみ使えます",
+"ko": "{0}: scope.body는 POST에서만 사용할 수 있습니다"
+},
+"scope.body只能用在POST": {
+"en": "scope.body can only be used with POST",
+"ja": "scope.body は POST でのみ使えます",
+"ko": "scope.body는 POST에서만 사용할 수 있습니다"
+},
+"重複註冊：{0} {1}": {
+"en": "Duplicate registration: {0} {1}",
+"ja": "重複登録：{0} {1}",
+"ko": "중복 등록: {0} {1}"
+},
+"重複註冊": {
+"en": "Duplicate registration",
+"ja": "重複登録",
+"ko": "중복 등록"
+},
+"找不到前端資料夾：{0}": {
+"en": "Frontend folder not found: {0}",
+"ja": "フロントエンドフォルダが見つかりません：{0}",
+"ko": "프런트엔드 폴더를 찾을 수 없습니다: {0}"
+},
+"找不到前端資料夾": {
+"en": "Frontend folder not found",
+"ja": "フロントエンドフォルダが見つかりません",
+"ko": "프런트엔드 폴더를 찾을 수 없습니다"
+},
+"namespace不合法：{0}": {
+"en": "Invalid namespace: {0}",
+"ja": "namespace が不正です：{0}",
+"ko": "namespace가 올바르지 않습니다: {0}"
+},
+"namespace不合法": {
+"en": "Invalid namespace",
+"ja": "namespace が不正です",
+"ko": "namespace가 올바르지 않습니다"
+},
+"{0} 是連結": {
+"en": "{0} is a symbolic link",
+"ja": "{0} はリンクです",
+"ko": "{0}은(는) 링크입니다"
+},
+"是連結": {
+"en": " is a symbolic link",
+"ja": "はリンクです",
+"ko": "은(는) 링크입니다"
+},
+"查不了權限：": {
+"en": "Unable to check permissions: ",
+"ja": "権限を確認できません：",
+"ko": "권한을 확인할 수 없습니다: "
+},
+"這一版核心還沒有內建云碩的模組公鑰": {
+"en": "This core version does not yet have the xCloudinfo module public key built in",
+"ja": "このバージョンのコアには、xCloudinfo のモジュール公開鍵がまだ内蔵されていません",
+"ko": "이 버전의 코어에는 xCloudinfo 모듈 공개 키가 아직 내장되어 있지 않습니다"
+},
+"請把主控台更新到有內建公鑰的版本": {
+"en": "Update the console to a version with the built-in public key",
+"ja": "公開鍵が内蔵されたバージョンにコンソールを更新してください",
+"ko": "공개 키가 내장된 버전으로 콘솔을 업데이트하세요"
+},
+"模組的簽章驗不過：不是云碩簽的，或檔案被改過": {
+"en": "The module signature failed verification: it was not signed by xCloudinfo, or the file was modified",
+"ja": "モジュールの署名を検証できません：xCloudinfo の署名ではないか、ファイルが改変されています",
+"ko": "모듈 서명 검증에 실패했습니다: xCloudinfo가 서명하지 않았거나 파일이 변경되었습니다"
+},
+"請向云碩重新取得模組套件，不要自行修改裡面的檔案": {
+"en": "Get the module package from xCloudinfo again, and do not modify the files inside it",
+"ja": "xCloudinfo からモジュールパッケージを再取得してください。中のファイルは編集しないでください",
+"ko": "xCloudinfo에서 모듈 패키지를 다시 받으세요. 안의 파일을 직접 수정하지 마세요"
+},
+"模組缺少{0}": {
+"en": "The module is missing {0}",
+"ja": "モジュールに {0} がありません",
+"ko": "모듈에 {0}이(가) 없습니다"
+},
+"模組缺少": {
+"en": "The module is missing ",
+"ja": "モジュールに次がありません：",
+"ko": "모듈에 다음이 없습니다: "
+},
+"請向云碩重新取得模組套件": {
+"en": "Get the module package from xCloudinfo again",
+"ja": "xCloudinfo からモジュールパッケージを再取得してください",
+"ko": "xCloudinfo에서 모듈 패키지를 다시 받으세요"
+},
+"只留給系統管理員（Windows：SYSTEM與Administrators；Linux、macOS：root或主控台的帳號，權限不能讓群組或其他人寫）": {
+"en": "Reserved for system administrators (Windows: SYSTEM and Administrators; Linux, macOS: root or the console's account; permissions must not allow write by the group or others)",
+"ja": "システム管理者専用です（Windows：SYSTEM と Administrators、Linux・macOS：root またはコンソールのアカウント。グループやその他のユーザーに書き込み権限を与えないでください）",
+"ko": "시스템 관리자 전용입니다(Windows: SYSTEM과 Administrators, Linux·macOS: root 또는 콘솔 계정. 그룹이나 다른 사용자에게 쓰기 권한을 주면 안 됩니다)"
+},
+"模組要的核心API是{0}，這一版核心是{1}": {
+"en": "The module requires core API {0}, but this core version is {1}",
+"ja": "モジュールが要求するコア API は {0} ですが、このコアのバージョンは {1} です",
+"ko": "모듈이 요구하는 코어 API는 {0}이지만 이 코어 버전은 {1}입니다"
+},
+"模組要的核心API是": {
+"en": "The module requires core API ",
+"ja": "モジュールが要求するコア API は ",
+"ko": "모듈이 요구하는 코어 API는 "
+},
+"這一版核心是": {
+"en": "this core version is ",
+"ja": "このコアのバージョンは ",
+"ko": "이 코어 버전은 "
+},
+"請把主控台與模組更新到相容的版本": {
+"en": "Update the console and the module to compatible versions",
+"ja": "コンソールとモジュールを互換性のあるバージョンに更新してください",
+"ko": "콘솔과 모듈을 호환되는 버전으로 업데이트하세요"
+},
+"不是zip檔": {
+"en": "Not a zip file",
+"ja": "zip ファイルではありません",
+"ko": "zip 파일이 아닙니다"
+},
+"壓縮檔裡有連結檔：{0}": {
+"en": "The archive contains a symbolic link: {0}",
+"ja": "アーカイブ内にリンクファイルがあります：{0}",
+"ko": "압축 파일 안에 링크 파일이 있습니다: {0}"
+},
+"壓縮檔裡有連結檔": {
+"en": "The archive contains a symbolic link",
+"ja": "アーカイブ内にリンクファイルがあります",
+"ko": "압축 파일 안에 링크 파일이 있습니다"
+},
+"模組資料一定要加密才寫入": {
+"en": "Module data must be encrypted before it is written",
+"ja": "モジュールのデータは暗号化してから書き込む必要があります",
+"ko": "모듈 데이터는 반드시 암호화한 뒤에 기록해야 합니다"
+},
+"資料表名稱不合法：": {
+"en": "Invalid table name: ",
+"ja": "テーブル名が不正です：",
+"ko": "테이블 이름이 올바르지 않습니다: "
+},
+"核心API第{0}版還沒開放 api.{1}": {
+"en": "Core API version {0} does not yet provide api.{1}",
+"ja": "コア API 第{0}版では api.{1} はまだ利用できません",
+"ko": "코어 API 제{0}판에서는 api.{1}을(를) 아직 사용할 수 없습니다"
+},
+"核心API第{0}版還沒開放api.{1}": {
+"en": "Core API version {0} does not yet provide api.{1}",
+"ja": "コア API 第{0}版では api.{1} はまだ利用できません",
+"ko": "코어 API 제{0}판에서는 api.{1}을(를) 아직 사용할 수 없습니다"
+},
+"版還沒開放 api.": {
+"en": " does not yet provide api.",
+"ja": "版では api. はまだ利用できません",
+"ko": "판에서는 api. 을(를) 아직 사용할 수 없습니다"
+},
+"版還沒開放api.": {
+"en": " does not yet provide api.",
+"ja": "版では api. はまだ利用できません",
+"ko": "판에서는 api. 을(를) 아직 사용할 수 없습니다"
+},
+"只收GET與POST：": {
+"en": "Only GET and POST are accepted: ",
+"ja": "GET と POST のみ受け付けます：",
+"ko": "GET과 POST만 허용합니다: "
+},
+"路由只能掛在/api/ent/底下：": {
+"en": "Routes can only be mounted under /api/ent/: ",
+"ja": "ルートは /api/ent/ の下にのみ設定できます：",
+"ko": "라우트는 /api/ent/ 아래에만 둘 수 있습니다: "
+},
+" 要宣告角色（": {
+"en": " must declare a role (",
+"ja": " にはロールの宣言が必要です（",
+"ko": " 에는 역할 선언이 필요합니다("
+},
+" 沒有宣告scope：每條路由都要說明碰的是哪個群組，由核心檢查": {
+"en": " does not declare a scope: every route must state which group it touches, and the core checks it",
+"ja": " に scope が宣言されていません。各ルートは対象のグループを明示する必要があり、コアが検査します",
+"ko": " 에 scope가 선언되어 있지 않습니다. 모든 라우트는 어떤 그룹을 다루는지 밝혀야 하며 코어가 검사합니다"
+},
+" 的handler不是函式": {
+"en": "'s handler is not a function",
+"ja": " の handler が関数ではありません",
+"ko": "의 handler가 함수가 아닙니다"
+},
+" 的scope要的「": {
+"en": "'s scope asks for \"",
+"ja": " の scope が要求する「",
+"ko": "의 scope가 요구하는 \""
+},
+"：scope.body只能用在POST": {
+"en": ": scope.body can only be used with POST",
+"ja": "：scope.body は POST でのみ使えます",
+"ko": ": scope.body는 POST에서만 사용할 수 있습니다"
+},
+"重複註冊：": {
+"en": "Duplicate registration: ",
+"ja": "重複登録：",
+"ko": "중복 등록: "
+},
+"找不到前端資料夾：": {
+"en": "Frontend folder not found: ",
+"ja": "フロントエンドフォルダが見つかりません：",
+"ko": "프런트엔드 폴더를 찾을 수 없습니다: "
+},
+"namespace不合法：": {
+"en": "Invalid namespace: ",
+"ja": "namespace が不正です：",
+"ko": "namespace가 올바르지 않습니다: "
+},
+" 是連結": {
+"en": " is a symbolic link",
+"ja": " はリンクです",
+"ko": " 은(는) 링크입니다"
+},
+"{0} 的擁有者不是root或主控台的帳號": {
+"en": "{0} is not owned by root or the console's account",
+"ja": "{0} の所有者が root またはコンソールのアカウントではありません",
+"ko": "{0}의 소유자가 root 또는 콘솔 계정이 아닙니다"
+},
+"的擁有者不是root或主控台的帳號": {
+"en": " is not owned by root or the console's account",
+"ja": "の所有者が root またはコンソールのアカウントではありません",
+"ko": "의 소유자가 root 또는 콘솔 계정이 아닙니다"
+},
+"讀不到manifest.json，或格式不對": {
+"en": "Cannot read manifest.json, or its format is wrong",
+"ja": "manifest.json を読み取れないか、形式が正しくありません",
+"ko": "manifest.json을 읽을 수 없거나 형식이 올바르지 않습니다"
+},
+"請重新上傳云碩提供的完整模組套件": {
+"en": "Upload the complete module package provided by xCloudinfo again",
+"ja": "xCloudinfo から提供された完全なモジュールパッケージを再度アップロードしてください",
+"ko": "xCloudinfo에서 받은 전체 모듈 패키지를 다시 업로드하세요"
+},
+"讀不到manifest.sig（模組沒有簽章）": {
+"en": "Cannot read manifest.sig (the module has no signature)",
+"ja": "manifest.sig を読み取れません（モジュールに署名がありません）",
+"ko": "manifest.sig를 읽을 수 없습니다(모듈에 서명이 없습니다)"
+},
+"清單裡有不合法的項目：{0}": {
+"en": "The manifest has an invalid entry: {0}",
+"ja": "マニフェストに不正な項目があります：{0}",
+"ko": "manifest에 올바르지 않은 항목이 있습니다: {0}"
+},
+"清單裡有不合法的項目": {
+"en": "The manifest has an invalid entry",
+"ja": "マニフェストに不正な項目があります",
+"ko": "manifest에 올바르지 않은 항목이 있습니다"
+},
+"少了檔案：{0}": {
+"en": "Missing file: {0}",
+"ja": "ファイルが不足しています：{0}",
+"ko": "파일이 없습니다: {0}"
+},
+"少了檔案": {
+"en": "Missing file",
+"ja": "ファイルが不足しています",
+"ko": "파일이 없습니다"
+},
+"請重新上傳完整的模組套件": {
+"en": "Upload the complete module package again",
+"ja": "完全なモジュールパッケージを再度アップロードしてください",
+"ko": "전체 모듈 패키지를 다시 업로드하세요"
+},
+"{0} 跟清單的sha256不一樣（被改過）": {
+"en": "{0} does not match the sha256 in the manifest (it was modified)",
+"ja": "{0} がマニフェストの sha256 と一致しません（改変されています）",
+"ko": "{0}이(가) manifest의 sha256과 다릅니다(변경되었습니다)"
+},
+"跟清單的sha256不一樣（被改過": {
+"en": "does not match the sha256 in the manifest (it was modified",
+"ja": "がマニフェストの sha256 と一致しません（改変されています",
+"ko": "이(가) manifest의 sha256과 다릅니다(변경되었습니다"
+},
+"請重新上傳云碩提供的模組套件，不要自行修改裡面的檔案": {
+"en": "Upload the module package provided by xCloudinfo again, and do not modify the files inside it",
+"ja": "xCloudinfo から提供されたモジュールパッケージを再度アップロードしてください。中のファイルは編集しないでください",
+"ko": "xCloudinfo에서 받은 모듈 패키지를 다시 업로드하세요. 안의 파일을 직접 수정하지 마세요"
+},
+"模組資料夾別的帳號也能寫：": {
+"en": "The module folder is writable by other accounts: ",
+"ja": "モジュールフォルダに他のアカウントが書き込めます：",
+"ko": "모듈 폴더에 다른 계정이 쓸 수 있습니다: "
+},
+"，這一版核心是": {
+"en": "; this core version is ",
+"ja": "、このコアのバージョンは ",
+"ko": ", 이 코어 버전은 "
+},
+"壓縮檔裡有連結檔：": {
+"en": "The archive contains a symbolic link: ",
+"ja": "アーカイブ内にリンクファイルがあります：",
+"ko": "압축 파일 안에 링크 파일이 있습니다: "
+},
+" 的擁有者不是root或主控台的帳號": {
+"en": " is not owned by root or the console's account",
+"ja": " の所有者が root またはコンソールのアカウントではありません",
+"ko": " 의 소유자가 root 또는 콘솔 계정이 아닙니다"
+},
+"{0} 別的帳號也能寫（權限{1}）": {
+"en": "{0} is writable by other accounts (permissions {1})",
+"ja": "{0} に他のアカウントが書き込めます（権限 {1}）",
+"ko": "{0}에 다른 계정이 쓸 수 있습니다(권한 {1})"
+},
+"別的帳號也能寫（權限": {
+"en": "is writable by other accounts (permissions ",
+"ja": "に他のアカウントが書き込めます（権限 ",
+"ko": "에 다른 계정이 쓸 수 있습니다(권한 "
+},
+"清單裡有不合法的項目：": {
+"en": "The manifest has an invalid entry: ",
+"ja": "マニフェストに不正な項目があります：",
+"ko": "manifest에 올바르지 않은 항목이 있습니다: "
+},
+"少了檔案：": {
+"en": "Missing file: ",
+"ja": "ファイルが不足しています：",
+"ko": "파일이 없습니다: "
+},
+" 跟清單的sha256不一樣（被改過）": {
+"en": " does not match the sha256 in the manifest (it was modified)",
+"ja": " がマニフェストの sha256 と一致しません（改変されています）",
+"ko": " 이(가) manifest의 sha256과 다릅니다(변경되었습니다)"
+},
+"模組沒有register(api)": {
+"en": "The module has no register(api)",
+"ja": "モジュールに register(api) がありません",
+"ko": "모듈에 register(api)가 없습니다"
+},
+"模組載入時出錯：{0}": {
+"en": "Error while loading the module: {0}",
+"ja": "モジュールの読み込み中にエラーが発生しました：{0}",
+"ko": "모듈을 로드하는 중 오류가 발생했습니다: {0}"
+},
+"模組載入時出錯": {
+"en": "Error while loading the module",
+"ja": "モジュールの読み込み中にエラーが発生しました",
+"ko": "모듈을 로드하는 중 오류가 발생했습니다"
+},
+"請向云碩回報，並附上主控台的記錄": {
+"en": "Report this to xCloudinfo and attach the console's logs",
+"ja": "xCloudinfo に報告し、コンソールのログを添付してください",
+"ko": "xCloudinfo에 보고하고 콘솔 로그를 첨부하세요"
+},
+"這個功能要能管全部群組的管理員": {
+"en": "This feature requires an administrator who can manage all groups",
+"ja": "この機能にはすべてのグループを管理できる管理者権限が必要です",
+"ko": "이 기능은 모든 그룹을 관리할 수 있는 관리자가 필요합니다"
+},
+"企業版模組 {0} {1} 出錯：\n": {
+"en": "Enterprise module {0} {1} error:\n",
+"ja": "エンタープライズモジュール {0} {1} のエラー：\n",
+"ko": "엔터프라이즈 모듈 {0} {1} 오류:\n"
+},
+"出錯：\n": {
+"en": " error:\n",
+"ja": "のエラー：\n",
+"ko": " 오류:\n"
+},
+"模組發生錯誤，已記錄": {
+"en": "A module error occurred and was logged",
+"ja": "モジュールでエラーが発生し、記録しました",
+"ko": "모듈에서 오류가 발생하여 기록했습니다"
+},
+" 別的帳號也能寫（權限": {
+"en": " is writable by other accounts (permissions ",
+"ja": " に他のアカウントが書き込めます（権限 ",
+"ko": "에 다른 계정이 쓸 수 있습니다(권한 "
+},
+"有清單外的資料夾：{0}": {
+"en": "Folder not listed in the manifest: {0}",
+"ja": "マニフェストにないフォルダがあります：{0}",
+"ko": "manifest에 없는 폴더가 있습니다: {0}"
+},
+"有清單外的資料夾": {
+"en": "Folder not listed in the manifest",
+"ja": "マニフェストにないフォルダがあります",
+"ko": "manifest에 없는 폴더가 있습니다"
+},
+"請刪掉它，或重新上傳完整的模組套件": {
+"en": "Delete it, or upload the complete module package again",
+"ja": "削除するか、完全なモジュールパッケージを再度アップロードしてください",
+"ko": "삭제하거나 전체 모듈 패키지를 다시 업로드하세요"
+},
+"有清單外的檔案：{0}": {
+"en": "File not listed in the manifest: {0}",
+"ja": "マニフェストにないファイルがあります：{0}",
+"ko": "manifest에 없는 파일이 있습니다: {0}"
+},
+"有清單外的檔案": {
+"en": "File not listed in the manifest",
+"ja": "マニフェストにないファイルがあります",
+"ko": "manifest에 없는 파일이 있습니다"
+},
+"企業版模組載入失敗：\n": {
+"en": "Failed to load the enterprise module:\n",
+"ja": "エンタープライズモジュールの読み込みに失敗しました：\n",
+"ko": "엔터프라이즈 모듈 로드에 실패했습니다:\n"
+},
+"模組載入時出錯：": {
+"en": "Error while loading the module: ",
+"ja": "モジュールの読み込み中にエラーが発生しました：",
+"ko": "모듈을 로드하는 중 오류가 발생했습니다: "
+},
+"企業版模組 ": {
+"en": "Enterprise module ",
+"ja": "エンタープライズモジュール ",
+"ko": "엔터프라이즈 모듈 "
+},
+" 出錯：\n": {
+"en": " error:\n",
+"ja": " のエラー：\n",
+"ko": " 오류:\n"
+},
+"有清單外的資料夾：": {
+"en": "Folder not listed in the manifest: ",
+"ja": "マニフェストにないフォルダがあります：",
+"ko": "manifest에 없는 폴더가 있습니다: "
+},
+"有清單外的檔案：": {
+"en": "File not listed in the manifest: ",
+"ja": "マニフェストにないファイルがあります：",
+"ko": "manifest에 없는 파일이 있습니다: "
+},
+"本文要帶{0}（群組編號）": {
+"en": "The body must include {0} (group ID)",
+"ja": "本文に {0}（グループ ID）を含める必要があります",
+"ko": "본문에 {0}(그룹 ID)을(를) 포함해야 합니다"
+},
+"本文要帶": {
+"en": "The body must include ",
+"ja": "本文に次を含める必要があります：",
+"ko": "본문에 다음을 포함해야 합니다: "
+},
+"群組編號": {
+"en": "group ID",
+"ja": "グループ ID",
+"ko": "그룹 ID"
+},
+"（群組編號）": {
+"en": " (group ID)",
+"ja": "（グループ ID）",
+"ko": " (그룹 ID)"
+},
+"」不在網址的命名群組裡": {
+"en": "\" is not a named group in the URL pattern",
+"ja": "」が URL の名前付きグループにありません",
+"ko": "\"이(가) URL의 이름 있는 그룹에 없습니다"
 }
 }
