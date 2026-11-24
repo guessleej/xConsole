@@ -5,11 +5,17 @@
    - 對話設定：系統提示詞與取樣參數（第三方 API 只送它支援的標準參數，由主控台把關）。
    - 說「畫一張…」「生成一段…的影片」直接產出；附圖說「把…改成…」改圖。輸入列也有「畫圖」「影片」鈕。
    - 快超過上下文時，把較早的對話摘要起來再送（畫面上原文照留），標示「已壓縮前 N 則」。
-   - 「工具」打開時，本機模型可以呼叫主控台的查詢工具（機器狀態、推薦、已下載模型；只查不動）。
+   - 「工具」打開時，本機模型可以讀網頁、聯網搜尋（管理者設了搜尋端點才有）、讀寫自己的Agent工作資料夾，
+     管理員另外可以查主控台與執行指令；寫檔與執行指令一律先問，可勾「本次對話不再詢問同類操作」。
+   - 頂列「思考：開／關」：每次請求帶chat_template_kwargs.enable_thinking，不必重新載入模型。
+   - 左欄可以篩「全部／收藏」與分類，每則對話可以設分類與標籤；附件可以拖進來或貼上截圖。
    共用的 renderRich、codeBlock、openPreview 在 pages.js。 */
 
-const CHAT2 = { list: null, cur: null, q: "", blob: {}, media: {}, ctx: {}, migrated: false, sideOpen: false };
-const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型" };
+const CHAT2 = { list: null, cur: null, q: "", blob: {}, media: {}, ctx: {}, migrated: false, sideOpen: false, filter: "all", cat: "" };
+const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型",
+  read_web_page: "讀網頁", web_search: "聯網搜尋", list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", run_command: "執行指令" };
+const TOOL_KIND_ZH = { file_write: "寫檔", command: "執行指令" };
+const STAR_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 1.8l2.5 5.2 5.7.8-4.1 4 1 5.6L10 14.7l-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/></svg>';
 const CHAT_DEF_KEY = "xconsole-chat-defaults";
 const REWRITE = [
   ["shorter", "更簡潔", "把你上一個回答改寫得更簡潔，保留所有重點，只輸出改寫後的內容。"],
@@ -40,6 +46,7 @@ function chatTargets2() {
     .filter((s) => isApiSlot(s) && s.busy && ((s.caps || []).includes("文字") || s.kind === "llama" || s.kind === "strata"))
     .forEach((s) => out.push({ key: `slot:${n.id}:${s.id}`, group: "本機模型", label: `${s.model || s.unit}（${n.name}）`, n, s,
       vision: (s.caps || []).includes("看圖"), local: true, url: `/api/node/${n.id}/chat/${s.id}`,
+      think: (s.caps || []).includes("思考"), thinkDefault: s.config?.thinking !== "off",
       ctx: s.config?.max_context || null })));
   (S.providers || []).filter((p) => p.key_set).forEach((p) => out.push({ key: `prov:${p.id}`, group: "第三方 API",
     label: `${p.name}・${p.default_model || ""}`, prov: p, local: false, url: `/api/providers/${p.id}/chat`, cn: p.cn_origin, ctx: 32768 }));
@@ -389,11 +396,17 @@ async function viewChat() {
   search.placeholder = "搜尋對話（標題與內容）";
   search.value = CHAT2.q;
   const listBox = el("div", "chat-list");
+  const filt = el("div", "chat-filter");
+  const fAll = el("button", "chip-btn", "全部");
+  const fFav = el("button", "chip-btn", "收藏");
+  const catSel = el("select", "chat-cat");
+  catSel.setAttribute("aria-label", "依分類篩選");
+  filt.append(fAll, fFav, catSel);
   const sideX = el("button", "btn sm chat-side-x", "收起");
   sideX.onclick = () => { CHAT2.sideOpen = false; side.classList.remove("open"); };
   const sideTop = el("div", "chat-side-top");
   sideTop.append(newB, sideX);
-  side.append(sideTop, search, listBox);
+  side.append(sideTop, search, filt, listBox);
   const mainCol = el("div", "chat-main");
   shell.append(side, mainCol);
 
@@ -411,24 +424,56 @@ async function viewChat() {
       await loadChatList();
       viewChat();
     } });
+  const setFav = async (it, on) => {
+    try { await api(`/api/chats/${it.id}/meta`, { method: "POST", body: { fav: on } }); } catch (ex) { toast(ex.message, "bad"); return; }
+    it.fav = on;
+    drawSide();
+  };
   const drawSide = () => {
     listBox.textContent = "";
-    if (!CHAT2.list.length) listBox.appendChild(el("p", "small muted", CHAT2.q ? "找不到符合的對話。" : "還沒有存下來的對話。"));
-    CHAT2.list.forEach((it) => {
+    fAll.setAttribute("aria-pressed", String(CHAT2.filter !== "fav"));
+    fFav.setAttribute("aria-pressed", String(CHAT2.filter === "fav"));
+    const cats = [...new Set(CHAT2.list.map((it) => it.category).filter(Boolean))].sort();
+    if (CHAT2.cat && !cats.includes(CHAT2.cat)) CHAT2.cat = "";
+    catSel.textContent = "";
+    [["", "所有分類"], ...cats.map((c) => [c, c])].forEach(([v, t]) => { const o = el("option", null, t); o.value = v; catSel.appendChild(o); });
+    catSel.value = CHAT2.cat;
+    catSel.hidden = !cats.length;
+    const rows = CHAT2.list.filter((it) => (CHAT2.filter !== "fav" || it.fav) && (!CHAT2.cat || it.category === CHAT2.cat));
+    if (!rows.length) listBox.appendChild(el("p", "small muted", CHAT2.q ? "找不到符合的對話。" : CHAT2.filter === "fav" ? "還沒有收藏的對話；在對話旁按星號收藏。"
+      : CHAT2.cat ? "這個分類沒有對話。" : "還沒有存下來的對話。"));
+    rows.forEach((it) => {
       const row = el("div", "chat-item");
       if (cur.id === it.id) row.setAttribute("aria-current", "true");
+      const star = el("button", "icon-btn chat-star" + (it.fav ? " on" : ""));
+      star.innerHTML = STAR_SVG;
+      star.setAttribute("aria-label", it.fav ? "取消收藏" : "收藏");
+      star.setAttribute("aria-pressed", String(!!it.fav));
+      star.title = it.fav ? "取消收藏" : "收藏";
+      star.onclick = () => setFav(it, !it.fav);
       const b = el("button", "chat-item-main");
       b.appendChild(el("span", "chat-item-t", it.title || "新對話"));
-      b.appendChild(el("span", "small muted", it.snippet || new Date(it.updated * 1000).toLocaleString(uiLocale(), { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })));
+      const when = new Date(it.updated * 1000).toLocaleString(uiLocale(), { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+      b.appendChild(el("span", "small muted", it.snippet || `${when}・${int(it.n_msgs || 0)}則`));
+      if (it.category || it.tags?.length) {
+        const lab = el("span", "chat-labels");
+        if (it.category) lab.appendChild(el("span", "chip idle", it.category));
+        (it.tags || []).forEach((t) => lab.appendChild(el("span", "chat-tag", "#" + t)));
+        b.appendChild(lab);
+      }
       b.onclick = () => pickChat(it);
-      const ren = el("button", "icon-btn", "改名");
-      ren.onclick = () => renameChat(it, () => { if (cur.id === it.id) cur.title = it.title; drawSide(); });
+      const ren = el("button", "icon-btn", "編輯");
+      ren.title = "改標題、分類與標籤";
+      ren.onclick = () => editChat(it, CHAT2.list, () => { if (cur.id === it.id) cur.title = it.title; drawSide(); });
       const del = el("button", "icon-btn danger-t", "刪除");
       del.onclick = () => dropChat(it);
-      row.append(b, ren, del);
+      row.append(star, b, ren, del);
       listBox.appendChild(row);
     });
   };
+  fAll.onclick = () => { CHAT2.filter = "all"; drawSide(); };
+  fFav.onclick = () => { CHAT2.filter = "fav"; drawSide(); };
+  catSel.onchange = () => { CHAT2.cat = catSel.value; drawSide(); };
   CHAT2.drawSide = drawSide;
   drawSide();
   let qT;
@@ -455,9 +500,11 @@ async function viewChat() {
   if (!targets.length) { const o = el("option", null, "（目前沒有執行中的模型，只能看紀錄）"); o.value = ""; sel.appendChild(o); sel.disabled = true; }
   sel.value = cur.target;
   const status = el("span", "small muted chat-status");
+  const thinkB = el("button", "btn sm toggle chat-think");
   const setB = el("button", "btn sm", "對話設定");
-  const expB = el("button", "btn sm", "匯出");
-  bar.append(sideT, sel, status, setB, expB);
+  const expB = el("button", "btn sm", "匯出Markdown");
+  const expJ = el("button", "btn sm", "匯出JSON");
+  bar.append(sideT, sel, status, thinkB, setB, expB, expJ);
   mainCol.appendChild(bar);
   const tgt = () => targets.find((t) => t.key === sel.value);
   const syncStatus = () => {
@@ -472,6 +519,25 @@ async function viewChat() {
   };
   setB.onclick = () => openChatSettings(cur, tgt(), () => { syncStatus(); if (cur.id) saveChat(cur); });
   expB.onclick = () => exportChat(cur);
+  expJ.onclick = () => exportChatJson(cur);
+  // 思考：開／關：模型的對話樣板認得enable_thinking才能切；切了只影響之後的請求，不用重新載入模型
+  const thinkOn = () => { const t = tgt(); return cur.settings?.think ?? (t?.thinkDefault !== false); };
+  const syncThink = () => {
+    const t = tgt();
+    const ok = !!(t?.local && t.think);
+    thinkB.disabled = !ok;
+    thinkB.textContent = ok ? `思考：${thinkOn() ? "開" : "關"}` : "思考：不支援";
+    thinkB.setAttribute("aria-pressed", String(ok && thinkOn()));
+    thinkB.title = !t ? "先選一個模型" : !t.local ? "第三方API不一定認得這個參數，要開關思考請在對方服務端設定"
+      : !t.think ? "這顆模型的對話樣板沒有思考開關（或代理是舊版）；要切換請換一顆會思考的模型"
+        : "開：先想再答，難題答得比較好但比較慢；關：直接回答。每次送出時帶給模型，不必重新載入";
+  };
+  thinkB.onclick = () => {
+    cur.settings = { ...(cur.settings || {}), think: !thinkOn() };
+    syncThink();
+    if (cur.id) saveChat(cur);
+  };
+  const thinkBody = (t) => (t?.local && t.think ? { chat_template_kwargs: { enable_thinking: thinkOn() } } : {});
 
   const box = el("div", "chat-box");
   mainCol.appendChild(box);
@@ -529,7 +595,8 @@ async function viewChat() {
     toolB.setAttribute("aria-pressed", String(!!cur.settings?.tools));
     const t = tgt();
     toolB.disabled = !t?.local;
-    toolB.title = t?.local ? "讓模型呼叫主控台的查詢工具：機器狀態、推薦模型、已下載的模型（只查，不會動作）" : "第三方 API 不開放主控台的工具";
+    toolB.title = t?.local ? (isAdmin() ? "讓模型呼叫工具：查主控台、讀網頁、聯網搜尋、讀寫Agent工作資料夾、執行指令；寫檔與執行指令會先問你"
+      : "讓模型呼叫工具：讀網頁、聯網搜尋、讀寫你自己的Agent工作資料夾；寫檔會先問你") : "第三方API不開放主控台的工具";
     ta.placeholder = cur.mode === "computer" ? "交代電腦要做的事，例：打開記事本，寫一段會議通知並存到桌面。Enter 送出"
       : cur.mode === "image" ? "描述想要的畫面（附一張圖就是改圖）。Enter 送出" : cur.mode === "video" ? "描述影片內容（附一張圖當第一格）。Enter 送出"
       : "問點什麼，或說「畫一張…」「生成一段…的影片」（Enter 送出，Shift+Enter 換行）";
@@ -578,9 +645,24 @@ async function viewChat() {
   attBtn.onclick = () => attach.click();
   attach.accept = ".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.log,.html,.xml,.yaml,.yml,.py,.js,.ts,.sh,.sql,image/png,image/jpeg,image/webp";
   attBtn.title = "附文件（PDF、Word、Excel、PowerPoint、純文字、程式碼）或圖片（看圖、改圖、影片第一格）";
-  attach.onchange = async () => {
-    const files = [...attach.files];
-    attach.value = "";
+  attach.onchange = () => { const files = [...attach.files]; attach.value = ""; addFiles(files); };
+  // 拖檔進輸入區、在輸入框貼上截圖：跟按「附件」走同一條路（同樣的大小與數量上限）
+  inputRow.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); inputRow.classList.add("drop"); } });
+  inputRow.addEventListener("dragleave", (e) => { if (!inputRow.contains(e.relatedTarget)) inputRow.classList.remove("drop"); });
+  inputRow.addEventListener("drop", (e) => {
+    inputRow.classList.remove("drop");
+    const files = [...(e.dataTransfer?.files || [])];
+    if (!files.length) return;
+    e.preventDefault();
+    addFiles(files);
+  });
+  ta.addEventListener("paste", (e) => {
+    const files = [...(e.clipboardData?.files || [])].filter((f) => /^image\//.test(f.type));
+    if (!files.length) return;                 // 一般文字照常貼上
+    e.preventDefault();
+    addFiles(files.map((f, i) => (f.name && f.name !== "image.png" ? f : new File([f], `截圖${i ? i + 1 : ""}.png`, { type: f.type }))));
+  });
+  async function addFiles(files) {
     for (const f of files) {
       if (/^image\//.test(f.type)) {
         if (f.size > 4 * 1024 * 1024) { toast("圖片最大 4 MB", "bad"); continue; }
@@ -602,19 +684,20 @@ async function viewChat() {
       }
       drawDocs();
     }
-  };
+  }
   const send = el("button", "btn primary", "送出");
   const stopB = el("button", "btn sm danger", "停止");
   stopB.hidden = true;
   // 工具（查機器的助理）與操作電腦只有管理員能用：一般使用者不顯示，伺服器端也擋
-  tools.append(attach, attBtn, ...(isAdmin() ? [toolB, pcB] : []), imgB, vidB, el("span", "spacer"), stopB, send);
-  if (!isAdmin() && cur.settings?.tools) delete cur.settings.tools;
+  // 工具每個人都有（能用哪些由主控台依身分決定）；操作電腦只有管理員能用：一般使用者不顯示，伺服器端也擋
+  tools.append(attach, attBtn, toolB, ...(isAdmin() ? [pcB] : []), imgB, vidB, el("span", "spacer"), stopB, send);
   inputRow.append(docsRow, ta, tools);
   drawDocs();
   mainCol.append(noteRow, inputRow);
-  sel.onchange = () => { cur.target = sel.value; syncMode(); syncStatus(); if (cur.id) saveChat(cur); };
+  sel.onchange = () => { cur.target = sel.value; syncMode(); syncStatus(); syncThink(); if (cur.id) saveChat(cur); };
   syncMode();
   syncStatus();
+  syncThink();
 
   const lock = (on) => {
     cur.busy = on; send.disabled = on; stopB.hidden = !on;
@@ -645,15 +728,27 @@ async function viewChat() {
       if (cur.settings?.tools && t.local && !hasImg) {
         // 系統提示詞與長對話的摘要都在 system 那一則：一起交給助理，壓縮過的前情才不會掉
         const sys = history.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-        const r = await api("/api/assistant", { method: "POST", signal: cur.ctl.signal, body: { node: t.n.id, slot: t.s.id,
+        let r = await api("/api/assistant", { method: "POST", signal: cur.ctl.signal, body: { node: t.n.id, slot: t.s.id,
           messages: history.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
-          system: sys, sampling: sampleBody(cur, t) } });
+          system: sys, sampling: sampleBody(cur, t), tool_allow: cur.settings?.tool_allow || [],
+          ...(t.think ? { think: thinkOn() } : {}) } });
+        // 會動到電腦的工具（寫檔、執行指令）：主控台停下來問，答了再接著跑；同一則回答可能問好幾次
+        while (r.ask) {
+          setNote(`模型想${TOOL_KIND_ZH[r.ask.kind] || "動作"}，等你決定…`);
+          const ans = await askTool(r.ask);
+          setNote("");
+          if (ans.always) {
+            cur.settings = { ...(cur.settings || {}), tool_allow: [...new Set([...(cur.settings?.tool_allow || []), r.ask.kind])] };
+          }
+          r = await api("/api/assistant/continue", { method: "POST", signal: cur.ctl.signal, body: { run: r.run, ...ans } });
+        }
+        const used = (r.steps || []).map((x) => (TOOL_LABEL[x.tool] || x.tool) + (x.denied ? "（你拒絕了）" : ""));
         Object.assign(reply, { content: r.content, reasoning: r.reasoning, pending: false,
-          stat: [r.steps?.length ? `查了：${r.steps.map((x) => TOOL_LABEL[x.tool] || x.tool).join("、")}` : "沒有用到工具",
+          stat: [used.length ? `用了：${[...new Set(used)].join("、")}` : "沒有用到工具",
             `${fmt((performance.now() - t0) / 1000, 1)} 秒`].filter(Boolean).join("・") });
         return;
       }
-      const body = { messages: history, stream: true, ...sampleBody(cur, t), ...(t.prov ? { model: t.prov.default_model } : {}) };
+      const body = { messages: history, stream: true, ...sampleBody(cur, t), ...thinkBody(t), ...(t.prov ? { model: t.prov.default_model } : {}) };
       const { timings, usage } = await streamInto(t, body, reply, paintOf(reply), cur.ctl.signal);
       const sp = timings?.predicted_per_second;
       if (sp) cur.lastSpeed = sp;
@@ -898,18 +993,77 @@ async function viewChat() {
   ta.focus();
 }
 
-function renameChat(it, done) {
+// 編輯一則對話：標題、分類（一則一個）、標籤（逗號或空白分開，最多10個）
+function editChat(it, all, done) {
   const d = el("div");
   const inp = textInput(it.title || "", "新的標題");
   inp.maxLength = 80;
-  d.appendChild(fieldBox("標題", inp));
-  modal({ title: "改名", bodyNode: d, hasInput: true, confirmText: "儲存", onConfirm: async () => {
+  const cat = textInput(it.category || "", "例：工作、課程、研究");
+  cat.maxLength = 40;
+  const dl = el("datalist");
+  dl.id = "chat-cats-" + it.id;
+  [...new Set((all || []).map((x) => x.category).filter(Boolean))].forEach((c) => { const o = el("option"); o.value = c; dl.appendChild(o); });
+  cat.setAttribute("list", dl.id);
+  const tags = textInput((it.tags || []).join("、"), "例：報價、客戶甲");
+  d.append(fieldBox("標題", inp), fieldBox("分類", cat, "一則對話放一個分類；左欄可以依分類篩選"), dl,
+    fieldBox("標籤", tags, "用逗號、頓號或空白分開，最多10個；搜尋也找得到標籤"));
+  modal({ title: "編輯對話", bodyNode: d, hasInput: true, confirmText: "儲存", onConfirm: async () => {
     const v = inp.value.trim();
     if (!v) { toast("標題不能空白", "bad"); return; }
-    try { await api(`/api/chats/${it.id}/rename`, { method: "POST", body: { title: v } }); } catch (ex) { toast(ex.message, "bad"); return; }
-    it.title = v;
+    const tl = [...new Set(tags.value.split(/[,，、\s]+/).map((x) => x.trim().replace(/^#/, "")).filter(Boolean))];
+    if (tl.length > 10) { toast("標籤最多10個", "bad"); return; }
+    try {
+      if (v !== it.title) await api(`/api/chats/${it.id}/rename`, { method: "POST", body: { title: v } });
+      const r = await api(`/api/chats/${it.id}/meta`, { method: "POST", body: { category: cat.value.trim(), tags: tl } });
+      Object.assign(it, { title: v, category: r.category, tags: r.tags });
+    } catch (ex) { toast(ex.message, "bad"); return; }
     done();
   } });
+}
+
+// 工具要動到電腦：寫檔給路徑與內容預覽，執行指令給整條指令。回{ allow, always }
+function askTool(a) {
+  return new Promise((resolve) => {
+    const d = el("div");
+    const kindZh = TOOL_KIND_ZH[a.kind] || "動作";
+    if (a.tool === "write_file") {
+      d.appendChild(el("p", "small", `模型想在工作資料夾「${a.folder}」寫入${a.path}（${int(a.chars || 0)}字），檔案已經存在就會整份覆蓋：`));
+      const pre = el("pre", "mono code-pre");
+      pre.textContent = (a.preview || "") + (a.chars > (a.preview || "").length ? "\n…（後面還有）" : "");
+      d.appendChild(pre);
+    } else {
+      d.appendChild(el("p", "small", `模型想在工作資料夾「${a.folder}」執行這條指令，請確認它是安全的再允許：`));
+      const pre = el("pre", "mono code-pre");
+      pre.textContent = a.command || "";
+      d.appendChild(pre);
+    }
+    const r = el("label", "check-row");
+    const cb = el("input");
+    cb.type = "checkbox";
+    r.append(cb, document.createTextNode(` 本次對話不再詢問同類操作（${kindZh}）`));
+    d.appendChild(r);
+    const ov = modal({ title: a.tool === "write_file" ? "模型想寫入一個檔案" : "模型想執行一條指令", bodyNode: d, hasInput: true });
+    const actions = ov.querySelector(".actions");
+    actions.textContent = "";
+    const finish = (allow) => { ov.remove(); resolve({ allow, always: allow && cb.checked }); };
+    const no = el("button", "btn", "拒絕");
+    no.onclick = () => finish(false);
+    const yes = el("button", "btn primary", "允許");
+    yes.onclick = () => finish(true);
+    actions.append(no, yes);
+    // Esc關掉視窗＝拒絕，不讓工具迴圈一直等
+    new MutationObserver((_, ob) => { if (!ov.isConnected) { ob.disconnect(); resolve({ allow: false, always: false }); } })
+      .observe(ov.parentNode || document.body, { childList: true });
+  });
+}
+
+function exportChatJson(cur) {
+  if (!cur.msgs.length) { toast("這則對話還是空的", "bad"); return; }
+  const it = (CHAT2.list || []).find((x) => x.id === cur.id) || {};
+  const doc = { format: "xconsole-chat", version: 1, exported_at: new Date().toISOString(), id: cur.id, title: cur.title || "對話",
+    model: cur.target, fav: !!it.fav, category: it.category || "", tags: it.tags || [], settings: cur.settings || {},
+    ...(cur.summary ? { summary: cur.summary } : {}), messages: cur.msgs.filter((m) => !m.pending).map(packMsg) };
+  download(`${(cur.title || "對話").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40)}.json`, JSON.stringify(doc, null, 2), "application/json;charset=utf-8");
 }
 
 function openChatSettings(cur, t, done) {
@@ -960,8 +1114,10 @@ function openChatSettings(cur, t, done) {
     }
     if (sys.value.trim()) out.system = sys.value.trim();
     if (st.tools) out.tools = true;
+    if (st.think !== undefined) out.think = st.think;
+    if (st.tool_allow?.length) out.tool_allow = st.tool_allow;
     cur.settings = out;
-    if (cb.checked) { const { tools, ...keep } = out; try { localStorage.setItem(CHAT_DEF_KEY, JSON.stringify(keep)); } catch (_) { /* 無痕 */ } }
+    if (cb.checked) { const { tools, tool_allow, ...keep } = out; try { localStorage.setItem(CHAT_DEF_KEY, JSON.stringify(keep)); } catch (_) { /* 無痕 */ } }
     toast("已套用到這則對話", "ok");
     done();
   } });

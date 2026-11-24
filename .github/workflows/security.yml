@@ -75,6 +75,12 @@ jobs:
         run: cd console && python test_extract.py
       - name: 對話紀錄（加密落地、別人的看不到、搜尋、附圖 blob、取樣參數只送支援的）
         run: cd console && python test_chats.py
+      - name: 對話工具（讀網頁擋內網位址、聯網搜尋、寫檔與執行指令先問、本次對話不再詢問、一般使用者只動自己的資料夾）
+        run: cd console && python test_chattools.py
+      - name: Agent任務（等核准、拒絕、步數上限、停止、加密落地、重啟後標成已中斷、只能刪自己的、計畫收尾）
+        run: cd console && python test_agent_tasks.py
+      - name: 每天會碰到的對齊項目（新版通知與跳過版本、載入中最後一行記錄、思考開關預設、畫面守衛）
+        run: cd console && python test_daily_parity.py
       - name: 加密入口金鑰（產生、撤銷、只存雜湊、用量）
         run: cd console && python test_apikeys.py
       - name: 多帳號與角色（逐條路由守衛、一次性密碼、只看得到自己的、停用與降級即時生效、登入節流不連累同一 NAT）

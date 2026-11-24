@@ -139,13 +139,14 @@ def routes():
 # 使用者能用的：寫死在這裡。放寬權限要連這裡一起改
 EXPECT_USER = {
     ("GET", "/api/me"), ("GET", "/api/fleet"), ("GET", "/api/branding"), ("GET", "/api/chats"), ("GET", "/api/keys"),
-    ("GET", "/api/sd/catalog"), ("GET", "/api/agent/tasks"), ("GET", "/api/providers"),
+    ("GET", "/api/sd/catalog"), ("GET", "/api/agent/tasks"), ("GET", "/api/providers"), ("GET", "/api/assistant/tools"),
     ("POST", "/api/logout"), ("POST", "/api/account/password"), ("POST", "/api/chats/save"), ("POST", "/api/chats/delete-all"),
     ("POST", "/api/extract"), ("POST", "/api/preview"), ("POST", "/api/agent/tasks"), ("POST", "/api/keys/create"),
+    ("POST", "/api/assistant"), ("POST", "/api/assistant/continue"),
 }
 EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/agent/tasks/[0-9a]{12}",
                   r"GET /api/node/a/(agent/folders|sd/recommend)", r"GET /api/node/a/sd/jobs(/[0-9a]{8}(/output(/0)?|/init)?)?",
-                  r"POST /api/chats/[0-9a]{12}/(rename|delete)", r"POST /api/agent/tasks/[0-9a]{12}/(approve|stop)",
+                  r"POST /api/chats/[0-9a]{12}/(rename|delete|meta)", r"POST /api/agent/tasks/[0-9a]{12}/(approve|stop|delete)",
                   r"POST /api/node/a/chat/a", r"POST /api/node/a/agent/(folders/create|fs/list|fs/read)",
                   r"POST /api/node/a/sd/(generate|admit)", r"POST /api/node/a/sd/jobs/[0-9a]{8}/(cancel|delete)",
                   r"POST /api/keys/[0-9a]{8}/(update|revoke)"]
@@ -243,6 +244,9 @@ def _roles_and_scope(admin):
     check("  範圍外的不能動 → 404", op.req("POST", "/api/node/n2/slot/s/start", {})[0] == 404)
     st, o = op.req("POST", "/api/node/n2/chat/s", {"messages": []})
     check("  範圍外的機器也不能對話（使用者功能一樣套範圍）", st == 404 and o.get("error") == "沒有這台機器", (st, o))
+    st, o = op.req("POST", "/api/assistant", {"node": "n2", "slot": "s", "messages": [{"role": "user", "content": "x"}]})
+    check("  範圍外的機器也不能用對話工具 → 404", st == 404 and "沒有這台" in o.get("error", ""), (st, o))
+    check("  範圍外的機器查不到可用的工具 → 404", op.req("GET", "/api/assistant/tools?node=n2")[0] == 404)
     st, o = vw.req("POST", "/api/node/n1/slot/s/start", {})
     check("檢視：範圍內也不能操作 → 403並講清楚", st == 403 and "檢視" in o.get("error", ""), (st, o))
     check("  檢視看得到狀態", vw.req("GET", "/api/node/n1/state")[0] == 200)

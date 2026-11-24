@@ -181,6 +181,38 @@ def main():
     except ValueError:
         check("儲存層拒收沒加密的標題", True)
 
+    # ---- 收藏、分類、標籤
+    st, out, _ = req("POST", f"/api/chats/{cid}/meta", {"fav": True, "category": "工作", "tags": ["#客戶甲", "報價", "報價"]})
+    check("設收藏、分類、標籤（標籤去掉 #、去重）", st == 200 and out["fav"] is True and out["category"] == "工作"
+          and out["tags"] == ["客戶甲", "報價"], out)
+    row = x.STORE.chat_get("admin", cid)
+    check("  分類標籤是 enc:v1: 密文、收藏是 0／1", row["labels"].startswith("enc:v1:") and "報價" not in row["labels"] and row["fav"] == 1)
+    before = row["updated"]
+    st, out, _ = req("GET", "/api/chats")
+    it = next(i for i in out["items"] if i["id"] == cid)
+    check("  列表帶收藏、分類、標籤、訊息數", it["fav"] is True and it["category"] == "工作" and it["tags"] == ["客戶甲", "報價"]
+          and "n_msgs" in it, it)
+    check("  按收藏不改最後更新時間（列表順序不跳）", x.STORE.chat_get("admin", cid)["updated"] == before)
+    req("POST", "/api/chats/save", {"id": cid, "title": "t", "msgs": [{"role": "user", "content": "存一次內容"}]})
+    st, out, _ = req("GET", f"/api/chats/{cid}")
+    check("  存對話內容不會把收藏與分類標籤洗掉", out["fav"] is True and out["category"] == "工作" and out["tags"] == ["客戶甲", "報價"], out)
+    st, out, _ = req("GET", "/api/chats?q=" + urllib.parse.quote("報價"))
+    check("  搜尋找得到標籤", [i["id"] for i in out["items"]] == [cid], out)
+    st, out, _ = req("POST", f"/api/chats/{cid}/meta", {"category": "", "tags": []})
+    check("  清掉分類標籤（收藏不動）", st == 200 and out["fav"] is True and out["category"] == "" and out["tags"] == []
+          and not x.STORE.chat_get("admin", cid)["labels"], out)
+    for bad, why in (({"fav": "yes"}, "收藏要布林"), ({"category": "長" * 41}, "分類太長"), ({"tags": ["t"] * 11}, "標籤太多"),
+                     ({"tags": ["長" * 31]}, "標籤太長"), ({"tags": "abc"}, "標籤要是清單")):
+        st, out, _ = req("POST", f"/api/chats/{cid}/meta", bad)
+        check(f"  擋下：{why}", st == 400, out)
+    st, out, _ = req("POST", "/api/chats/" + "a" * 12 + "/meta", {"fav": True})
+    check("  別人的對話不能設收藏", st == 404 and not x.STORE.chat_get("alice", "a" * 12)["fav"])
+    check("  使用者也能用（路由開放）", x.user_may("POST", f"/api/chats/{cid}/meta"))
+    st, out, _ = req("POST", "/api/chats/save", {"id": cid, "msgs": [{"role": "user", "content": "x"}],
+                                                 "settings": {"think": False, "tool_allow": ["command", "亂寫"]}})
+    st, out, _ = req("GET", f"/api/chats/{cid}")
+    check("對話設定存「思考：關」與不再詢問的工具類別（只收認得的）", out["settings"] == {"think": False, "tool_allow": ["command"]}, out["settings"])
+
     st, out, _ = req("POST", f"/api/chats/{cid}/delete", {})
     check("刪除", st == 200 and x.STORE.chat_get("admin", cid) is None)
 
@@ -223,6 +255,15 @@ def main():
     check("  種子 -1 不送", "seed" not in r[2], r)
     r = A.chat_request("s1", {"messages": [{"role": "user", "content": "嗨"}], "top_k": 1.5})
     check("  Top K 不是整數回 400", r[0] == 400, r)
+    r = A.chat_request("s1", {"messages": [{"role": "user", "content": "嗨"}], "chat_template_kwargs": {"enable_thinking": False, "x": 1}})
+    check("  思考開關：只轉送 enable_thinking 一個布林", r[2].get("chat_template_kwargs") == {"enable_thinking": False}, r)
+    r = A.chat_request("s1", {"messages": [{"role": "user", "content": "嗨"}], "chat_template_kwargs": {"enable_thinking": "no"}})
+    check("  不是布林就不送", "chat_template_kwargs" not in r[2], r)
+    check("  對話樣板認得 enable_thinking 才算可切換思考",
+          A.gguf_profile({"general.architecture": "qwen3", "tokenizer.chat_template": "{% if enable_thinking %}<think>{% endif %}"})["thinking"]
+          and not A.gguf_profile({"general.architecture": "llama", "tokenizer.chat_template": "{{ messages }}"})["thinking"])
+    check("  換模型時「思考」能力依新模型重算", A.model_caps({"caps": ["文字", "思考"]}, {"thinking": False}) == ["文字"]
+          and A.model_caps({"caps": []}, {"thinking": True, "vision": True}) == ["思考", "文字", "看圖"])
 
     print("全部通過" if OK else "有失敗")
     sys.exit(0 if OK else 1)

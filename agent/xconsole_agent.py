@@ -1665,6 +1665,16 @@ def harvest_measurements(slot, reg):
     return rec
 
 
+def slot_caps(slot):
+    """登錄檔記的能力；舊版換上的llama.cpp模型沒記「思考」，照設定檔指的模型檔頭補上（檔頭讀過就快取）。"""
+    caps = list(slot.get("caps") or [])
+    if slot.get("kind") == "llama" and slot.get("config") and "思考" not in caps:
+        model = (load_json(slot["config"], None) or {}).get("model")
+        if isinstance(model, str) and model.endswith(".gguf") and (_profile_cached(model) or {}).get("thinking"):
+            caps = sorted(caps + ["思考"])
+    return caps
+
+
 def slot_state(slot, reg, hw):
     state = unit_state(slot["unit"]) if slot.get("unit") else "none"
     active = state == "active"
@@ -1699,7 +1709,7 @@ def slot_state(slot, reg, hw):
         "unit": slot.get("unit"),
         "port": (cfg or {}).get("port") or slot.get("port"),
         "model": slot.get("model"), "quant": slot.get("quant"),
-        "caps": slot.get("caps") or [], "kind": slot.get("kind"),
+        "caps": slot_caps(slot), "kind": slot.get("kind"),
         "gpu_ids": slot.get("gpu_ids"),
         "active": active,
         "state": state,
@@ -2142,6 +2152,18 @@ def load_progress(rec, pid=None, read_bytes=None, rss_gib=None, log_text="", rea
     return out
 
 
+LOG_KEYISH_RX = re.compile(r"(?i)((?:api[-_]?key|token|password|secret|bearer)[\s=:\"']+)\S+")
+
+
+def last_log_line(text):
+    """記錄檔最後一行有字的（載入中給畫面看「它現在在做什麼」）；像金鑰的值遮掉、太長截斷。"""
+    for ln in reversed((text or "").splitlines()[-50:]):
+        ln = ln.strip()
+        if ln:
+            return LOG_KEYISH_RX.sub(r"\1[已遮罩]", ln)[:300]
+    return ""
+
+
 def slot_progress(slot_id):
     slot = _slot(slot_id)
     if not slot:
@@ -2174,6 +2196,7 @@ def slot_progress(slot_id):
     rss = proc_rss_gib(pid) if rb is None and pid else None
     text = _load_log(rec)
     out = load_progress(rec, pid, rb, rss, text, ready=_port_ready(rec.get("port")) if pid else False, now=now)
+    out["last_line"] = last_log_line(text)
     with _LOAD_LOCK:
         if slot_id in _LOAD and _LOAD[slot_id]["state"] == "loading":
             _LOAD[slot_id]["stage"] = out["stage"]
@@ -2967,6 +2990,12 @@ def gguf_root(reg=None):
     return expand(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)
 
 
+def model_caps(old, m):
+    """跟模型有關的能力（看圖、可切換思考）每次依新模型重算，不沿用上一顆的。"""
+    caps = (set(old.get("caps") or []) - {"看圖", "思考"}) | {"文字"}
+    return sorted(caps | ({"看圖"} if m.get("vision") else set()) | ({"思考"} if m.get("thinking") else set()))
+
+
 def gguf_meta(path, tensors=False):
     """讀 GGUF 檔頭的 key-value（不讀權重）。tokenizer 那種幾十萬筆的陣列直接跳過。
     path 也可以是已開好的檔案物件（例：從 Hugging Face 用 Range 抓回來的前幾 MB）。
@@ -3061,9 +3090,12 @@ def gguf_profile(meta):
             full_b += b
     name = meta.get("general.name") or meta.get("general.basename") or ""
     low = f"{arch} {name}".lower()
+    tpl = meta.get("tokenizer.chat_template")
     return {"arch": arch, "meta_name": name, "ctx_train": _num(g("context_length", 0)) or None,
             "kv_full_bpt": full_b, "kv_swa_bpt": swa_b, "swa_window": swa if swa_b else 0,
-            "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN)}
+            "layers": n_layer, "cn_origin": any(c in low for c in CN_ORIGIN),
+            # 對話樣板認得enable_thinking：每次請求帶chat_template_kwargs就能開關思考，不必重新載入
+            "thinking": isinstance(tpl, str) and "enable_thinking" in tpl}
 
 
 def weight_profile(parts):
@@ -3661,7 +3693,8 @@ def llama_config(path):
             # 用硬碟執行（檔案映射）：沒放 GPU 的層，KV 在系統記憶體（admit 照這個比例分到兩個池）
             "kv_ram_frac": float(raw.get("kv_ram_frac") or 0) if raw.get("disk") else 0.0,
             "disk_mode": bool(raw.get("disk")),
-            "_native": raw.get("model"), "_pack": None, "engine": "llama"}
+            "_native": raw.get("model"), "_pack": None, "engine": "llama",
+            "thinking": raw.get("reasoning") or "auto"}     # 啟動時的思考模式：對話頁的「思考：開／關」預設照這個
 
 
 def llama_key(raw):
@@ -4081,7 +4114,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
     put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
          "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
          # 跟模型有關的能力（看圖）每次依新模型重算，不沿用上一顆的
-         "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
+         "caps": model_caps(old, m),
          "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
 
     def undo(msg, code=500, extra=None, restart_old=True):
@@ -4133,7 +4166,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
             cpu_moe = lay["cpu_moe"]                    # MoE 依張量分層時，專家層留在映射記憶體的層數
             put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
                  "port": int(port), "est_vram_gib": est["vram"], "est_ram_gib": est["ram"],
-                 "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
+                 "caps": model_caps(old, m),
                  "model": m["name"], "quant": m.get("quant"), "cpu_moe": cpu_moe or None})
             verdict = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
     auto_ctx = None
@@ -4151,7 +4184,7 @@ def set_llama_model(slot_id, model_id, ctx=None, force=False, gpus=..., allow_di
             os.chmod(cfg_path, 0o600)
             put({**fields, "kind": "llama", "unit": unit, "config": cfg_path, "engines": engines,
                  "port": int(port), "est_vram_gib": ly["est_vram"], "est_ram_gib": ly["est_ram"],
-                 "caps": sorted((set(old.get("caps") or []) - {"看圖"}) | {"文字"} | ({"看圖"} if m.get("vision") else set())),
+                 "caps": model_caps(old, m),
                  "model": m["name"], "quant": m.get("quant"), "cpu_moe": ly["cpu_moe"] or None})
             v2 = admit(slot_id, extra_free=(ov, orr), reclaim_cards=card_split(old_v, old.get("gpu_ids"), cards))
             if v2["allow"]:
@@ -4771,6 +4804,10 @@ def chat_request(slot_id, body):
         req[k] = int(v) if typ is int else v
     if isinstance(body.get("tools"), list) and len(body["tools"]) <= 16:
         req["tools"] = body["tools"]
+    # 對話頁的「思考：開／關」：只收enable_thinking一個布林，其他樣板參數不讓網頁塞進來
+    ctk = body.get("chat_template_kwargs")
+    if isinstance(ctk, dict) and isinstance(ctk.get("enable_thinking"), bool):
+        req["chat_template_kwargs"] = {"enable_thinking": ctk["enable_thinking"]}
     name = (raw or {}).get("model_name")
     if not name:
         # 登記進來的既有服務沒有 xConsole 管的設定檔：跟 API 實測一樣，問 /v1/models 取第一個（有些伺服器沒帶 model 會拒絕）
