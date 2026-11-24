@@ -39,8 +39,10 @@ import zipfile
 CORE_API = 1
 ROLE_RANK = {"user": 0, "viewer": 1, "operator": 2, "admin": 3}
 # 云碩的模組簽章公鑰（Ed25519，32位元組hex）。私鑰離線保管，不進repo、不進CI、不放環境變數。
-# ponytail: 正式金鑰還沒產生；云碩在離線機器跑tools/module_sign.py keygen後，把印出的公鑰加進這裡並發新版核心
-TRUSTED_KEYS = {}
+# 換金鑰：在保管私鑰的機器跑tools/module_sign.py keygen，把新公鑰加進來發新版核心；舊的那把等客戶都換到新簽的模組再拿掉
+TRUSTED_KEYS = {
+    "xcloudinfo-2026-11": "ed21ccdd49b8f3ccce2b77be216a4cd54d11ae5f631ae23bbc72ca0eaccf7b71",
+}
 PKG = "xconsole_ent"
 ENTRY = "__init__.py"
 RESERVED = ("manifest.json", "manifest.sig")
