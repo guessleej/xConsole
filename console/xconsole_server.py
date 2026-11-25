@@ -53,6 +53,7 @@ import tls  # noqa: E402
 import agentlink  # noqa: E402
 import userchan  # noqa: E402
 import mirror  # noqa: E402
+import issues  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
@@ -112,6 +113,8 @@ USER_ROUTES = [
     ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend)"),
     ("GET", r"/api/node/[\w.-]+/sd/jobs(/[0-9a-f]{8}(/output(/[0-3])?|/init)?)?"),
     ("POST", r"/api/(logout|account/password|chats/save|chats/delete-all|extract|preview|agent/tasks|keys/create|assistant|assistant/continue)"),
+    ("GET", r"/api/issues/(mine|checking)"),          # 問題回報（清單 #19）：每個人都能回報、看自己的回條
+    ("POST", r"/api/issues"),
     ("POST", r"/api/chats/[0-9a-f]{12}/(rename|delete|meta)"),
     ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop|delete)"),
     ("POST", r"/api/node/[\w.-]+/chat/[\w.-]+"),
@@ -2588,6 +2591,46 @@ def mirror_urls():
     return {"urls": [f"https://{'[' + h + ']' if ':' in h else h}:{PORT}/mirror" for h in names], "cert": cert}
 
 
+# ---- 即時問題回報（清單 #19）
+def issue_cfg():
+    return {**issues.DEFAULT_CFG, **(fleet().get("issues") or {})}
+
+
+def smtp_cfg():
+    return dict(fleet().get("smtp") or {})
+
+
+def issue_mailer(to, subject, text):
+    """信裡只放摘要；寄之前再過一次遮罩，萬一說明裡貼了金鑰也不會寄出去。"""
+    smtp = smtp_cfg()
+    pw = tls.unseal(CERTS.p, smtp["password"]).decode() if str(smtp.get("password") or "").startswith("enc:v1:") else ""
+    return issues.send_mail(smtp, pw, to, mask_secret(subject), mask_secret(text))
+
+
+ISSUES = issues.Issues(os.path.join(STATE_DIR, "issues.db"), os.path.join(STATE_DIR, "issue-files"), issue_mailer)
+
+
+def issue_public(it, full=False):
+    """回報人看到的回條與進度；管理頁另外看到情境、附件與寄信紀錄。"""
+    out = {k: it[k] for k in ("id", "at", "level", "text", "page", "target", "state", "checking", "due", "reply_due", "picked", "done")}
+    out["replies"] = it["replies"]
+    if full:
+        out.update(by=it["by"], role=it["role"], context=it["context"], files=it["files"], mails=it["mails"][-10:])
+    return out
+
+
+def issue_worker():
+    """每分鐘看一次：緊急件逾時沒人接手就催（之後每小時），一般件逾期每天提醒。"""
+    while True:
+        time.sleep(60)
+        try:
+            c = issue_cfg()
+            ISSUES.escalate_scan(c)
+            ISSUES.overdue_scan(c)
+        except Exception as exc:  # noqa: BLE001
+            print(f"問題回報催辦出錯：{exc}", flush=True)
+
+
 def hf_token():
     t = (fleet().get("hf") or {}).get("token") or ""
     try:
@@ -4137,6 +4180,32 @@ class Handler(BaseHTTPRequestHandler):
             body = fh.read()
         return self._send(200, body, MIME.get(os.path.splitext(full)[1], "application/octet-stream"))
 
+    def _issue_attach(self, iid):
+        """回報人自己的工單附截圖、錄音、錄影：原始檔直接送，帶 X-XConsole-Upload，最大 40 MB。"""
+        ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if not self.user or ctype != "application/octet-stream" or self.headers.get("X-XConsole-Upload") != "1" \
+                or not 0 < n <= issues.ATTACH_LIMIT["video"]:
+            if self.user and 0 < n <= issues.ATTACH_LIMIT["video"]:
+                self.rfile.read(n)                # 讀完再回，客戶端才收得到錯誤而不是連線被重設
+            self.close_connection = True
+            self._headers_done()
+            return self._json(401 if not self.user else 413 if n > issues.ATTACH_LIMIT["video"] else 415,
+                              {"error": "請先登入" if not self.user else "附件最大 40 MB，要帶 X-XConsole-Upload 與 application/octet-stream"})
+        data = self.rfile.read(n)
+        self._headers_done()
+        try:
+            f = ISSUES.attach(iid, self.user, data, urllib.parse.unquote(self.headers.get("X-Filename") or ""))
+        except LookupError as exc:
+            return self._json(404, {"error": str(exc)})
+        except ValueError as exc:
+            return self._json(400, {"error": str(exc)})
+        self._audit("issue.attach", f"#{iid}", True, {"kind": f["kind"], "bytes": f["size"]})
+        return self._json(200, {"ok": True, "file": f})
+
     def _winrt_upload(self, ctype):
         """主控台不能連外時：管理者把Windows執行環境包（xconsole-runtime-<版本>-win-x64.zip）從別台下載後在這裡上傳。"""
         if not self.user:
@@ -4769,6 +4838,25 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "目前沒有待配對的 CSR"})
             return self._send(200, rec["csr_pem"].encode(), "application/pkcs10",
                               {"Content-Disposition": f'attachment; filename="{rec["cn"]}.csr"'})
+        if path == "/api/issues/mine":
+            return self._json(200, {"items": [issue_public(x) for x in ISSUES.rows(by=self.user, limit=30)]})
+        if path == "/api/issues/checking":
+            return self._json(200, {"targets": ISSUES.checking()})
+        if path == "/api/issues":
+            st = (q.get("state") or [""])[0]
+            smtp = smtp_cfg()
+            return self._json(200, {"items": [issue_public(x, True) for x in ISSUES.rows(state=st if st in issues.STATES else None)],
+                                    "cfg": issue_cfg(), "smtp": {k: smtp.get(k) for k in ("host", "port", "security", "user", "from")}
+                                    | {"password_set": bool(smtp.get("password"))},
+                                    **ISSUES.status(issue_cfg(), bool(smtp.get("host")))})
+        m = re.fullmatch(r"/api/issues/(\d+)/file/([0-9a-f]{16})", path)
+        if m:
+            full, f = ISSUES.file_path(m.group(1), m.group(2))
+            if not full or not os.path.exists(full):
+                return self._json(404, {"error": "沒有這個附件"})
+            ctype = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "mp3": "audio/mpeg",
+                     "ogg": "audio/ogg", "wav": "audio/wav", "m4a": "audio/mp4", "mp4": "video/mp4", "webm": "video/webm"}[f["ext"]]
+            return self._send_file(full, ctype)
         if path == "/api/mirror":
             du = shutil.disk_usage(MIRROR.root)
             return self._json(200, {**MIRROR.status(), "root": MIRROR.root, "free_gib": round(du.free / 2**30, 1),
@@ -4808,6 +4896,9 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST
     def do_POST(self):  # noqa: N802
         path = urlparse(self.path).path
+        m = re.fullmatch(r"/api/issues/(\d+)/attach", path)
+        if m:
+            return self._issue_attach(m.group(1))
         if UPLOAD_RX.fullmatch(path) and self.user and not self.is_admin:
             self._headers_done()
             self.close_connection = True            # 本文是大檔，不讀完：直接關連線
@@ -5862,6 +5953,60 @@ class Handler(BaseHTTPRequestHandler):
             except chattools.FetchError as exc:
                 return self._json(502, {"error": str(exc)})
             return self._json(200, {"results": rows})
+        if path == "/api/issues":
+            try:
+                out = ISSUES.submit(self.user, (self.who or {}).get("role", ""), body, issue_cfg())
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            self._audit("issue.submit", f"#{out['id']}", True, {"level": out["level"], "page": str(body.get("page") or "")[:60]})
+            return self._json(200, {"ok": True, **out})
+        m = re.fullmatch(r"/api/issues/(\d+)/update", path)
+        if m:
+            try:
+                it = ISSUES.update(m.group(1), self.user, issue_cfg(), state=body.get("state"), reply=body.get("reply"),
+                                   checking=body.get("checking") if isinstance(body.get("checking"), bool) else None)
+            except LookupError as exc:
+                return self._json(404, {"error": str(exc)})
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            self._audit("issue.update", f"#{it['id']}", True, {"state": it["state"], "checking": it["checking"]})
+            return self._json(200, {"ok": True, "item": issue_public(it, True)})
+        if path == "/api/issues/settings":
+            try:
+                c = issues.check_cfg(body.get("cfg") or {})
+                sm = body.get("smtp") or {}
+                host = str(sm.get("host") or "").strip()
+                if host and not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host):
+                    raise ValueError("郵件伺服器要寫主機名稱或 IP（例：smtp.office365.com）")
+                port = sm.get("port")
+                if port not in (None, "") and (isinstance(port, bool) or not isinstance(port, int) or not 0 < port < 65536):
+                    raise ValueError("埠要是 1～65535")
+                if sm.get("security", "starttls") not in ("starttls", "ssl", "none"):
+                    raise ValueError("加密方式要是 STARTTLS、SSL 或不加密")
+                frm = str(sm.get("from") or "").strip()
+                if frm and not issues.is_email(frm):
+                    raise ValueError("寄件人要是 email")
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            pw = sm.get("password")
+
+            def put(cfg):
+                cfg["issues"] = c
+                old = cfg.get("smtp") or {}
+                cfg["smtp"] = {"host": host, "port": port or None, "security": sm.get("security", "starttls"),
+                               "user": str(sm.get("user") or "").strip()[:200], "from": frm,
+                               # 密碼一律 AES-256-GCM 加密落地；沒填就沿用、明確清空才拿掉
+                               "password": tls.seal(CERTS.p, pw.encode()) if isinstance(pw, str) and pw else
+                               ("" if pw == "" and sm.get("clear_password") else old.get("password", ""))}
+            update_fleet(put)
+            self._audit("issue.settings", "", True, {"recipients": len(c["recipients"]), "seniors": len(c["seniors"]),
+                                                     "smtp_host": host, "password_changed": bool(pw)})
+            return self._json(200, {"ok": True})
+        if path == "/api/issues/test-mail":
+            to = [x for x in issue_cfg().get("recipients") or [] if issues.is_email(x)]
+            ok, why = issue_mailer(to, "[xConsole] 問題回報測試信", "這是問題回報的測試信。收到就代表郵件伺服器與通知名單都設好了。")
+            self._audit("issue.test_mail", "", ok, {"to": len(to), "error": why})
+            return self._json(200 if ok else 502, {"ok": ok, "error": why, "to": to})
         if path == "/api/mirror/engine/delete":
             name = str(body.get("name") or "")
             try:
@@ -6075,6 +6220,7 @@ def main():
     threading.Thread(target=aligner, daemon=True).start()
     threading.Thread(target=safety_worker, daemon=True).start()
     threading.Thread(target=MIRROR.worker, daemon=True).start()
+    threading.Thread(target=issue_worker, daemon=True).start()
     ALIGN_WAKE.set()
     if not DESKTOP and not winrt.meta(STATE_DIR):
         winrt.fetch(STATE_DIR, quiet=True)      # 「加一台機器」的Windows腳本要用：啟動時先試著抓一次，抓不到畫面上有按鈕
