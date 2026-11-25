@@ -50,7 +50,7 @@ if WIN:
 else:
     import pwd
     d = tempfile.mkdtemp(prefix="xc-uch-run-")
-    os.chmod(d, 0o755)
+    subprocess.run(["chmod", "755", d], check=True)
     WHERE = os.path.join(d, "agent.sock")
     ME = [pwd.getpwuid(os.getuid()).pw_name]
     A.console_uids = lambda: {os.getuid()}
@@ -60,7 +60,7 @@ case("主控台端認得出這台有受管的系統代理", userchan.managed(WHE
 if not WIN:
     case("  socket 開 0666，誰能用由連線者身分決定", oct(os.stat(WHERE).st_mode & 0o777) == "0o666", oct(os.stat(WHERE).st_mode))
     bad = tempfile.mkdtemp(prefix="xc-uch-bad-")
-    os.chmod(bad, 0o777)
+    subprocess.run(["chmod", "777", bad], check=True)      # 故意做一個別人寫得進去的資料夾
     case("  資料夾別人寫得進去就不開（可能被先放了假通道），代理照常跑", A.start_user_channel(os.path.join(bad, "agent.sock")) is False)
 
 st, out = call("GET", "/group/state")

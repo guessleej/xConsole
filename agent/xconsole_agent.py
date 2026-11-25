@@ -10743,7 +10743,10 @@ def start_user_channel(where):
     """Unix socket 檔開 0666 讓誰都連得上，誰能用由連線者身分決定；資料夾別人寫得進去就不開（可能被先放了假通道）。
     開不起來只影響同一台的桌面版，代理照常服務主控台，所以印出原因、回 False，不結束。"""
     if OS == "windows":
-        threading.Thread(target=_pipe_serve, args=(where,), daemon=True).start()
+        first = _pipe_create(where, first=True)    # 第一個執行個體當場開好：回來之後桌面版馬上連得到
+        if first is None:
+            return False
+        threading.Thread(target=_pipe_serve, args=(where, first), daemon=True).start()
         return True
     import socketserver
     try:
@@ -10760,7 +10763,7 @@ def start_user_channel(where):
         pass
     srv = socketserver.ThreadingUnixStreamServer(where, UnixUserHandler)
     srv.daemon_threads = True
-    os.chmod(where, 0o666)
+    subprocess.run(["chmod", "666", where], check=True)      # 刻意讓誰都連得上：誰能用由連線者身分決定
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return True
 
@@ -10862,27 +10865,42 @@ class PipeUserHandler(UserHandler):
         self.wfile.flush()
 
 
-def _pipe_serve(name):
-    ct, wt, k32, adv = _win32()
+@functools.cache
+def _pipe_sa():
+    ct, wt, _, adv = _win32()
 
     class SA(ct.Structure):
         _fields_ = [("nLength", wt.DWORD), ("lpSecurityDescriptor", ct.c_void_p), ("bInheritHandle", wt.BOOL)]
     sd = ct.c_void_p()
     if not adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(USER_PIPE_SDDL, 1, ct.byref(sd), None):
-        print(f"本機使用者通道開不起來：{ct.WinError(ct.get_last_error())}", flush=True)
-        return
-    sa = SA(ct.sizeof(SA), sd, False)
-    first = 0x00080000                        # FILE_FLAG_FIRST_PIPE_INSTANCE：已經有人先開了同名管道就不開
-    while True:
-        h = k32.CreateNamedPipeW(r"\\.\pipe" + "\\" + name, 0x3 | first, 0x8, 255, 65536, 65536, 0, ct.byref(sa))
-        if h in (None, ct.c_void_p(-1).value):
-            print(f"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{ct.WinError(ct.get_last_error())}", flush=True)
-            return
-        first = 0
-        if not k32.ConnectNamedPipe(h, None) and ct.get_last_error() != 535:    # 535：連線者比我們先到，也算接上
+        raise ct.WinError(ct.get_last_error())
+    return SA(ct.sizeof(SA), sd, False)
+
+
+def _pipe_create(name, first=False):
+    """開一個管道執行個體；第一個加 FILE_FLAG_FIRST_PIPE_INSTANCE：已經有人先開了同名管道就不開。"""
+    ct, _, k32, _ = _win32()
+    try:
+        sa = _pipe_sa()
+    except OSError as exc:
+        print(f"本機使用者通道開不起來：{exc}", flush=True)
+        return None
+    h = k32.CreateNamedPipeW(r"\\.\pipe" + "\\" + name, 0x3 | (0x00080000 if first else 0), 0x8, 255, 65536, 65536, 0,
+                             ct.byref(sa))
+    if h in (None, ct.c_void_p(-1).value):
+        print(f"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{ct.WinError(ct.get_last_error())}", flush=True)
+        return None
+    return h
+
+
+def _pipe_serve(name, h):
+    ct, _, k32, _ = _win32()
+    while h is not None:
+        if k32.ConnectNamedPipe(h, None) or ct.get_last_error() == 535:     # 535：連線者比我們先到，也算接上
+            threading.Thread(target=_pipe_conn, args=(h,), daemon=True).start()
+        else:
             k32.CloseHandle(h)
-            continue
-        threading.Thread(target=_pipe_conn, args=(h,), daemon=True).start()
+        h = _pipe_create(name)
 
 
 def _pipe_conn(h):

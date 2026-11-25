@@ -889,8 +889,10 @@ def valid_proxy(u):
 
 def node_url(node, path):
     """主控台連代理（link=pull，伺服器）用 https；代理主動連回（link=push，工作站）的排進那台的佇列。"""
-    if node.get("link") in ("push", "user"):
-        return f"{node['link']}://{node['id']}{path}"
+    if node.get("link") == "push":
+        return f"push://{node['id']}{path}"
+    if node.get("link") == "user":            # 本機使用者通道：沒有權杖，帶過去的空權杖代理不看
+        return f"user://{node['id']}{path}"
     h = node["host"]
     return f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
 
@@ -923,10 +925,6 @@ def node_ctx(node):
     return {"push": PUSH, "user": USERCH}.get(node.get("link")) or tls.client_context(trust_file(node["id"]))
 
 
-def node_auth(node):
-    return {} if node.get("link") == "user" else {"Authorization": f"Bearer {node_token(node)}"}
-
-
 def node_request(node_id, path, data, ctype="application/json"):
     """組一個送給某台代理的請求（主機只取自 fleet.json、用部署時取回的憑證驗證）。回 (請求, TLS 設定) 或 (None, 錯誤)。"""
     node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
@@ -937,8 +935,8 @@ def node_request(node_id, path, data, ctype="application/json"):
     ctx = node_ctx(node)
     if ctx is None:
         return None, f"還沒信任 {node['name']} 的代理憑證"
-    return urllib.request.Request(node_url(node, path), data=data, method="POST",
-                                  headers={**node_auth(node), "Content-Type": ctype}), ctx
+    return urllib.request.Request(node_url(node, path), data=data, method="POST", headers={
+        "Authorization": f"Bearer {node_token(node)}", "Content-Type": ctype}), ctx
 
 
 # ---- 對話的「工具」：主控台查詢（管理員）、讀網頁、聯網搜尋（設了搜尋端點才有）、讀寫Agent工作資料夾、執行指令（管理員）。
@@ -1245,7 +1243,8 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
                               f"或在「設定 → 機器」匯入該機憑證", "offline": True, "untrusted": True}
     url = node_url(node, path)
     data = json.dumps(body or {}).encode() if method == "POST" else None
-    req = urllib.request.Request(url, data=data, method=method, headers={**node_auth(node), "Content-Type": "application/json"})
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        "Authorization": f"Bearer {node_token(node)}", "Content-Type": "application/json"})
     deadline = time.time() + timeout + 60
     try:
         # 單次等待用呼叫端給的時限（換模型要等好幾分鐘才回），讀完整個回應另有總時限
