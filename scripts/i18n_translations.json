@@ -26233,5 +26233,110 @@
 "en": "The internal mirror is still preparing",
 "ja": "内部ミラーは準備中です",
 "ko": "내부 미러가 아직 준비 중입니다"
+},
+"每種機型會拿到哪一版": {
+"en": "Which version each machine type gets",
+"ja": "機種ごとに取得するバージョン",
+"ko": "기종별로 받는 버전"
+},
+"還讀不到 {0} 的硬體，等它們連上主控台再看。": {
+"en": "Hardware for {0} isn't available yet; check again once they connect to the console.",
+"ja": "{0} のハードウェア情報をまだ取得できません。コンソールに接続してから確認してください。",
+"ko": "{0}의 하드웨어 정보를 아직 읽을 수 없습니다. 콘솔에 연결된 뒤 다시 확인하세요."
+},
+"{0} 台：{1}": {
+"en": "{0} machines: {1}",
+"ja": "{0} 台：{1}",
+"ko": "{0}대: {1}"
+},
+"auto（依硬體挑）": {
+"en": "auto (picked by hardware)",
+"ja": "auto（ハードウェアに応じて選択）",
+"ko": "auto(하드웨어에 맞게 선택)"
+},
+"挑不出來": {
+"en": "Can't pick",
+"ja": "選べません",
+"ko": "선택할 수 없음"
+},
+"放不下：改用 {0}": {
+"en": "Doesn't fit: use {0} instead",
+"ja": "収まりません：{0} を使ってください",
+"ko": "들어가지 않음: {0}을(를) 사용하세요"
+},
+"這種機型改用（一行一個；空的就照群組設定）": {
+"en": "Use instead for this machine type (one per line; empty follows the group setting)",
+"ja": "この機種で代わりに使う（1行に1つ。空欄ならグループ設定どおり）",
+"ko": "이 기종에서 대신 사용(한 줄에 하나, 비워 두면 그룹 설정대로)"
+},
+"還讀不到硬體的：{0}": {
+"en": "Hardware not available yet: {0}",
+"ja": "ハードウェア情報をまだ取得できない端末：{0}",
+"ko": "아직 하드웨어를 읽을 수 없는 컴퓨터: {0}"
+},
+"用硬碟跑（慢）": {
+"en": "Runs from disk (slow)",
+"ja": "ディスクで実行（遅い）",
+"ko": "디스크로 실행(느림)"
+},
+"共享記憶體（GPU 與系統分兩塊）": {
+"en": "Shared memory (split between GPU and system)",
+"ja": "共有メモリ（GPU とシステムに分割）",
+"ko": "공유 메모리(GPU와 시스템으로 분할)"
+},
+"獨立顯示卡": {
+"en": "Discrete GPU",
+"ja": "独立 GPU",
+"ko": "독립 그래픽 카드"
+},
+"{0}・{1}・可放模型約 {2} GiB": {
+"en": "{0} · {1} · about {2} GiB for models",
+"ja": "{0}・{1}・モデル用に約 {2} GiB",
+"ko": "{0} · {1} · 모델용 약 {2} GiB"
+},
+"速度是估算（依記憶體頻寬與模型大小算），實際跑過一次之後會依實測校正": {
+"en": "Speeds are estimates (from memory bandwidth and model size) and are corrected after a real run",
+"ja": "速度は推定値（メモリ帯域とモデルサイズから算出）で、一度実行すると実測で補正されます",
+"ko": "속도는 추정값(메모리 대역폭과 모델 크기로 계산)이며 한 번 실행하면 실측으로 보정됩니다"
+},
+"{0} 在這種機型上連用硬碟都跑不動，請改小一點的模型": {
+"en": "{0} can't run on this machine type even from disk; choose a smaller model",
+"ja": "{0} はこの機種ではディスクを使っても実行できません。小さいモデルにしてください",
+"ko": "{0}은(는) 이 기종에서 디스크로도 실행할 수 없습니다. 더 작은 모델을 선택하세요"
+},
+"還讀不到這台的硬體，等它連上主控台再挑版本": {
+"en": "This machine's hardware isn't available yet; the version will be picked once it connects to the console",
+"ja": "この端末のハードウェア情報をまだ取得できません。コンソールに接続してからバージョンを選びます",
+"ko": "이 컴퓨터의 하드웨어를 아직 읽을 수 없어 콘솔에 연결된 뒤 버전을 고릅니다"
+},
+"推薦清單裡沒有這種機型跑得動的模型，請改指定一顆小一點的模型": {
+"en": "No model in the recommended list runs on this machine type; specify a smaller model",
+"ja": "推奨リストにこの機種で動くモデルがありません。小さいモデルを指定してください",
+"ko": "추천 목록에 이 기종에서 실행되는 모델이 없습니다. 더 작은 모델을 지정하세요"
+},
+"{0} 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 {1}:Q4_K_M），或先加進推薦清單": {
+"en": "{0} isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. {1}:Q4_K_M) or add it to the list first",
+"ja": "{0} は推奨リストにないため量子化がわかりません。量子化を指定する（例 {1}:Q4_K_M）か、先にリストに追加してください",
+"ko": "{0}은(는) 추천 목록에 없어 양자화를 알 수 없습니다. 양자화를 지정하거나(예: {1}:Q4_K_M) 먼저 목록에 추가하세요"
+},
+"依機型覆寫最多 32 種機型": {
+"en": "Per-machine-type overrides support at most 32 machine types",
+"ja": "機種ごとの上書きは最大 32 機種です",
+"ko": "기종별 덮어쓰기는 최대 32개 기종입니다"
+},
+"「{0}」的覆寫": {
+"en": "Override for \"{0}\"",
+"ja": "「{0}」の上書き",
+"ko": "\"{0}\" 덮어쓰기"
+},
+"依機型覆寫的機型代號不對": {
+"en": "Invalid machine type key in the overrides",
+"ja": "上書きの機種コードが不正です",
+"ko": "덮어쓰기의 기종 코드가 올바르지 않습니다"
+},
+"收到 auto：主控台版本較舊、沒有先依機型挑好版本，請更新主控台；這次先略過": {
+"en": "Received auto: the console is an older version and didn't pick a version for this machine type; please update the console. Skipped for now",
+"ja": "auto を受信しました：コンソールが古く、機種に合わせたバージョンを選んでいません。コンソールを更新してください。今回はスキップします",
+"ko": "auto를 받았습니다: 콘솔이 구버전이라 기종별 버전을 고르지 않았습니다. 콘솔을 업데이트하세요. 이번에는 건너뜁니다"
 }
 }

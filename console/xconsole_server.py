@@ -123,7 +123,7 @@ USER_ROUTES = [
 # 檢視（清單 #10）：使用者能用的，再加上看得到機器狀態與群組（唯讀）。檔案瀏覽、API串接、記錄頁不給
 VIEWER_ROUTES = [
     ("GET", r"/api/(groups|catalog)"),
-    ("GET", r"/api/groups/[0-9a-f]{8}/history"),
+    ("GET", r"/api/groups/[0-9a-f]{8}/(history|plan)"),
     ("GET", r"/api/node/[\w.-]+/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)"),
     ("GET", r"/api/node/[\w.-]+/(logs|catalog)/[\w.-]+"),
     ("GET", r"/api/node/[\w.-]+/slot/[\w.-]+/progress"),
@@ -1280,6 +1280,8 @@ def fleet_state(scope=None):
     nodes = []
     for n in cfg["nodes"]:
         code, body = call_node(n["id"], "/state", timeout=30)
+        if code == 200 and body.get("pools"):
+            NODE_HW[n["id"]] = (time.time(), body)
         g = gmap.get(n.get("group") or groups.DEFAULT)
         nodes.append({"id": n["id"], "name": n["name"], "host": n["host"],
                       "group": n.get("group", "未分類"), "online": code == 200,
@@ -1408,6 +1410,111 @@ ALIGN_STATE = {}                  # 機器 → {"at", "state"} 或 {"at", "error
 ALIGN_EVERY = 60
 
 
+
+# ---- 混合機型自動挑版本（清單 #14）：依每台回報的硬體分成幾種機型，用推薦清單與准入同一條公式替每種挑量化；
+# 群組設定寫 auto（依硬體挑一顆）或沒寫量化的「作者/模型」時才需要挑；管理者可以依機型覆寫。
+NODE_HW = {}                      # 機器 → (讀到的時間, /state)；群組總覽每次重抓時順便更新
+NODE_HW_TTL = 600
+LEVEL_NAMES = {"smooth": "流暢", "ok": "能跑", "disk": "用硬碟跑（慢）", "no": "放不下"}
+MM_NAMES = {"unified_split": "共享記憶體（GPU 與系統分兩塊）", "unified_single": "統一記憶體", "discrete": "獨立顯示卡",
+            "cpu": "只有 CPU"}
+
+
+def node_hw(nid):
+    hit = NODE_HW.get(nid)
+    if hit and time.time() - hit[0] < NODE_HW_TTL:
+        return hit[1]
+    code, st = call_node(nid, "/state", timeout=30)
+    if code == 200 and st.get("pools"):
+        NODE_HW[nid] = (time.time(), st)
+        return st
+    return hit[1] if hit else None
+
+
+def hw_class(state):
+    """機型：記憶體架構、顯示卡（或 CPU）名稱、這台能放模型的記憶體（取整數 GiB）。回 (代號, 畫面上的名稱)。"""
+    cap = recommend.capacity(state)
+    chip = state.get("chip") or {}
+    mm = "cpu" if cap.get("cpu_only") else cap["memory_model"]
+    gib = round((cap.get("fast") or 0) + (cap.get("slow") or 0))
+    name = str(chip.get("gpu") or chip.get("cpu") or "這台")[:60]
+    return f"{mm}|{name}|{gib}", f"{name}・{MM_NAMES.get(mm, mm)}・可放模型約 {gib} GiB"
+
+
+def needs_pick(s):
+    return bool((s.get("overrides") or {})) or any(m == "auto" or ":" not in m for m in s.get("models") or [])
+
+
+def resolve_spec(spec, rec):
+    """一顆群組模型在這種機型上用哪個檔。回 {model, spec（具體的「作者/模型:量化」，挑不出來是 None）, level, tok_s, place, cn, why, alt}。"""
+    out = {"model": spec, "spec": None, "level": None, "tok_s": None, "place": "", "cn": False, "why": "", "alt": None}
+    repo, _, quant = spec.partition(":")
+    if spec == "auto":
+        repo = rec.get("featured") or next(iter(rec.get("top") or []), None)
+        if not repo:
+            return {**out, "why": "推薦清單裡沒有這種機型跑得動的模型，請改指定一顆小一點的模型"}
+    item = next((x for x in rec["items"] if x["repo"].lower() == repo.lower()), None)
+    out["cn"] = bool(item.get("cn_origin")) if item else recommend.is_cn({"repo": repo})
+    if quant:
+        plan = next((p for p in (item or {}).get("plans") or [] if str(p.get("quant") or "").lower() == quant.lower()), None)
+        out.update(spec=spec)
+        if plan:
+            out.update(level=plan["level"], tok_s=plan.get("tok_s"), place=plan.get("place") or "")
+            best = next((p for p in item["plans"] if p["stem"] == item.get("pick")), None)
+            if plan["level"] == "no" and best:
+                out["alt"] = f"{item['repo']}:{best['quant']}"      # 放不下：給這種機型放得下的量化
+        return out
+    if not item or not item.get("plans"):
+        return {**out, "why": f"{repo} 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 {repo}:Q4_K_M），或先加進推薦清單"}
+    plan = next((p for p in item["plans"] if p["stem"] == item.get("pick")), None)
+    if not plan:
+        return {**out, "why": f"{repo} 在這種機型上連用硬碟都跑不動，請改小一點的模型"}
+    return {**out, "spec": f"{item['repo']}:{plan['quant']}", "level": plan["level"], "tok_s": plan.get("tok_s"),
+            "place": plan.get("place") or ""}
+
+
+def node_models(g, n):
+    """這台實際要準備的模型清單（已挑好量化）。回 (清單, None) 或 (None, 挑不出來的原因)。"""
+    s = g.get("settings") or {}
+    if not needs_pick(s):
+        return s.get("models") or [], None
+    st = node_hw(n["id"])
+    if not st:
+        return None, "還讀不到這台的硬體，等它連上主控台再挑版本"
+    key, _ = hw_class(st)
+    specs = (s.get("overrides") or {}).get(key) or s.get("models") or []
+    rec = recommend.recommend(st, {}, CATALOG.load())
+    rows = [resolve_spec(m, rec) for m in specs]
+    bad = next((r for r in rows if not r["spec"]), None)
+    if bad:
+        return None, bad["why"]
+    return list(dict.fromkeys(r["spec"] for r in rows)), None
+
+
+def group_plan(g, nodes):
+    """群組設定頁的「每種機型會拿到哪一版」：依機型分組，列出每顆模型挑到的檔、大概多快、放不下的替代方案。"""
+    s = g.get("settings") or {}
+    classes, unknown = {}, []
+    for n in nodes:
+        st = node_hw(n["id"])
+        if not st:
+            unknown.append(n.get("name") or n["id"])
+            continue
+        key, label = hw_class(st)
+        c = classes.setdefault(key, {"key": key, "label": label, "nodes": [], "state": st})
+        c["nodes"].append(n.get("name") or n["id"])
+    catalog = CATALOG.load()
+    out = []
+    for c in classes.values():
+        specs = (s.get("overrides") or {}).get(c["key"]) or s.get("models") or []
+        rec = recommend.recommend(c.pop("state"), {}, catalog)
+        rows = [resolve_spec(m, rec) for m in specs]
+        for r in rows:
+            r["level_name"] = LEVEL_NAMES.get(r["level"], "")
+        out.append({**c, "rows": rows, "override": (s.get("overrides") or {}).get(c["key"]) or []})
+    return {"classes": sorted(out, key=lambda c: c["label"]), "unknown": unknown,
+            "note": "速度是估算（依記憶體頻寬與模型大小算），實際跑過一次之後會依實測校正"}
+
 # ---- 工作站互傳（清單 #12）：排程前請收方試連送方，連得到的才發票證；每台同時最多送 2 份，拿到的再傳下一台（樹狀）。
 # 群組裡還沒有任何一台有的模型，只讓一台（種子）從網路拿，其他台等它；連不到任何送方的就照舊從網路（或這台設定的鏡像）拿。
 PEER_TICKET_TTL = 60
@@ -1511,6 +1618,11 @@ def align_once():
             continue                             # 安全指令沒送完之前不對齊
         # 預設設定的群組（例如原本的群組被刪、機器移到未分類）也要送：代理才會放掉舊群組的鎖定與限制
         # ponytail: 一台一台依序送；連不到的伺服器各等 20 秒，機器多了再改並行
+        models, why = node_models(g, n)
+        if why:
+            ALIGN_STATE[n["id"]] = {"at": int(time.time()), "error": why}
+            continue
+        g = {**g, "settings": {**g["settings"], "models": models}}      # 這台機型挑好的版本
         body = {"group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}
         members = [m for m in cfg["nodes"] if (m.get("group") or groups.DEFAULT) == g["name"]]
         peers = peer_plan(g, n, members)
@@ -1541,6 +1653,10 @@ def aligner():
             align_once()
         except Exception as exc:  # noqa: BLE001
             print(f"群組對齊出錯：{exc}", flush=True)
+
+
+def group_nodes(g, nodes):
+    return [n for n in nodes if (n.get("group") or groups.DEFAULT) == g["name"] and not n.get("revoked")]
 
 
 def group_members(g, nodes):
@@ -4527,6 +4643,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"groups": out,
                                     "kinds": groups.KINDS, "lockable": groups.LOCKABLE, "sources": groups.SOURCES,
                                     "defaults": groups.defaults()})
+        m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/plan", path)
+        if m:
+            cfg = fleet()
+            g = next((x for x in cfg.get("groups", []) if x["id"] == m.group(1)), None)
+            if g is None or (self.scope is not None and g["id"] not in self.scope):
+                return self._json(404, {"error": "沒有這個群組"})
+            return self._json(200, group_plan(g, group_nodes(g, cfg["nodes"])))
         m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/history", path)
         if m:
             g = next((x for x in fleet().get("groups", []) if x["id"] == m.group(1)), None)
@@ -5614,7 +5737,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/mirror/prefetch", "/api/mirror/delete"):
             repo, quant = str(body.get("repo") or "").strip(), str(body.get("quant") or "").strip()[:40]
             try:
-                out = ({"files": MIRROR.prefetch(repo, quant)} if path.endswith("prefetch") else (MIRROR.delete(repo) or {}))
+                out = {"files": MIRROR.prefetch(repo, quant)} if path.endswith("prefetch") else (MIRROR.delete(repo) or {})
             except (ValueError, OSError) as exc:
                 self._audit("mirror." + path.rsplit("/", 1)[1], repo, False, {"error": str(exc)[:120]})
                 return self._json(400, {"error": str(exc)})

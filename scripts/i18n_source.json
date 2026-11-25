@@ -5072,6 +5072,62 @@
 "pattern": false
 },
 {
+"zh": "每種機型會拿到哪一版",
+"pattern": false
+},
+{
+"zh": "還讀不到 {0} 的硬體，等它們連上主控台再看。",
+"pattern": true
+},
+{
+"zh": "還讀不到",
+"pattern": false
+},
+{
+"zh": "的硬體，等它們連上主控台再看",
+"pattern": false
+},
+{
+"zh": "這個群組還沒有機器。",
+"pattern": false
+},
+{
+"zh": "{0} 台：{1}",
+"pattern": true
+},
+{
+"zh": "auto（依硬體挑）",
+"pattern": false
+},
+{
+"zh": "挑不出來",
+"pattern": false
+},
+{
+"zh": "放不下：改用 {0}",
+"pattern": true
+},
+{
+"zh": "放不下：改用",
+"pattern": false
+},
+{
+"zh": "空的就照群組設定",
+"pattern": false
+},
+{
+"zh": "這種機型改用（一行一個；空的就照群組設定）",
+"pattern": false
+},
+{
+"zh": "還讀不到硬體的：{0}",
+"pattern": true
+},
+{
+"zh": "還讀不到硬體的",
+"pattern": false
+},
+{
 "zh": "「{0}」的設定",
 "pattern": true
 },
@@ -10588,6 +10644,22 @@
 "pattern": false
 },
 {
+"zh": "用硬碟跑（慢）",
+"pattern": false
+},
+{
+"zh": "共享記憶體（GPU 與系統分兩塊）",
+"pattern": false
+},
+{
+"zh": "獨立顯示卡",
+"pattern": false
+},
+{
+"zh": "只有 CPU",
+"pattern": false
+},
+{
 "zh": "產生。加入碼 30 分鐘內有效、只能用一次。\n# 每一段下載都釘住主控台憑證的公鑰，不是關掉驗證。\nset -euo pipefail\nC='",
 "pattern": false
 },
@@ -10709,6 +10781,18 @@
 },
 {
 "zh": "這個工具",
+"pattern": false
+},
+{
+"zh": "{0}・{1}・可放模型約 {2} GiB",
+"pattern": true
+},
+{
+"zh": "可放模型約",
+"pattern": false
+},
+{
+"zh": "速度是估算（依記憶體頻寬與模型大小算），實際跑過一次之後會依實測校正",
 "pattern": false
 },
 {
@@ -10937,6 +11021,34 @@
 },
 {
 "zh": "」這個資料夾；能用的是",
+"pattern": false
+},
+{
+"zh": "・可放模型約 ",
+"pattern": false
+},
+{
+"zh": "{0} 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 {1}:Q4_K_M），或先加進推薦清單",
+"pattern": true
+},
+{
+"zh": "不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例",
+"pattern": false
+},
+{
+"zh": ":Q4_K_M），或先加進推薦清單",
+"pattern": false
+},
+{
+"zh": "{0} 在這種機型上連用硬碟都跑不動，請改小一點的模型",
+"pattern": true
+},
+{
+"zh": "在這種機型上連用硬碟都跑不動，請改小一點的模型",
+"pattern": false
+},
+{
+"zh": "還讀不到這台的硬體，等它連上主控台再挑版本",
 "pattern": false
 },
 {
@@ -11313,6 +11425,18 @@
 },
 {
 "zh": "的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
+"pattern": false
+},
+{
+"zh": "推薦清單裡沒有這種機型跑得動的模型，請改指定一顆小一點的模型",
+"pattern": false
+},
+{
+"zh": " 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 ",
+"pattern": false
+},
+{
+"zh": " 在這種機型上連用硬碟都跑不動，請改小一點的模型",
 "pattern": false
 },
 {
@@ -15152,6 +15276,18 @@
 "pattern": false
 },
 {
+"zh": "依機型覆寫最多 32 種機型",
+"pattern": false
+},
+{
+"zh": "「{0}」的覆寫",
+"pattern": true
+},
+{
+"zh": "」的覆寫",
+"pattern": false
+},
+{
 "zh": "限速要寫每秒幾 Mbps 與哪些時段",
 "pattern": false
 },
@@ -15305,6 +15441,10 @@
 },
 {
 "zh": "模型存放位置要是完整路徑（例：/data/xconsole 或 D:\\xconsole），不能有 ..",
+"pattern": false
+},
+{
+"zh": "依機型覆寫的機型代號不對",
 "pattern": false
 },
 {
@@ -16436,10 +16576,6 @@
 "pattern": false
 },
 {
-"zh": "只有 CPU",
-"pattern": false
-},
-{
 "zh": "[Unit]\nDescription=xConsole 欄位 ",
 "pattern": false
 },
@@ -17248,7 +17384,7 @@
 "pattern": false
 },
 {
-"zh": "auto（依每台硬體挑版本）要等混合機型功能上線，這次先略過",
+"zh": "收到 auto：主控台版本較舊、沒有先依機型挑好版本，請更新主控台；這次先略過",
 "pattern": false
 },
 {

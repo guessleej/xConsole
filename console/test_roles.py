@@ -151,7 +151,7 @@ EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/age
                   r"POST /api/keys/[0-9a]{8}/(update|revoke)"]
 
 
-EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/history",
+EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/(history|plan)",
                     r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
                     r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
 EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
@@ -278,6 +278,8 @@ def _roles_and_scope(admin):
           and op.req("GET", f"/api/groups/{ga}/history")[1]["history"][0]["by"] == "teacher-a@cloudinfo.com.tw", o)
     check("  範圍外的群組看歷史、退回 → 404", op.req("GET", f"/api/groups/{gb}/history")[0] == 404
           and op.req("POST", f"/api/groups/{gb}/rollback", {"version": 1})[0] == 404)
+    check("  每種機型會拿到哪一版：檢視看得到自己範圍的，範圍外的 → 404", vw.req("GET", f"/api/groups/{ga}/plan")[0] == 200
+          and op.req("GET", f"/api/groups/{gb}/plan")[0] == 404)
 
     # 金鑰：只能選範圍內的；範圍改了舊金鑰馬上跟著縮
     check("限定群組的帳號產生金鑰：不能選全部", op.req("POST", "/api/keys/create", {"name": "全部"})[0] == 400)
