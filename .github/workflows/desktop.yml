@@ -206,7 +206,7 @@ jobs:
     name: 安裝檔附到正式版
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-latest"' || '["self-hosted","xconsole"]') }}
     permissions:
       contents: write

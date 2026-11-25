@@ -8,7 +8,7 @@ permissions:
   contents: write
 jobs:
   release:
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-latest"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

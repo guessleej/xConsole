@@ -21,7 +21,7 @@ jobs:
   # ── 0. 測試（含 test/security/ 安全測試）──────────────────
   tests:
     name: 0 Tests
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,14 +147,14 @@ jobs:
       - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
         run: |
           python -m pip install --disable-pip-version-check playwright==1.65.0
-          # 自建 runner 沒有免密碼 sudo，Chromium 需要的系統函式庫已裝在 .50，只下載瀏覽器本身
+          # 自建 runner 沒有免密碼 sudo，Chromium 需要的系統函式庫已裝在 .50 與 .70，只下載瀏覽器本身
           if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then python -m playwright install chromium; else python -m playwright install --with-deps chromium; fi
           python test/test_ui_browser.py
 
   # ── 1. SAST ────────────────────────────────────────────────
   codeql:
     name: 1 SAST (CodeQL)
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     permissions:
       contents: read
@@ -177,7 +177,7 @@ jobs:
   # ── 2. 機密掃描（含整個 git 歷史）──────────────────────────
   gitleaks:
     name: 2 Secrets (gitleaks)
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     env:
       GITLEAKS_VERSION: 8.30.1
@@ -200,7 +200,7 @@ jobs:
   # ── 3. 依賴弱點（真的擋，不掛 || true）──────────────────────
   deps:
     name: 3 Dependencies (pip-audit)
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -216,7 +216,7 @@ jobs:
   # ── 4+5. SBOM 產出與弱點掃描 ─────────────────────────────────
   sbom:
     name: 4+5 SBOM (syft) + Vulns (grype)
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
+    # 同一儲存庫的 PR、push、排程、標籤走 .50／.70 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -263,8 +263,8 @@ jobs:
   # ── 6. DAST（中級必跑）──────────────────────────────────────
   zap:
     name: 6 DAST (OWASP ZAP baseline)
-    # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
-    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
+    # ZAP 要跑容器：只排到 .50（xc50），用那台給 CI 的 rootless Docker；.70 只有正式服務的 Docker，CI 不碰
+    runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole","xc50"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
