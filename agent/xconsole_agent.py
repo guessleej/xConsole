@@ -8728,7 +8728,11 @@ def sd_thumb(jid, i=0):
     src = os.path.join(GEN_DIR, outs[i])
     if not src.endswith(".png") or not os.path.isfile(src):
         return sd_output(jid, i)
-    dst = os.path.join(GEN_DIR, _sd_thumb_name(jid, i))
+    # 檔名用紀錄裡的編號（不是網址上的），而且正規化之後一定要在作品資料夾裡
+    root = os.path.realpath(GEN_DIR)
+    dst = os.path.realpath(os.path.join(root, _sd_thumb_name(j["id"], int(i))))
+    if not dst.startswith(root + os.sep):
+        return sd_output(jid, i)
     try:
         if not os.path.isfile(dst) and not png_thumb(src, dst):
             return sd_output(jid, i)
