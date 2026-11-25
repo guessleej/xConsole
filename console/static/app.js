@@ -3551,7 +3551,7 @@ function viewOverview() {
   reveal(main);
 }
 
-const READY_CHIP = { ready: "ok", preparing: "brand", differs: "warn", nofit: "bad", failed: "bad", offline: "bad", rejoin: "bad", clone: "bad" };
+const READY_CHIP = { ready: "ok", preparing: "brand", differs: "warn", nofit: "bad", failed: "bad", offline: "bad", rejoin: "bad", clone: "bad", disabled: "warn", revoked: "bad" };
 
 // 群組裡一台的小卡：名稱、狀態、原因；準備中有下載進度條。點進去就是「這台」的概覽
 function readyCard(n) {
@@ -3754,6 +3754,8 @@ function viewNode() {
   h.appendChild(el("span", "spacer"));
   h.append(setBtn, libBtn);
   if (st.machine.note) head.appendChild(el("p", "note", st.machine.note));
+  if (st.disabled_by_admin) head.appendChild(el("p", "note bad",
+    `這台已被管理者停用（${taipei(st.disabled_by_admin.at)}），模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」。`));
   // 新機器從零到能用的順序軸：全部完成就不顯示（已經設好的機器不佔版面）
   const info = S.minfo?.[n.id];
   if (info) {
@@ -4681,7 +4683,9 @@ async function settingsMachines(wrap) {
     e.onclick = () => openMachineSettings(n.id);
     const r = el("button", "btn sm danger", "移除");
     r.onclick = () => removeMachine(n);
-    td.append(e, r);
+    const sf = el("button", "btn sm", "停用／清除");
+    sf.onclick = () => openSafety(n);
+    td.append(e, sf, r);
     if (n.clone) {
       const c = el("button", "btn sm", "解除疑似複製");
       c.onclick = () => clearClone(n, n.clone);
@@ -4694,6 +4698,104 @@ async function settingsMachines(wrap) {
   sb.appendChild(tb);
   box.textContent = "";
   box.appendChild(sb);
+}
+
+const SAFETY_HOW = {
+  disable: "停掉這台所有模型服務並取消開機自啟，本機不能再啟動或換模型，群組設定先收著不套用。按「恢復」照原樣開回來。",
+  enable: "取消停用：停用前開機自啟的模型服務照原樣開回來，停用期間收到的群組設定開始準備與套用。",
+  wipe: "停掉模型服務，刪掉Agent工作資料夾、畫圖與影片的產出、模型服務的記錄檔，取消連結進來的外部資料夾（裡面的檔案不動）。勾選後連xConsole存放區裡的模型一起刪。刪了不能復原。",
+  revoke: "這台丟掉權杖與連回設定，主控台也不再對它下指令；要重新加入才能再管理。遺失或離職收回的機器，先排「清除」再排這一筆。",
+};
+const SAFETY_STATE = { pending: "待送", sending: "送出中", done: "已完成", canceled: "已取消", superseded: "被後下的取代" };
+
+function taipei(ts) {
+  return ts ? new Date(ts * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" }) : "—";
+}
+
+async function openSafety(n) {
+  const body = el("div");
+  const ov = modal({ title: `${n.name} 的停用與清除`, bodyNode: body, hasInput: true });
+  ov.querySelector(".modal").classList.add("wide");
+  const load = async () => {
+    loading(body);
+    let d;
+    try { d = await api(`/api/node/${n.id}/safety`); } catch (ex) { body.textContent = ""; errNote(body, ex.message); return; }
+    body.textContent = "";
+    const status = d.revoked ? `身分已撤銷（${taipei(d.revoked.at)}，${d.revoked.by || "—"}）`
+      : d.disabled ? `已停用（${taipei(d.disabled.at)}，${d.disabled.by || "—"}）` : "正常";
+    body.appendChild(el("p", d.revoked || d.disabled ? "note warn" : "note", `目前狀態：${status}`));
+    body.appendChild(el("p", "small muted", d.push && !d.online
+      ? "這台現在沒有連回。指令會存在主控台，沒有期限，它下次連上時在群組對齊之前先執行；還沒送出前可以取消。"
+      : "指令存在主控台，這台連得上就馬上送；連不上的話每分鐘再試，沒有期限。還沒送出前可以取消。"));
+
+    if (d.cmds.length) {
+      const tbl = el("table", "api-table");
+      const hr = el("tr");
+      ["指令", "下指令的人", "時間（台北時間）", "狀態", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+      tbl.appendChild(hr);
+      d.cmds.forEach((c) => {
+        const tr = el("tr");
+        tr.appendChild(el("td", "nowrap", d.kinds[c.kind] + (c.opts.models ? "（含模型）" : "")));
+        tr.appendChild(el("td", null, c.by || "—"));
+        tr.appendChild(el("td", "nowrap", taipei(c.created)));
+        const st = el("td", c.error ? "bad-t" : null, SAFETY_STATE[c.state] || c.state);
+        if (c.state === "pending" && c.error) st.appendChild(el("div", "small", `上次沒送成：${c.error}`));
+        if (c.state === "done") st.appendChild(el("div", "small muted", taipei(c.done)));
+        tr.appendChild(st);
+        const td = el("td", "nowrap");
+        if (c.state === "pending") {
+          const b = el("button", "btn sm", "取消");
+          b.onclick = async () => {
+            try { await api(`/api/node/${n.id}/safety/${c.id}/cancel`, { method: "POST", body: {} }); toast("已取消", "ok"); }
+            catch (ex) { toast(ex.message, "bad"); }
+            load();
+          };
+          td.appendChild(b);
+        }
+        tr.appendChild(td);
+        tbl.appendChild(tr);
+      });
+      const tw = el("div", "md-table-wrap");
+      tw.appendChild(tbl);
+      body.appendChild(tw);
+    }
+    if (d.revoked) return;
+
+    const form = el("div", "grp-form");
+    const kind = el("select");
+    Object.entries(d.kinds).forEach(([k, t]) => { const o = el("option", null, t); o.value = k; kind.appendChild(o); });
+    groupField(form, "要做什麼", kind);
+    const how = el("p", "small muted");
+    const modelsBox = el("label", "grp-checks");
+    const models = el("input");
+    models.type = "checkbox";
+    modelsBox.append(models, document.createTextNode("連存放區裡的模型一起刪"));
+    const confirmIn = groupInputBox("text", "", { placeholder: n.name, autocomplete: "off" });
+    const confirmField = groupField(form, `輸入這台的名稱「${n.name}」確認`, confirmIn, true).parentNode;
+    form.appendChild(modelsBox);
+    const go = el("button", "btn danger", "送出");
+    const sync = () => {
+      how.textContent = SAFETY_HOW[kind.value];
+      modelsBox.style.display = kind.value === "wipe" ? "" : "none";
+      confirmField.style.display = kind.value === "enable" ? "none" : "";
+      go.className = "btn " + (kind.value === "enable" ? "primary" : "danger");
+    };
+    kind.onchange = sync;
+    sync();
+    go.onclick = async () => {
+      try {
+        const r = await api(`/api/node/${n.id}/safety`, { method: "POST",
+          body: { kind: kind.value, confirm: confirmIn.value.trim(), models: kind.value === "wipe" && models.checked } });
+        toast(r.superseded.length ? `已排入，取代了還沒送出的 ${r.superseded.length} 筆` : "已排入", "ok");
+      } catch (ex) { toast(ex.message, "bad"); }
+      load();
+    };
+    body.append(form, how);
+    const act = el("div", "slot-actions");
+    act.appendChild(go);
+    body.appendChild(act);
+  };
+  load();
 }
 
 function importTrust(n) {

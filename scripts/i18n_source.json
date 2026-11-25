@@ -3988,6 +3988,18 @@
 "pattern": false
 },
 {
+"zh": "這台已被管理者停用（{0}），模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」。",
+"pattern": true
+},
+{
+"zh": "這台已被管理者停用",
+"pattern": false
+},
+{
+"zh": "模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」",
+"pattern": false
+},
+{
 "zh": "情境：",
 "pattern": false
 },
@@ -5164,7 +5176,147 @@
 "pattern": false
 },
 {
+"zh": "停用／清除",
+"pattern": false
+},
+{
 "zh": "解除疑似複製",
+"pattern": false
+},
+{
+"zh": "停掉這台所有模型服務並取消開機自啟，本機不能再啟動或換模型，群組設定先收著不套用。按「恢復」照原樣開回來。",
+"pattern": false
+},
+{
+"zh": "取消停用：停用前開機自啟的模型服務照原樣開回來，停用期間收到的群組設定開始準備與套用。",
+"pattern": false
+},
+{
+"zh": "停掉模型服務，刪掉Agent工作資料夾、畫圖與影片的產出、模型服務的記錄檔，取消連結進來的外部資料夾（裡面的檔案不動）。勾選後連xConsole存放區裡的模型一起刪。刪了不能復原。",
+"pattern": false
+},
+{
+"zh": "這台丟掉權杖與連回設定，主控台也不再對它下指令；要重新加入才能再管理。遺失或離職收回的機器，先排「清除」再排這一筆。",
+"pattern": false
+},
+{
+"zh": "待送",
+"pattern": false
+},
+{
+"zh": "送出中",
+"pattern": false
+},
+{
+"zh": "已完成",
+"pattern": false
+},
+{
+"zh": "被後下的取代",
+"pattern": false
+},
+{
+"zh": "{0} 的停用與清除",
+"pattern": true
+},
+{
+"zh": "的停用與清除",
+"pattern": false
+},
+{
+"zh": "身分已撤銷（{0}，{1}）",
+"pattern": true
+},
+{
+"zh": "身分已撤銷",
+"pattern": false
+},
+{
+"zh": "已停用（{0}，{1}）",
+"pattern": true
+},
+{
+"zh": "已停用",
+"pattern": false
+},
+{
+"zh": "正常",
+"pattern": false
+},
+{
+"zh": "目前狀態：{0}",
+"pattern": true
+},
+{
+"zh": "目前狀態",
+"pattern": false
+},
+{
+"zh": "這台現在沒有連回。指令會存在主控台，沒有期限，它下次連上時在群組對齊之前先執行；還沒送出前可以取消。",
+"pattern": false
+},
+{
+"zh": "指令存在主控台，這台連得上就馬上送；連不上的話每分鐘再試，沒有期限。還沒送出前可以取消。",
+"pattern": false
+},
+{
+"zh": "指令",
+"pattern": false
+},
+{
+"zh": "下指令的人",
+"pattern": false
+},
+{
+"zh": "（含模型）",
+"pattern": false
+},
+{
+"zh": "上次沒送成：{0}",
+"pattern": true
+},
+{
+"zh": "上次沒送成",
+"pattern": false
+},
+{
+"zh": "要做什麼",
+"pattern": false
+},
+{
+"zh": "連存放區裡的模型一起刪",
+"pattern": false
+},
+{
+"zh": "輸入這台的名稱「{0}」確認",
+"pattern": true
+},
+{
+"zh": "輸入這台的名稱「",
+"pattern": false
+},
+{
+"zh": "」確認",
+"pattern": false
+},
+{
+"zh": "送出",
+"pattern": false
+},
+{
+"zh": "已排入，取代了還沒送出的 {0} 筆",
+"pattern": true
+},
+{
+"zh": "已排入，取代了還沒送出的",
+"pattern": false
+},
+{
+"zh": "筆",
+"pattern": false
+},
+{
+"zh": "已排入",
 "pattern": false
 },
 {
@@ -5261,10 +5413,6 @@
 },
 {
 "zh": "還有步驟要先完成前面的才能做",
-"pattern": false
-},
-{
-"zh": "已完成",
 "pattern": false
 },
 {
@@ -8652,10 +8800,6 @@
 "pattern": false
 },
 {
-"zh": "筆",
-"pattern": false
-},
-{
 "zh": "執行日誌",
 "pattern": false
 },
@@ -9820,10 +9964,6 @@
 "pattern": false
 },
 {
-"zh": "送出",
-"pattern": false
-},
-{
 "zh": "這則對話的模型目前沒有在執行，先在上面換一個",
 "pattern": false
 },
@@ -10297,6 +10437,18 @@
 },
 {
 "zh": "還沒啟動",
+"pattern": false
+},
+{
+"zh": "恢復",
+"pattern": false
+},
+{
+"zh": "清除",
+"pattern": false
+},
+{
+"zh": "撤銷身分",
 "pattern": false
 },
 {
@@ -11012,6 +11164,14 @@
 "pattern": true
 },
 {
+"zh": "{0} 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）",
+"pattern": true
+},
+{
+"zh": "的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」",
+"pattern": false
+},
+{
 "zh": "還沒信任 {0} 的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
 "pattern": true
 },
@@ -11137,10 +11297,6 @@
 },
 {
 "zh": "金鑰格式不對（不能有空白，最多 512 字）",
-"pattern": false
-},
-{
-"zh": "清除",
 "pattern": false
 },
 {
@@ -11464,6 +11620,10 @@
 "pattern": false
 },
 {
+"zh": " 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）",
+"pattern": false
+},
+{
 "zh": " 的代理憑證，請重新執行 deploy_console.sh 或在「設定 → 機器」匯入該機憑證",
 "pattern": false
 },
@@ -11485,6 +11645,14 @@
 },
 {
 "zh": "的代理",
+"pattern": false
+},
+{
+"zh": "送安全指令出錯：{0}",
+"pattern": true
+},
+{
+"zh": "送安全指令出錯",
 "pattern": false
 },
 {
@@ -11892,6 +12060,18 @@
 "pattern": false
 },
 {
+"zh": "上次送出後這台已經不認舊的權杖：身分已丟掉",
+"pattern": false
+},
+{
+"zh": "這台的代理版本太舊，不支援安全指令，請更新代理",
+"pattern": false
+},
+{
+"zh": "送安全指令出錯：",
+"pattern": false
+},
+{
 "zh": "群組對齊出錯：",
 "pattern": false
 },
@@ -12105,6 +12285,22 @@
 },
 {
 "zh": "主控台找不到代理程式檔，請重新部署主控台",
+"pattern": false
+},
+{
+"zh": "指令只能是：停用、恢復、清除、撤銷身分",
+"pattern": false
+},
+{
+"zh": "請輸入這台的名稱「{0}」確認",
+"pattern": true
+},
+{
+"zh": "請輸入這台的名稱「",
+"pattern": false
+},
+{
+"zh": "這台的身分已撤銷，指令送不到；要先重新加入",
 "pattern": false
 },
 {
@@ -12337,6 +12533,10 @@
 },
 {
 "zh": "帳號或密碼不對",
+"pattern": false
+},
+{
+"zh": "這一筆已經送出、完成或取消了，不能再取消",
 "pattern": false
 },
 {
@@ -14964,6 +15164,22 @@
 "pattern": false
 },
 {
+"zh": "{0} 由管理者撤銷，要重新加入才能再管理",
+"pattern": true
+},
+{
+"zh": "由管理者撤銷，要重新加入才能再管理",
+"pattern": false
+},
+{
+"zh": "{0} 由管理者停用，恢復後才會套用群組設定",
+"pattern": true
+},
+{
+"zh": "由管理者停用，恢復後才會套用群組設定",
+"pattern": false
+},
+{
 "zh": "上次連線 {0}",
 "pattern": true
 },
@@ -15033,6 +15249,18 @@
 },
 {
 "zh": "」不是模型名稱（例：Org/Model-GGUF:Q4_K_M，或 auto 由主控台依硬體挑）",
+"pattern": false
+},
+{
+"zh": " 由管理者撤銷，要重新加入才能再管理",
+"pattern": false
+},
+{
+"zh": " 由管理者停用，恢復後才會套用群組設定",
+"pattern": false
+},
+{
+"zh": "；目前離線",
 "pattern": false
 },
 {
@@ -15856,6 +16084,10 @@
 "pattern": false
 },
 {
+"zh": "這台已被管理者停用，請洽IT",
+"pattern": false
+},
+{
 "zh": "已用新身分重新加入",
 "pattern": false
 },
@@ -16013,6 +16245,26 @@
 },
 {
 "zh": "準備完成",
+"pattern": false
+},
+{
+"zh": "管理者撤銷了這台的身分",
+"pattern": false
+},
+{
+"zh": "管理者撤銷了這台的身分：需要重新加入主控台",
+"pattern": false
+},
+{
+"zh": "管理者撤銷了這台的身分：已丟掉權杖與連回設定，請重新加入主控台",
+"pattern": false
+},
+{
+"zh": "收到管理者的安全指令：{0}",
+"pattern": true
+},
+{
+"zh": "收到管理者的安全指令",
 "pattern": false
 },
 {
@@ -16713,6 +16965,10 @@
 },
 {
 "zh": "在跑的模型不在只准用的清單裡，已停掉",
+"pattern": false
+},
+{
+"zh": "收到管理者的安全指令：",
 "pattern": false
 },
 {
@@ -17929,6 +18185,10 @@
 },
 {
 "zh": "張，目前用",
+"pattern": false
+},
+{
+"zh": "安全指令格式不對",
 "pattern": false
 },
 {

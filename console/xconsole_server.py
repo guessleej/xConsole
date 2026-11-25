@@ -1216,6 +1216,9 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
         return 404, {"error": f"沒有這台機器：{node_id}"}
     if clone_block(node):
         return 409, {"error": clone_block(node), "clone": True, "offline": True}
+    if node.get("revoked"):
+        return 409, {"error": f"{node['name']} 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）",
+                     "revoked": True, "offline": True}
     ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
     if ctx is None:
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
@@ -1275,6 +1278,14 @@ def fleet_state(scope=None):
     return {"ts": time.time(), "nodes": nodes, "groups": out}
 
 
+def _admin_state(n, st):
+    """管理者下的停用或撤銷：在線時以代理回報為準，離線看主控台記下的。"""
+    if n.get("revoked"):
+        return {"code": "revoked", "at": n["revoked"]["at"]}
+    d = st["disabled_by_admin"] if st and "disabled_by_admin" in st else n.get("disabled_by_admin")   # 舊版代理不回報這一項
+    return {"code": "disabled", "at": d["at"]} if d else None
+
+
 def node_ready(n, g, online, st):
     """群組總覽上這台的狀態（groups.member_status）。上次連線：主動連回的看通道，其他看取樣紀錄。"""
     last = LINK.last_seen(n["id"]) if n.get("link") == "push" else None
@@ -1283,10 +1294,84 @@ def node_ready(n, g, online, st):
     a = ALIGN_STATE.get(n["id"])
     rejoin = ((st.get("identity") or {}).get("rejoin") or {}).get("reason")
     # 放不下時要改用什麼，由代理用失敗的那組上下文、並行數與欄位（綁卡）實際試算過才給
-    return groups.member_status(g, online, a, clone=n.get("clone"), rejoin=rejoin, last_seen=seen)
+    return groups.member_status(g, online, a, clone=n.get("clone"), rejoin=rejoin, last_seen=seen,
+                                admin=_admin_state(n, st if online else None))
 
 
 # ---------------------------------------------------------------- 背景取樣
+
+# ---------------------------------------------------------------- 安全指令（清單 #25）
+# 停用、恢復、清除、撤銷身分存在資料庫裡，不設期限；機器一連上就先送，送完才做群組對齊。
+# 主動連回的機器看通道在不在線；主控台連過去的機器每分鐘試一次。
+SAFETY_KINDS = {"disable": "停用", "enable": "恢復", "wipe": "清除", "revoke": "撤銷身分"}
+SAFETY_WAKE = threading.Event()
+SAFETY_RETRY = 60
+_SAFETY_LOCKS = {}
+_SAFETY_TRIED = {}
+
+
+def _safety_mark(nid, kind, by):
+    """指令做完，主控台這邊記下這台的狀態（離線時群組總覽與機器頁也看得到）。"""
+    def put(cfg):
+        for n in cfg["nodes"]:
+            if n["id"] != nid:
+                continue
+            if kind == "disable":
+                n["disabled_by_admin"] = {"at": int(time.time()), "by": by}
+            elif kind == "enable":
+                n.pop("disabled_by_admin", None)
+            elif kind == "revoke":
+                n["revoked"] = {"at": int(time.time()), "by": by}
+    update_fleet(put)
+
+
+def deliver_safety(nid):
+    """依序送這台還沒送到的安全指令。回 True 表示全部送完（沒有待送的）。"""
+    lock = _SAFETY_LOCKS.setdefault(nid, threading.Lock())
+    if not lock.acquire(blocking=False):
+        return False                             # 別的執行緒正在送這台
+    try:
+        for c in STORE.safety_pending(nid):
+            if c["state"] != "pending" or not STORE.safety_claim(c["id"]):
+                return False
+            code, out = call_node(nid, "/safety", "POST", {"id": c["id"], "kind": c["kind"], "opts": c["opts"], "by": c["by"]},
+                                  timeout=600)
+            if code == 401 and c["kind"] == "revoke" and c["tried"]:
+                code, out = 200, {"kind": "revoke", "note": "上次送出後這台已經不認舊的權杖：身分已丟掉"}
+            if code != 200:
+                STORE.safety_tried(c["id"], "這台的代理版本太舊，不支援安全指令，請更新代理" if code == 404
+                                   else out.get("error") or f"HTTP {code}")
+                return False
+            if STORE.safety_done(c["id"], out):
+                _safety_mark(nid, c["kind"], c["by"])
+                STORE.audit(c["by"], "", "node.safety_done", nid, True, {"kind": c["kind"], "id": c["id"], "result": out})
+        return True
+    finally:
+        lock.release()
+
+
+def safety_worker():
+    STORE.safety_unstick()
+    while True:
+        SAFETY_WAKE.wait(5)
+        SAFETY_WAKE.clear()
+        try:
+            nodes = {n["id"]: n for n in fleet()["nodes"]}
+            for nid in STORE.safety_pending_nodes():
+                n = nodes.get(nid)
+                if not n or n.get("revoked"):
+                    continue
+                if n.get("link") == "push":
+                    if not LINK.online(nid):
+                        continue
+                elif time.time() - _SAFETY_TRIED.get(nid, 0) < SAFETY_RETRY:
+                    continue
+                _SAFETY_TRIED[nid] = time.time()
+                if deliver_safety(nid):
+                    ALIGN_WAKE.set()             # 停用、恢復之後群組狀態會變，馬上對齊一次
+        except Exception as exc:  # noqa: BLE001
+            print(f"送安全指令出錯：{exc}", flush=True)
+
 
 # ---------------------------------------------------------------- 群組設定對齊（清單 #5）
 # 每分鐘（改了群組設定就馬上）把每台所屬群組的設定送過去，附主控台的時間；代理自己分「準備」與「套用」兩段做，
@@ -1305,6 +1390,8 @@ def align_once():
             continue
         if n.get("link") == "push" and not LINK.online(n["id"]):
             continue
+        if n.get("revoked") or (n["id"] in STORE.safety_pending_nodes() and not deliver_safety(n["id"])):
+            continue                             # 安全指令沒送完之前不對齊
         # 預設設定的群組（例如原本的群組被刪、機器移到未分類）也要送：代理才會放掉舊群組的鎖定與限制
         # ponytail: 一台一台依序送；連不到的伺服器各等 20 秒，機器多了再改並行
         body = {"group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}
@@ -1845,6 +1932,7 @@ def _join_node(handler, body):
             same = next((n for n in cfg["nodes"] if n["id"] == j.get("replace")), None)
             if same:                                   # 指定重新安裝的那台：換新的權杖、位址與憑證，名稱群組不動
                 same.update(host=good, agent_port=port, link=link, token=tls.seal(CERTS.p, token.encode()))
+                same.pop("revoked", None)              # 撤銷身分之後重新加入
                 nid = same["id"]
                 return
             taken = {n["id"] for n in cfg["nodes"]}
@@ -4087,6 +4175,14 @@ class Handler(BaseHTTPRequestHandler):
             if not j:
                 return self._json(404, {"error": "沒有這個加入碼"})
             return self._json(200, joincodes.public(j))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/safety", path)
+        if m:
+            node = next((n for n in fleet()["nodes"] if n["id"] == m.group(1)), None)
+            if not node:
+                return self._json(404, {"error": "沒有這台機器"})
+            return self._json(200, {"cmds": STORE.safety_list(node["id"]), "kinds": SAFETY_KINDS,
+                                    "disabled": node.get("disabled_by_admin"), "revoked": node.get("revoked"),
+                                    "push": node.get("link") == "push", "online": LINK.online(node["id"]) if node.get("link") == "push" else None})
         m = re.fullmatch(r"/api/node/([\w.-]+)/machine", path)
         if m:
             return self._json(*call_node(m.group(1), "/machine", timeout=60))
@@ -4467,6 +4563,31 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "沒有這個加入碼"})
             self._audit("node.join_code_revoke", j["id"], True, {"group": j.get("group"), "used": j["used"], "uses": j["uses"]})
             return self._json(200, {"ok": True, "code": joincodes.public(j)})
+        m = re.fullmatch(r"/api/node/([\w.-]+)/safety(?:/([0-9a-f]{24})/cancel)?", path)
+        if m:
+            node = next((n for n in fleet()["nodes"] if n["id"] == m.group(1)), None)
+            if not node:
+                return self._json(404, {"error": "沒有這台機器"})
+            if m.group(2):
+                ok = STORE.safety_cancel(node["id"], m.group(2), self.user)
+                self._audit("node.safety_cancel", node["id"], ok, {"id": m.group(2)})
+                return self._json(200 if ok else 409, {"ok": True} if ok else {"error": "這一筆已經送出、完成或取消了，不能再取消"})
+            kind = body.get("kind")
+            if kind not in SAFETY_KINDS:
+                return self._json(400, {"error": "指令只能是：停用、恢復、清除、撤銷身分"})
+            if kind != "enable" and str(body.get("confirm") or "").strip() != node["name"]:
+                return self._json(400, {"error": f"請輸入這台的名稱「{node['name']}」確認"})
+            if node.get("revoked"):
+                return self._json(409, {"error": "這台的身分已撤銷，指令送不到；要先重新加入"})
+            opts = {"models": True} if kind == "wipe" and body.get("models") is True else {}
+            try:
+                cmd, gone = STORE.safety_add(node["id"], kind, opts, self.user)
+            except ValueError as exc:
+                return self._json(409, {"error": str(exc)})
+            self._audit("node.safety", node["id"], True, {"kind": kind, "id": cmd["id"], "opts": opts, "superseded": gone})
+            _SAFETY_TRIED.pop(node["id"], None)
+            SAFETY_WAKE.set()
+            return self._json(200, {"ok": True, "cmd": cmd, "superseded": gone})
         m = re.fullmatch(r"/api/nodes/([\w.-]+)/(update|remove|clone-clear)", path)
         if m:
             nid, act = m.group(1), m.group(2)
@@ -4487,7 +4608,8 @@ class Handler(BaseHTTPRequestHandler):
                     os.remove(trust_file(nid))
                 LINK.forget(nid)
                 RING.forget(nid)
-                self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"]})
+                dropped = STORE.safety_cancel_node(nid, self.user)
+                self._audit("node.remove", nid, True, {"name": node["name"], "host": node["host"], "safety_canceled": dropped})
                 return self._json(200, {"ok": True})
             name = str(body.get("name", node["name"]) or "").strip()
             group = str(body.get("group", node.get("group", "")) or "").strip() or "未分類"
@@ -5498,6 +5620,7 @@ def main():
     threading.Thread(target=sampler, daemon=True).start()
     threading.Thread(target=update_watch, daemon=True).start()
     threading.Thread(target=aligner, daemon=True).start()
+    threading.Thread(target=safety_worker, daemon=True).start()
     ALIGN_WAKE.set()
     if not DESKTOP and not winrt.meta(STATE_DIR):
         winrt.fetch(STATE_DIR, quiet=True)      # 「加一台機器」的Windows腳本要用：啟動時先試著抓一次，抓不到畫面上有按鈕

@@ -49,6 +49,8 @@ jobs:
         run: python test/test_module_contract.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
+      - name: 安全指令（停用、恢復、清除、撤銷身分；離線排著、連上先送、後下覆蓋先下、重送不重做）
+        run: cd console && python test_safety.py
       - name: 群組加入碼（可用次數、有效時間、名稱樣板、限定網段、作廢、主控台重啟後仍有效）
         run: cd console && python test_joincodes.py
       - name: Windows工作站執行環境包（檢查、上傳、從GitHub下載核對sha256、加入碼才拿得到、腳本寫死sha256）

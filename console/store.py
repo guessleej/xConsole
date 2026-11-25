@@ -88,6 +88,10 @@ class Store:
         CREATE INDEX IF NOT EXISTS agent_tasks_user ON agent_tasks(user, created);
         CREATE TABLE IF NOT EXISTS agent_folders(
           node TEXT, folder TEXT, owner TEXT, created REAL, PRIMARY KEY(node, folder));
+        CREATE TABLE IF NOT EXISTS safety_cmds(
+          id TEXT PRIMARY KEY, node TEXT, kind TEXT, opts TEXT, state TEXT, created REAL, by TEXT,
+          tried REAL, error TEXT, done REAL, result TEXT, closed_by TEXT);
+        CREATE INDEX IF NOT EXISTS safety_node ON safety_cmds(node, state);
         """)
         # 舊版資料庫補欄位：對話的收藏（明文0／1）與分類標籤（使用者寫的字，跟標題一樣加密）
         have = {r[1] for r in self.db.execute("PRAGMA table_info(chats)")}
@@ -97,6 +101,82 @@ class Store:
         # 舊版的帳號表沒有群組範圍：補欄位，空的＝不限群組（升級後每個人看到的跟以前一樣）
         if "scope" not in {r[1] for r in self.db.execute("PRAGMA table_info(users)")}:
             self.db.execute("ALTER TABLE users ADD COLUMN scope TEXT")
+
+    # ---- 安全指令（清單 #25）：停用、恢復、清除、撤銷身分。不設期限，機器下次連上時先送
+
+    SAFETY_PAIR = {"disable": "enable", "enable": "disable"}
+
+    def _safety_row(self, r):
+        return {"id": r[0], "node": r[1], "kind": r[2], "opts": json.loads(r[3] or "{}"), "state": r[4], "created": r[5],
+                "by": r[6], "tried": r[7], "error": r[8], "done": r[9], "result": json.loads(r[10] or "null"), "closed_by": r[11]}
+
+    def safety_add(self, node, kind, opts, by):
+        """排一筆。後下的覆蓋先下的：同一種、或停用與恢復互相，還沒送出的那筆標「被取代」。
+        已排了撤銷身分就不再收新的（撤銷之後這台要重新加入，之後的指令送不到）。回 (這一筆, 被取代的編號)。"""
+        with self.lock:
+            pend = [self._safety_row(r) for r in self.db.execute(
+                "SELECT * FROM safety_cmds WHERE node=? AND state IN ('pending','sending')", (node,))]
+            if any(c["kind"] == "revoke" for c in pend) and kind != "revoke":
+                raise ValueError("這台已經排了「撤銷身分」，要先取消那一筆才能下別的指令")
+            gone = [c["id"] for c in pend if c["state"] == "pending" and c["kind"] in (kind, self.SAFETY_PAIR.get(kind))]
+            now = time.time()
+            for cid in gone:
+                self.db.execute("UPDATE safety_cmds SET state='superseded', done=?, closed_by=? WHERE id=?", (now, by, cid))
+            cid = secrets.token_hex(12)
+            self.db.execute("INSERT INTO safety_cmds(id, node, kind, opts, state, created, by) VALUES(?,?,?,?,?,?,?)",
+                            (cid, node, kind, json.dumps(opts or {}), "pending", now, by))
+        return self.safety_get(cid), gone
+
+    def safety_get(self, cid):
+        r = self.db.execute("SELECT * FROM safety_cmds WHERE id=?", (cid,)).fetchone()
+        return self._safety_row(r) if r else None
+
+    def safety_pending(self, node):
+        """要送的順序：照下的先後，撤銷身分一定最後（送完這台就認不得主控台了）。"""
+        rows = [self._safety_row(r) for r in self.db.execute(
+            "SELECT * FROM safety_cmds WHERE node=? AND state IN ('pending','sending') ORDER BY created", (node,))]
+        return sorted(rows, key=lambda c: c["kind"] == "revoke")
+
+    def safety_pending_nodes(self):
+        return {r[0] for r in self.db.execute("SELECT DISTINCT node FROM safety_cmds WHERE state IN ('pending','sending')")}
+
+    def safety_claim(self, cid):
+        """送出前標「送出中」：送出中的不能取消（代理可能已經在做了）。回 False 表示已被取消或別人在送。"""
+        with self.lock:
+            return self.db.execute("UPDATE safety_cmds SET state='sending' WHERE id=? AND state='pending'", (cid,)).rowcount == 1
+
+    def safety_unstick(self):
+        """主控台重開：上次送到一半的改回待送（代理靠編號去重，再送一次不會做兩次）。"""
+        with self.lock:
+            self.db.execute("UPDATE safety_cmds SET state='pending' WHERE state='sending'")
+
+    def safety_list(self, node, limit=50):
+        return [self._safety_row(r) for r in self.db.execute(
+            "SELECT * FROM safety_cmds WHERE node=? ORDER BY created DESC LIMIT ?", (node, limit))]
+
+    def safety_cancel(self, node, cid, by):
+        with self.lock:
+            cur = self.db.execute("UPDATE safety_cmds SET state='canceled', done=?, closed_by=? "
+                                  "WHERE id=? AND node=? AND state='pending'", (time.time(), by, cid, node))
+        return cur.rowcount == 1
+
+    def safety_cancel_node(self, node, by):
+        """機器從主控台移除：還沒送到的一起取消（含送到一半的，那台已經不歸這個主控台管）。"""
+        with self.lock:
+            return self.db.execute("UPDATE safety_cmds SET state='canceled', done=?, closed_by=? "
+                                   "WHERE node=? AND state IN ('pending','sending')", (time.time(), by, node)).rowcount
+
+    def safety_tried(self, cid, error):
+        with self.lock:
+            self.db.execute("UPDATE safety_cmds SET state='pending', tried=?, error=? WHERE id=? AND state='sending'",
+                            (time.time(), str(error or "")[:300], cid))
+
+    def safety_done(self, cid, result):
+        """回 True 表示這次才完成。"""
+        with self.lock:
+            cur = self.db.execute("UPDATE safety_cmds SET state='done', done=?, result=?, error=NULL "
+                                  "WHERE id=? AND state='sending'", (time.time(), json.dumps(result), cid))
+        return cur.rowcount == 1
 
     # ---- 稽核
     def audit(self, user, ip, action, target="", ok=True, detail=None):
