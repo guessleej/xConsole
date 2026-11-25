@@ -20,7 +20,6 @@ import re
 import sys
 import tempfile
 import threading
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -152,11 +151,11 @@ EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/age
                   r"POST /api/keys/[0-9a]{8}/(update|revoke)"]
 
 
-EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)",
+EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/history",
                     r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
                     r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
 EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
-                      r"POST /api/groups/a{8}/update",
+                      r"POST /api/groups/a{8}/(update|rollback)",
                       r"POST /api/node/a/slots/add"]
 
 
@@ -272,6 +271,13 @@ def _roles_and_scope(admin):
     check("  改名 → 403", st == 403, (st, o))
     check("  範圍外的群組 → 404", op.req("POST", f"/api/groups/{gb}/update", {"settings": cur["settings"]})[0] == 404)
     check("  檢視不能改群組設定 → 403", vw.req("POST", f"/api/groups/{ga}/update", {"settings": cur["settings"]})[0] == 403)
+    check("  檢視看得到設定歷史、不能退回 → 403", vw.req("GET", f"/api/groups/{ga}/history")[0] == 200
+          and vw.req("POST", f"/api/groups/{ga}/rollback", {"version": 1})[0] == 403)
+    st, o = op.req("POST", f"/api/groups/{ga}/rollback", {"version": 1})
+    check("  維運能退回設定；歷史記下是誰退的", st == 200 and o.get("changed")
+          and op.req("GET", f"/api/groups/{ga}/history")[1]["history"][0]["by"] == "teacher-a@cloudinfo.com.tw", o)
+    check("  範圍外的群組看歷史、退回 → 404", op.req("GET", f"/api/groups/{gb}/history")[0] == 404
+          and op.req("POST", f"/api/groups/{gb}/rollback", {"version": 1})[0] == 404)
 
     # 金鑰：只能選範圍內的；範圍改了舊金鑰馬上跟著縮
     check("限定群組的帳號產生金鑰：不能選全部", op.req("POST", "/api/keys/create", {"name": "全部"})[0] == 400)

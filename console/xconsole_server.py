@@ -120,6 +120,7 @@ USER_ROUTES = [
 # 檢視（清單 #10）：使用者能用的，再加上看得到機器狀態與群組（唯讀）。檔案瀏覽、API串接、記錄頁不給
 VIEWER_ROUTES = [
     ("GET", r"/api/(groups|catalog)"),
+    ("GET", r"/api/groups/[0-9a-f]{8}/history"),
     ("GET", r"/api/node/[\w.-]+/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)"),
     ("GET", r"/api/node/[\w.-]+/(logs|catalog)/[\w.-]+"),
     ("GET", r"/api/node/[\w.-]+/slot/[\w.-]+/progress"),
@@ -129,7 +130,7 @@ OPERATOR_ROUTES = [
     ("POST", r"/api/node/[\w.-]+/slot/[\w.-]+/(start|stop|restart|model)"),
     ("POST", r"/api/node/[\w.-]+/(all/(start|stop|restart)|admit/[\w.-]+|profile/[\w.-]+)"),
     ("POST", r"/api/node/[\w.-]+/slots/add"),         # 只限空欄位：這台還沒有欄位時，按「啟動模型」會先自動建一格
-    ("POST", r"/api/groups/[0-9a-f]{8}/update"),
+    ("POST", r"/api/groups/[0-9a-f]{8}/(update|rollback)"),
 ]
 ROLES = ("admin", "operator", "viewer", "user")
 ROLE_NAMES = {"admin": "管理員", "operator": "維運", "viewer": "檢視", "user": "使用者"}
@@ -4241,12 +4242,19 @@ class Handler(BaseHTTPRequestHandler):
                 if sc is not None and g["id"] not in sc:
                     continue
                 ms = group_members(g, cfg["nodes"])
+                g = {k: v for k, v in g.items() if k != "history"}      # 歷史另外拿（/history），清單每15秒重抓不必帶
                 out.append(dict(g, members=count.get(g["name"], 0), nodes=ms,
                                 ready=sum(1 for m in ms if m["prepared"] >= g["version"]),
                                 done=sum(1 for m in ms if m["applied"] >= g["version"])))
             return self._json(200, {"groups": out,
                                     "kinds": groups.KINDS, "lockable": groups.LOCKABLE, "sources": groups.SOURCES,
                                     "defaults": groups.defaults()})
+        m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/history", path)
+        if m:
+            g = next((x for x in fleet().get("groups", []) if x["id"] == m.group(1)), None)
+            if g is None:
+                return self._json(404, {"error": "沒有這個群組"})
+            return self._json(200, {"version": g["version"], "history": groups.history(g), "max": groups.HISTORY_MAX})
         if path == "/api/link":
             c = link_cfg()
             return self._json(200, dict(c, port=LINK_PORT, listen=LINK_LISTEN, nodes=len(push_ids()),
@@ -5069,8 +5077,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 g = groups.new(body.get("name"), str(body.get("kind") or "一般"))
                 if body.get("settings") is not None:
-                    groups.update(g, settings=body["settings"])
-                    g["version"] = 1                 # 新建的群組從 1 起算
+                    g["settings"] = groups.check(body["settings"])     # 新建的群組從 v1 起算
             except ValueError as exc:
                 return self._json(400, {"error": str(exc)})
             err = []
@@ -5085,6 +5092,36 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(409, {"error": err[0]})
             self._audit("group.create", g["name"], True, {"kind": g["kind"]})
             return self._json(200, {"ok": True, "group": g})
+        m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/rollback", path)
+        if m:
+            v = body.get("version")
+            if isinstance(v, bool) or not isinstance(v, int):
+                return self._json(400, {"error": "要指定退回哪一版（version）"})
+            out = {}
+
+            def back(cfg):
+                g = next((x for x in cfg.get("groups", []) if x["id"] == m.group(1)), None)
+                if g is None:
+                    out.update(code=404, error="沒有這個群組")
+                    return
+                try:
+                    _, changed = groups.rollback(g, v, by=self.user)
+                except LookupError as exc:
+                    out.update(code=404, error=str(exc))
+                    return
+                except ValueError as exc:
+                    out.update(code=400, error=f"v{v} 的設定現在不合法，不能退回：{exc}")
+                    return
+                out.update(code=200, group=dict(g), changed=changed)
+            update_fleet(back)
+            if out.get("code") != 200:
+                return self._json(out["code"], {"error": out["error"]})
+            g = out["group"]
+            g.pop("history", None)
+            self._audit("group.rollback", g["name"], True, {"to": v, "version": g["version"], "settings_changed": out["changed"]})
+            if out["changed"]:
+                ALIGN_WAKE.set()
+            return self._json(200, {"ok": True, "group": g, "changed": out["changed"]})
         m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/(update|delete)", path)
         if m:
             gid, act = m.groups()
@@ -5113,7 +5150,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 try:
                     name, changed = groups.update(g, body.get("name"), body.get("kind"), body.get("settings"),
-                                                  taken={x["name"] for x in cfg["groups"] if x["id"] != gid})
+                                                  taken={x["name"] for x in cfg["groups"] if x["id"] != gid}, by=self.user)
                 except ValueError as exc:
                     out.update(code=409 if "同名" in str(exc) else 400, error=str(exc))
                     return
@@ -5121,7 +5158,7 @@ class Handler(BaseHTTPRequestHandler):
                     if n.get("group") == old:
                         n["group"] = name               # 改名時成員一起改，不會掉出群組
                 JOINS.rename_group(gid, name)           # 還能用的加入碼也跟著改
-                out.update(code=200, group=dict(g), changed=changed, old=old)
+                out.update(code=200, group={k: v for k, v in g.items() if k != "history"}, changed=changed, old=old)
             update_fleet(edit)
             if out.get("code") != 200:
                 return self._json(out.get("code", 400), {"error": out.get("error")})

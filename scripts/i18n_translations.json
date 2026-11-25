@@ -25423,5 +25423,190 @@
 "en": "The search endpoint setting is invalid",
 "ja": "検索エンドポイントの設定が正しくありません",
 "ko": "검색 엔드포인트 설정이 올바르지 않습니다"
+},
+" 版）": {
+"en": " are kept)",
+"ja": " 版のみ保存）",
+"ko": "개만 보관)"
+},
+" 的設定現在不合法，不能退回：": {
+"en": " settings are no longer valid and cannot be restored: ",
+"ja": "の設定は現在無効なため戻せません：",
+"ko": "의 설정이 지금은 유효하지 않아 되돌릴 수 없습니다: "
+},
+" 這一版（只保留最近 ": {
+"en": " (only the latest ",
+"ja": "（直近 ",
+"ko": "(최근 "
+},
+"v{0} 的設定現在不合法，不能退回：{1}": {
+"en": "The settings of v{0} are no longer valid and cannot be restored: {1}",
+"ja": "v{0} の設定は現在無効なため戻せません：{1}",
+"ko": "v{0}의 설정이 지금은 유효하지 않아 되돌릴 수 없습니다: {1}"
+},
+"」退回 v": {
+"en": "” back to v",
+"ja": "」を次の版に戻す: v",
+"ko": "” 되돌리기: v"
+},
+"內容相同": {
+"en": "Same content",
+"ja": "内容は同じ",
+"ko": "내용 동일"
+},
+"功耗上限": {
+"en": "Power limit",
+"ja": "電力上限",
+"ko": "전력 상한"
+},
+"各台照這一版的套用時機重新準備與套用": {
+"en": "Each machine prepares and applies it according to this version's apply timing",
+"ja": "各マシンはこの版の適用タイミングで準備と適用をやり直します",
+"ko": "각 기기는 이 버전의 적용 시점에 따라 다시 준비하고 적용합니다"
+},
+"存放位置": {
+"en": "Storage location",
+"ja": "保存場所",
+"ko": "저장 위치"
+},
+"已退回，設定版本升到 v": {
+"en": "Rolled back; settings are now v",
+"ja": "戻しました。設定の版: v",
+"ko": "되돌렸습니다. 설정 버전: v"
+},
+"已退回，設定版本升到 v{0}": {
+"en": "Rolled back; settings are now v{0}",
+"ja": "戻しました。設定は v{0} になりました",
+"ko": "되돌렸습니다. 설정이 v{0}(으)로 올라갔습니다"
+},
+"把「": {
+"en": "Roll “",
+"ja": "「",
+"ko": "“"
+},
+"把「{0}」退回 v{1}": {
+"en": "Roll “{0}” back to v{1}",
+"ja": "「{0}」を v{1} に戻す",
+"ko": "“{0}”을(를) v{1}(으)로 되돌리기"
+},
+"改到的項目": {
+"en": "Items changed",
+"ja": "変わる項目",
+"ko": "바뀌는 항목"
+},
+"時間（台北時間）": {
+"en": "Time (Taipei)",
+"ja": "時刻（台北時間）",
+"ko": "시간(타이베이 시간)"
+},
+"會用 v": {
+"en": "Will use v",
+"ja": "次の版を使用: v",
+"ko": "사용할 버전: v"
+},
+"會用 v{0} 的設定產生新的一版 v{1}，改到的項目：{2}。各台照這一版的套用時機重新準備與套用。": {
+"en": "The settings of v{0} will become a new version v{1}. Items changed: {2}. Each machine prepares and applies it according to this version's apply timing.",
+"ja": "v{0} の設定で新しい版 v{1} を作ります。変わる項目：{2}。各マシンはこの版の適用タイミングで準備と適用をやり直します。",
+"ko": "v{0}의 설정으로 새 버전 v{1}을(를) 만듭니다. 바뀌는 항목: {2}. 각 기기는 이 버전의 적용 시점에 따라 다시 준비하고 적용합니다."
+},
+"模型來源": {
+"en": "Model sources",
+"ja": "モデルの取得元",
+"ko": "모델 출처"
+},
+"每改一次設定留一版；退回某一版會產生新的版本號，各台照新版本重新準備與套用": {
+"en": "Every settings change is kept as a version. Rolling back creates a new version number, and each machine prepares and applies it again.",
+"ja": "設定を変更するたびに1版ずつ残ります。ある版に戻すと新しい版番号になり、各マシンはその版で準備と適用をやり直します。",
+"ko": "설정을 바꿀 때마다 한 버전씩 남습니다. 이전 버전으로 되돌리면 새 버전 번호가 생기고, 각 기기는 그 버전으로 다시 준비하고 적용합니다."
+},
+"沒有 v": {
+"en": "No version v",
+"ja": "該当する版がありません: v",
+"ko": "해당 버전 없음: v"
+},
+"沒有 v{0} 這一版（只保留最近 {1} 版）": {
+"en": "Version v{0} does not exist (only the latest {1} are kept)",
+"ja": "v{0} という版はありません（直近 {1} 版のみ保存）",
+"ko": "v{0} 버전이 없습니다(최근 {1}개만 보관)"
+},
+"版本": {
+"en": "Version",
+"ja": "版",
+"ko": "버전"
+},
+"的設定現在不合法，不能退回": {
+"en": "settings are no longer valid and cannot be restored",
+"ja": "の設定は現在無効なため戻せません",
+"ko": "설정이 지금은 유효하지 않아 되돌릴 수 없습니다"
+},
+"的設定產生新的一版 v": {
+"en": "settings to create new version v",
+"ja": "の設定で新しい版を作成: v",
+"ko": "설정으로 새 버전 생성: v"
+},
+"目前使用中": {
+"en": "In use now",
+"ja": "現在使用中",
+"ko": "현재 사용 중"
+},
+"要指定退回哪一版（version）": {
+"en": "Specify which version to roll back to (version)",
+"ja": "戻す版（version）を指定してください",
+"ko": "되돌릴 버전(version)을 지정하세요"
+},
+"設定歷史": {
+"en": "Settings history",
+"ja": "設定の履歴",
+"ko": "설정 기록"
+},
+"誰改的": {
+"en": "Changed by",
+"ja": "変更者",
+"ko": "변경한 사람"
+},
+"跟目前設定不同的地方": {
+"en": "Differs from current in",
+"ja": "現在の設定との違い",
+"ko": "현재 설정과 다른 항목"
+},
+"退回 v": {
+"en": "Rolled back to v",
+"ja": "戻した版: v",
+"ko": "되돌린 버전: v"
+},
+"退回 v{0}": {
+"en": "Rolled back to v{0}",
+"ja": "v{0} に戻す",
+"ko": "v{0}(으)로 되돌림"
+},
+"退回這一版": {
+"en": "Roll back to this",
+"ja": "この版に戻す",
+"ko": "이 버전으로 되돌리기"
+},
+"這一版跟目前設定相同，版本不動": {
+"en": "This version matches the current settings; version unchanged",
+"ja": "この版は現在の設定と同じため、版は変わりません",
+"ko": "이 버전은 현재 설정과 같아 버전이 바뀌지 않습니다"
+},
+"這一版（只保留最近": {
+"en": "(only the latest",
+"ja": "（直近",
+"ko": "(최근"
+},
+"還沒有舊版本。之後每存一次不同的設定，這裡就多一版，最多保留最近": {
+"en": "No earlier versions yet. Each time different settings are saved, a version is added here; the latest",
+"ja": "まだ以前の版はありません。異なる設定を保存するたびにここへ1版追加され、直近",
+"ko": "아직 이전 버전이 없습니다. 다른 설정을 저장할 때마다 여기에 한 버전이 추가되며 최근"
+},
+"還沒有舊版本。之後每存一次不同的設定，這裡就多一版，最多保留最近 {0} 版。": {
+"en": "No earlier versions yet. Each time different settings are saved, a version is added here; the latest {0} are kept.",
+"ja": "まだ以前の版はありません。異なる設定を保存するたびにここへ1版追加され、直近 {0} 版まで保存されます。",
+"ko": "아직 이전 버전이 없습니다. 다른 설정을 저장할 때마다 여기에 한 버전이 추가되며 최근 {0}개까지 보관합니다."
+},
+"鎖定": {
+"en": "Locks",
+"ja": "ロック",
+"ko": "잠금"
 }
 }

@@ -3,6 +3,7 @@
 
 一、群組設定的檢查（groups.check／update／ensure，不開網路）：合法的照收、不合法的講人話擋下、
     設定真的變了版本號才加一、改名撞名不動任何東西、「未分類」不能改名。
+    設定歷史（清單 #21）：每版留一筆、最多保留 HISTORY_MAX 版、退回某一版產生新版本號、標出差在哪幾項。
 三、群組設定對齊：主控台送給一支真的代理，代理準備並套用後回報，鎖定經主控台也改不了。
 二、端對端：舊版只有群組名稱的機器，主控台啟動時補上群組物件；經網頁 API 新增、改設定、改名（成員跟著改）、
     刪除（成員移到未分類）；機器改到新群組名稱時自動建出群組。
@@ -104,6 +105,43 @@ def unit():
     _, ch = groups.update(old, name="Bob's lab", settings={"models": ["auto"]})
     check("  這種舊名稱的群組照樣能改設定（名稱沒改就不重驗），也能改成合法的名稱",
           ch and groups.update(old, name="Bob lab")[0] == "Bob lab")
+    history()
+
+
+def history():
+    g = groups.new("歷史測試")
+    check("新群組還沒有歷史（第一次改設定才把 v1 補進來）", groups.history(g) == [] and "history" not in g)
+    groups.update(g, settings={"models": ["a/b:Q4_K_M"]}, by="admin")
+    groups.update(g, settings={"models": ["a/b:Q4_K_M"], "profile": {"ctx": 8192}}, by="ops")
+    groups.update(g, name="歷史測試二")
+    h = groups.history(g)
+    check("每次設定真的變了留一版，新的在前；改名不留", [x["version"] for x in h] == [3, 2, 1] and h[0]["current"]
+          and [x["by"] for x in h] == ["ops", "admin", ""], [(x["version"], x["by"]) for x in h])
+    check("  每版標出跟目前設定差在哪幾項", h[1]["diff"] == ["profile"] and h[2]["diff"] == ["models", "profile"]
+          and h[0]["diff"] == [], [x["diff"] for x in h])
+    tgt, ch = groups.rollback(g, 1, by="ops")
+    h = groups.history(g)
+    check("退回 v1：用 v1 的設定產生 v4（版本號只增不減，代理才會重新對齊），註明退回哪一版",
+          ch and g["version"] == 4 and g["settings"] == groups.defaults() and h[0]["note"] == "退回 v1"
+          and h[0]["by"] == "ops" and tgt["version"] == 1, (g["version"], h[0]))
+    _, ch = groups.rollback(g, 1)
+    check("  再退回同樣內容的一版：設定沒變，版本不動", not ch and g["version"] == 4)
+    try:
+        groups.rollback(g, 99)
+        ok = False
+    except LookupError:
+        ok = True
+    check("  退回不存在的版本：講明只保留最近幾版", ok)
+    g["history"][0]["settings"]["gone_field"] = 1          # 未來拿掉的欄位不能讓舊版退不回去
+    del g["history"][0]["settings"]["gpu_power_limit"]     # 舊版還沒有的新欄位用預設值
+    groups.update(g, settings={"models": ["x/y:Q8_0"]})
+    _, ch = groups.rollback(g, 1)
+    check("  舊版少了新欄位、多了已拿掉的欄位：照樣退得回去", ch and g["settings"] == groups.defaults())
+    for i in range(groups.HISTORY_MAX + 5):
+        groups.update(g, settings={"profile": {"ctx": 1024 * (i + 1)}})
+    vs = [x["version"] for x in g["history"]]
+    check(f"最多保留最近 {groups.HISTORY_MAX} 版，目前那一版一定在", len(vs) == groups.HISTORY_MAX and vs[-1] == g["version"]
+          and vs == list(range(g["version"] - groups.HISTORY_MAX + 1, g["version"] + 1)), vs[:3])
 
 
 def free_port():
@@ -167,12 +205,27 @@ def e2e():
         check("  同樣內容再存一次：版本不動", st == 200 and not out["changed"] and out["group"]["version"] == 2, out)
         st, out = call(f"/api/groups/{a['id']}/update", {"settings": {"storage_root": "relative/path"}})
         check("  不合法的設定：400，版本不動", st == 400 and by_name()["電腦教室 A"]["version"] == 2, out)
+        st, out = call(f"/api/groups/{a['id']}/history")
+        h = out.get("history") or []
+        check("設定歷史：v2（admin 改的）與補進來的 v1，新的在前", st == 200 and [x["version"] for x in h] == [2, 1]
+              and h[0]["by"] == "admin" and h[1]["diff"] == ["models", "locked"], out)
+        check("  群組清單不帶歷史（清單每15秒重抓）", all("history" not in g for g in by_name().values()))
+        st, out = call(f"/api/groups/{a['id']}/rollback", {"version": 1})
+        check("退回 v1：產生 v3、設定回到預設", st == 200 and out["changed"] and out["group"]["version"] == 3
+              and out["group"]["settings"] == groups.defaults() and "history" not in out["group"], out)
+        st, out = call(f"/api/groups/{a['id']}/history")
+        check("  歷史多一筆「退回 v1」", out["history"][0]["note"] == "退回 v1" and out["history"][0]["version"] == 3, out)
+        check("  退回不存在的版本：404；沒給版本：400",
+              call(f"/api/groups/{a['id']}/rollback", {"version": 42})[0] == 404
+              and call(f"/api/groups/{a['id']}/rollback", {"version": "1"})[0] == 400)
+        st, out = call(f"/api/groups/{a['id']}/rollback", {"version": 2})
+        check("  再退回 v2：產生 v4", st == 200 and out["group"]["version"] == 4 and out["group"]["settings"]["locked"] == ["models"], out)
         st, out = call(f"/api/groups/{a['id']}/update", {"name": "業務部"})
         check("  改成已有的名稱：409", st == 409, out)
         st, out = call(f"/api/groups/{a['id']}/update", {"name": "電腦教室 101"})
         fl = call("/api/nodes")[1]["nodes"]
         check("改名：成員一起改，不會掉出群組", st == 200 and sum(1 for n in fl if n["group"] == "電腦教室 101") == 3
-              and by_name()["電腦教室 101"]["version"] == 2, [n["group"] for n in fl])
+              and by_name()["電腦教室 101"]["version"] == 4, [n["group"] for n in fl])
         st, out = call("/api/nodes/pc-4/update", {"name": "PC 4", "group": "失敗組", "host": "10.0.0.99", "agent_port": 9401})
         check("換位址連不到而改回：不會留下空的新群組", st == 400 and "失敗組" not in by_name(), (st, out))
         st, out = call("/api/nodes/pc-3/update", {"name": "PC 3", "group": "研發部", "host": "10.0.0.3", "agent_port": 9401})
