@@ -4360,6 +4360,38 @@
 "pattern": true
 },
 {
+"zh": "推理引擎（同機型編一次、其他台直接拿）",
+"pattern": false
+},
+{
+"zh": "llama.cpp {0}・從 {1} 收進來・{2}",
+"pattern": true
+},
+{
+"zh": "從",
+"pattern": false
+},
+{
+"zh": "收進來",
+"pattern": false
+},
+{
+"zh": "刪除 {0} 的推理引擎包",
+"pattern": true
+},
+{
+"zh": "的推理引擎包",
+"pattern": false
+},
+{
+"zh": "刪掉主控台上這一包；已經裝好的機器不受影響。同機型還沒裝的機器，會改由其中一台重新編一次。",
+"pattern": false
+},
+{
+"zh": "已刪除",
+"pattern": false
+},
+{
 "zh": "內部鏡像還沒有任何模型。群組裡的機器第一次要模型時主控台會自動下載，也可以在上面先下載。",
 "pattern": false
 },
@@ -4385,10 +4417,6 @@
 },
 {
 "zh": "GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載",
-"pattern": false
-},
-{
-"zh": "已刪除",
 "pattern": false
 },
 {
@@ -11920,6 +11948,18 @@
 "pattern": false
 },
 {
+"zh": "跟 {0} 拿推理引擎包沒成功：{1}",
+"pattern": true
+},
+{
+"zh": "跟",
+"pattern": false
+},
+{
+"zh": "拿推理引擎包沒成功",
+"pattern": false
+},
+{
 "zh": "這台的代理版本太舊，不支援群組設定，請更新代理",
 "pattern": false
 },
@@ -12337,6 +12377,14 @@
 },
 {
 "zh": "送安全指令出錯：",
+"pattern": false
+},
+{
+"zh": "跟 ",
+"pattern": false
+},
+{
+"zh": " 拿推理引擎包沒成功：",
 "pattern": false
 },
 {
@@ -12769,6 +12817,10 @@
 },
 {
 "zh": " 字）",
+"pattern": false
+},
+{
+"zh": "內部鏡像沒有這包推理引擎",
 "pattern": false
 },
 {
@@ -13342,10 +13394,6 @@
 {
 "zh": "從（{0}, {1}）拖到（{2}, {3}）",
 "pattern": true
-},
-{
-"zh": "從",
-"pattern": false
 },
 {
 "zh": "拖到",
@@ -16360,6 +16408,18 @@
 "pattern": false
 },
 {
+"zh": "推理引擎包的名稱或 sha256 不對",
+"pattern": false
+},
+{
+"zh": "推理引擎包的 SHA-256 跟那台回報的不同，不收",
+"pattern": false
+},
+{
+"zh": "推理引擎包名稱不合法",
+"pattern": false
+},
+{
 "zh": "讀不到 {0} 的檔案清單",
 "pattern": true
 },
@@ -16529,6 +16589,14 @@
 },
 {
 "zh": "這台已被管理者停用，請洽IT",
+"pattern": false
+},
+{
+"zh": "等太久了（超過 4 小時）",
+"pattern": false
+},
+{
+"zh": "沒有主控台的網址",
 "pattern": false
 },
 {
@@ -16709,6 +16777,14 @@
 },
 {
 "zh": "收到管理者的安全指令",
+"pattern": false
+},
+{
+"zh": "從主控台拿同機型編好的推理引擎（核對 SHA-256、試跑過才換上）",
+"pattern": false
+},
+{
+"zh": "這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝",
 "pattern": false
 },
 {
@@ -17412,10 +17488,6 @@
 "pattern": false
 },
 {
-"zh": "這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝",
-"pattern": false
-},
-{
 "zh": "准入預檢通過（逐欄試算，實際換上時會再算一次）",
 "pattern": false
 },
@@ -17437,6 +17509,46 @@
 },
 {
 "zh": "收到管理者的安全指令：",
+"pattern": false
+},
+{
+"zh": "平台名稱不合法：{0}",
+"pattern": true
+},
+{
+"zh": "平台名稱不合法",
+"pattern": false
+},
+{
+"zh": "主控台給的推理引擎包名稱或 sha256 不對",
+"pattern": false
+},
+{
+"zh": "跟主控台拿推理引擎沒成功：{0}",
+"pattern": true
+},
+{
+"zh": "跟主控台拿推理引擎沒成功",
+"pattern": false
+},
+{
+"zh": "同機型編好的推理引擎在這台裝不起來：{0}",
+"pattern": true
+},
+{
+"zh": "同機型編好的推理引擎在這台裝不起來",
+"pattern": false
+},
+{
+"zh": "安裝推理引擎（官方預編譯版）",
+"pattern": false
+},
+{
+"zh": "編譯推理引擎（編好後同機型的其他台直接拿，不必各自編）",
+"pattern": false
+},
+{
+"zh": "等同機型的那台編好推理引擎",
 "pattern": false
 },
 {
@@ -18748,6 +18860,30 @@
 "pattern": false
 },
 {
+"zh": "平台名稱不合法：",
+"pattern": false
+},
+{
+"zh": "跟主控台拿推理引擎沒成功：",
+"pattern": false
+},
+{
+"zh": "推理引擎安裝不起來",
+"pattern": false
+},
+{
+"zh": "同機型編好的推理引擎在這台裝不起來：",
+"pattern": false
+},
+{
+"zh": "推理引擎裝不起來：{0}",
+"pattern": true
+},
+{
+"zh": "推理引擎裝不起來",
+"pattern": false
+},
+{
 "zh": "不了（要以系統管理員或 SYSTEM 執行）：",
 "pattern": false
 },
@@ -19656,6 +19792,10 @@
 "pattern": false
 },
 {
+"zh": "這台沒有編好的推理引擎包",
+"pattern": false
+},
+{
 "zh": "桌面小幫手還沒啟動：請用 ",
 "pattern": false
 },
@@ -19772,6 +19912,10 @@
 "pattern": false
 },
 {
+"zh": "推理引擎裝不起來：",
+"pattern": false
+},
+{
 "zh": "互傳埠只收同一個網段的機器",
 "pattern": false
 },
@@ -19810,10 +19954,6 @@
 {
 "zh": "{0}：跟 {1} 互傳沒成功（{2}）",
 "pattern": true
-},
-{
-"zh": "跟",
-"pattern": false
 },
 {
 "zh": "互傳沒成功",
@@ -20520,6 +20660,14 @@
 "pattern": false
 },
 {
+"zh": "打包給同機型的機器時出錯（這台照常能用）：{0}\n",
+"pattern": true
+},
+{
+"zh": "打包給同機型的機器時出錯（這台照常能用",
+"pattern": false
+},
+{
 "zh": "下載站不支援續傳，",
 "pattern": false
 },
@@ -20709,6 +20857,10 @@
 },
 {
 "zh": "自動偵測",
+"pattern": false
+},
+{
+"zh": "打包給同機型的機器時出錯（這台照常能用）：",
 "pattern": false
 },
 {

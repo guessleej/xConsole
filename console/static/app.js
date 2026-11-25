@@ -4149,6 +4149,31 @@ async function settingsMirror(wrap) {
       });
       list.appendChild(t);
     }
+    if ((st.engines || []).length) {
+      list.appendChild(el("h3", null, "推理引擎（同機型編一次、其他台直接拿）"));
+      const et = el("table", "tbl");
+      st.engines.forEach((e) => {
+        const tr = el("tr");
+        const nm = el("td");
+        nm.appendChild(el("div", "mono", e.platform));
+        nm.appendChild(el("div", "small muted", `llama.cpp ${e.tag}・從 ${e.from || "—"} 收進來・${taipei(e.at)}`));
+        tr.appendChild(nm);
+        tr.appendChild(el("td", "num", `${fmt(e.size / 2 ** 20, 0)} MiB`));
+        const td = el("td", "row-acts");
+        const del = el("button", "btn sm danger", "刪除");
+        del.onclick = () => modal({ title: `刪除 ${e.platform} 的推理引擎包`, bodyNode: el("p", "note bad",
+          "刪掉主控台上這一包；已經裝好的機器不受影響。同機型還沒裝的機器，會改由其中一台重新編一次。"),
+          confirmText: "刪除", danger: true, onConfirm: async () => {
+            try { await api("/api/mirror/engine/delete", { method: "POST", body: { name: e.name } }); toast("已刪除", "ok"); } catch (ex) { toast(ex.message, "bad"); return; }
+            load();
+          } });
+        td.appendChild(del);
+        tr.appendChild(td);
+        et.appendChild(tr);
+      });
+      list.appendChild(et);
+      list.appendChild(el("h3", null, "模型"));
+    }
     if (!st.repos.length) {
       list.appendChild(el("p", "note", "內部鏡像還沒有任何模型。群組裡的機器第一次要模型時主控台會自動下載，也可以在上面先下載。"));
       return;
