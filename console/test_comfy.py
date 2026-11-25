@@ -657,6 +657,8 @@ def e2e():
     x.comfy_jobs_load()
     check("主控台重啟過：跑到一半的標成中斷並說明", x.comfy_job("a" * 12)["state"] == "interrupted" and "output" in x.comfy_job("a" * 12)["error"])
 
+    check("產出資料夾：編號格式不對或想跑出去一律不給", x.comfy_job_dir("a" * 12) and not any(
+        x.comfy_job_dir(b) for b in ("../" + "a" * 9, "a" * 11, "A" * 12, "a" * 12 + "/..", "")))
     check("刪掉自己的產出（連檔案）", u1.req("POST", f"/api/comfy/jobs/{jid}/delete", {})[0] == 200
           and not os.path.exists(os.path.join(x.COMFY_DIR, jid)))
     n_before = len(x.STORE.comfy_job_rows("u1@cloudinfo.com.tw"))

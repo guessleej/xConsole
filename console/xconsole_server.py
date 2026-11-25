@@ -3023,7 +3023,7 @@ def comfy_generate(user, body, admin=False):
            "phase": "準備中", "created": time.time(), "values": values, "fields": a["fields"], "summary": text[:300],
            "cancel": threading.Event(), "step": 0, "steps": 0, "done_nodes": 0, "total_nodes": len(api), "queue": None,
            "live": True, "error": "", "outputs": []}
-    out_dir = os.path.join(COMFY_DIR, jid)
+    out_dir = comfy_job_dir(jid)
     os.makedirs(out_dir, mode=0o700, exist_ok=True)
     comfy_save(job)
     with _COMFY_LOCK:
@@ -3049,8 +3049,19 @@ def comfy_trim(user):
             comfy_job_remove(r["id"])
 
 
+def comfy_job_dir(jid):
+    """這件產出的資料夾。編號格式不對或組出來的路徑跑到產出資料夾外面就回 None。"""
+    base = os.path.realpath(COMFY_DIR)
+    full = os.path.realpath(os.path.join(base, str(jid)))
+    if not re.fullmatch(r"[0-9a-f]{12}", str(jid)) or not full.startswith(base + os.sep):
+        return None
+    return full
+
+
 def comfy_job_remove(jid):
-    shutil.rmtree(os.path.join(COMFY_DIR, jid), ignore_errors=True)
+    d = comfy_job_dir(jid)
+    if d:
+        shutil.rmtree(d, ignore_errors=True)
     return STORE.comfy_job_delete(jid)
 
 
@@ -5083,7 +5094,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, comfy_public(j, self.is_admin))
             outs = j.get("outputs") or []
             o = outs[int(m.group(3))] if int(m.group(3)) < len(outs) else None
-            full = os.path.join(COMFY_DIR, j["id"], o["file"]) if o and re.fullmatch(r"\d{1,2}\.[a-z0-9]{2,5}", str(o.get("file"))) else ""
+            d = comfy_job_dir(j["id"])
+            full = os.path.join(d, o["file"]) if d and o and re.fullmatch(r"\d{1,2}\.[a-z0-9]{2,5}", str(o.get("file"))) else ""
             if not full or not os.path.isfile(full):
                 return self._json(404, {"error": "這個檔案不見了"})
             return self._send_file(full, o["mime"])
