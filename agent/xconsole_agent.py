@@ -9937,10 +9937,11 @@ def _slot_model_path(sl):
 def _group_prepare(st, s):
     specs = [x for x in s.get("models") or [] if x != "auto"]
     if "auto" in (s.get("models") or []):
-        _gstep(st, "auto（依每台硬體挑版本）要等混合機型功能上線，這次先略過", "skip")
+        _gstep(st, "收到 auto：主控台版本較舊、沒有先依機型挑好版本，請更新主控台；這次先略過", "skip")
     allowed = s.get("allowed_models") or []
     for spec in specs:
-        if allowed and spec not in allowed:
+        # 主控台依機型挑了量化：只准用的清單寫「作者/模型」（不限量化）也算在內
+        if allowed and spec not in allowed and _group_spec(spec)[0] not in allowed:
             raise RuntimeError(f"{spec} 不在「只准用的模型」清單裡")
     for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置"), ("reserve_user_gib", "保留給使用者的記憶體")):
         if s.get(k) not in (None, "", 0):

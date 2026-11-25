@@ -234,11 +234,16 @@ def e2e():
         st, out = call("/api/node/ws-1/safety", {"kind": "wipe", "confirm": "教室 01"})
         wid = out["cmd"]["id"]
         check("離線時排清除：存起來等它連上", st == 200 and out["cmd"]["state"] == "pending", out)
-        st, out = call(f"/api/node/ws-1/safety/{wid}/cancel", {})
+        # 排進去的當下背景就會試送一次：正在送的那幾秒取消會回 409，等它送不成、改回待送再取消
+        for _ in range(60):
+            st, out = call(f"/api/node/ws-1/safety/{wid}/cancel", {})
+            if st != 409:
+                break
+            time.sleep(0.5)
         check("  送出前可以取消", st == 200 and call(f"/api/node/ws-1/safety/{wid}/cancel", {})[0] == 409)
         st, out = call("/api/node/ws-1/safety", {"kind": "disable", "confirm": "教室 01"})
         did = out["cmd"]["id"]
-        d = wait(lambda d: any(c["id"] == did and c.get("error") for c in d["cmds"]))
+        d = wait(lambda d: any(c["id"] == did and c.get("error") for c in d["cmds"]), 90)
         c = next(c for c in d["cmds"] if c["id"] == did)
         check("連不上：留著待送、記下原因（不設期限）", c["state"] == "pending" and c["error"], c)
 

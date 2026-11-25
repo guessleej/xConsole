@@ -4662,6 +4662,53 @@ function groupMembers(g) {
   return c;
 }
 
+// 混合機型（清單 #14）：每種機型會拿到哪一版、大概多快、放不下給替代方案；可依機型覆寫（一行一個，空的就照群組設定）
+function groupPlanBox(g, ovBoxes) {
+  const box = el("div", "grp-plan");
+  box.appendChild(el("h3", null, "每種機型會拿到哪一版"));
+  const body = el("div");
+  box.appendChild(body);
+  loading(body);
+  api(`/api/groups/${g.id}/plan`).then((r) => {
+    body.textContent = "";
+    if (!r.classes.length) {
+      body.appendChild(el("p", "note", r.unknown.length ? `還讀不到 ${r.unknown.join("、")} 的硬體，等它們連上主控台再看。` : "這個群組還沒有機器。"));
+      return;
+    }
+    body.appendChild(el("p", "small muted", r.note));
+    r.classes.forEach((c) => {
+      const sec = el("div", "grp-class");
+      sec.appendChild(el("b", null, c.label));
+      sec.appendChild(el("div", "small muted", `${c.nodes.length} 台：${c.nodes.join("、")}`));
+      const t = el("table", "tbl");
+      c.rows.forEach((x) => {
+        const tr = el("tr");
+        const nm = el("td");
+        nm.appendChild(el("div", "mono small", x.model === "auto" ? "auto（依硬體挑）" : x.model));
+        if (x.spec && x.spec !== x.model) nm.appendChild(el("div", "mono", `→ ${x.spec}`));
+        if (x.cn) nm.appendChild(cnChip());
+        tr.appendChild(nm);
+        tr.appendChild(el("td", "small nowrap " + (x.level === "no" || !x.spec ? "bad-t" : ""), x.spec ? x.level_name || "—" : "挑不出來"));
+        tr.appendChild(el("td", "num small", x.tok_s ? `約 ${fmt(x.tok_s)} tok/s` : "—"));
+        tr.appendChild(el("td", "small", x.why || (x.alt ? `放不下：改用 ${x.alt}` : x.place)));
+        t.appendChild(tr);
+      });
+      sec.appendChild(t);
+      const ov = el("textarea");
+      ov.value = (c.override || []).join("\n");
+      ov.disabled = !canOperate();
+      ov.placeholder = "空的就照群組設定";
+      ovBoxes[c.key] = ov;
+      const f = el("label", "field wide", "這種機型改用（一行一個；空的就照群組設定）");
+      f.appendChild(ov);
+      sec.appendChild(f);
+      body.appendChild(sec);
+    });
+    if (r.unknown.length) body.appendChild(el("p", "small muted", `還讀不到硬體的：${r.unknown.join("、")}`));
+  }).catch((ex) => { body.textContent = ""; body.appendChild(el("p", "note bad", ex.message)); });
+  return box;
+}
+
 function groupEditor(g, d) {
   const st = g.settings || d.defaults;
   const p = st.profile || {};
@@ -4754,6 +4801,8 @@ function groupEditor(g, d) {
   const local = at ? new Date(at.getTime() - at.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
   const fAt = groupField(form, "指定時間（選「指定時間」才用）", groupInputBox("datetime-local", local));
   c.appendChild(form);
+  const ovBoxes = {};
+  c.appendChild(groupPlanBox(g, ovBoxes));
 
   const act = el("div", "slot-actions");
   const sb = el("button", "btn primary", "儲存設定");
@@ -4777,6 +4826,7 @@ function groupEditor(g, d) {
       rate_limit: n(fRate) === null ? null : { mbps: n(fRate), hours: [...hoursBox.children].map((r) => r.read()) },
       sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
       locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
+      overrides: { ...(st.overrides || {}), ...Object.fromEntries(Object.entries(ovBoxes).map(([k, t]) => [k, ls(t)])) },
     };
     try {
       const r = await api(`/api/groups/${g.id}/update`, { method: "POST", body: { name: fName.value.trim(), kind: fKind.value, settings } });
