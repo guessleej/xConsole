@@ -33,6 +33,7 @@ import ssl
 import struct
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -5656,6 +5657,12 @@ def _build_run(st, pre, log, kind="llama"):
         if rc != 0:
             raise RuntimeError(f"編好了但跑不起來（{'--version' if kind == 'llama' else '--help'} 失敗），可能缺 GPU 函式庫")
         st.update(state="done", phase="完成", exe=exe)
+        if kind == "llama":
+            try:
+                engine_pack_make(exe, st["tag"])     # 打包給同機型的機器，不必每台都編
+            except (OSError, tarfile.TarError) as ex:
+                with open(log, "a", encoding="utf-8") as fh:
+                    fh.write(f"打包給同機型的機器時出錯（這台照常能用）：{ex}\n")
     except Exception as ex:  # noqa: BLE001
         st.update(state="cancelled" if _BUILD["cancel"] else "failed", error=str(ex)[:300])
     st["ended"] = time.time()
@@ -8755,6 +8762,20 @@ class Handler(BaseHTTPRequestHandler):
                 pass
         return None
 
+    def _engine_pack(self):
+        """主控台來拿這台編好的推理引擎包（收進內部鏡像給同機型的機器）。"""
+        full = engine_pack_file()
+        if not full:
+            return self._send(404, {"error": "這台沒有編好的推理引擎包"})
+        self.send_response(200)
+        self.send_header("Content-Type", "application/gzip")
+        self.send_header("Content-Length", str(os.path.getsize(full)))
+        self.end_headers()
+        with open(full, "rb") as fh:
+            while chunk := fh.read(4 << 20):
+                self.wfile.write(chunk)
+        return None
+
     def _body(self):
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -8899,6 +8920,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "est": (registry().get("model_est") or {}).get(nm)})
         if path == "/peer/probe":
             return self._send(*peer_probe(body))
+        if path == "/engine/pack":
+            return self._engine_pack()
         if path == "/group/sync":
             return self._send(*group_sync(body))
         m = re.fullmatch(r"/slot/([\w.-]+)/model", path)
@@ -9811,6 +9834,8 @@ def group_sync(body):
     urls = [u for u in mir.get("urls") or [] if isinstance(u, str) and u.startswith("https://") and len(u) < 300][:8]
     if urls != GROUP_MIRROR["urls"] or mir.get("cert") != GROUP_MIRROR["cert"]:
         GROUP_MIRROR.update(urls=urls, cert=str(mir.get("cert") or "")[:65536], base="", at=0.0)
+    if isinstance(body.get("engine"), dict):
+        GROUP_ENGINE.update(at=time.time(), plan=body["engine"])
     peers = body.get("peers")
     if isinstance(peers, dict) and len(peers) <= 32:
         GROUP_PEERS.update(at=time.time(), plans={str(k)[:200]: v for k, v in peers.items() if isinstance(v, dict)})
@@ -9826,7 +9851,7 @@ def group_sync(body):
             st["steps"] = [{"step": f"收到群組設定 v{v}", "state": "ok", "at": int(time.time())}]
         _gwrite(st)
     GROUP_WAKE.set()
-    return 200, {**group_public(), "peer": peer_info(s)}
+    return 200, {**group_public(), "peer": peer_info(s), "engine": engine_info()}
 
 
 def group_lock(item):
@@ -9952,8 +9977,8 @@ def _group_prepare(st, s):
         raise RuntimeError(f"群組要 {len(specs)} 顆模型，這台只有 {len(slots)} 個可放語言模型的欄位")
     for spec in specs:
         _group_fetch(st, spec)
-    if specs and not llama_server_exe(reg):
-        raise RuntimeError("這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝")
+    if specs:
+        group_engine(st)
     p = s.get("profile") or {}
     for spec, sl in zip(specs, slots):
         ok, why = llama_precheck(sl["id"], _group_find(spec), p.get("ctx"), p.get("parallel"))
@@ -10685,6 +10710,148 @@ def safety_run(body):
     print(f"收到管理者的安全指令：{kind}", flush=True)
     return 200, res
 
+
+# ---- 推理引擎一次編譯分發（清單 #15）
+# 官方沒有預編譯版的平台（Jetson、GB10 的 aarch64 CUDA，以及其他 Linux）：群組裡同機型的挑一台編，編好打包，
+# 主控台收進內部鏡像，同機型的其他台從主控台拿，經過跟「手動匯入」同一套核對（sha256、安全解壓、試跑）才換上。
+ENGINE_PACK = os.path.join(ENGINE_DIR, "pack.json")
+GROUP_ENGINE = {"at": 0.0, "plan": {}}       # 主控台這一輪給的安排：offer（去拿）、build（你來編）、wait（等）
+
+
+@functools.cache
+def engine_platform():
+    """同一包引擎能不能直接搬去用：作業系統與版本、CPU 架構、GPU 後端與大版本、顯示卡架構。"""
+    import platform
+    rel = ""
+    try:
+        with open("/etc/os-release", encoding="utf-8") as fh:
+            kv = dict(x.rstrip("\n").split("=", 1) for x in fh if "=" in x)
+        rel = (kv.get("ID", "") + kv.get("VERSION_ID", "")).replace('"', "")
+    except OSError:
+        pass
+    base = f"{OS}{'-' + rel if rel else ''}-{platform.machine().lower()}"
+    if shutil.which("nvidia-smi"):
+        rc, out, _ = sh(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"], timeout=15)
+        caps = sorted({x.strip().replace(".", "") for x in out.splitlines() if re.fullmatch(r"\d+\.\d+", x.strip())}) if rc == 0 else []
+        _, v, _ = sh(["nvidia-smi"], timeout=15)
+        cuda = re.search(r"CUDA Version:\s*(\d+)", v)
+        if caps:
+            return f"{base}-cuda{cuda.group(1) if cuda else ''}-sm{'_'.join(caps)}"
+    if shutil.which("rocminfo"):
+        _, out, _ = sh(["rocminfo"], timeout=20)
+        gfx = sorted(set(re.findall(r"Name:\s+(gfx[0-9a-f]+)", out)))
+        if gfx:
+            return f"{base}-rocm-{'_'.join(gfx)}"
+    return f"{base}-cpu"
+
+
+def engine_pack_make(exe, tag):
+    """把編好的 llama-server 那一層（執行檔與旁邊的函式庫）打成 tar.gz，記下 sha256。回 pack.json 的內容。"""
+    plat = engine_platform()
+    name = f"{tag}-{plat}.tar.gz"
+    if not ENG_IMPORT_RX.fullmatch(name):
+        raise OSError(f"平台名稱不合法：{plat}")
+    os.makedirs(os.path.join(ENGINE_DIR, "packs"), mode=0o700, exist_ok=True)
+    out = os.path.join(ENGINE_DIR, "packs", name)
+    src = os.path.dirname(exe)
+    with tarfile.open(out + ".tmp", "w:gz") as tf:
+        for f in sorted(os.listdir(src)):
+            full = os.path.join(src, f)
+            if os.path.isfile(full) and not os.path.islink(full):
+                tf.add(full, arcname=f"llama-bin/{f}")
+    os.replace(out + ".tmp", out)
+    meta = {"name": name, "platform": plat, "tag": tag, "sha256": _sha256_file(out), "size": os.path.getsize(out),
+            "path": out, "exe": exe}
+    save_json(ENGINE_PACK, meta)
+    return meta
+
+
+def engine_info():
+    """回給主控台排程：這台的平台、有沒有引擎、有沒有可以給別台的包、是不是正在編。"""
+    pack = load_json(ENGINE_PACK, None)
+    if pack and not (os.path.exists(pack.get("path", "")) and os.path.exists(pack.get("exe", ""))):
+        pack = None
+    reg = registry()
+    have = bool((reg["machine"].get("llama_server") and os.path.exists(expand(reg["machine"]["llama_server"]))) or llama_globs())
+    return {"platform": engine_platform(), "have": have, "official": OS != "linux",
+            "building": bool(_BUILD.get("thread_alive")) and _BUILD.get("kind") == "llama",
+            "pack": {k: pack[k] for k in ("name", "platform", "tag", "sha256", "size")} if pack else None}
+
+
+def engine_pack_file():
+    pack = load_json(ENGINE_PACK, None)
+    return pack["path"] if pack and os.path.exists(pack.get("path", "")) else None
+
+
+def _wait_build(kind="llama", limit=4 * 3600):
+    """等這台的安裝或編譯做完（編譯可能要半小時以上）。成功回 None，失敗回原因。"""
+    end = time.time() + limit
+    while time.time() < end:
+        st = load_json(ENGINES[kind]["file"], {}) or {}
+        if st.get("state") == "done" and not _BUILD.get("thread_alive"):
+            return None
+        if st.get("state") in ("failed", "cancelled") and not _BUILD.get("thread_alive"):
+            return st.get("error") or st["state"]
+        time.sleep(5)
+    return "等太久了（超過 4 小時）"
+
+
+def _engine_fetch(offer):
+    """從主控台的內部鏡像拿同機型編好的包，交給手動匯入那一套核對並安裝。"""
+    name, sha = str(offer.get("name") or ""), str(offer.get("sha256") or "")
+    if not ENG_IMPORT_RX.fullmatch(name) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+        raise RuntimeError("主控台給的推理引擎包名稱或 sha256 不對")
+    final, part = _imp_paths("llama", name)
+    os.makedirs(IMPORT_DIR, mode=0o700, exist_ok=True)
+    GROUP_MIRROR.update(urls=offer.get("urls") or GROUP_MIRROR["urls"], cert=offer.get("cert") or GROUP_MIRROR["cert"])
+    ctx = _mirror_ctx()
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
+    why = "沒有主控台的網址"
+    for u in GROUP_MIRROR["urls"]:
+        try:
+            req = urllib.request.Request(f"{u}/engine/{urllib.parse.quote(name)}", headers={"Authorization": f"Bearer {TOKEN}"})
+            with op.open(req, timeout=60) as r, open(part, "wb") as fh:
+                while chunk := r.read(8 << 20):
+                    fh.write(chunk)
+            os.replace(part, final)
+            break
+        except Exception as exc:  # noqa: BLE001
+            why = str(exc)[:160]
+    else:
+        raise RuntimeError(f"跟主控台拿推理引擎沒成功：{why}")
+    code, out = engine_import_install("llama", name, sha)
+    if code != 200:
+        raise RuntimeError(out.get("error") or "推理引擎安裝不起來")
+    err = _wait_build()
+    if err:
+        raise RuntimeError(f"同機型編好的推理引擎在這台裝不起來：{err}")
+
+
+def group_engine(st):
+    """群組準備時這台還沒有 llama.cpp：macOS／Windows 裝官方預編譯版；Linux 照主控台安排，拿同機型編好的、自己編、或等。"""
+    if llama_server_exe():
+        return
+    plan = GROUP_ENGINE["plan"] or {}
+    if OS != "linux" or plan.get("build"):
+        text = "安裝推理引擎（官方預編譯版）" if OS != "linux" else "編譯推理引擎（編好後同機型的其他台直接拿，不必各自編）"
+        _gstep(st, text, "run")
+        code, out = start_build("llama")
+        if code not in (200, 409):
+            raise RuntimeError(f"推理引擎裝不起來：{out.get('error')}")
+        err = _wait_build()
+        if err:
+            raise RuntimeError(f"推理引擎裝不起來：{err}")
+        _gstep(st, text)
+        return
+    if plan.get("offer"):
+        text = "從主控台拿同機型編好的推理引擎（核對 SHA-256、試跑過才換上）"
+        _gstep(st, text, "run")
+        _engine_fetch(plan["offer"])
+        _gstep(st, text)
+        return
+    if plan.get("wait"):
+        raise PeerWait("等同機型的那台編好推理引擎")
+    raise RuntimeError("這台還沒有 llama.cpp 推理引擎，請先在「推理引擎」安裝")
 
 # ---- 內部鏡像與下載限速（清單 #13）
 # 群組的模型來源勾了「內部鏡像」：跟主控台拿（主控台先從 Hugging Face 取得並核對 sha256）。主控台給的是它每個網址與

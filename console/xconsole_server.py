@@ -1515,6 +1515,60 @@ def group_plan(g, nodes):
     return {"classes": sorted(out, key=lambda c: c["label"]), "unknown": unknown,
             "note": "速度是估算（依記憶體頻寬與模型大小算），實際跑過一次之後會依實測校正"}
 
+
+# ---- 推理引擎一次編譯分發（清單 #15）：同機型（作業系統、CPU 架構、GPU 後端與架構）只讓一台編，
+# 編好的包主控台收進內部鏡像，同機型的其他台從主控台拿；macOS／Windows 用官方預編譯版，不排。
+ENGINE_FETCH = set()
+
+
+def _engine_info(nid, gid):
+    return ((_peer_state(nid, gid) or {}).get("engine")) or None
+
+
+def engine_collect(nid, info):
+    """那台有編好的包、主控台還沒有同平台的：背景跟它拿（核對 sha256 才收）。"""
+    pack = (info or {}).get("pack")
+    if not pack or MIRROR.engine_for(pack.get("platform")) or pack.get("name") in ENGINE_FETCH:
+        return
+    ENGINE_FETCH.add(pack.get("name"))
+
+    def run():
+        tmp = os.path.join(MIRROR.root, f".engine-{secrets.token_hex(6)}.part")
+        try:
+            req, ctx = node_request(nid, "/engine/pack", b"{}")
+            if req is None:
+                raise OSError(ctx)
+            with agent_open(req, ctx, 600) as resp, open(tmp, "wb") as fh:
+                while chunk := resp.read(8 << 20):
+                    fh.write(chunk)
+            MIRROR.engine_put({**pack, "from": nid}, tmp)
+            ALIGN_WAKE.set()                    # 同機型等著的機器馬上拿
+        except Exception as exc:  # noqa: BLE001
+            print(f"跟 {nid} 拿推理引擎包沒成功：{exc}", flush=True)
+        finally:
+            ENGINE_FETCH.discard(pack.get("name"))
+            if os.path.exists(tmp):
+                os.remove(tmp)
+    threading.Thread(target=run, daemon=True).start()
+
+
+def engine_plan(g, n, members):
+    """給 n 的推理引擎安排：{"offer": 包}、{"build": True}、{"wait": True}；不用安排回 {}。"""
+    info = _engine_info(n["id"], g["id"])
+    if not info or info.get("have") or info.get("official"):
+        return {}
+    plat = info.get("platform")
+    pack = MIRROR.engine_for(plat)
+    if pack:
+        return {"offer": {**pack, **mirror_urls()}}
+    same = [(m, _engine_info(m["id"], g["id"])) for m in members if not m.get("revoked")]
+    same = [(m, e) for m, e in same if e and e.get("platform") == plat]
+    if any(e.get("pack") or e.get("building") for m, e in same if m["id"] != n["id"]):
+        return {"wait": True}                    # 有一台正在編、或編好了正在收進主控台
+    seed = next((m for m, e in sorted(same, key=lambda x: x[0]["id"]) if not e.get("have")
+                 and not (_peer_state(m["id"], g["id"]) or {}).get("error")), None)
+    return {"build": True} if not seed or seed["id"] == n["id"] else {"wait": True}
+
 # ---- 工作站互傳（清單 #12）：排程前請收方試連送方，連得到的才發票證；每台同時最多送 2 份，拿到的再傳下一台（樹狀）。
 # 群組裡還沒有任何一台有的模型，只讓一台（種子）從網路拿，其他台等它；連不到任何送方的就照舊從網路（或這台設定的鏡像）拿。
 PEER_TICKET_TTL = 60
@@ -1630,11 +1684,13 @@ def align_once():
             body["peers"] = peers            # 一次性票證：只在這一輪的請求裡，不落地
         if "mirror" in (g["settings"].get("sources") or []):
             body["mirror"] = mirror_urls()
+        body["engine"] = engine_plan(g, n, members)
         if hf_token():
             body["hf_token"] = hf_token()        # 受限模型要下載才帶；代理只放記憶體、不寫檔
         code, out = call_node(n["id"], "/group/sync", "POST", body, timeout=20)
         if code == 200:
             ALIGN_STATE[n["id"]] = {"at": int(time.time()), "state": out}
+            engine_collect(n["id"], out.get("engine"))
         else:
             ALIGN_STATE[n["id"]] = {"at": int(time.time()), "error": "這台的代理版本太舊，不支援群組設定，請更新代理"
                                     if code == 404 else (out.get("error") or f"HTTP {code}")}
@@ -3534,6 +3590,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if rest == "/ping":
                 return self._json(200, {"ok": True, "service": "xconsole-mirror"})
+            m = re.fullmatch(r"/engine/([^/]+)", rest)
+            if m:
+                full = MIRROR.engine_path(m.group(1))
+                return self._mirror_file(full) if full else self._json(404, {"error": "內部鏡像沒有這包推理引擎"})
             m = re.fullmatch(r"/api/models/([^/]+/[^/]+)(/tree/main)?", rest)
             if m:
                 code, raw = (MIRROR.tree if m.group(2) else MIRROR.info)(m.group(1))
@@ -4676,7 +4736,8 @@ class Handler(BaseHTTPRequestHandler):
                               {"Content-Disposition": f'attachment; filename="{rec["cn"]}.csr"'})
         if path == "/api/mirror":
             du = shutil.disk_usage(MIRROR.root)
-            return self._json(200, {**MIRROR.status(), "root": MIRROR.root, "free_gib": round(du.free / 2**30, 1)})
+            return self._json(200, {**MIRROR.status(), "root": MIRROR.root, "free_gib": round(du.free / 2**30, 1),
+                                    "engines": [dict(v, name=k) for k, v in sorted(MIRROR.engines().items())]})
         if path == "/api/admin/usage-report":
             try:
                 days = max(1, min(400, int((q.get("days") or ["30"])[0])))
@@ -5734,6 +5795,14 @@ class Handler(BaseHTTPRequestHandler):
             except chattools.FetchError as exc:
                 return self._json(502, {"error": str(exc)})
             return self._json(200, {"results": rows})
+        if path == "/api/mirror/engine/delete":
+            name = str(body.get("name") or "")
+            try:
+                MIRROR.engine_delete(name)
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            self._audit("mirror.engine_delete", name, True)
+            return self._json(200, {"ok": True})
         if path in ("/api/mirror/prefetch", "/api/mirror/delete"):
             repo, quant = str(body.get("repo") or "").strip(), str(body.get("quant") or "").strip()[:40]
             try:

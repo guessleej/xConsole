@@ -26338,5 +26338,90 @@
 "en": "Received auto: the console is an older version and didn't pick a version for this machine type; please update the console. Skipped for now",
 "ja": "auto を受信しました：コンソールが古く、機種に合わせたバージョンを選んでいません。コンソールを更新してください。今回はスキップします",
 "ko": "auto를 받았습니다: 콘솔이 구버전이라 기종별 버전을 고르지 않았습니다. 콘솔을 업데이트하세요. 이번에는 건너뜁니다"
+},
+"推理引擎（同機型編一次、其他台直接拿）": {
+"en": "Inference engines (built once per machine type, the rest download it)",
+"ja": "推論エンジン（同じ機種で一度ビルドし、他の端末はそれを取得）",
+"ko": "추론 엔진(같은 기종에서 한 번 빌드, 나머지는 그대로 받음)"
+},
+"刪除 {0} 的推理引擎包": {
+"en": "Delete the inference engine package for {0}",
+"ja": "{0} の推論エンジンパッケージを削除",
+"ko": "{0}의 추론 엔진 패키지 삭제"
+},
+"刪掉主控台上這一包；已經裝好的機器不受影響。同機型還沒裝的機器，會改由其中一台重新編一次。": {
+"en": "Deletes this package from the console; machines that already installed it are unaffected. For machines of this type that haven't installed it yet, one of them will build it again.",
+"ja": "コンソール上のこのパッケージを削除します。インストール済みの端末には影響しません。同じ機種で未インストールの端末は、そのうち1台が再ビルドします。",
+"ko": "콘솔에서 이 패키지를 삭제합니다. 이미 설치한 컴퓨터는 영향이 없으며, 같은 기종에서 아직 설치하지 않은 컴퓨터 중 한 대가 다시 빌드합니다."
+},
+"內部鏡像沒有這包推理引擎": {
+"en": "The internal mirror doesn't have this engine package",
+"ja": "内部ミラーにこの推論エンジンパッケージはありません",
+"ko": "내부 미러에 이 추론 엔진 패키지가 없습니다"
+},
+"推理引擎包的名稱或 sha256 不對": {
+"en": "The engine package name or sha256 is invalid",
+"ja": "推論エンジンパッケージの名前または sha256 が不正です",
+"ko": "추론 엔진 패키지 이름 또는 sha256이 올바르지 않습니다"
+},
+"推理引擎包的 SHA-256 跟那台回報的不同，不收": {
+"en": "The engine package's SHA-256 doesn't match what that machine reported; rejected",
+"ja": "推論エンジンパッケージの SHA-256 がその端末の報告と一致しないため受け付けません",
+"ko": "추론 엔진 패키지의 SHA-256이 그 컴퓨터가 보고한 값과 달라 받지 않습니다"
+},
+"推理引擎包名稱不合法": {
+"en": "Invalid engine package name",
+"ja": "推論エンジンパッケージ名が不正です",
+"ko": "추론 엔진 패키지 이름이 올바르지 않습니다"
+},
+"從主控台拿同機型編好的推理引擎（核對 SHA-256、試跑過才換上）": {
+"en": "Getting the inference engine built on the same machine type from the console (SHA-256 checked and test-run before use)",
+"ja": "同じ機種でビルドした推論エンジンをコンソールから取得（SHA-256 照合と試験実行の後に使用）",
+"ko": "같은 기종에서 빌드한 추론 엔진을 콘솔에서 받는 중(SHA-256 확인과 시험 실행 후 사용)"
+},
+"主控台給的推理引擎包名稱或 sha256 不對": {
+"en": "The engine package name or sha256 from the console is invalid",
+"ja": "コンソールから届いた推論エンジンパッケージの名前または sha256 が不正です",
+"ko": "콘솔이 준 추론 엔진 패키지 이름 또는 sha256이 올바르지 않습니다"
+},
+"跟主控台拿推理引擎沒成功：{0}": {
+"en": "Couldn't get the inference engine from the console: {0}",
+"ja": "コンソールから推論エンジンを取得できませんでした：{0}",
+"ko": "콘솔에서 추론 엔진을 받지 못했습니다: {0}"
+},
+"同機型編好的推理引擎在這台裝不起來：{0}": {
+"en": "The engine built on the same machine type won't install on this machine: {0}",
+"ja": "同じ機種でビルドした推論エンジンがこの端末にインストールできません：{0}",
+"ko": "같은 기종에서 빌드한 추론 엔진을 이 컴퓨터에 설치할 수 없습니다: {0}"
+},
+"安裝推理引擎（官方預編譯版）": {
+"en": "Installing the inference engine (official prebuilt release)",
+"ja": "推論エンジンをインストール（公式ビルド版）",
+"ko": "추론 엔진 설치(공식 사전 빌드판)"
+},
+"編譯推理引擎（編好後同機型的其他台直接拿，不必各自編）": {
+"en": "Building the inference engine (other machines of this type will download it instead of building their own)",
+"ja": "推論エンジンをビルド（同じ機種の他の端末はビルドせずにそれを取得）",
+"ko": "추론 엔진 빌드(같은 기종의 다른 컴퓨터는 각자 빌드하지 않고 받음)"
+},
+"等同機型的那台編好推理引擎": {
+"en": "Waiting for a machine of the same type to finish building the inference engine",
+"ja": "同じ機種の端末が推論エンジンをビルドし終えるのを待っています",
+"ko": "같은 기종의 컴퓨터가 추론 엔진 빌드를 마치기를 기다리는 중"
+},
+"推理引擎安裝不起來": {
+"en": "The inference engine couldn't be installed",
+"ja": "推論エンジンをインストールできません",
+"ko": "추론 엔진을 설치할 수 없습니다"
+},
+"推理引擎裝不起來：{0}": {
+"en": "The inference engine couldn't be installed: {0}",
+"ja": "推論エンジンをインストールできません：{0}",
+"ko": "추론 엔진을 설치할 수 없습니다: {0}"
+},
+"這台沒有編好的推理引擎包": {
+"en": "This machine has no built engine package",
+"ja": "この端末にはビルド済みの推論エンジンパッケージがありません",
+"ko": "이 컴퓨터에는 빌드된 추론 엔진 패키지가 없습니다"
 }
 }

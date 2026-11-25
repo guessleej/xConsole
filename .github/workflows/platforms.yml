@@ -60,6 +60,8 @@ jobs:
         run: python agent/test_peer.py
       - name: 內部鏡像與下載限速
         run: python console/test_mirror.py
+      - name: 推理引擎一次編譯分發
+        run: python console/test_engine_dist.py
       - name: Windows工作站執行環境包（檢查、上傳、從GitHub下載核對sha256、加入碼才拿得到、腳本寫死sha256）
         run: python console/test_winrt.py
       - name: 推薦清單

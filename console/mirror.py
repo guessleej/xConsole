@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 
 REPO_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,95}/[A-Za-z0-9][\w.-]{0,95}")
+ENGINE_RX = re.compile(r"[A-Za-z0-9][\w.+-]{0,150}\.tar\.gz")
 PART_RX = re.compile(r"[\w.+-]{1,200}")         # 檔名逐段比：一段一段比是線性的，不會被刻意的長字串拖慢
 CHUNK = 8 << 20
 
@@ -216,6 +217,79 @@ class Mirror:
         jobs = [{"key": k, **{x: v.get(x) for x in ("state", "done", "total", "error")}}
                 for k, v in self.jobs.items() if v.get("state") in ("queued", "running", "failed")]
         return {"repos": repos, "jobs": jobs}
+
+    # ---- 推理引擎包（清單 #15）：同機型挑一台編好，主控台收進來給同機型的其他台
+    def _edir(self):
+        return os.path.join(self.root, "_engines")
+
+    def engines(self):
+        try:
+            with open(os.path.join(self._edir(), "index.json"), encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return {}
+
+    def _save_engines(self, idx):
+        os.makedirs(self._edir(), mode=0o700, exist_ok=True)
+        p = os.path.join(self._edir(), "index.json")
+        with open(p + ".tmp", "w", encoding="utf-8") as fh:
+            json.dump(idx, fh, ensure_ascii=False)
+        os.replace(p + ".tmp", p)
+
+    def engine_for(self, platform):
+        rows = [dict(v, name=k) for k, v in self.engines().items() if v.get("platform") == platform]
+        return max(rows, key=lambda r: r.get("at", 0)) if rows else None
+
+    def _engine_file(self, name):
+        """包在存放區裡的完整路徑：名稱先比格式，realpath 之後確認還在引擎資料夾裡，跳出去回 None。"""
+        if not ENGINE_RX.fullmatch(name or ""):
+            return None
+        base = os.path.realpath(self._edir())
+        full = os.path.realpath(os.path.join(base, name))
+        return full if full.startswith(base + os.sep) else None
+
+    def engine_path(self, name):
+        full = self._engine_file(name)
+        return full if full and name in self.engines() and os.path.exists(full) else None
+
+    def engine_put(self, meta, src):
+        """收一包：sha256 對得上才收，同平台舊的那包換掉。"""
+        name = str(meta.get("name") or "")
+        dest = self._engine_file(name)
+        if not dest or not re.fullmatch(r"[0-9a-f]{64}", str(meta.get("sha256") or "")):
+            raise ValueError("推理引擎包的名稱或 sha256 不對")
+        h = hashlib.sha256()
+        with open(src, "rb") as fh:
+            while b := fh.read(CHUNK):
+                h.update(b)
+        if h.hexdigest() != meta["sha256"]:
+            os.remove(src)
+            raise OSError("推理引擎包的 SHA-256 跟那台回報的不同，不收")
+        os.makedirs(self._edir(), mode=0o700, exist_ok=True)
+        with self.lock:
+            idx = self.engines()
+            for old in [k for k, v in idx.items() if v.get("platform") == meta.get("platform") and k != name]:
+                idx.pop(old)
+                try:
+                    os.remove(self._engine_file(old) or "")
+                except OSError:
+                    pass
+            os.replace(src, dest)
+            idx[name] = {k: meta.get(k) for k in ("platform", "tag", "sha256", "size", "from")} | {"at": int(time.time())}
+            self._save_engines(idx)
+
+    def engine_delete(self, name):
+        full = self._engine_file(name)
+        if not full:
+            raise ValueError("推理引擎包名稱不合法")
+        with self.lock:
+            idx = self.engines()
+            idx.pop(name, None)
+            self._save_engines(idx)
+            try:
+                os.remove(full)
+            except OSError:
+                pass
 
     def delete(self, repo):
         _safe(repo)
