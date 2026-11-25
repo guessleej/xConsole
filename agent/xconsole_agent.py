@@ -430,7 +430,17 @@ def floors(machine):
         base["ram"] = float(machine["ram_floor_gib"])
     if machine.get("vram_floor_gib") is not None:
         base["vram"] = float(machine["vram_floor_gib"])
+    base["ram"] = round(base["ram"] + group_reserve(), 1)
     return base
+
+
+def group_reserve():
+    """群組設定的「保留給使用者其他程式的記憶體」（清單 #16）：加在系統記憶體的底線上。
+    用收到的那一版（準備時的預檢就要算進去），不是只看已套用的。"""
+    try:
+        return float((group_state().get("settings") or {}).get("reserve_user_gib") or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 # ---------------------------------------------------------------- 硬體量測
@@ -3382,13 +3392,47 @@ def watchdog_stop(unit):
 
 
 def disk_watchdog():
-    hits = {}
+    hits, uf = {}, {}
     while True:
         time.sleep(WATCHDOG_EVERY)
         try:
-            watchdog_check(registry(), ram_pool()["free_gib"], hits)
+            reg, free = registry(), ram_pool()["free_gib"]
+            watchdog_check(reg, free, hits)
+            user_first_check(reg, free, uf)
         except Exception as ex:  # noqa: BLE001  看門狗自己不能掛
             print("看門狗：", ex, file=sys.stderr)
+
+
+USER_FIRST_HITS = 5                            # 連續 5 次（約 15 秒）都低於底線才卸載，避開瞬間的尖峰
+
+
+def user_first_check(reg, free_gib, hits, stop=None):
+    """使用者優先（清單 #16）：加入群組的工作站上，使用者自己的程式把可用記憶體壓到底線以下，
+    就先卸載最大的那顆模型、留下說明，不讓整台卡死。群組設定選「不動」就不管。回這次卸載的欄位 id 清單。"""
+    gs = group_state()
+    act = gs.get("active") or {}
+    if not gs.get("group_id") or not act or act.get("user_first", "unload") != "unload":
+        hits.clear()
+        return []
+    line = floors(reg["machine"])["ram"]
+    running = [sl for sl in reg["slots"] if sl.get("unit") and _alive(sl)]
+    if not running or free_gib >= line:
+        hits.clear()
+        return []
+    hits["n"] = hits.get("n", 0) + 1
+    if hits["n"] < USER_FIRST_HITS:
+        return []
+    hits.clear()
+    sl = max(running, key=lambda x: float(x.get("est_ram_gib") or 0) + float(x.get("est_vram_gib") or 0))
+    (stop or (lambda unit: sysctl(unit, "stop")))(sl["unit"])
+    msg = (f"這台的其他程式把系統記憶體用到只剩 {free_gib:.1f} GiB（底線 {line:.1f} GiB），為了不讓電腦卡住，"
+           f"{time.strftime('%m/%d %H:%M')} 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用")
+    with _WD_LOCK:
+        notes = watchdog_notes()
+        notes[sl["id"]] = {"at": int(time.time()), "free_gib": round(free_gib, 1), "line": round(line, 1),
+                           "model": sl.get("model"), "disabled": False, "user_first": True, "message": msg}
+        save_json(WATCHDOG_FILE, notes)
+    return [sl["id"]]
 
 
 # ---------------------------------------------------------------- 生不生得出字
@@ -9968,7 +10012,7 @@ def _group_prepare(st, s):
         # 主控台依機型挑了量化：只准用的清單寫「作者/模型」（不限量化）也算在內
         if allowed and spec not in allowed and _group_spec(spec)[0] not in allowed:
             raise RuntimeError(f"{spec} 不在「只准用的模型」清單裡")
-    for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置"), ("reserve_user_gib", "保留給使用者的記憶體")):
+    for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置")):
         if s.get(k) not in (None, "", 0):
             _gstep(st, f"{label}這一版的代理還不支援，先略過", "skip")
     reg = registry()

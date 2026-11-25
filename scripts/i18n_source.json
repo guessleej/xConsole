@@ -5224,7 +5224,19 @@
 "pattern": false
 },
 {
-"zh": "保留給使用者其他程式的記憶體（GiB）",
+"zh": "保留給使用者其他程式的記憶體（GiB，加在系統記憶體的底線上）",
+"pattern": false
+},
+{
+"zh": "先卸載模型，不讓電腦卡住（工作站建議）",
+"pattern": false
+},
+{
+"zh": "不動（伺服器）",
+"pattern": false
+},
+{
+"zh": "使用者的程式把記憶體用光時",
 "pattern": false
 },
 {
@@ -15324,6 +15336,10 @@
 "pattern": false
 },
 {
+"zh": "使用者優先要選「先卸載模型」或「不動」",
+"pattern": false
+},
+{
 "zh": "依機型覆寫最多 32 種機型",
 "pattern": false
 },
@@ -16520,6 +16536,22 @@
 "pattern": false
 },
 {
+"zh": "這台的其他程式把系統記憶體用到只剩 {0} GiB（底線 {1} GiB），為了不讓電腦卡住，{2} 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用",
+"pattern": true
+},
+{
+"zh": "這台的其他程式把系統記憶體用到只剩",
+"pattern": false
+},
+{
+"zh": "GiB），為了不讓電腦卡住",
+"pattern": false
+},
+{
+"zh": "先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用",
+"pattern": false
+},
+{
 "zh": "[Unit]\nDescription=xConsole 欄位 {0}：llama.cpp\nAfter=network.target\n\n[Service]\nType=simple\nExecStart={1} {2} --launch-llama {3}\nRestart=on-failure\nRestartSec=10\nStandardOutput=append:{4}\nStandardError=inherit\n\n[Install]\nWantedBy=default.target\n",
 "pattern": true
 },
@@ -16641,6 +16673,22 @@
 },
 {
 "zh": "已套用並重啟，用新設定實際打過一次 /v1/models",
+"pattern": false
+},
+{
+"zh": "這台的其他程式把系統記憶體用到只剩 ",
+"pattern": false
+},
+{
+"zh": " GiB（底線 ",
+"pattern": false
+},
+{
+"zh": " GiB），為了不讓電腦卡住，",
+"pattern": false
+},
+{
+"zh": " 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用",
 "pattern": false
 },
 {
@@ -17465,10 +17513,6 @@
 },
 {
 "zh": "模型存放位置",
-"pattern": false
-},
-{
-"zh": "保留給使用者的記憶體",
 "pattern": false
 },
 {

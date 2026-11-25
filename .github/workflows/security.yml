@@ -53,6 +53,8 @@ jobs:
         run: python agent/test_user_channel.py
       - name: 工作站互傳（票證、只送核對過的檔、同網段、同時2份、續傳、sha256、排程）
         run: python agent/test_peer.py
+      - name: 工作站准入（保留記憶體加在底線上、使用者優先先卸載模型）
+        run: python agent/test_userfirst.py
       - name: 內部鏡像與下載限速（代理權杖、sha256、續傳、驗主控台憑證、時段）
         run: cd console && python test_mirror.py
       - name: 混合機型自動挑版本（機型分類、挑量化、放不下的替代、依機型覆寫）
