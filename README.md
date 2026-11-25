@@ -139,6 +139,7 @@
 - 模型頁可以直接貼 Hugging Face 網址或「作者/模型」；原始權重（沒有 GGUF）的 repo 會列出社群轉好的 GGUF 版本讓人挑。
 - 資料（設定、模型、引擎、對話）放在 `%LOCALAPPDATA%\tw.xcloudinfo.xconsole`（macOS：`~/Library/Application Support/tw.xcloudinfo.xconsole`），解除安裝不會刪。
 - 更新：「設定 › 版本與更新」下載新版安裝檔、核對 GitHub 公布的 sha256 再打開它。
+- 學校或公司用大量部署裝過系統代理的電腦（`install.sh --console`、`install.ps1`以SYSTEM執行）：桌面版打開時會認出來，不再帶起自己的代理，改經本機使用者通道接系統代理（Linux `/run/xconsole/user/agent.sock`、macOS `/Library/Application Support/xConsole/run/agent.sock`、Windows具名管道`xconsole-user`）。這條通道只給坐在電腦前的人用，只能看狀態、群組鎖定、已安裝的模型與對話；換模型、改設定要請管理者在學校或公司的主控台做，每筆請求寫進系統代理的`user-channel.log`。
 - 安裝檔由 CI（`.github/workflows/desktop.yml`）在三個平台各自建；Windows 那台會實際靜默安裝、啟動、確認主控台與代理起得來、結束後不留行程、再解除安裝。打 `v` 標籤時附到同一個正式版。原始碼在 `desktop/`（Tauri 2），內含的 Python 由 `desktop/scripts/prepare_payload.py` 準備（核對 sha256）。
 - 安裝檔目前沒有程式碼簽章：Windows 第一次開會出現 SmartScreen「已保護您的電腦」，按「其他資訊 › 仍要執行」；macOS 要在「系統設定 › 隱私權與安全性」按「仍要打開」。要拿掉這一步得買程式碼簽章憑證（Windows）與 Apple 開發者帳號（macOS）。
 
@@ -461,9 +462,10 @@ cd ~/xconsole && python3 xconsole_server.py --set-credentials
 | `console/test_safety.py` | 任何 Linux（要 cryptography） | 40 | 安全指令：佇列規則（後下覆蓋先下、排了撤銷身分不收別的、撤銷身分最後送、送出中不能取消、主控台重開改回待送、移除機器一起取消）；代理這一側（同一個編號重送回上次結果、停用中只准停止與看狀態、清除只刪xConsole自己的東西、勾了才刪模型、撤銷身分換掉權杖）；另起隔離主控台加一支真的代理端對端：離線時排、連上後依序送達、停用中換模型回423、群組總覽標已停用、代理重開照樣停用、恢復、撤銷身分後不再下指令、全部寫稽核 |
 | `console/test_roles.py` | 任何 Linux（要 cryptography） | 122 | 多帳號、角色與群組範圍：從原始碼抓出每一條路由，對使用者、檢視、維運各打一次，能用的必須剛好等於寫死的清單；一次性密碼、每個人只看得到自己的東西、停用降級馬上失效、最後一位管理員；群組範圍：範圍外的機器與群組看不到、直接打回404，金鑰只能選範圍內的且範圍縮了舊金鑰跟著縮，Agent的資料夾與模型都驗，維運只能改群組設定、能退回舊版，檢視看得到歷史但不能退回，群組刪了不會變成不限，舊資料庫自動補欄位 |
 | `test/test_silent_install.py` | 任何 Linux 或 macOS（要 cryptography） | 29 | 靜默安裝：`install/join.py` 對隔離主控台＋真的代理，加入碼從標準輸入、指紋對才加入（大小寫與冒號不拘）、指紋錯或沒給（自簽）都擋且不用掉名額、碼格式不對擋；`install.sh` 的 `--join-code` 拒絕、大量部署參數沒配 `--console` 擋、不是 root 擋、回應檔權限判定；`install.ps1` 的 `-JoinCode` 實際執行拒絕；主控台產的腳本不再用環境變數傳加入碼 |
-| `test/e2e_silent.py` | CI 三個作業系統（要 root／系統管理員，只在 CI 跑） | Linux 16、macOS 14、Windows 13 | 實裝：權限放寬的回應檔擋下並刪掉、`-JoinCode` 擋下、正確的回應檔裝成開機自啟並加入（名稱照樣板）、回應檔讀完即刪、代理以 `xconsole`／`_xconsole`／SYSTEM 跑、複製偵測有依據（Linux 靠開機時 root 抄到 `/run` 的主機板識別碼）、砍掉會自己起來（Linux、macOS）、移除乾淨 |
+| `test/e2e_silent.py` | CI 三個作業系統（要 root／系統管理員，只在 CI 跑） | Linux 19、macOS 17、Windows 15 | 實裝：權限放寬的回應檔擋下並刪掉、`-JoinCode` 擋下、正確的回應檔裝成開機自啟並加入（名稱照樣板）、回應檔讀完即刪、代理以 `xconsole`／`_xconsole`／SYSTEM 跑、複製偵測有依據（Linux 靠開機時 root 抄到 `/run` 的主機板識別碼）、砍掉會自己起來（Linux、macOS）、本機使用者通道開好且換模型被拒（Unix 另驗 socket 0666、資料夾只有專用帳號寫得進去）、移除乾淨 |
 | `console/test_joincodes.py` | 任何 Linux 或 macOS（要 cryptography） | 58 | 群組加入碼：名稱樣板展開與不合法寫法、網段解析與 IPv4 對映、可用次數與有效時間的範圍、多台必須用樣板、重新安裝只能一次；兩個同時加入各拿到不同名稱、名額滿了第三個擋下；重新載入後仍有效；用完、網段外、作廢都加入不了；過期 7 天的紀錄自動清掉；另起隔離主控台與一支真的代理端對端：主控台重啟後同一個碼照樣加入 A01～A03、用完擋下、清單不含公鑰、沒登入看不到也不能作廢、磁碟上只有雜湊 |
 | `console/test_console_id.py` | Linux／macOS／Windows | 7 | 主控台識別碼：第一次產生UUID、再讀不變、權限600、不留暫存檔、內容壞掉換新並留舊檔、同時啟動16個只會有一個 |
+| `agent/test_user_channel.py` | Linux／macOS／Windows（要cryptography） | 21 | 本機使用者通道：只放行使用者層的操作（換模型、刪模型、群組同步、讀金鑰與記錄、執行指令一律403）、Unix socket 0666但不是坐在電腦前的人擋下、資料夾別人寫得進去就不開、每筆寫稽核且不記對話內容、主控台先驗通道擁有者（擁有者不對就不連）、主控台`call_node`經通道拿狀態與帶回拒絕原因 |
 | `test/test_module_contract.py` | Linux／macOS／Windows（要 cryptography） | 52 | 企業版模組的擴充合約：沒有公鑰、沒有簽章、別人的金鑰、簽完改檔、清單外的檔、`__pycache__`、權限太寬（含上一層）、核心API不相容、沒宣告scope、路由掛錯地方、呼叫還沒開放的擴充點，都以開源核心啟動並寫原因；網址、本文、模組資料三種範圍與全域由核心檢查，範圍外404；資料整筆加密、自動套範圍；handler出錯不洩漏；`api.console_id()`與畫面、識別碼檔一致；網頁上傳驗過才換上、壞的不動原本的、移除回到一般版 |
 | `console/test_winrt.py` | 任何機器（要 cryptography） | 32 | Windows工作站執行環境包：不是zip、路徑往上跳、python／runtime以外的檔、連結檔、少了必要的檔一律擋下；上傳不合格的不動原本那一包；從GitHub只拿同一版的附件並核對公布的sha256，對不上丟掉；加入碼才拿得到；腳本寫死這一包的sha256、沒有就改用那台的Python |
 | `agent/test_group.py` | Linux／macOS／Windows | 37 | 群組設定對齊代理這一側：準備（下載、核對 SHA-256、只准用的模型）與套用分兩段、指定時間以主控台時鐘為準、下次開機才套用、鎖定時本機 API 回 423、被改掉的模型拉回、換群組重來（本機假的 Hugging Face）；下載那一步記進度百分比、放不下（預檢或套用時准入擋下）記下是哪一顆哪一欄，並用同一組參數與欄位試算更小的量化給建議 |

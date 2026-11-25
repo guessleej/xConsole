@@ -1,6 +1,6 @@
 # xConsole模型主控台威脅模型（STRIDE）
 
-> 版本：v1.9　日期：2026/11/25　依據：SECURITY_PLAN v1.2第4節邊界清單
+> 版本：v2.0　日期：2026/11/25　依據：SECURITY_PLAN v1.2第4節邊界清單
 > 每條跨邊界的資料流至少分析一次STRIDE；每個威脅對應一個控制措施與ASVS條號；沒有控制措施的列進第6節缺口清單。
 > 「狀態」欄的「已測」代表 `test/security/test_security.py` 或 `test/test_api_integration.py` 有對應的測試項；
 > 第3b～3d節（2026/11新增）的「已測」對應 `agent/test_agent_mode.py`、`console/test_agent_tasks.py`、`console/test_providers.py`、`console/test_preview.py`、`console/test_e2e_features.py`。
@@ -147,15 +147,16 @@ S假冒（Spoofing）／T竄改（Tampering）／R否認（Repudiation）／I資
 | 傳來被竄改的模型 | T | 某台被入侵，送出改過的權重 | 收方逐檔核對主控台給的sha256（來自Hugging Face公布值或第一台下載後的核對結果），對不上丟掉並改向別台或鏡像要 | V10.3 | 設計 |
 | 互傳埠被當成入侵點 | E／D | 從外部網段或不相干的機器打互傳埠 | 互傳埠只收本機網段、只回帶有效票證的請求；群組關閉互傳就移除監聽；連線數與頻寬有上限 | V13、V12.6 | 設計 |
 
-## 2e. B15本機使用者 → 系統代理（`docs/WORKSTATION_FLEET.md`第六節的B9，清單第28項，尚未實作）
+## 2e. B15本機使用者 → 系統代理（`docs/WORKSTATION_FLEET.md`第六節的B9，清單第28項）
 
-工作站由學校或公司統一管理時，代理以系統服務執行，坐在電腦前的是學生或員工。桌面App要經本機通道跟系統代理說話。這一節是上線前必須全部做到的控制。
+工作站由學校或公司統一管理時，代理以系統服務執行，坐在電腦前的是學生或員工。桌面App經本機通道跟系統代理說話（Linux `/run/xconsole/user/agent.sock`、macOS `/Library/Application Support/xConsole/run/agent.sock`、Windows具名管道 `xconsole-user`），只在大量部署的安裝（install.sh `--console`、install.ps1 SYSTEM）開。下表「已測」對應 `agent/test_user_channel.py`（Linux、macOS、Windows三種都跑）與 `test/e2e_silent.py` 的實際安裝。
 
 | 威脅 | 類型 | 情境 | 控制措施 | ASVS | 狀態 |
 |---|---|---|---|---|---|
-| 學生經本機通道換模型、改設定、解除鎖定 | E | 桌面App或自己寫的程式打本機通道 | 本機通道只開放使用者層操作（對話、查狀態、看已安裝的模型）；換模型、改設定、解除群組鎖定一律只走主控台通道 | V8.2 | 設計 |
-| 別的使用者或程式冒用本機通道 | S | 同一台電腦的其他帳號連進來 | Windows用具名管道並設ACL、Linux與macOS用Unix socket並設檔案權限，只給登入的互動使用者；不開TCP埠 | V4.1 | 設計 |
-| 否認經本機通道做過的事 | R | 出事後說不是自己 | 代理從作業系統取得連線者的帳號（具名管道的用戶端身分、`SO_PEERCRED`），連同動作寫稽核 | V16.1 | 設計 |
+| 學生經本機通道換模型、改設定、解除鎖定 | E | 桌面App或自己寫的程式打本機通道 | 通道上的路由先過白名單：只放行查狀態、群組狀態與鎖定、已安裝的模型、對話；換模型、刪模型、群組同步、讀金鑰與記錄、執行指令一律403並講明要請管理者 | V8.2 | 已測 |
+| 別的使用者或程式冒用本機通道 | S | 同一台電腦的其他帳號（SSH登入、排程工作）連進來 | Windows具名管道的ACL只給互動式登入的使用者（另加`PIPE_REJECT_REMOTE_CLIENTS`擋網路上來的）；Linux與macOS的socket檔開0666，但代理用`SO_PEERCRED`／`LOCAL_PEERCRED`取得連線者，只放行坐在電腦前的人（Linux看logind座位的`ACTIVE_UID`、macOS看`/dev/console`的擁有者）與root；不開TCP埠 | V4.1 | 已測 |
+| 同一台的其他帳號先開一個假通道 | S | 搶在系統代理之前開同名的socket或管道，騙桌面App把對話送過去 | Unix通道資料夾只有專用帳號寫得進去（別人寫得進去代理就不開）；主控台連之前先驗socket擁有者是專用帳號、資料夾別人寫不進去；Windows用`FILE_FLAG_FIRST_PIPE_INSTANCE`，主控台驗管道擁有者是SYSTEM或系統管理員，並以`SECURITY_IDENTIFICATION`連線，對方只認得出是誰、不能冒用身分 | V4.1 | 已測 |
+| 否認經本機通道做過的事 | R | 出事後說不是自己 | 代理從作業系統取得連線者的帳號（Windows扮演具名管道的用戶端讀帳號、Unix查uid），每筆請求連同路徑與放行或拒絕寫進 `user-channel.log`（權限600，超過5 MB換一份）；對話內容不記 | V16.1 | 已測 |
 
 ## 3. B3 IDE／外部服務 ↔ 模型API
 
@@ -289,4 +290,5 @@ xConsole原本只管模型服務的啟停與設定。2026/11起多了三個會�
 | v1.5 | 2026/11/24 | 新增B12企業版模組載入（簽章、sha256、權限、路由scope、模組資料範圍與加密） |
 | v1.8 | 2026/11/25 | 3f加「授權綁的主控台識別碼被換掉或改壞」：`api.console_id()`（清單第26項） |
 | v1.9 | 2026/11/25 | 「模型來源不合規」：中國來源標示擴及正在執行的欄位、群組總覽與群組設定，全部統一成紅底「中國來源」標籤（清單第27項） |
+| v2.0 | 2026/11/25 | 2e本機使用者通道實作完成，三列由「設計」改「已測」，加「同一台的其他帳號先開一個假通道」；Linux與macOS改依連線者身分只放行坐在電腦前的人（清單第28項） |
 | v1.6 | 2026/11/25 | 新增B13代理主動連回通道、B14工作站互傳（第二期設計）、B15本機使用者 → 系統代理（設計）；2b加偽造主機板識別碼與還原卡兩列；對照工作站規劃的B5～B9編號；G2擴及工作站、加G5 |

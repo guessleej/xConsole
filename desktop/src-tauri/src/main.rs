@@ -52,6 +52,10 @@ struct Watch {
 }
 
 impl Watch {
+    /// 不帶起任何東西（受管的機器不帶起自己的代理）
+    fn idle() -> Watch {
+        Watch { child: None, since: Instant::now(), fails: 0, last_err: None }
+    }
     fn start(r: std::io::Result<Child>) -> Watch {
         let mut w = Watch { child: None, since: Instant::now(), fails: 0, last_err: None };
         w.take(r);
@@ -240,6 +244,15 @@ fn register_agent(rt: &Runtime) -> bool {
     c.status().map(|s| s.success()).unwrap_or(false)
 }
 
+/// 這台有學校或公司統一裝的系統代理（本機使用者通道在聽）：登記成經通道連，不再帶起自己的代理。
+fn register_managed(rt: &Runtime) -> bool {
+    let home = rt.data.to_string_lossy().to_string();
+    let name = hostname();
+    let mut c = command(rt, &["install/setup_local.py", "--home", &home, "--managed", "--name", &name], "console.log");
+    c.stdin(Stdio::null());
+    c.status().map(|s| s.success()).unwrap_or(false)
+}
+
 fn hostname() -> String {
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
@@ -267,10 +280,11 @@ fn console_url(rt: &Runtime) -> url::Url {
 
 /// 背景執行緒：帶起代理與主控台、看著它們，掛了就重新帶起（主控台更新完或切換區網存取時會自己結束，也走這條）。
 fn supervise(app: AppHandle, rt: Arc<Runtime>) {
-    let mut agent = Watch::start(spawn_agent(&rt));
+    let managed = register_managed(&rt);
+    let mut agent = if managed { Watch::idle() } else { Watch::start(spawn_agent(&rt)) };
     // 代理起來了才登記（起不來時登記也會失敗，還白等60秒才講原因）；第一次沒起來、之後重試起來了再補登記
     // 登記成功才算數：登記失敗（例如代理一起來就掉、還沒產生憑證）之後每30秒再試，直到登記上
-    let mut registered = agent.child.is_some() && register_agent(&rt);
+    let mut registered = managed || (agent.child.is_some() && register_agent(&rt));
     let mut reg_at = Instant::now();
     let mut console = Watch::start(spawn_console(&rt));
     let mut first = true;
@@ -307,7 +321,7 @@ fn supervise(app: AppHandle, rt: Arc<Runtime>) {
         if rt.fault.lock().unwrap().is_some() {
             continue;
         }
-        if agent.dead() && agent.fails < FAIL_LIMIT {
+        if !managed && agent.dead() && agent.fails < FAIL_LIMIT {
             thread::sleep(Duration::from_secs(2));
             agent.take(spawn_agent(&rt));
         }

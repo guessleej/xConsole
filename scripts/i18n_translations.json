@@ -25958,5 +25958,30 @@
 "en": "China-origin models in these settings (still usable, not allowed in government projects)",
 "ja": "この設定に含まれる中国由来のモデル（そのまま使えますが、政府案件では使用できません）",
 "ko": "이 설정에 포함된 중국 출처 모델(그대로 쓸 수 있지만 정부 프로젝트에는 사용할 수 없음)"
+},
+"這台由學校或公司統一管理：在這裡可以看狀態、對話、看已安裝的模型；換模型、改設定請洽管理者。": {
+"en": "This computer is managed by your school or company: here you can check its status, chat, and see installed models. To change models or settings, contact your administrator.",
+"ja": "このコンピューターは学校または会社が一元管理しています。ここでは状態の確認、チャット、インストール済みモデルの閲覧ができます。モデルや設定を変更するには管理者に連絡してください。",
+"ko": "이 컴퓨터는 학교나 회사에서 통합 관리합니다. 여기서는 상태 확인, 대화, 설치된 모델 보기만 할 수 있으며, 모델이나 설정을 바꾸려면 관리자에게 문의하세요."
+},
+"本機通道（受管的系統代理）": {
+"en": "Local channel (managed system agent)",
+"ja": "ローカルチャネル（管理対象のシステムエージェント）",
+"ko": "로컬 채널(관리되는 시스템 에이전트)"
+},
+"不需要（作業系統驗身分）": {
+"en": "Not needed (the OS verifies identity)",
+"ja": "不要（OSが本人確認）",
+"ko": "필요 없음(운영 체제가 신원 확인)"
+},
+"這個通道只給坐在這台電腦前的人用": {
+"en": "This channel is only for the person sitting at this computer",
+"ja": "このチャネルはこのコンピューターの前にいる人だけが使えます",
+"ko": "이 채널은 이 컴퓨터 앞에 앉은 사람만 쓸 수 있습니다"
+},
+"這台由學校或公司統一管理：這裡只能看狀態、對話、看已安裝的模型；換模型、改設定要請管理者在主控台做": {
+"en": "This computer is managed by your school or company: here you can only check status, chat, and see installed models. Changing models or settings must be done by an administrator in the console",
+"ja": "このコンピューターは学校または会社が一元管理しています。ここでは状態の確認、チャット、インストール済みモデルの閲覧のみ可能です。モデルや設定の変更は管理者がコンソールで行います",
+"ko": "이 컴퓨터는 학교나 회사에서 통합 관리합니다. 여기서는 상태 확인, 대화, 설치된 모델 보기만 할 수 있으며, 모델과 설정 변경은 관리자가 콘솔에서 해야 합니다"
 }
 }

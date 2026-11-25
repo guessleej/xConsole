@@ -68,7 +68,7 @@ mstop() {   # 停掉大量部署裝的代理服務（重裝與移除共用）
 mhome() { if [ "$OSN" = Darwin ]; then dscl . -read "/Users/$MU" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true; else getent passwd "$MU" | cut -d: -f6 || true; fi; }
 managed_uninstall() {
   mstop
-  if [ "$OSN" = Darwin ]; then rm -f "/Library/LaunchDaemons/$LA.plist"
+  if [ "$OSN" = Darwin ]; then rm -f "/Library/LaunchDaemons/$LA.plist"; rm -rf "/Library/Application Support/xConsole/run"
   else H=$(mhome); [ -n "$H" ] && rm -f "$H/.config/systemd/user/xconsole-agent.service"; loginctl disable-linger "$MU" 2>/dev/null || true
     systemctl disable --now xconsole-hwid.service >/dev/null 2>&1 || true; rm -f /etc/systemd/system/xconsole-hwid.service; rm -rf /run/xconsole; systemctl daemon-reload 2>/dev/null || true; fi
   echo "已移除大量部署裝的節點代理服務。專用帳號 $MU 與資料（$(mhome)）保留；要整個刪掉請自行刪除帳號與資料夾。"
@@ -159,6 +159,10 @@ managed() {
 
   say "4/5 開機自啟並啟動"
   if [ "$OSN" = Darwin ]; then
+    # 本機使用者通道：同一台的桌面版經這裡看狀態、對話（換模型與設定仍只走主控台）。資料夾只有專用帳號寫得進去
+    local UCH="/Library/Application Support/xConsole/run"
+    install -d -m 755 -o root -g wheel "/Library/Application Support/xConsole"
+    install -d -m 755 -o "$MU" -g "$MU" "$UCH"
     local PL="/Library/LaunchDaemons/$LA.plist"
     cat > "$PL" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -168,7 +172,7 @@ managed() {
   <key>UserName</key><string>$MU</string>
   <key>GroupName</key><string>$MU</string>
   <key>WorkingDirectory</key><string>$DATA</string>
-  <key>ProgramArguments</key><array><string>$PYM</string><string>$DATA/xconsole_agent.py</string><string>--home</string><string>$DATA</string></array>
+  <key>ProgramArguments</key><array><string>$PYM</string><string>$DATA/xconsole_agent.py</string><string>--home</string><string>$DATA</string><string>--user-channel</string><string>$UCH/agent.sock</string></array>
   <key>EnvironmentVariables</key><dict><key>HOME</key><string>$DATA</string></dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -191,13 +195,15 @@ Before=systemd-user-sessions.service user@.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'install -d -m 755 /run/xconsole && if [ -r /sys/class/dmi/id/product_uuid ]; then cat /sys/class/dmi/id/product_uuid > /run/xconsole/smbios_uuid.tmp && chmod 644 /run/xconsole/smbios_uuid.tmp && mv /run/xconsole/smbios_uuid.tmp /run/xconsole/smbios_uuid; fi'
+ExecStart=/bin/sh -c 'install -d -m 755 /run/xconsole && install -d -m 755 -o xconsole -g xconsole /run/xconsole/user && if [ -r /sys/class/dmi/id/product_uuid ]; then cat /sys/class/dmi/id/product_uuid > /run/xconsole/smbios_uuid.tmp && chmod 644 /run/xconsole/smbios_uuid.tmp && mv /run/xconsole/smbios_uuid.tmp /run/xconsole/smbios_uuid; fi'
 
 [Install]
 WantedBy=multi-user.target
 UNIT
     systemctl daemon-reload
-    systemctl enable --now xconsole-hwid.service >/dev/null 2>&1 || echo "提醒：xconsole-hwid.service 沒有啟動成功，複製偵測會改看系統碟序號"
+    # 用 restart：升級時它已經跑過（RemainAfterExit），enable --now 不會再跑，新加的通道資料夾就要等下次開機才有
+    { systemctl enable xconsole-hwid.service && systemctl restart xconsole-hwid.service; } >/dev/null 2>&1 \
+      || echo "提醒：xconsole-hwid.service 沒有啟動成功，複製偵測會改看系統碟序號，本機使用者通道也開不起來"
     loginctl enable-linger "$MU"
     local u; u=$(id -u "$MU")
     for i in $(seq 1 30); do [ -S "/run/user/$u/systemd/private" ] && break; sleep 1; done
@@ -210,7 +216,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=$PYM %h/xconsole_agent.py
+ExecStart=$PYM %h/xconsole_agent.py --user-channel /run/xconsole/user/agent.sock
 Restart=always
 RestartSec=5
 MemoryMax=256M
@@ -271,7 +277,7 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || die
 
 say "2/6 複製程式到 $DST"
 mkdir -p -m 700 "$ST" "$DST/static" "$DST/agent"
-for f in xconsole_server.py tls.py agentlink.py linkcert.py groups.py joincodes.py modules.py winrt.py gateway.py store.py report.py recommend.py extract.py chats.py chattools.py computer.py updater.py catalog_default.json sd_catalog_default.json; do cp "$SRC/console/$f" "$DST/$f"; done
+for f in xconsole_server.py tls.py agentlink.py userchan.py linkcert.py groups.py joincodes.py modules.py winrt.py gateway.py store.py report.py recommend.py extract.py chats.py chattools.py computer.py updater.py catalog_default.json sd_catalog_default.json; do cp "$SRC/console/$f" "$DST/$f"; done
 cp "$SRC/console/static/"* "$DST/static/"
 cp "$SRC/agent/xconsole_agent.py" "$DST/agent/xconsole_agent.py"       # 「加一台機器」要發給別台的那一份
 cp "$SRC/agent/xconsole_agent.py" "$HOME/xconsole_agent.py"
