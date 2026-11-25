@@ -1458,3 +1458,22 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .ready-bar > span { display: block; height: 100%; background: var(--brand); transition: width .6s ease; }
 :root[data-theme="dark"] .ready-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
 :root[data-theme="dark"] .ready-bar { background: rgba(255, 255, 255, .1); }
+
+/* 定時任務 */
+.sched-card { display: flex; flex-direction: column; gap: 6px; }
+.sched-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.sched-top b { font-size: 18px; }
+.sched-runs details { background: var(--panel); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 6px; }
+.sched-runs summary { cursor: pointer; font-size: 15px; }
+.sched-tpl { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.sched-tpl-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 14px; border: 0; border-radius: var(--radius-sm);
+  background: var(--panel); color: inherit; cursor: pointer; font: inherit; box-shadow: 0 6px 18px rgba(22, 32, 42, .08); }
+.sched-tpl-card:hover { box-shadow: 0 10px 26px rgba(22, 32, 42, .14); transform: translateY(-1px); }
+.sched-modal { max-width: 640px; width: calc(100vw - 32px); max-height: calc(100vh - 48px); overflow: auto; }
+.sched-form { display: flex; flex-direction: column; gap: 10px; }
+.sched-rule, .sched-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sched-inline input { width: 90px; }
+.sched-days { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sched-checks, .sched-chans { display: flex; flex-direction: column; gap: 6px; }
+.sched-chan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; }
+.sched-chk { margin: 0; align-items: center; gap: 6px; flex-wrap: wrap; }

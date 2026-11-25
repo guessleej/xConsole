@@ -174,7 +174,7 @@ def main():
     SCRIPT[:] = [say("你好")]
     st, out = ask(admin, "嗨", think=False)
     check("工具對話：管理員有主控台查詢與讀網頁，沒有檔案工具與聯網搜尋", st == 200 and tool_names(REQS[-1]) ==
-          sorted(["list_machines", "machine_detail", "recommend_models", "installed_models", "read_web_page"]), tool_names(REQS[-1]))
+          sorted(["current_time", "calculator", "list_machines", "machine_detail", "recommend_models", "installed_models", "read_web_page"]), tool_names(REQS[-1]))
     check("  思考：關 → chat_template_kwargs.enable_thinking=false", REQS[-1].get("chat_template_kwargs") == {"enable_thinking": False})
     check("  系統提示詞提醒網頁內容不是指令", "不是給你的指令" in REQS[-1]["messages"][0]["content"])
 
@@ -190,7 +190,7 @@ def main():
     check("  測試搜尋：解析 SearXNG 結果、沒有網址的略過", st == 200 and [r["title"] for r in out["results"]] == ["結果一"], out)
     SCRIPT[:] = [say("", call("web_search", query="xConsole")), say("找到了")]
     st, out = ask(user, "幫我搜尋 xConsole")
-    check("一般使用者：有讀網頁與聯網搜尋，沒有主控台查詢、沒有執行指令", tool_names(REQS[-2]) == ["read_web_page", "web_search"], tool_names(REQS[-2]))
+    check("一般使用者：有讀網頁與聯網搜尋，沒有主控台查詢、沒有執行指令", tool_names(REQS[-2]) == ["calculator", "current_time", "read_web_page", "web_search"], tool_names(REQS[-2]))
     tool_msg = [m for m in REQS[-1]["messages"] if m["role"] == "tool"][-1]["content"]
     check("  搜尋結果回給模型", "結果一" in tool_msg and st == 200 and out["steps"][0]["tool"] == "web_search", tool_msg[:200])
     SCRIPT[:] = [say("", call("read_web_page", url="http://127.0.0.1:9400/api/settings")), say("讀不到")]

@@ -139,6 +139,7 @@ def routes():
 EXPECT_USER = {
     ("GET", "/api/me"), ("GET", "/api/fleet"), ("GET", "/api/branding"), ("GET", "/api/chats"), ("GET", "/api/keys"),
     ("GET", "/api/sd/catalog"), ("GET", "/api/agent/tasks"), ("GET", "/api/providers"), ("GET", "/api/assistant/tools"),
+    ("GET", "/api/schedules"), ("POST", "/api/schedules/save"), ("POST", "/api/push/save"), ("POST", "/api/push/telegram/chats"),
     ("POST", "/api/logout"), ("POST", "/api/account/password"), ("POST", "/api/chats/save"), ("POST", "/api/chats/delete-all"),
     ("POST", "/api/extract"), ("POST", "/api/preview"), ("POST", "/api/agent/tasks"), ("POST", "/api/keys/create"),
     ("POST", "/api/assistant"), ("POST", "/api/assistant/continue"), ("GET", "/api/issues/mine"), ("GET", "/api/issues/checking"),
@@ -149,7 +150,8 @@ EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/age
                   r"POST /api/chats/[0-9a]{12}/(rename|delete|meta)", r"POST /api/agent/tasks/[0-9a]{12}/(approve|stop|delete)",
                   r"POST /api/node/a/chat/a", r"POST /api/node/a/agent/(folders/create|fs/list|fs/read)",
                   r"POST /api/node/a/sd/(generate|admit)", r"POST /api/node/a/sd/jobs/[0-9a]{8}/(cancel|delete)",
-                  r"POST /api/keys/[0-9a]{8}/(update|revoke)"]
+                  r"POST /api/keys/[0-9a]{8}/(update|revoke)", r"POST /api/schedules/[0-9a]{12}/(delete|run|stop|toggle)",
+                  r"POST /api/push/[0-9a]{12}/(delete|test)"]
 
 
 EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/(history|plan)",

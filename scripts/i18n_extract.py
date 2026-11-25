@@ -14,9 +14,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CJK = re.compile(r"[㐀-鿿豈-﫿]")
-JS = ["console/static/app.js", "console/static/pages.js", "console/static/chat.js"]
+JS = ["console/static/app.js", "console/static/pages.js", "console/static/chat.js", "console/static/schedule.js"]
 HTML = ["console/static/index.html"]
-PY = ["console/xconsole_server.py", "console/chats.py", "console/chattools.py", "console/computer.py", "console/recommend.py", "console/report.py", "console/gateway.py",
+PY = ["console/xconsole_server.py", "console/chats.py", "console/chattools.py", "console/schedules.py", "console/computer.py", "console/recommend.py", "console/report.py", "console/gateway.py",
       "console/extract.py", "console/tls.py", "console/updater.py", "console/groups.py", "console/joincodes.py", "console/modules.py", "console/winrt.py", "console/mirror.py", "console/issues.py", "agent/xconsole_agent.py"]
 
 
