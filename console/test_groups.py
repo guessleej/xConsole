@@ -196,8 +196,13 @@ def e2e():
               and gs["電腦教室 A"]["version"] == 1, {k: (v["members"], v["version"]) for k, v in gs.items()})
         st, out = call("/api/groups", {"name": "業務部", "kind": "部門"})
         check("新增群組", st == 200 and out["group"]["kind"] == "部門" and out["group"]["version"] == 1, out)
+        out_id = out["group"]["id"]
         st, out = call("/api/groups", {"name": "業務部"})
         check("  同名的再建一次：409", st == 409, out)
+        st, out = call(f"/api/groups/{out_id}/update", {"settings": {
+            "models": ["unsloth/Qwen3-8B-GGUF:Q4_K_M", "auto"], "allowed_models": ["unsloth/gemma-3-4b-it-GGUF:Q4_K_M", "x/DeepSeek-R1-GGUF"]}})
+        check("中國來源（清單 #27）：群組清單標出設定裡的中國來源模型，只標示不擋",
+              st == 200 and by_name()["業務部"]["cn_models"] == ["unsloth/Qwen3-8B-GGUF:Q4_K_M", "x/DeepSeek-R1-GGUF"], out)
         a = gs["電腦教室 A"]
         st, out = call(f"/api/groups/{a['id']}/update", {"settings": {"models": ["auto"], "locked": ["models"]}})
         check("改設定：版本升到 2", st == 200 and out["changed"] and out["group"]["version"] == 2, out)
@@ -334,6 +339,8 @@ def e2e_align():
         check("  群組標題列：1／1 台就緒、五步都完成、沒有下一步",
               gg["ready"] == 1 and gg["members"] == 1 and gg["done"] == gg["total"] == 5 and gg["next"] is None
               and [s["state"] for s in gg["steps"]] == ["done"] * 5, gg)
+        check("  群組總覽帶模型與中國來源清單（畫面依這兩欄標紅底標籤）",
+              gg["models"] == [] and gg["cn_models"] == [], (gg.get("models"), gg.get("cn_models")))
         un = next(x for x in fl["groups"] if x["name"] == "未分類")
         check("  沒有機器的群組：下一步是加入機器，後面的還不能做並寫明要先完成第 2 步",
               un["members"] == 0 and un["next"] == {"n": 2, "t": "加入機器"}

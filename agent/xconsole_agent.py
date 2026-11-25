@@ -1709,6 +1709,7 @@ def slot_state(slot, reg, hw):
         "unit": slot.get("unit"),
         "port": (cfg or {}).get("port") or slot.get("port"),
         "model": slot.get("model"), "quant": slot.get("quant"),
+        "cn_origin": any(c in f"{slot.get('model') or ''} {slot.get('unit') or ''}".lower() for c in CN_ORIGIN),
         "caps": slot_caps(slot), "kind": slot.get("kind"),
         "gpu_ids": slot.get("gpu_ids"),
         "active": active,

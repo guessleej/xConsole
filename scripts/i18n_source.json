@@ -1,5 +1,13 @@
 [
 {
+"zh": "中國來源",
+"pattern": false
+},
+{
+"zh": "中國來源的模型：內部測試可以用，政府案不得使用",
+"pattern": false
+},
+{
 "zh": "請先登入",
 "pattern": false
 },
@@ -389,10 +397,6 @@
 },
 {
 "zh": "看圖",
-"pattern": false
-},
-{
-"zh": "中國來源・政府案不可用",
 "pattern": false
 },
 {
@@ -5032,6 +5036,10 @@
 "pattern": false
 },
 {
+"zh": "設定裡的中國來源模型（照樣可以用，政府案不得使用）",
+"pattern": false
+},
+{
 "zh": "上下文長度（token，空的就是不指定）",
 "pattern": false
 },
@@ -9305,10 +9313,6 @@
 },
 {
 "zh": "新增第三方 API",
-"pattern": false
-},
-{
-"zh": "中國來源",
 "pattern": false
 },
 {

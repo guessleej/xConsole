@@ -1274,6 +1274,7 @@ def fleet_state(scope=None):
     for g in cfg.get("groups", []):
         mine = [x["ready"] for x in nodes if (x["group"] or groups.DEFAULT) == g["name"] and x["ready"]]
         out.append({"id": g["id"], "name": g["name"], "kind": g.get("kind"), "version": g["version"],
+                    "models": (g.get("settings") or {}).get("models", []), "cn_models": group_cn(g),
                     **groups.setup_steps(g, mine)})
     return {"ts": time.time(), "nodes": nodes, "groups": out}
 
@@ -1284,6 +1285,12 @@ def _admin_state(n, st):
         return {"code": "revoked", "at": n["revoked"]["at"]}
     d = st["disabled_by_admin"] if st and "disabled_by_admin" in st else n.get("disabled_by_admin")   # 舊版代理不回報這一項
     return {"code": "disabled", "at": d["at"]} if d else None
+
+
+def group_cn(g):
+    """群組設定裡寫到的中國來源模型（要哪些、只准用的）：畫面標紅底「中國來源」，只標示不擋。"""
+    st = g.get("settings") or {}
+    return [m for m in dict.fromkeys(st.get("models", []) + st.get("allowed_models", [])) if recommend.is_cn({"repo": m})]
 
 
 def node_ready(n, g, online, st):
@@ -4340,7 +4347,7 @@ class Handler(BaseHTTPRequestHandler):
                     continue
                 ms = group_members(g, cfg["nodes"])
                 g = {k: v for k, v in g.items() if k != "history"}      # 歷史另外拿（/history），清單每15秒重抓不必帶
-                out.append(dict(g, members=count.get(g["name"], 0), nodes=ms,
+                out.append(dict(g, members=count.get(g["name"], 0), nodes=ms, cn_models=group_cn(g),
                                 ready=sum(1 for m in ms if m["prepared"] >= g["version"]),
                                 done=sum(1 for m in ms if m["applied"] >= g["version"])))
             return self._json(200, {"groups": out,

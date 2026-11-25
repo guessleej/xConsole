@@ -792,6 +792,7 @@ textarea {
 .modal.wide { width: min(760px, 100%); }
 .chip.warn { background: rgba(217, 119, 6, .14); color: var(--warn-t); }
 .chip.bad { background: rgba(198, 40, 40, .12); color: var(--bad); }
+.chip.cn { background: #b01010; color: #fff; font-weight: 700; }   /* 紅底白字 7.2:1，開燈關燈同一個 */
 .pick-h { font-size: 15px; margin: 14px 0 2px; }
 .pick-list { display: grid; gap: 6px; margin-top: 8px; }
 label.pick {

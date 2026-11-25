@@ -111,6 +111,31 @@ def login(pg, base):
     pg.wait_for_selector("#nav button", state="attached", timeout=30000)
 
 
+def test_cn_label(pg):
+    """清單 #27：正在執行的模型是中國來源，欄位卡上要有紅底「中國來源」標籤。"""
+    def cn(route):
+        r = route.fetch()
+        data = r.json()
+        for n in data.get("nodes") or []:
+            st = n.setdefault("state", {}) or {}
+            n["state"] = st
+            st["slots"] = [dict(SLOT, model="Qwen3-8B-Instruct", cn_origin=True)] + \
+                [s for s in st.get("slots") or [] if s.get("id") != "brain"]
+        route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
+    pg.unroute("**/api/fleet")
+    pg.route("**/api/fleet", cn)
+    pg.evaluate("refresh().then(() => go('node:local'))")
+    try:
+        pg.wait_for_selector(".chip.cn", timeout=8000)
+        got = pg.evaluate("(() => { const c = document.querySelector('.chip.cn'); return [c.textContent, getComputedStyle(c).backgroundColor]; })()")
+    except Exception as e:  # noqa: BLE001
+        got = str(e)[:120]
+    check("中國來源：欄位卡上是紅底「中國來源」標籤", got == ["中國來源", "rgb(176, 16, 16)"], got)
+    pg.unroute("**/api/fleet")
+    pg.route("**/api/fleet", with_slot)
+    pg.evaluate("refresh()")
+
+
 def test_api_list(pg):
     """BUG-1：清單頁打精簡版 apiinfo（不算執行設定），回來之後表格要出現模型名稱。"""
     asked = []
@@ -366,6 +391,7 @@ def main():
             pg.route("**/api/fleet", with_slot)
             login(pg, base)
             test_api_list(pg)
+            test_cn_label(pg)
             test_gateway_ui(pg)
             test_user_journey(pg, base)
             test_desktop_toggle(pg)
