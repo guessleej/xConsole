@@ -268,13 +268,13 @@ def e2e():
         check("撤銷身分：送達後主控台標成已撤銷", d["revoked"] and d["cmds"][0]["kind"] == "revoke", d["cmds"][:2])
         st, out = call("/api/node/ws-1/state")
         check("  之後主控台不再對它下指令", st == 409 and out.get("revoked"), (st, out))
-        for _ in range(20):
-            if open(tfile).read().strip() != token:
-                break
-            time.sleep(0.5)
         actx = ssl.create_default_context(cafile=os.path.join(ahome, ".xconsole", "agent-cert.pem"))
         actx.check_hostname = False
-        hz = json.loads(urllib.request.urlopen(f"https://127.0.0.1:{aport}/healthz", context=actx, timeout=10).read())
+        for _ in range(40):                       # 換權杖檔與標「需要重新加入」是兩步，兩樣都到了才算
+            hz = json.loads(urllib.request.urlopen(f"https://127.0.0.1:{aport}/healthz", context=actx, timeout=10).read())
+            if open(tfile).read().strip() != token and hz.get("needs_rejoin"):
+                break
+            time.sleep(0.5)
         check("  代理丟掉舊權杖、顯示需要重新加入", open(tfile).read().strip() != token and hz.get("needs_rejoin"), hz)
         check("  身分撤銷後不收新指令", call("/api/node/ws-1/safety", {"kind": "disable", "confirm": "教室 01"})[0] == 409)
         aud = [a["action"] for a in call("/api/admin/audit")[1]["items"]]
