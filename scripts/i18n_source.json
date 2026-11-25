@@ -9232,6 +9232,14 @@
 "pattern": false
 },
 {
+"zh": "・{0}輪",
+"pattern": true
+},
+{
+"zh": "輪",
+"pattern": false
+},
+{
 "zh": "新任務",
 "pattern": false
 },
@@ -9276,11 +9284,19 @@
 "pattern": false
 },
 {
-"zh": "描述要做的事，越具體越好（Enter 送出，Shift+Enter 換行）",
+"zh": "思考過程",
 "pattern": false
 },
 {
-"zh": "交給 Agent",
+"zh": "開新任務",
+"pattern": false
+},
+{
+"zh": "不接前面的任務，從頭交代一件新的事",
+"pattern": false
+},
+{
+"zh": "交給Agent",
 "pattern": false
 },
 {
@@ -9288,7 +9304,23 @@
 "pattern": false
 },
 {
-"zh": "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方 Agent 會寫給你自己跑",
+"zh": "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方Agent會寫給你自己跑",
+"pattern": false
+},
+{
+"zh": "接著交代",
+"pattern": false
+},
+{
+"zh": "會接在這件任務後面：Agent看得到前面的交代、做過的操作與結論",
+"pattern": false
+},
+{
+"zh": "接著交代：要改哪裡、再加什麼（Enter送出，Shift+Enter換行）",
+"pattern": false
+},
+{
+"zh": "描述要做的事，越具體越好（Enter送出，Shift+Enter換行）",
 "pattern": false
 },
 {
@@ -9328,7 +9360,7 @@
 "pattern": false
 },
 {
-"zh": "它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成。",
+"zh": "它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成；做完還可以接著交代要改的地方。",
 "pattern": false
 },
 {
@@ -9348,7 +9380,83 @@
 "pattern": false
 },
 {
-"zh": "Agent 完成了",
+"zh": "等你允許執行指令",
+"pattern": false
+},
+{
+"zh": "正在準備修改",
+"pattern": false
+},
+{
+"zh": "正在寫",
+"pattern": false
+},
+{
+"zh": "{0}{1}（已產生{2}）",
+"pattern": true
+},
+{
+"zh": "已產生",
+"pattern": false
+},
+{
+"zh": "正在準備要執行的指令",
+"pattern": false
+},
+{
+"zh": "正在更新計畫",
+"pattern": false
+},
+{
+"zh": "正在寫總結",
+"pattern": false
+},
+{
+"zh": "正在準備{0}",
+"pattern": true
+},
+{
+"zh": "正在準備",
+"pattern": false
+},
+{
+"zh": "正在執行指令：{0}",
+"pattern": true
+},
+{
+"zh": "正在執行指令",
+"pattern": false
+},
+{
+"zh": "正在{0}{1}",
+"pattern": true
+},
+{
+"zh": "正在",
+"pattern": false
+},
+{
+"zh": "正在回答",
+"pattern": false
+},
+{
+"zh": "正在處理模型的回覆",
+"pattern": false
+},
+{
+"zh": "正在思考",
+"pattern": false
+},
+{
+"zh": "用時{0}:{1}・第{2}/{3}步",
+"pattern": true
+},
+{
+"zh": "用時",
+"pattern": false
+},
+{
+"zh": "Agent完成了",
 "pattern": false
 },
 {
@@ -9368,7 +9476,7 @@
 "pattern": false
 },
 {
-"zh": " 這個任務之後的指令不再詢問",
+"zh": " 這一輪之後的指令不再詢問",
 "pattern": false
 },
 {
@@ -9416,6 +9524,10 @@
 "pattern": false
 },
 {
+"zh": "修改檔案",
+"pattern": false
+},
+{
 "zh": "執行指令",
 "pattern": false
 },
@@ -9428,11 +9540,31 @@
 "pattern": false
 },
 {
+"zh": "（第{0}行起）",
+"pattern": true
+},
+{
+"zh": "行起",
+"pattern": false
+},
+{
+"zh": "換了{0}處",
+"pattern": true
+},
+{
+"zh": "換了",
+"pattern": false
+},
+{
+"zh": "處",
+"pattern": false
+},
+{
 "zh": "（逾時）",
 "pattern": false
 },
 {
-"zh": "結束碼 {0}{1}",
+"zh": "結束碼{0}{1}",
 "pattern": true
 },
 {
@@ -9790,10 +9922,6 @@
 {
 "zh": "（已產生{0}，提示詞：{1}）",
 "pattern": true
-},
-{
-"zh": "已產生",
-"pattern": false
 },
 {
 "zh": "圖片",
@@ -10504,10 +10632,6 @@
 "pattern": false
 },
 {
-"zh": "思考過程",
-"pattern": false
-},
-{
 "zh": "思考中…",
 "pattern": false
 },
@@ -10716,6 +10840,10 @@
 "pattern": false
 },
 {
+"zh": "需要時用list_files、read_file了解現況（read_file回的內容帶行號，大檔用start_line分段讀；也讀得了PDF、Word、Excel）；改既有檔案的一段用edit_file，建新檔或整份重寫用write_file。",
+"pattern": false
+},
+{
 "zh": "還沒啟動",
 "pattern": false
 },
@@ -10788,19 +10916,7 @@
 "pattern": false
 },
 {
-"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑；指令在這個資料夾裡用 {1} 執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。",
-"pattern": true
-},
-{
-"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「",
-"pattern": false
-},
-{
-"zh": "」的路徑；指令在這個資料夾裡用",
-"pattern": false
-},
-{
-"zh": "執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結",
+"zh": "檔案",
 "pattern": false
 },
 {
@@ -10940,19 +11056,43 @@
 "pattern": false
 },
 {
-"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。",
+"zh": "工作資料夾裡的相對路徑",
+"pattern": false
+},
+{
+"zh": "這是同一件任務的追問：前幾輪的交代、做過的操作與結論在前面的對話裡，工作資料夾裡是之前做好的檔案。先看清楚現況再接著改，不要從頭重做。",
+"pattern": false
+},
+{
+"zh": "{0}{1}是空的。",
 "pattern": true
 },
 {
-"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結",
+"zh": "是空的",
 "pattern": false
 },
 {
-"zh": "」的路徑；指令在這個資料夾裡用 ",
+"zh": "共{0}行",
+"pattern": true
+},
+{
+"zh": "總行數不明（檔案很大）",
 "pattern": false
 },
 {
-"zh": " 執行。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。",
+"zh": "{0}{1}：{2}，第{3}行之後沒有內容。",
+"pattern": true
+},
+{
+"zh": "行之後沒有內容",
+"pattern": false
+},
+{
+"zh": "{0}{1}：{2}，這次是第{3}～{4}行。",
+"pattern": true
+},
+{
+"zh": "這次是第",
 "pattern": false
 },
 {
@@ -11236,11 +11376,15 @@
 "pattern": false
 },
 {
-"zh": "讀一個文字檔（最多 1 MB）",
+"zh": "讀一個檔案，回帶行號的內容與總行數；大檔用start_line與max_lines分段讀。也讀得了PDF、Word、Excel、PowerPoint（回抽出來的文字）",
 "pattern": false
 },
 {
-"zh": "建立或覆寫一個檔案（整份內容，最多 2 MB）；上層資料夾會自動建立",
+"zh": "建立新檔或整份覆寫（最多2 MB），上層資料夾會自動建立；只改既有檔案的一段請用edit_file",
+"pattern": false
+},
+{
+"zh": "把檔案裡的一段原文換成新內容。old_text要跟檔案裡的一字不差（含縮排與空白、不含read_file顯示的行號），而且只出現一次；不確定就先read_file。replace_all=true會把出現的地方全部換掉",
 "pattern": false
 },
 {
@@ -11256,7 +11400,83 @@
 "pattern": false
 },
 {
-"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。",
+"zh": "用run_command執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫finish並寫總結。",
+"pattern": false
+},
+{
+"zh": "（被拒絕）",
+"pattern": false
+},
+{
+"zh": "（這一輪出錯停下：{0}）",
+"pattern": true
+},
+{
+"zh": "這一輪出錯停下",
+"pattern": false
+},
+{
+"zh": "（這一輪沒有留下結論）",
+"pattern": false
+},
+{
+"zh": "第{0}輪：交代「{1}」，結果：{2}",
+"pattern": true
+},
+{
+"zh": "輪：交代「",
+"pattern": false
+},
+{
+"zh": "」，結果",
+"pattern": false
+},
+{
+"zh": "是空的。",
+"pattern": false
+},
+{
+"zh": "，第",
+"pattern": false
+},
+{
+"zh": "行之後沒有內容。",
+"pattern": false
+},
+{
+"zh": "，這次是第",
+"pattern": false
+},
+{
+"zh": "行。",
+"pattern": false
+},
+{
+"zh": "後面還有，要接著讀請用start_line={0}。",
+"pattern": true
+},
+{
+"zh": "後面還有，要接著讀請用start_line=",
+"pattern": false
+},
+{
+"zh": "已經讀到結尾。",
+"pattern": false
+},
+{
+"zh": "這台的代理版本較舊，還不能讀PDF與Office檔；請管理者先更新這台",
+"pattern": false
+},
+{
+"zh": "\n……（文件太長，後面沒有抽出來）",
+"pattern": false
+},
+{
+"zh": "文件",
+"pattern": false
+},
+{
+"zh": "這是二進位檔，不顯示內容；read_file讀得了文字檔與PDF、Word、Excel、PowerPoint",
 "pattern": false
 },
 {
@@ -11272,6 +11492,10 @@
 "pattern": false
 },
 {
+"zh": "（{0}字）",
+"pattern": true
+},
+{
 "zh": "模型要是本機欄位或第三方 API",
 "pattern": false
 },
@@ -11285,6 +11509,10 @@
 },
 {
 "zh": "這筆第三方 API 沒有設預設模型，請指定模型",
+"pattern": false
+},
+{
+"zh": "已經有一個Agent任務在進行，請等它做完或按停止",
 "pattern": false
 },
 {
@@ -11724,11 +11952,91 @@
 "pattern": false
 },
 {
-"zh": "這筆第三方 API 已經被刪掉了",
+"zh": "需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫finish並寫總結。",
 "pattern": false
 },
 {
-"zh": "這筆第三方 API 沒有設預設模型",
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑；指令在這個資料夾裡用{1}執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；",
+"pattern": true
+},
+{
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「",
+"pattern": false
+},
+{
+"zh": "」的路徑；指令在這個資料夾裡用",
+"pattern": false
+},
+{
+"zh": "執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫",
+"pattern": false
+},
+{
+"zh": "列出檔案{0}",
+"pattern": true
+},
+{
+"zh": "讀檔{0}",
+"pattern": true
+},
+{
+"zh": "寫檔{0}",
+"pattern": true
+},
+{
+"zh": "修改{0}",
+"pattern": true
+},
+{
+"zh": "執行指令{0}",
+"pattern": true
+},
+{
+"zh": "（出錯）",
+"pattern": false
+},
+{
+"zh": "（這一輪出錯停下：",
+"pattern": false
+},
+{
+"zh": "」，結果：",
+"pattern": false
+},
+{
+"zh": "好的，我知道前情了。",
+"pattern": false
+},
+{
+"zh": "模型的回應太大（超過16 MB），已中止",
+"pattern": false
+},
+{
+"zh": "代理回的不是JSON",
+"pattern": false
+},
+{
+"zh": "這筆第三方API已經被刪掉了",
+"pattern": false
+},
+{
+"zh": "這筆第三方API沒有設預設模型",
+"pattern": false
+},
+{
+"zh": "對方回應太大",
+"pattern": false
+},
+{
+"zh": "對方送回串流，但這裡要的是一般回應",
+"pattern": false
+},
+{
+"zh": "……（這一行太長，後面省略）",
+"pattern": false
+},
+{
+"zh": "這台的代理版本較舊，還沒有edit_file；這次請改用write_file整份重寫，並請管理者更新這台",
 "pattern": false
 },
 {
@@ -11740,6 +12048,10 @@
 "pattern": false
 },
 {
+"zh": "字）",
+"pattern": false
+},
+{
 "zh": "任務出錯：{0}",
 "pattern": true
 },
@@ -11748,7 +12060,7 @@
 "pattern": false
 },
 {
-"zh": "主控台重新啟動，這個任務中斷了；已經做好的檔案還在工作資料夾裡，可以再交代一次接著做",
+"zh": "主控台重新啟動，這一輪中斷了；已經做好的檔案還在工作資料夾裡，可以直接接著交代",
 "pattern": false
 },
 {
@@ -11764,27 +12076,35 @@
 "pattern": false
 },
 {
+"zh": "模型要是本機欄位（kind=local, slot）或第三方API（kind=provider, id）",
+"pattern": false
+},
+{
+"zh": "第三方API用的是單位付費的金鑰，只有管理員能用",
+"pattern": false
+},
+{
+"zh": "沒有這筆第三方API",
+"pattern": false
+},
+{
+"zh": "這筆第三方API沒有設預設模型，請指定模型",
+"pattern": false
+},
+{
+"zh": "有人正在用Agent，這台一次只跑一件；請稍後再試",
+"pattern": false
+},
+{
 "zh": "請寫要交代的事（最多 8000 字）",
 "pattern": false
 },
 {
-"zh": "模型要是本機欄位（kind=local, slot）或第三方 API（kind=provider, id）",
+"zh": "只能接著交代自己的任務",
 "pattern": false
 },
 {
-"zh": "第三方 API 用的是單位付費的金鑰，只有管理員能用",
-"pattern": false
-},
-{
-"zh": "沒有「{0}」這個工作資料夾，請先建立",
-"pattern": true
-},
-{
-"zh": "沒有「",
-"pattern": false
-},
-{
-"zh": "」這個工作資料夾，請先建立",
+"zh": "請寫要接著交代的事（最多8000字）",
 "pattern": false
 },
 {
@@ -12104,10 +12424,6 @@
 "pattern": false
 },
 {
-"zh": "對方回應太大",
-"pattern": false
-},
-{
 "zh": "檢查新版失敗：{0}",
 "pattern": true
 },
@@ -12156,6 +12472,34 @@
 "pattern": false
 },
 {
+"zh": "你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；",
+"pattern": true
+},
+{
+"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫",
+"pattern": false
+},
+{
+"zh": "執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；",
+"pattern": false
+},
+{
+"zh": "（結束碼{0}）",
+"pattern": true
+},
+{
+"zh": "（這一輪被使用者停止，沒做完）",
+"pattern": false
+},
+{
+"zh": "（主控台重新啟動，這一輪中斷了）",
+"pattern": false
+},
+{
+"zh": "（更早幾輪的細節已省略，只留結論摘要；需要時請重新讀檔確認現況）\n",
+"pattern": false
+},
+{
 "zh": "Agent任務{0}存不進資料庫：{1}",
 "pattern": true
 },
@@ -12168,6 +12512,18 @@
 "pattern": false
 },
 {
+"zh": "連不上那台的代理：{0}",
+"pattern": true
+},
+{
+"zh": "連不上那台的代理",
+"pattern": false
+},
+{
+"zh": "對方回的不是JSON（網址可能不是OpenAI相容的API）",
+"pattern": false
+},
+{
 "zh": "任務已停止",
 "pattern": false
 },
@@ -12176,7 +12532,7 @@
 "pattern": false
 },
 {
-"zh": "已達 {0} 步上限，任務停止；可以看已完成的部分，再交代下一件事",
+"zh": "已達{0}步上限，這一輪停在這裡；可以看已完成的部分，再接著交代下一步",
 "pattern": true
 },
 {
@@ -12184,11 +12540,11 @@
 "pattern": false
 },
 {
-"zh": "步上限，任務停止；可以看已完成的部分，再交代下一件事",
+"zh": "步上限，這一輪停在這裡；可以看已完成的部分，再接著交代下一步",
 "pattern": false
 },
 {
-"zh": "已超過 30 分鐘上限，任務停止",
+"zh": "已超過30分鐘上限，這一輪停在這裡；可以再接著交代",
 "pattern": false
 },
 {
@@ -12220,7 +12576,27 @@
 "pattern": false
 },
 {
-"zh": "已經有一個 Agent 任務在進行，請等它做完或按停止",
+"zh": "沒有「{0}」這個工作資料夾，請先建立",
+"pattern": true
+},
+{
+"zh": "沒有「",
+"pattern": false
+},
+{
+"zh": "」這個工作資料夾，請先建立",
+"pattern": false
+},
+{
+"zh": "工作資料夾「{0}」已經不在了，請開新任務",
+"pattern": true
+},
+{
+"zh": "工作資料夾「",
+"pattern": false
+},
+{
+"zh": "」已經不在了，請開新任務",
 "pattern": false
 },
 {
@@ -12269,14 +12645,6 @@
 },
 {
 "zh": "），請等前一個回完",
-"pattern": false
-},
-{
-"zh": "連不上那台的代理：{0}",
-"pattern": true
-},
-{
-"zh": "連不上那台的代理",
 "pattern": false
 },
 {
@@ -12512,7 +12880,47 @@
 "pattern": false
 },
 {
+"zh": "從第幾行開始，預設1",
+"pattern": false
+},
+{
+"zh": "最多讀幾行，預設{0}",
+"pattern": true
+},
+{
+"zh": "最多讀幾行，預設",
+"pattern": false
+},
+{
+"zh": "檔案的完整內容",
+"pattern": false
+},
+{
+"zh": "要被換掉的原文",
+"pattern": false
+},
+{
+"zh": "換成的新內容",
+"pattern": false
+},
+{
+"zh": "全部替換，預設false",
+"pattern": false
+},
+{
 "zh": "秒，預設 120、最多 600",
+"pattern": false
+},
+{
+"zh": "」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；",
+"pattern": false
+},
+{
+"zh": "（結束碼",
+"pattern": false
+},
+{
+"zh": "（這一輪做過的操作：\n",
 "pattern": false
 },
 {
@@ -12520,16 +12928,20 @@
 "pattern": false
 },
 {
-"zh": "已達 ",
-"pattern": false
-},
-{
-"zh": " 步上限，任務停止；可以看已完成的部分，再交代下一件事",
-"pattern": false
-},
-{
-"zh": "模型回 {0}",
+"zh": "代理回{0}",
 "pattern": true
+},
+{
+"zh": "連不上那台的代理：",
+"pattern": false
+},
+{
+"zh": "模型的串流中斷了（{0}）",
+"pattern": true
+},
+{
+"zh": "模型的串流中斷了",
+"pattern": false
 },
 {
 "zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息：{0}",
@@ -12552,15 +12964,11 @@
 "pattern": false
 },
 {
-"zh": "（{0} 字）",
-"pattern": true
-},
-{
 "zh": "讀不回來：",
 "pattern": false
 },
 {
-"zh": "有人正在用 Agent，這台一次只跑一件；請稍後再試",
+"zh": "沒有這個任務",
 "pattern": false
 },
 {
@@ -12577,10 +12985,6 @@
 },
 {
 "zh": "這台的代理是舊版，還不支援加密入口；請到「設定 › 版本與更新」更新代理",
-"pattern": false
-},
-{
-"zh": "連不上那台的代理：",
 "pattern": false
 },
 {
@@ -12629,10 +13033,6 @@
 },
 {
 "zh": "沒有這個加入碼",
-"pattern": false
-},
-{
-"zh": "沒有這個任務",
 "pattern": false
 },
 {
@@ -12884,11 +13284,19 @@
 "pattern": false
 },
 {
+"zh": "（整個資料夾）",
+"pattern": false
+},
+{
+"zh": "模型的串流中斷了（",
+"pattern": false
+},
+{
 "zh": "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。請換一個支援工具呼叫的模型。對方的訊息：",
 "pattern": false
 },
 {
-"zh": " 字）",
+"zh": "；大檔請拆成幾個小檔，或先寫骨架再用edit_file分段補上",
 "pattern": false
 },
 {
@@ -13052,15 +13460,15 @@
 "pattern": false
 },
 {
-"zh": "（{0}字）",
-"pattern": true
-},
-{
 "zh": "這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰",
 "pattern": false
 },
 {
 "zh": "憑證驗不過（",
+"pattern": false
+},
+{
+"zh": "工具參數不是完整的JSON",
 "pattern": false
 },
 {
@@ -13116,7 +13524,7 @@
 "pattern": false
 },
 {
-"zh": "字）",
+"zh": "（輸出到了單次上限被截斷）",
 "pattern": false
 },
 {
@@ -13125,10 +13533,6 @@
 },
 {
 "zh": " 的設定現在不合法，不能退回：",
-"pattern": false
-},
-{
-"zh": "檔案",
 "pattern": false
 },
 {
@@ -13201,6 +13605,10 @@
 },
 {
 "zh": " 太長（上限 ",
+"pattern": false
+},
+{
+"zh": " 字）",
 "pattern": false
 },
 {
@@ -18668,6 +19076,18 @@
 "pattern": false
 },
 {
+"zh": "{0} 是資料夾",
+"pattern": true
+},
+{
+"zh": "是資料夾",
+"pattern": false
+},
+{
+"zh": "路徑不在工作資料夾內",
+"pattern": false
+},
+{
 "zh": "內容要是文字",
 "pattern": false
 },
@@ -18680,15 +19100,67 @@
 "pattern": false
 },
 {
-"zh": "{0} 是資料夾",
-"pattern": true
-},
-{
-"zh": "是資料夾",
+"zh": "old_text與new_text都要是文字",
 "pattern": false
 },
 {
-"zh": "路徑不在工作資料夾內",
+"zh": "old_text不能是空的；要新建或整份重寫請用write_file",
+"pattern": false
+},
+{
+"zh": "old_text跟new_text一樣，沒有要改的",
+"pattern": false
+},
+{
+"zh": "沒有這個檔案：{0}（要新建請用write_file）",
+"pattern": true
+},
+{
+"zh": "要新建請用write_file",
+"pattern": false
+},
+{
+"zh": "{0}超過2 MB，edit_file改不了",
+"pattern": true
+},
+{
+"zh": "超過2 MB，edit_file改不了",
+"pattern": false
+},
+{
+"zh": "在{0}裡找不到old_text（要一字不差，含縮排與空白）；請先用read_file看實際內容再改",
+"pattern": true
+},
+{
+"zh": "裡找不到old_text（要一字不差，含縮排與空白）；請先用read_file看實際內容再改",
+"pattern": false
+},
+{
+"zh": "old_text在{0}裡出現{1}次；請多帶前後幾行讓它只出現一次，或設replace_all=true全部替換",
+"pattern": true
+},
+{
+"zh": "old_text在",
+"pattern": false
+},
+{
+"zh": "裡出現",
+"pattern": false
+},
+{
+"zh": "次；請多帶前後幾行讓它只出現一次，或設replace_all=true全部替換",
+"pattern": false
+},
+{
+"zh": "改完會超過2 MB（{0} MB），請拆成幾個檔",
+"pattern": true
+},
+{
+"zh": "改完會超過2 MB",
+"pattern": false
+},
+{
+"zh": "MB），請拆成幾個檔",
 "pattern": false
 },
 {
@@ -19800,7 +20272,15 @@
 "pattern": false
 },
 {
-"zh": "一次最多寫 2 MB（這次 ",
+"zh": "{0}有{1} MB，文件最大15 MB",
+"pattern": true
+},
+{
+"zh": "MB，文件最大15 MB",
+"pattern": false
+},
+{
+"zh": "start與lines要是整數",
 "pattern": false
 },
 {
@@ -19813,6 +20293,30 @@
 },
 {
 "zh": "寫不進",
+"pattern": false
+},
+{
+"zh": "一次最多寫 2 MB（這次 ",
+"pattern": false
+},
+{
+"zh": "（要新建請用write_file）",
+"pattern": false
+},
+{
+"zh": "{0}不是UTF-8文字檔，edit_file改不了；請用write_file整份重寫",
+"pattern": true
+},
+{
+"zh": "不是UTF-8文字檔，edit_file改不了；請用write_file整份重寫",
+"pattern": false
+},
+{
+"zh": "改完會超過2 MB（",
+"pattern": false
+},
+{
+"zh": " MB），請拆成幾個檔",
 "pattern": false
 },
 {
@@ -20553,6 +21057,10 @@
 },
 {
 "zh": "打不開這個資料夾：",
+"pattern": false
+},
+{
+"zh": " MB，文件最大15 MB",
 "pattern": false
 },
 {

@@ -113,7 +113,7 @@ USER_ROUTES = [
     ("GET", r"/api/node/[\w.-]+/sd/jobs(/[0-9a-f]{8}(/output(/[0-3])?|/init)?)?"),
     ("POST", r"/api/(logout|account/password|chats/save|chats/delete-all|extract|preview|agent/tasks|keys/create|assistant|assistant/continue)"),
     ("POST", r"/api/chats/[0-9a-f]{12}/(rename|delete|meta)"),
-    ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop|delete)"),
+    ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop|delete|continue)"),
     ("POST", r"/api/node/[\w.-]+/chat/[\w.-]+"),
     ("POST", r"/api/node/[\w.-]+/agent/(folders/create|fs/list|fs/read)"),
     ("POST", r"/api/node/[\w.-]+/sd/(generate|admit)"),
@@ -3100,22 +3100,49 @@ def provider_chat_request(prov, body):
 
 
 # ---------------------------------------------------------------- Agent 任務（主控台負責對話迴圈）
-# 模型用 OpenAI 的 tools 格式呼叫六個工具；檔案與指令實際在那台機器的代理上做（/agent/*，只能動工作資料夾）。
+# 模型用OpenAI的tools格式呼叫七個工具；檔案與指令實際在那台機器的代理上做（/agent/*，只能動工作資料夾）。
 # run_command 一定先停在 waiting_approval，有人按允許才送出去；每一條實際執行的指令都寫稽核。
-AGENT_MAX_STEPS = 40
-AGENT_MAX_SEC = 1800
+# 同一件任務可以一直追問：每次交代是一輪（turns），模型看得到前幾輪的交代、做過的操作與結論。
+AGENT_MAX_STEPS = 40                 # 每一輪
+AGENT_MAX_SEC = 1800                 # 每一輪
 AGENT_KEEP = 100                 # 每個人保留最近幾件（存在主控台資料庫，重啟後還在）
 AGENT_LIVE = ("running", "waiting_approval")
+AGENT_TURNS_KEEP = 100
+AGENT_HISTORY_TURNS = 6              # 最近幾輪完整帶給模型，更早的只帶結論摘要
+AGENT_HISTORY_CHARS = 24000          # 前情的總字數上限：本機模型的上下文常常只有32K token
+AGENT_OPS_KEEP = 40
+AGENT_READ_LINES = 2000
+AGENT_READ_CHARS = 24000             # 一次讀檔回給模型的字數上限：超過就停在那一行，告訴它從哪裡接著讀
+AGENT_TOOL_TEXT = 30000
+AGENT_LIVE_TAIL = 6000               # 即時狀態只帶串流內容的最後這麼多字給畫面
+AGENT_STREAM_MAX = 16 << 20          # 一次回應最多收這麼多：被接管的代理或服務一直吐也不會吃光記憶體
+AGENT_DOC_EXT = {"pdf", "docx", "xlsx", "pptx", "doc", "xls", "ppt"}
 AGENT_TASKS = {}
 _AGENT_LOCK = threading.Lock()
+_PATH_ARG = {"path": {"type": "string", "description": "工作資料夾裡的相對路徑"}}
 AGENT_TOOLS = [
     {"type": "function", "function": {"name": "list_files", "description": "列出工作資料夾（或其中一個子資料夾）裡的檔案",
                                       "parameters": {"type": "object", "properties": {"path": {"type": "string", "description": "子資料夾的相對路徑，空白＝整個工作資料夾"}}}}},
-    {"type": "function", "function": {"name": "read_file", "description": "讀一個文字檔（最多 1 MB）",
-                                      "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "write_file", "description": "建立或覆寫一個檔案（整份內容，最多 2 MB）；上層資料夾會自動建立",
-                                      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+    {"type": "function", "function": {"name": "read_file",
+                                      "description": "讀一個檔案，回帶行號的內容與總行數；大檔用start_line與max_lines分段讀。"
+                                                     "也讀得了PDF、Word、Excel、PowerPoint（回抽出來的文字）",
+                                      "parameters": {"type": "object", "properties": {
+                                          **_PATH_ARG,
+                                          "start_line": {"type": "integer", "description": "從第幾行開始，預設1"},
+                                          "max_lines": {"type": "integer", "description": f"最多讀幾行，預設{AGENT_READ_LINES}"}},
+                                          "required": ["path"]}}},
+    {"type": "function", "function": {"name": "write_file", "description": "建立新檔或整份覆寫（最多2 MB），上層資料夾會自動建立；只改既有檔案的一段請用edit_file",
+                                      "parameters": {"type": "object", "properties": {**_PATH_ARG, "content": {"type": "string", "description": "檔案的完整內容"}},
                                                      "required": ["path", "content"]}}},
+    {"type": "function", "function": {"name": "edit_file",
+                                      "description": "把檔案裡的一段原文換成新內容。old_text要跟檔案裡的一字不差（含縮排與空白、不含read_file顯示的行號），"
+                                                     "而且只出現一次；不確定就先read_file。replace_all=true會把出現的地方全部換掉",
+                                      "parameters": {"type": "object", "properties": {
+                                          **_PATH_ARG,
+                                          "old_text": {"type": "string", "description": "要被換掉的原文"},
+                                          "new_text": {"type": "string", "description": "換成的新內容"},
+                                          "replace_all": {"type": "boolean", "description": "全部替換，預設false"}},
+                                          "required": ["path", "old_text", "new_text"]}}},
     {"type": "function", "function": {"name": "run_command", "description": "在工作資料夾裡執行一條指令（要使用者按允許才會執行）",
                                       "parameters": {"type": "object", "properties": {"command": {"type": "string"},
                                                                                       "timeout": {"type": "integer", "description": "秒，預設 120、最多 600"}},
@@ -3128,20 +3155,81 @@ AGENT_TOOLS = [
                                       "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}}},
 ]
 TOOLS_UNSUPPORTED_RX = re.compile(r"tool|function|jinja", re.I)
+STREAM_UNSUPPORTED_RX = re.compile(r"stream", re.I)
+_FILE_HOW = ("需要時用list_files、read_file了解現況（read_file回的內容帶行號，大檔用start_line分段讀；也讀得了PDF、Word、Excel）；"
+             "改既有檔案的一段用edit_file，建新檔或整份重寫用write_file。")
 
 
-def agent_system_prompt(folder, osname, can_exec=True):
+def agent_system_prompt(folder, osname, can_exec=True, followup=False):
     shell = {"windows": "Windows PowerShell", "darwin": "macOS 的 zsh", "linux": "Linux 的 bash"}.get(osname, "shell")
+    more = ("這是同一件任務的追問：前幾輪的交代、做過的操作與結論在前面的對話裡，工作資料夾裡是之前做好的檔案。"
+            "先看清楚現況再接著改，不要從頭重做。") if followup else ""
     if not can_exec:
         return ("你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。"
                 f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑。這個帳號不能執行指令，只能讀寫檔案。"
-                "做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，"
-                "用 write_file 寫整份檔案內容。需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫 finish 並寫總結。")
+                "做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；" + _FILE_HOW +
+                "需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫finish並寫總結。" + more)
     return ("你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。"
-            f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑；指令在這個資料夾裡用 {shell} 執行。"
-            "做法：先用 update_plan 列出步驟，再一步一步做，每做完一步更新計畫；需要時用 list_files、read_file 了解現況，"
-            "用 write_file 寫整份檔案內容，用 run_command 執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。"
-            "不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫 finish 並寫總結。")
+            f"你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{folder}」的路徑；指令在這個資料夾裡用{shell}執行。"
+            "做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；" + _FILE_HOW +
+            "用run_command執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。"
+            "不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫finish並寫總結。" + more)
+
+
+def agent_turn(prompt, label):
+    return {"prompt": prompt, "model": label, "started": time.time(), "ended": None, "state": "running",
+            "summary": None, "error": None, "ops": [], "steps": 0}
+
+
+def agent_op(name, args, result=None):
+    """操作清單的一行：追問時當前情帶給模型。"""
+    p = str(args.get("path") or "")
+    label = {"list_files": f"列出檔案{p or '（整個資料夾）'}", "read_file": f"讀檔{p}", "write_file": f"寫檔{p}",
+             "edit_file": f"修改{p}", "run_command": f"執行指令{str(args.get('command') or '')[:160]}"}.get(name, name)
+    if isinstance(result, dict):
+        if result.get("denied"):
+            label += "（被拒絕）"
+        elif "error" in result:
+            label += "（出錯）"
+        elif name == "run_command" and result.get("exit_code") not in (0, None):
+            label += f"（結束碼{result['exit_code']}）"
+    return label
+
+
+def agent_history(turns):
+    """追問時帶給模型的前情：最近幾輪完整帶（交代、做過的操作、結論），超過輪數或字數上限的只留結論摘要。"""
+    def outcome(x):
+        if x.get("summary"):
+            return x["summary"][:2000]
+        if x.get("state") == "failed":
+            return f"（這一輪出錯停下：{(x.get('error') or '')[:300]}）"
+        return {"stopped": "（這一輪被使用者停止，沒做完）",
+                "interrupted": "（主控台重新啟動，這一輪中斷了）"}.get(x.get("state"), "（這一輪沒有留下結論）")
+    full, used = [], 0
+    for x in reversed(turns):
+        ops = x.get("ops") or []
+        body = (("（這一輪做過的操作：\n" + "\n".join("- " + o for o in ops[-AGENT_OPS_KEEP:]) + "）\n\n") if ops else "") + outcome(x)
+        size = len(x.get("prompt") or "") + len(body)
+        if len(full) >= AGENT_HISTORY_TURNS or (full and used + size > AGENT_HISTORY_CHARS):
+            break
+        full.insert(0, [{"role": "user", "content": x.get("prompt") or ""}, {"role": "assistant", "content": body}])
+        used += size
+    older = turns[:len(turns) - len(full)]
+    msgs = []
+    if older:
+        lines, room = [], AGENT_HISTORY_CHARS // 3
+        for i in range(len(older), 0, -1):
+            x = older[i - 1]
+            line = f"第{i}輪：交代「{(x.get('prompt') or '')[:200]}」，結果：{outcome(x)[:300]}"
+            if len(line) > room:
+                break
+            lines.insert(0, line)
+            room -= len(line)
+        msgs += [{"role": "user", "content": "（更早幾輪的細節已省略，只留結論摘要；需要時請重新讀檔確認現況）\n" + "\n".join(lines)},
+                 {"role": "assistant", "content": "好的，我知道前情了。"}]
+    for pair in full:
+        msgs += pair
+    return msgs
 
 
 class AgentTask:
@@ -3153,13 +3241,22 @@ class AgentTask:
         self.pending, self.decision, self.always, self.stop = None, None, False, False
         self.steps, self.created, self.updated = 0, time.time(), time.time()
         self.deadline = self.created + AGENT_MAX_SEC
+        self.turn_started = self.created
+        self.turns = [agent_turn(prompt, label)]
         self.can_exec = True
+        self.no_stream = False           # 這個模型的推理引擎不支援串流（工具呼叫）：之後都用一般呼叫
+        self.log_base = 0                # 紀錄只留最近400筆，前面捨棄了幾筆：畫面用絕對序號接著拿新的
+        self.tree_rev = 0
+        self.gen = 0                     # 第幾次開跑：停止後馬上追問，舊的背景執行緒晚回來也認得出自己已經過時
+        self.live = {"phase": "thinking", "since": self.created}
+        self.docs = {}                   # 這件任務讀過的文件抽出來的字：分段讀同一份不必每次重抽
         self.dropped = False             # 已刪除：背景執行緒晚回來也不再寫回資料庫
         self.event = threading.Event()
         self.lock = threading.Lock()
 
     DOC_KEYS = ("id", "ip", "node", "folder", "model", "prompt", "label", "state", "error", "summary", "plan", "files",
-                "log", "tree", "always", "steps", "created", "updated", "deadline", "can_exec")
+                "log", "tree", "always", "steps", "created", "updated", "deadline", "can_exec", "turns", "turn_started",
+                "log_base", "no_stream")
 
     @classmethod
     def restore(cls, user, doc):
@@ -3168,12 +3265,16 @@ class AgentTask:
         for k in cls.DOC_KEYS:
             if k in doc:
                 setattr(t, k, doc[k])
+        if not doc.get("turns"):          # 能追問之前存的任務：整件當成一輪，操作清單從紀錄補
+            ops = [agent_op(e.get("tool") or "", e.get("args") or {}) for e in t.log
+                   if e.get("type") == "tool" and e.get("tool") not in ("update_plan", "finish")]
+            t.turns[0].update(state=t.state, summary=t.summary, error=t.error, ops=ops[-AGENT_OPS_KEEP:], steps=t.steps,
+                              started=t.created, ended=t.updated)
         t.stop = t.state not in AGENT_LIVE
         return t
 
     def save(self):
-        """整筆加密寫進主控台資料庫（跟對話一樣AES-256-GCM）。
-        ponytail: 每記一筆就整份重寫，紀錄上限400筆、每步要等模型，寫入量不是瓶頸；真的變慢再改成只追加紀錄。"""
+        """整筆加密寫進主控台資料庫（跟對話一樣AES-256-GCM）。每記一筆就整份重寫：紀錄上限400筆、每一步都要等模型，寫入量不是瓶頸。"""
         if self.dropped:
             return
         with self.lock:
@@ -3198,34 +3299,242 @@ class AgentTask:
     def add(self, kind, **kw):
         with self.lock:
             self.log.append({"type": kind, "ts": time.time(), **kw})
-            del self.log[:-400]
+            drop = len(self.log) - 400
+            if drop > 0:
+                del self.log[:drop]
+                self.log_base += drop
             self.updated = time.time()
         self.save()
 
-    def public(self, full=True):
+    def set_live(self, phase, **kw):
+        with self.lock:
+            self.live = {"phase": phase, "since": time.time(), **kw}
+
+    def public(self, full=True, since=None, tree_rev=None):
+        """since：畫面已經有的紀錄序號，只回後面新的；tree_rev：畫面上的檔案樹版本，沒變就不再送整棵。"""
         with self.lock:
             out = {"id": self.id, "user": self.user, "node": self.node, "folder": self.folder, "model": self.label, "state": self.state,
                    "prompt": self.prompt if full else self.prompt[:160], "steps": self.steps, "max_steps": AGENT_MAX_STEPS,
                    "created": self.created, "updated": self.updated, "deadline": self.deadline, "error": self.error,
-                   "summary": self.summary, "always": self.always, "pending": self.pending}
+                   "summary": self.summary, "always": self.always, "pending": self.pending, "turns": len(self.turns),
+                   "turn_started": self.turn_started, "log_next": self.log_base + len(self.log), "tree_rev": self.tree_rev,
+                   "now": time.time()}
+            if self.state in AGENT_LIVE and self.live:
+                out["live"] = dict(self.live)
             if full:
-                out.update(plan=list(self.plan), log=list(self.log), tree=list(self.tree),
+                skip = 0 if since is None else min(len(self.log), max(0, since - self.log_base))
+                out.update(plan=list(self.plan), log=self.log[skip:], log_from=self.log_base + skip,
                            files=[{"path": k, "action": v} for k, v in self.files.items()])
+                if tree_rev != self.tree_rev:
+                    out["tree"] = list(self.tree)
             return out
 
 
-def agent_model_call(t, req):
-    """呼叫 Agent 用的模型（非串流）。本機欄位經代理；第三方經 provider_json。"""
-    m = t.model
+def _noop():
+    pass
+
+
+def _stream_lines(resp):
+    while True:
+        line = resp.readline(1 << 20)
+        if not line:
+            return
+        yield line
+
+
+class StreamError(Exception):
+    pass
+
+
+def sse_assemble(lines, on_delta=None, should_stop=None, every=0.25):
+    """把OpenAI相容的串流片段組回一則完整訊息：內容、思考內容（reasoning_content或reasoning）、
+    工具呼叫（依index把id、名稱、參數片段接起來）、用量與結束原因。
+    on_delta最多每every秒叫一次，收到(目前的內容, 目前的思考, 正在產生的那個工具呼叫或None)；
+    should_stop()為真就不再讀（關連線是呼叫端的事）。串流裡回錯誤、或總量超過上限，丟StreamError。"""
+    content, reasoning, calls = [], [], {}
+    usage = finish = None
+    last, total = 0.0, 0
+
+    def snapshot():
+        return "".join(content), "".join(reasoning), calls[max(calls)] if calls else None
+
+    for raw in lines:
+        if should_stop and should_stop():
+            break
+        total += len(raw)
+        if total > AGENT_STREAM_MAX:
+            raise StreamError("模型的回應太大（超過16 MB），已中止")
+        line = (raw.decode("utf-8", "replace") if isinstance(raw, bytes) else str(raw)).strip()
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            break
+        try:
+            obj = json.loads(data)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("error"):
+            e = obj["error"]
+            raise StreamError(str(e.get("message") if isinstance(e, dict) else e)[:400])
+        usage = obj.get("usage") or usage
+        for ch in obj.get("choices") or []:
+            if not isinstance(ch, dict):
+                continue
+            d = ch.get("delta") or ch.get("message") or {}
+            if isinstance(d.get("content"), str):
+                content.append(d["content"])
+            r = d.get("reasoning_content") or d.get("reasoning")
+            if isinstance(r, str):
+                reasoning.append(r)
+            for tc in d.get("tool_calls") or []:
+                if not isinstance(tc, dict):
+                    continue
+                i = tc["index"] if isinstance(tc.get("index"), int) else len(calls)
+                slot = calls.setdefault(i, {"id": None, "type": "function", "function": {"name": "", "arguments": ""}})
+                if tc.get("id"):
+                    slot["id"] = tc["id"]
+                fn = tc.get("function") or {}
+                name = fn.get("name")
+                # 名稱多半一次給完；有的服務每片都重送完整名稱，有的分片送，兩種都要接得起來
+                if isinstance(name, str) and name and name != slot["function"]["name"]:
+                    slot["function"]["name"] += name
+                a = fn.get("arguments")
+                if isinstance(a, str):
+                    slot["function"]["arguments"] += a
+                elif isinstance(a, dict):
+                    slot["function"]["arguments"] = json.dumps(a, ensure_ascii=False)
+            finish = ch.get("finish_reason") or finish
+        if on_delta and time.monotonic() - last >= every:
+            last = time.monotonic()
+            on_delta(*snapshot())
+    calls_out = [calls[k] for k in sorted(calls)]
+    for c in calls_out:
+        c["id"] = c["id"] or "call_" + secrets.token_hex(4)
+    return {"role": "assistant", "content": "".join(content), "reasoning_content": "".join(reasoning) or None,
+            "tool_calls": calls_out or None, "finish_reason": finish, "usage": usage}
+
+
+def agent_live_delta(t, content, reasoning, call):
+    """串流進來時的即時狀態：在寫哪個檔、已經產生多少，或是在想、在回答。"""
+    tail = {"text": content[-AGENT_LIVE_TAIL:], "reasoning": reasoning[-AGENT_LIVE_TAIL:]}
+    name = (call or {}).get("function", {}).get("name") if call else ""
+    if name:
+        args = call["function"]["arguments"]
+        m = re.search(r'"path"\s*:\s*"((?:[^"\\]|\\.)*)', args)
+        path = m.group(1) if m else ""
+        try:
+            path = json.loads(f'"{path}"')
+        except ValueError:
+            pass                                # 跳脫字元還沒傳完整：先照原樣顯示
+        t.set_live("writing" if name in ("write_file", "edit_file") else "calling", tool=name, path=path[:300],
+                   bytes=len(args.encode("utf-8")), **tail)
+    else:
+        t.set_live("answering" if content else "thinking", **tail)
+
+
+def node_chat_open(node_id, slot, body):
+    """本機欄位的對話（經那台代理的/chat/<欄位>）。回(狀態碼, JSON或None, 串流的行或None, 關連線的函式)。"""
+    req, ctx = node_request(node_id, f"/chat/{slot}", json.dumps(body).encode())
+    if req is None:
+        return 404, {"error": ctx}, None, _noop
+    try:
+        resp = agent_open(req, ctx, 600)
+    except urllib.error.HTTPError as exc:
+        try:
+            out = json.load(exc)
+        except Exception:  # noqa: BLE001
+            out = None
+        return exc.code, out if isinstance(out, dict) else {"error": f"代理回{exc.code}"}, None, _noop
+    except Exception as exc:  # noqa: BLE001
+        return 502, {"error": f"連不上那台的代理：{str(exc)[:120]}"}, None, _noop
+    if "event-stream" in (resp.headers.get("Content-Type") or ""):
+        return 200, None, _stream_lines(resp), resp.close
+    try:
+        out = json.loads(resp.read(NODE_REPLY_MAX) or b"{}")
+    except ValueError:
+        out = {"error": "代理回的不是JSON"}
+    finally:
+        resp.close()
+    return resp.status, out, None, _noop
+
+
+def agent_chat_open(m, body):
+    """送出Agent的一次模型請求，回傳格式同node_chat_open。本機欄位經代理；第三方直接連（驗憑證、不跟轉址）。"""
     if m["kind"] == "local":
-        return call_node(m["node"], f"/chat/{m['slot']}", "POST", req, timeout=600)
+        return node_chat_open(m["node"], m["slot"], body)
     prov = STORE.provider_get(m["id"])
     if not prov:
-        return 404, {"error": "這筆第三方 API 已經被刪掉了"}
-    body = {**req, "model": m.get("model") or prov.get("default_model")}
+        return 404, {"error": "這筆第三方API已經被刪掉了"}, None, _noop
+    body = {**body, "model": m.get("model") or prov.get("default_model")}
     if not body["model"]:
-        return 400, {"error": "這筆第三方 API 沒有設預設模型"}
-    return provider_json(prov, "POST", "/chat/completions", body, timeout=600)
+        return 400, {"error": "這筆第三方API沒有設預設模型"}, None, _noop
+    if body.get("stream"):
+        body["stream_options"] = {"include_usage": True}
+    try:
+        conn, resp, key = provider_open(prov, "POST", "/chat/completions", body, timeout=600)
+        if resp.status == 400 and body.get("stream_options"):
+            # 有的相容端點不認stream_options：拿掉再送一次（只是少了用量統計）
+            peek = _provider_err(resp, key)
+            conn.close()
+            if "stream_options" not in peek and "include_usage" not in peek:
+                return 400, {"error": peek}, None, _noop
+            body.pop("stream_options")
+            conn, resp, key = provider_open(prov, "POST", "/chat/completions", body, timeout=600)
+    except ProviderError as exc:
+        return exc.code, {"error": exc.msg}, None, _noop
+    if resp.status >= 400:
+        try:
+            return (400 if resp.status < 500 else 502), {"error": _provider_err(resp, key)}, None, _noop
+        finally:
+            conn.close()
+    if "event-stream" in (resp.getheader("Content-Type") or ""):
+        return 200, None, _stream_lines(resp), conn.close
+    try:
+        raw = resp.read(NODE_REPLY_MAX + 1)
+    finally:
+        conn.close()
+    if len(raw) > NODE_REPLY_MAX:
+        return 502, {"error": "對方回應太大"}, None, _noop
+    try:
+        return 200, json.loads(raw or b"{}"), None, _noop
+    except ValueError:
+        return 502, {"error": "對方回的不是JSON（網址可能不是OpenAI相容的API）"}, None, _noop
+
+
+def model_call_json(m, req):
+    """非串流的一次呼叫（操作電腦用）。回(狀態碼, 整包JSON)。"""
+    code, out, lines, close = agent_chat_open(m, {**req, "stream": False})
+    close()
+    if lines is not None:
+        return 502, {"error": "對方送回串流，但這裡要的是一般回應"}
+    return code, out or {}
+
+
+def agent_model_call(t, req, halted):
+    """呼叫Agent用的模型：串流，邊收邊更新即時狀態；推理引擎不支援串流就改一般呼叫，這件任務之後都不再試。
+    回(200, 完整的message)或(狀態碼, {"error"})。halted()為真就不再收（按了停止或超時）。"""
+    stream = not t.no_stream
+    code, out, lines, close = agent_chat_open(t.model, {**req, "stream": stream})
+    if stream and code != 200 and STREAM_UNSUPPORTED_RX.search(str((out or {}).get("error") or "")):
+        t.no_stream = True
+        code, out, lines, close = agent_chat_open(t.model, {**req, "stream": False})
+    try:
+        if code != 200:
+            return code, out or {}
+        if lines is None:
+            ch = (out.get("choices") or [{}])[0]
+            return 200, dict(ch.get("message") or {}, finish_reason=ch.get("finish_reason"))
+        try:
+            return 200, sse_assemble(lines, lambda c, r, k: agent_live_delta(t, c, r, k), halted)
+        except StreamError as exc:
+            return 502, {"error": str(exc)}
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            return 502, {"error": f"模型的串流中斷了（{type(exc).__name__}）"}
+    finally:
+        close()
 
 
 def _tree_snapshot(t):
@@ -3233,8 +3542,11 @@ def _tree_snapshot(t):
     if code != 200:
         return None
     rows = out.get("files") or []
+    tree = [{"path": r["path"], "dir": r["dir"], "size": r["size"]} for r in rows]
     with t.lock:
-        t.tree = [{"path": r["path"], "dir": r["dir"], "size": r["size"]} for r in rows]
+        if tree != t.tree:
+            t.tree = tree
+            t.tree_rev += 1
     return {r["path"]: (r["size"], r["mtime"]) for r in rows if not r["dir"]}
 
 
@@ -3249,19 +3561,22 @@ def _mark_files(t, before, after):
                 t.files[p] = "modified"
 
 
-def _wait_approval(t, cmd, timeout):
-    """停在 waiting_approval，等有人按允許／拒絕；按停止或超過 30 分鐘就不等了。回 True＝允許。"""
+def _wait_approval(t, cmd, timeout, gen):
+    """停在waiting_approval，等有人按允許／拒絕；按停止、超過這一輪的時限或已經換下一輪就不等了。回True＝允許。"""
     with t.lock:
         t.pending = {"id": secrets.token_hex(4), "tool": "run_command", "command": cmd, "timeout": timeout,
                      "asked_at": time.time()}
         t.state, t.decision = "waiting_approval", None
         t.event.clear()
         t.updated = time.time()
+        t.live = {"phase": "approval", "since": time.time(), "command": cmd[:300]}
     t.save()
     while not t.event.wait(1):
-        if t.stop or time.time() > t.deadline:
+        if t.stop or t.gen != gen or time.time() > t.deadline:
             break
     with t.lock:
+        if t.gen != gen:
+            return False
         d, t.pending = t.decision, None
         if t.state == "waiting_approval":
             t.state = "running"
@@ -3272,8 +3587,94 @@ def _wait_approval(t, cmd, timeout):
     return bool(d.get("allow"))
 
 
-def agent_tool(t, name, args):
-    """執行一個工具，回給模型的結果（dict）。"""
+def _as_int(v, default, lo, hi):
+    try:
+        return max(lo, min(hi, int(v)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _split_lines(text):
+    rows = [r[:-1] if r.endswith("\r") else r for r in text.split("\n")]
+    if rows and rows[-1] == "":
+        rows.pop()
+    return rows
+
+
+def agent_numbered(path, rows, first, total, what="檔案"):
+    """read_file回給模型的純文字：開頭寫總行數、這次讀到哪、後面還有沒有，接著是帶行號的內容（總量不超過AGENT_READ_CHARS）。"""
+    if total == 0:
+        return f"{what}{path}是空的。"
+    body, used = [], 0
+    for i, line in enumerate(rows):
+        s = f"{first + i:>6}\t{line}"
+        if len(s) > AGENT_READ_CHARS:
+            s = s[:AGENT_READ_CHARS] + "……（這一行太長，後面省略）"
+        if body and used + len(s) + 1 > AGENT_READ_CHARS:
+            break
+        body.append(s)
+        used += len(s) + 1
+    tot = f"共{total}行" if total is not None else "總行數不明（檔案很大）"
+    if not body:
+        return f"{what}{path}：{tot}，第{first}行之後沒有內容。"
+    last = first + len(body) - 1
+    more = total is None or last < total
+    head = (f"{what}{path}：{tot}，這次是第{first}～{last}行。"
+            + (f"後面還有，要接著讀請用start_line={last + 1}。" if more else "已經讀到結尾。"))
+    return head + "\n" + "\n".join(body)
+
+
+def agent_doc_text(t, path):
+    """PDF、Office檔：原檔從代理拿回來，交給extract.py的獨立行程抽字（限時、限大小）。同一份檔案在這件任務裡只抽一次。回 (文字, 錯誤)。"""
+    code, out = call_node(t.node, "/agent/fs/read", "POST", {"folder": t.folder, "path": path, "raw": True}, timeout=120)
+    if code != 200:
+        return None, out.get("error")
+    b64 = out.get("b64")
+    if not isinstance(b64, str):
+        return None, "這台的代理版本較舊，還不能讀PDF與Office檔；請管理者先更新這台"
+    key = hashlib.sha256(b64.encode()).hexdigest()
+    with t.lock:
+        hit = t.docs.get(path)
+    if hit and hit[0] == key:
+        return hit[1], None
+    code, ex = extract_doc(path.rsplit("/", 1)[-1], b64)
+    if code != 200:
+        return None, ex.get("error")
+    text = ex["text"] + ("\n……（文件太長，後面沒有抽出來）" if ex.get("truncated") else "")
+    with t.lock:
+        t.docs = dict(list(t.docs.items())[-2:])
+        t.docs[path] = (key, text)
+    return text, None
+
+
+def agent_read_tool(t, path, start, count):
+    """read_file：帶行號、分段讀；PDF與Office檔先抽字再分段。成功回純文字，出錯回{"error"}。"""
+    first = _as_int(start, 1, 1, 10 ** 9)
+    want = _as_int(count, AGENT_READ_LINES, 1, 5000)
+    name = path.rsplit("/", 1)[-1]
+    if "." in name and name.rsplit(".", 1)[-1].lower() in AGENT_DOC_EXT:
+        text, err = agent_doc_text(t, path)
+        if err:
+            return {"error": err}
+        rows = _split_lines(text)
+        return agent_numbered(path, rows[first - 1:first - 1 + want], first, len(rows), "文件")
+    code, out = call_node(t.node, "/agent/fs/read", "POST", {"folder": t.folder, "path": path, "start": first, "lines": want},
+                          timeout=60)
+    if code != 200:
+        return {"error": out.get("error")}
+    if out.get("binary"):
+        return {"path": out["path"], "size": out["size"],
+                "note": "這是二進位檔，不顯示內容；read_file讀得了文字檔與PDF、Word、Excel、PowerPoint"}
+    rows = _split_lines(out.get("content") or "")
+    if "total_lines" in out:
+        return agent_numbered(path, rows, first, out["total_lines"])
+    # 舊版代理不認分段參數，回的是整份檔案的前1 MB：在這裡切
+    total = None if out.get("truncated") else len(rows)
+    return agent_numbered(path, rows[first - 1:first - 1 + want], first, total)
+
+
+def agent_tool(t, name, args, gen=None):
+    """執行一個工具，回給模型的結果（dict，或read_file的純文字）。"""
     if name == "list_files":
         code, out = call_node(t.node, "/agent/fs/list", "POST", {"folder": t.folder, "path": str(args.get("path") or "")}, timeout=60)
         if code != 200:
@@ -3281,14 +3682,7 @@ def agent_tool(t, name, args):
         rows = out.get("files") or []
         return {"files": [r["path"] + ("/" if r["dir"] else "") for r in rows[:400]], "truncated": len(rows) > 400 or out.get("truncated")}
     if name == "read_file":
-        code, out = call_node(t.node, "/agent/fs/read", "POST", {"folder": t.folder, "path": str(args.get("path") or "")}, timeout=60)
-        if code != 200:
-            return {"error": out.get("error")}
-        if out.get("binary"):
-            return {"path": out["path"], "size": out["size"], "note": "這是二進位檔，不顯示內容"}
-        c = out.get("content") or ""
-        return {"path": out["path"], "size": out["size"], "content": c[:24000],
-                "truncated": out.get("truncated") or len(c) > 24000}
+        return agent_read_tool(t, str(args.get("path") or ""), args.get("start_line"), args.get("max_lines"))
     if name == "write_file":
         path, content = str(args.get("path") or ""), args.get("content")
         code, out = call_node(t.node, "/agent/fs/write", "POST", {"folder": t.folder, "path": path, "content": content}, timeout=60)
@@ -3301,6 +3695,20 @@ def agent_tool(t, name, args):
                 t.files[out["path"]] = "modified"
         _tree_snapshot(t)
         return {"ok": True, "path": out["path"], "size": out["size"], "created": out.get("created")}
+    if name == "edit_file":
+        path = str(args.get("path") or "")
+        code, out = call_node(t.node, "/agent/fs/edit", "POST", {
+            "folder": t.folder, "path": path, "old": args.get("old_text"), "new": args.get("new_text"),
+            "replace_all": args.get("replace_all") in (True, "true", 1)}, timeout=60)
+        if code == 404 and out.get("error") == "找不到":
+            return {"error": "這台的代理版本較舊，還沒有edit_file；這次請改用write_file整份重寫，並請管理者更新這台"}
+        if code != 200:
+            return {"error": out.get("error"), **({"count": out["count"]} if "count" in out else {})}
+        with t.lock:
+            if t.files.get(out["path"]) != "created":
+                t.files[out["path"]] = "modified"
+        _tree_snapshot(t)
+        return {"ok": True, "path": out["path"], "replaced": out.get("replaced"), "size": out.get("size")}
     if name == "run_command" and not t.can_exec:
         return {"error": "這個帳號不能執行指令；只能讀寫工作資料夾裡的檔案"}
     if name == "run_command":
@@ -3311,11 +3719,12 @@ def agent_tool(t, name, args):
             tmo = 120
         if not cmd:
             return {"error": "指令是空的"}
-        if not t.always and not _wait_approval(t, cmd, tmo):
-            if t.stop or time.time() > t.deadline:
+        if not t.always and not _wait_approval(t, cmd, tmo, t.gen if gen is None else gen):
+            if t.stop or time.time() > t.deadline or (gen is not None and t.gen != gen):
                 return {"error": "任務已停止"}
             t.add("result", tool="run_command", ok=False, text="使用者拒絕執行這條指令")
             return {"denied": True, "message": "使用者拒絕執行這條指令。請換別的做法，或說明為什麼需要它"}
+        t.set_live("running", command=cmd[:300])
         before = _tree_snapshot(t)
         code, out = call_node(t.node, "/agent/exec", "POST", {"folder": t.folder, "cmd": cmd, "timeout": tmo}, timeout=tmo + 60)
         STORE.audit(t.user, t.ip, "agent.exec", f"{t.node}/{t.folder}", code == 200 and out.get("code") == 0,
@@ -3346,49 +3755,70 @@ def agent_tool(t, name, args):
     return {"error": f"沒有 {name} 這個工具"}
 
 
+def _shown_args(args):
+    """畫面與紀錄裡的工具參數：檔案內容只記字數。"""
+    return {k: (f"（{len(str(v))}字）" if k in ("content", "old_text", "new_text") else v) for k, v in args.items()}
+
+
 def agent_run(t):
-    """背景執行緒：一步＝呼叫模型一次。上限 40 步、30 分鐘。"""
-    convo = [{"role": "system", "content": agent_system_prompt(t.folder, t.model.get("os"), t.can_exec)},
-             {"role": "user", "content": t.prompt}]
+    """背景執行緒：跑任務的最新一輪。一步＝呼叫模型一次；每一輪上限AGENT_MAX_STEPS步、30分鐘。"""
+    with t.lock:
+        gen, turn, prior = t.gen, t.turns[-1], list(t.turns[:-1])
+    convo = [{"role": "system", "content": agent_system_prompt(t.folder, t.model.get("os"), t.can_exec, bool(prior))},
+             *agent_history(prior), {"role": "user", "content": turn["prompt"]}]
     used_tools, bare = False, 0
+
+    def halted():
+        return t.stop or t.gen != gen
 
     def end(state, error=None):
         with t.lock:
+            if t.gen != gen:                 # 已經換下一輪了：狀態歸新的那一輪管
+                return
             if t.stop:                       # 按過停止就維持「已停止」，背景晚回來的結果不改狀態
                 state, error = "stopped", None
-            t.state, t.error, t.pending = state, error, None
+            t.state, t.error, t.pending, t.live = state, error, None, {}
             t.close_plan(state)
             t.updated = time.time()
+            turn.update(state=state, error=error, summary=t.summary if state == "done" else None, ended=time.time(), steps=t.steps)
+            summary = t.summary if state == "done" else None
+            said = next((e.get("text") for e in reversed(t.log) if e.get("type") == "text"), None)
         if error:
             t.add("error", text=error)
+        elif summary and summary.strip() != (said or "").strip():
+            t.add("summary", text=summary)
         else:
             t.save()
         STORE.audit(t.user, t.ip, "agent.task_end", f"{t.node}/{t.folder}", state == "done",
-                    {"task": t.id, "state": state, "steps": t.steps, "message": error})
+                    {"task": t.id, "state": state, "steps": t.steps, "turn": len(t.turns), "message": error})
     try:
         _tree_snapshot(t)
         while True:
-            if t.stop:
+            if halted():
                 return end("stopped")
             if t.steps >= AGENT_MAX_STEPS:
-                return end("failed", f"已達 {AGENT_MAX_STEPS} 步上限，任務停止；可以看已完成的部分，再交代下一件事")
+                return end("failed", f"已達{AGENT_MAX_STEPS}步上限，這一輪停在這裡；可以看已完成的部分，再接著交代下一步")
             if time.time() > t.deadline:
-                return end("failed", "已超過 30 分鐘上限，任務停止")
+                return end("failed", "已超過30分鐘上限，這一輪停在這裡；可以再接著交代")
             t.steps += 1
             tools = AGENT_TOOLS if t.can_exec else [x for x in AGENT_TOOLS if x["function"]["name"] != "run_command"]
-            code, out = agent_model_call(t, {"messages": convo, "tools": tools, "stream": False,
-                                             "max_tokens": 4096, "temperature": 0.2})
-            if t.stop:
+            t.set_live("thinking")
+            code, msg = agent_model_call(t, {"messages": convo, "tools": tools, "max_tokens": 4096, "temperature": 0.2},
+                                         lambda: halted() or time.time() > t.deadline)
+            if halted():
                 return end("stopped")
+            t.set_live("working")
             if code != 200:
-                err = mask_secret((out or {}).get("error") or f"模型回 {code}")
+                err = mask_secret((msg or {}).get("error") or f"模型回{code}")
                 if not used_tools and TOOLS_UNSUPPORTED_RX.search(err):
                     return end("failed", "這個模型（或它的推理引擎）不支援工具呼叫（tools），Agent 用不了。"
                                          f"請換一個支援工具呼叫的模型。對方的訊息：{err[:200]}")
                 return end("failed", f"模型回 {code}：{err[:300]}")
-            msg = ((out.get("choices") or [{}])[0]).get("message") or {}
             text = (msg.get("content") or "").strip()
+            thought = (msg.get("reasoning_content") or msg.get("reasoning") or "").strip()
             calls = [c for c in (msg.get("tool_calls") or []) if isinstance(c, dict)][:3]
+            if thought:
+                t.add("thinking", text=thought[:8000])
             if text:
                 t.add("text", text=text[:8000])
             if not calls:
@@ -3411,24 +3841,37 @@ def agent_run(t):
             for c in calls:
                 fn = c.get("function") or {}
                 name = str(fn.get("name") or "")
+                raw_args = fn.get("arguments")
                 try:
-                    args = json.loads(fn.get("arguments") or "{}") if isinstance(fn.get("arguments"), str) else (fn.get("arguments") or {})
+                    args = json.loads(raw_args or "{}") if isinstance(raw_args, str) else (raw_args or {})
                 except ValueError:
+                    args = None
+                if not isinstance(args, dict):
+                    cut = msg.get("finish_reason") == "length"
+                    result = {"error": "工具參數不是完整的JSON" + ("（輸出到了單次上限被截斷）" if cut else "")
+                                       + "；大檔請拆成幾個小檔，或先寫骨架再用edit_file分段補上"}
+                    t.add("tool", tool=name, args={})
                     args = {}
-                args = args if isinstance(args, dict) else {}
-                shown = {k: (v if k != "content" else f"（{len(str(v))} 字）") for k, v in args.items()}
-                t.add("tool", tool=name, args=shown)
-                result = agent_tool(t, name, args)
-                if t.stop:
+                else:
+                    t.add("tool", tool=name, args=_shown_args(args))
+                    if name not in ("run_command", "update_plan", "finish"):
+                        t.set_live("tool", tool=name, path=str(args.get("path") or "")[:300])
+                    result = agent_tool(t, name, args, gen)
+                if halted():
                     return end("stopped")
                 if name == "finish":
                     with t.lock:
                         t.summary = str(args.get("summary") or text or "")[:8000]
                     finished = True
-                if not (name == "run_command" and result.get("denied")):
-                    t.add("result", tool=name, ok="error" not in result,
-                          text=json.dumps(result, ensure_ascii=False)[:4000])
-                convo.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(result, ensure_ascii=False)[:12000]})
+                elif name != "update_plan":
+                    with t.lock:
+                        turn["ops"] = (turn["ops"] + [agent_op(name, args, result)])[-AGENT_OPS_KEEP:]
+                is_text = isinstance(result, str)
+                if not (name == "run_command" and not is_text and result.get("denied")):
+                    t.add("result", tool=name, ok=is_text or "error" not in result,
+                          text=result[:4000] if is_text else json.dumps(result, ensure_ascii=False)[:4000])
+                convo.append({"role": "tool", "tool_call_id": c["id"],
+                              "content": result[:AGENT_TOOL_TEXT] if is_text else json.dumps(result, ensure_ascii=False)[:12000]})
             if finished:
                 return end("done")
     except Exception as exc:  # noqa: BLE001
@@ -3438,14 +3881,15 @@ def agent_run(t):
 
 
 def agent_stop(t, audit):
-    """按停止：馬上標成已停止並放開「一次一個任務」的鎖，正在跑的指令砍掉。
-    ponytail: 進行中的模型請求不硬切，背景執行緒等它回來就收工、不再做下一步；要秒停得替 call_node 加可中斷的連線。"""
+    """按停止：馬上標成已停止並放開「一次一個任務」的鎖，正在跑的指令砍掉；串流中的模型回應在下一個片段就不再收、連線關掉。"""
     with t.lock:
         was = t.state
         t.stop = True
         if was in AGENT_LIVE:
-            t.state, t.pending, t.updated = "stopped", None, time.time()
+            t.state, t.pending, t.updated, t.live = "stopped", None, time.time(), {}
             t.close_plan("stopped")
+            if t.turns:
+                t.turns[-1].update(state="stopped", ended=time.time(), steps=t.steps)
     t.event.set()
     t.save()
     if was in ("running", "waiting_approval"):
@@ -3456,7 +3900,7 @@ def agent_stop(t, audit):
 
 
 def agent_tasks_load():
-    """主控台啟動時把存著的任務讀回來；上次還在進行中的，背景執行緒已經不在了，標成「已中斷」。回讀到幾件。"""
+    """主控台啟動時把存著的任務讀回來；上次還在進行中的，背景執行緒已經不在了，標成「已中斷」（之後可以接著交代）。回讀到幾件。"""
     n = 0
     for r in STORE.agent_task_rows():
         try:
@@ -3468,8 +3912,9 @@ def agent_tasks_load():
         if t.state in AGENT_LIVE:
             with t.lock:
                 t.state, t.pending = "interrupted", None
-                t.error = "主控台重新啟動，這個任務中斷了；已經做好的檔案還在工作資料夾裡，可以再交代一次接著做"
+                t.error = "主控台重新啟動，這一輪中斷了；已經做好的檔案還在工作資料夾裡，可以直接接著交代"
                 t.close_plan("interrupted")
+                t.turns[-1].update(state="interrupted", error=t.error, ended=time.time(), steps=t.steps)
                 t.log.append({"type": "error", "ts": time.time(), "text": t.error})
             t.save()
         with _AGENT_LOCK:
@@ -3525,14 +3970,54 @@ def computer_start(user, ip, body, audit):
     def cn(nid, path, method, b, timeout):
         return call_node(nid, path, method, b, timeout=timeout)
 
-    class _T:      # agent_model_call 只用到 .model
-        pass
-
     def mc(t, req):
-        holder = _T()
-        holder.model = t.model
-        return agent_model_call(holder, req)
+        return model_call_json(t.model, req)
     return computer.start(user, ip, node, model, body.get("goal"), label, cn, mc, audit)
+
+
+def agent_pick_model(node, m, can_exec, may_node):
+    """Agent用的模型。回 (模型, 標籤, None) 或 (None, None, (狀態碼, 錯誤))。"""
+    if isinstance(m, str):                    # 也收字串：local:<欄位>、provider:<id>[:<模型>]
+        kind, _, rest = m.partition(":")
+        m = {"kind": kind, "slot": rest} if kind == "local" else {"kind": kind, "id": rest.split(":", 1)[0],
+                                                                    "model": rest.split(":", 1)[1] if ":" in rest else ""}
+    if not isinstance(m, dict) or m.get("kind") not in ("local", "provider"):
+        return None, None, (400, "模型要是本機欄位（kind=local, slot）或第三方API（kind=provider, id）")
+    if m["kind"] == "provider" and not can_exec:
+        return None, None, (403, "第三方API用的是單位付費的金鑰，只有管理員能用")
+    if m["kind"] == "local":
+        slot = str(m.get("slot") or "")
+        mnode = str(m.get("node") or node)
+        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]) or not may_node(mnode):
+            return None, None, (400, "本機模型要指定欄位")
+        return {"kind": "local", "node": mnode, "slot": slot}, f"本機 {mnode}/{slot}", None
+    prov = STORE.provider_get(str(m.get("id") or ""))
+    if not prov:
+        return None, None, (404, "沒有這筆第三方API")
+    name = str(m.get("model") or prov.get("default_model") or "")
+    if not name or not PROVIDER_MODEL_RX.fullmatch(name):
+        return None, None, (400, "這筆第三方API沒有設預設模型，請指定模型")
+    return {"kind": "provider", "id": prov["id"], "model": name}, f"{prov['name']}／{name}", None
+
+
+def _agent_folder_os(node, folder):
+    """工作資料夾還在不在，順便拿那台的作業系統（決定指令用哪種shell）。回 (os, None) 或 (None, (狀態碼, 回應))。"""
+    code, out = call_node(node, "/agent/folders", timeout=30)
+    if code != 200:
+        return None, (code, {"error": out.get("error"), "disabled": out.get("disabled")})
+    if folder not in [f["name"] for f in out.get("folders") or []]:
+        return None, (400, {"error": f"沒有「{folder}」這個工作資料夾，請先建立"})
+    return out.get("os"), None
+
+
+def _agent_busy(user, can_exec):
+    """一台主控台一次只跑一件Agent任務。呼叫端持有 _AGENT_LOCK。回None或 (狀態碼, 回應)。"""
+    busy = next((x for x in AGENT_TASKS.values() if x.state in AGENT_LIVE), None)
+    if not busy:
+        return None
+    if busy.user != user and not can_exec:
+        return 409, {"error": "有人正在用Agent，這台一次只跑一件；請稍後再試"}
+    return 409, {"error": "已經有一個Agent任務在進行，請等它做完或按停止", "task": busy.id}
 
 
 def agent_start(user, ip, body, can_exec=True, may_node=lambda _n: True):
@@ -3545,45 +4030,64 @@ def agent_start(user, ip, body, can_exec=True, may_node=lambda _n: True):
         return 404, {"error": "沒有這台機器"}
     if not 1 <= len(prompt) <= 8000:
         return 400, {"error": "請寫要交代的事（最多 8000 字）"}
-    m = body.get("model")
-    if isinstance(m, str):                    # 也收字串：local:<欄位>、provider:<id>[:<模型>]
-        kind, _, rest = m.partition(":")
-        m = {"kind": kind, "slot": rest} if kind == "local" else {"kind": kind, "id": rest.split(":", 1)[0],
-                                                                    "model": rest.split(":", 1)[1] if ":" in rest else ""}
-    if not isinstance(m, dict) or m.get("kind") not in ("local", "provider"):
-        return 400, {"error": "模型要是本機欄位（kind=local, slot）或第三方 API（kind=provider, id）"}
-    if m["kind"] == "provider" and not can_exec:
-        return 403, {"error": "第三方 API 用的是單位付費的金鑰，只有管理員能用"}
-    if m["kind"] == "local":
-        slot = str(m.get("slot") or "")
-        mnode = str(m.get("node") or node)
-        if not re.fullmatch(r"[\w.-]{1,64}", slot) or not any(n["id"] == mnode for n in fleet()["nodes"]) or not may_node(mnode):
-            return 400, {"error": "本機模型要指定欄位"}
-        model, label = {"kind": "local", "node": mnode, "slot": slot}, f"本機 {mnode}/{slot}"
-    else:
-        prov = STORE.provider_get(str(m.get("id") or ""))
-        if not prov:
-            return 404, {"error": "沒有這筆第三方 API"}
-        name = str(m.get("model") or prov.get("default_model") or "")
-        if not name or not PROVIDER_MODEL_RX.fullmatch(name):
-            return 400, {"error": "這筆第三方 API 沒有設預設模型，請指定模型"}
-        model, label = {"kind": "provider", "id": prov["id"], "model": name}, f"{prov['name']}／{name}"
-    code, out = call_node(node, "/agent/folders", timeout=30)
-    if code != 200:
-        return code, {"error": out.get("error"), "disabled": out.get("disabled")}
-    if folder not in [f["name"] for f in out.get("folders") or []]:
-        return 400, {"error": f"沒有「{folder}」這個工作資料夾，請先建立"}
-    model["os"] = out.get("os")
+    model, label, bad = agent_pick_model(node, body.get("model"), can_exec, may_node)
+    if bad:
+        return bad[0], {"error": bad[1]}
+    model["os"], bad = _agent_folder_os(node, folder)
+    if bad:
+        return bad
     with _AGENT_LOCK:
-        busy = next((x for x in AGENT_TASKS.values() if x.state in AGENT_LIVE), None)
-        if busy:
-            if busy.user != user and not can_exec:
-                return 409, {"error": "有人正在用 Agent，這台一次只跑一件；請稍後再試"}
-            return 409, {"error": "已經有一個 Agent 任務在進行，請等它做完或按停止", "task": busy.id}
+        bad = _agent_busy(user, can_exec)
+        if bad:
+            return bad
         t = AgentTask(user, ip, node, folder, model, prompt, label)
         t.can_exec = can_exec
         AGENT_TASKS[t.id] = t
     t.save()
+    threading.Thread(target=agent_run, args=(t,), daemon=True, name=f"agent-{t.id}").start()
+    return 200, t.public()
+
+
+def agent_continue(t, user, body, can_exec=True, may_node=lambda _n: True):
+    """同一件任務接著交代（追問）：做完、停掉、出錯、中斷的都可以，工作資料夾不變，模型可以換。
+    「這個任務之後的指令不再詢問」不帶到新的一輪：追問可能隔了很久、交代的事也不一樣，指令要重新確認。回 (狀態碼, 回應)。"""
+    if t.user != user:
+        return 403, {"error": "只能接著交代自己的任務"}
+    prompt = str(body.get("prompt") or "").strip()
+    if not 1 <= len(prompt) <= 8000:
+        return 400, {"error": "請寫要接著交代的事（最多8000字）"}
+    if not may_node(t.node):
+        return 404, {"error": "沒有這台機器"}
+    if body.get("model"):
+        model, label, bad = agent_pick_model(t.node, body.get("model"), can_exec, may_node)
+        if bad:
+            return bad[0], {"error": bad[1]}
+    else:
+        model, label = dict(t.model), t.label
+        if model.get("kind") == "provider" and not can_exec:
+            return 403, {"error": "第三方API用的是單位付費的金鑰，只有管理員能用"}
+    model["os"], bad = _agent_folder_os(t.node, t.folder)
+    if bad:
+        if bad[0] == 400:
+            return 400, {"error": f"工作資料夾「{t.folder}」已經不在了，請開新任務"}
+        return bad
+    with _AGENT_LOCK:
+        bad = _agent_busy(user, can_exec)
+        if bad:
+            return bad
+        with t.lock:
+            if t.dropped or t.id not in AGENT_TASKS:
+                return 404, {"error": "沒有這個任務"}
+            now = time.time()
+            t.turns.append(agent_turn(prompt, label))
+            del t.turns[:-AGENT_TURNS_KEEP]
+            t.model, t.label, t.can_exec = model, label, can_exec
+            t.state, t.error, t.summary, t.pending, t.decision = "running", None, None, None, None
+            t.stop, t.always, t.steps, t.gen = False, False, 0, t.gen + 1
+            t.turn_started, t.deadline, t.updated = now, now + AGENT_MAX_SEC, now
+            t.live = {"phase": "thinking", "since": now}
+            t.event.clear()
+    t.add("user", text=prompt)
     threading.Thread(target=agent_run, args=(t,), daemon=True, name=f"agent-{t.id}").start()
     return 200, t.public()
 
@@ -4650,7 +5154,12 @@ class Handler(BaseHTTPRequestHandler):
             t = AGENT_TASKS.get(m.group(1))
             if t and not self.is_admin and t.user != self.user:
                 t = None                                         # 別人的任務當作不存在
-            return self._json(200, t.public()) if t else self._json(404, {"error": "沒有這個任務"})
+            if not t:
+                return self._json(404, {"error": "沒有這個任務"})
+            q = parse_qs(urlparse(self.path).query)
+            since, rev = (q.get("since") or [""])[0], (q.get("tree") or [""])[0]
+            return self._json(200, t.public(since=int(since) if since.isdigit() else None,
+                                            tree_rev=int(rev) if rev.isdigit() else None))
         # ---- 對話紀錄（存在主控台、加密落地；每個人只看得到自己的）
         if path == "/api/chats":
             q = (parse_qs(urlparse(self.path).query).get("q") or [""])[0]
@@ -5317,11 +5826,19 @@ class Handler(BaseHTTPRequestHandler):
             code, out = call_node(m.group(1), "/desktop/open", "POST", {"path": body.get("path")}, timeout=20)
             self._audit("desktop.open", f"{m.group(1)}:{str(body.get('path') or '')[:200]}", code == 200, {"message": out.get("error")})
             return self._json(code, out)
-        m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})/(approve|stop|delete)", path)
+        m = re.fullmatch(r"/api/agent/tasks/([0-9a-f]{12})/(approve|stop|delete|continue)", path)
         if m:
             t = AGENT_TASKS.get(m.group(1))
             if not t or (not self.is_admin and t.user != self.user):
                 return self._json(404, {"error": "沒有這個任務"})
+            if m.group(2) == "continue":
+                if not self._mine_folder(t.node, t.folder):
+                    return self._json(404, {"error": "沒有這個工作資料夾"})
+                code, out = agent_continue(t, self.user, body, can_exec=self.is_admin, may_node=self._in_scope)
+                self._audit("agent.task_continue", f"{t.node}/{t.folder}", code == 200,
+                            {"task": t.id, "turn": out.get("turns"), "model": out.get("model"),
+                             "prompt_chars": len(str(body.get("prompt") or "")), "message": out.get("error")})
+                return self._json(code, out)
             if m.group(2) == "stop":
                 return self._json(200, agent_stop(t, self._audit))
             if m.group(2) == "delete":

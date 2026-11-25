@@ -41,6 +41,22 @@ def say(text="", *calls):
     return {"choices": [{"message": {"role": "assistant", "content": text, "tool_calls": list(calls) or None}}]}
 
 
+def sse(obj):
+    """把一則完整回應切成OpenAI相容的串流片段（內容、工具名稱與參數都切小段），模擬llama.cpp與第三方API的串流。"""
+    msg = obj["choices"][0]["message"]
+    out = [{"choices": [{"index": 0, "delta": {"role": "assistant"}}]}]
+    text = msg.get("content") or ""
+    out += [{"choices": [{"index": 0, "delta": {"content": text[i:i + 3]}}]} for i in range(0, len(text), 3)]
+    for i, c in enumerate(msg.get("tool_calls") or []):
+        a = c["function"]["arguments"]
+        out.append({"choices": [{"index": 0, "delta": {"tool_calls": [{"index": i, "id": c["id"], "type": "function",
+                                                                          "function": {"name": c["function"]["name"], "arguments": ""}}]}}]})
+        out += [{"choices": [{"index": 0, "delta": {"tool_calls": [{"index": i, "function": {"arguments": a[j:j + 7]}}]}}]}
+                for j in range(0, len(a), 7)]
+    out.append({"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls" if msg.get("tool_calls") else "stop"}]})
+    return [f"data: {json.dumps(x, ensure_ascii=False)}\n\n".encode() for x in out] + [b"data: [DONE]\n\n"]
+
+
 class FakeModel(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -50,6 +66,13 @@ class FakeModel(BaseHTTPRequestHandler):
         REQS.append(body)
         nxt = SCRIPT.pop(0) if SCRIPT else say("", call("list_files"))
         code, obj = nxt if isinstance(nxt, tuple) else (200, nxt)
+        if code == 200 and body.get("stream"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for line in sse(obj):
+                self.wfile.write(line)
+            return
         b = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -81,14 +104,22 @@ def fake_call_node(node_id, path, method="GET", body=None, timeout=40):
         return A.agent_exec_cancel()
     if path == "/agent/folders/create":
         return A.agent_folder_create(b.get("name"))
-    if path.startswith("/chat/"):
-        REQS.append(b)
-        nxt = SCRIPT.pop(0) if SCRIPT else say("", call("list_files"))
-        return nxt if isinstance(nxt, tuple) else (200, nxt)
+    if path == "/agent/fs/edit":
+        return A.agent_edit(b.get("folder"), b.get("path"), b.get("old"), b.get("new"), b.get("replace_all") is True)
     return 404, {"error": "找不到"}
 
 
+def fake_node_chat(node_id, slot, body):
+    """本機欄位的對話：照劇本回串流（跟代理的 /chat/{欄位}轉回來的一樣是一行一行的SSE）。"""
+    REQS.append(body)
+    nxt = SCRIPT.pop(0) if SCRIPT else say("", call("list_files"))
+    if isinstance(nxt, tuple):
+        return nxt[0], nxt[1], None, lambda: None
+    return 200, None, iter(sse(nxt)), lambda: None
+
+
 x.call_node = fake_call_node
+x.node_chat_open = fake_node_chat
 x.update_fleet(lambda c: c.__setitem__("nodes", [{"id": "n1", "name": "測試機", "host": "127.0.0.1", "agent_port": 1}]))
 x.set_credentials("admin", "agent-test-pw")
 srv = ThreadingHTTPServer(("127.0.0.1", 0), x.Handler)
@@ -171,8 +202,9 @@ def main():
     check("  log 有 text、tool、result 三種", {e["type"] for e in t["log"]} >= {"text", "tool", "result"}, {e["type"] for e in t["log"]})
     check("  tree 是資料夾的檔案清單", {r["path"] for r in t["tree"]} >= {"index.html", "out.txt"}, t["tree"])
     check("  總結取自 finish", t["summary"] == "首頁做好了，也產生了 out.txt")
-    check("  送給模型的是 OpenAI tools 格式（六個工具）", sorted(f["function"]["name"] for f in REQS[0]["tools"])
-          == sorted(["list_files", "read_file", "write_file", "run_command", "update_plan", "finish"]))
+    check("  送給模型的是OpenAI tools格式（七個工具）", sorted(f["function"]["name"] for f in REQS[0]["tools"])
+          == sorted(["list_files", "read_file", "edit_file", "write_file", "run_command", "update_plan", "finish"]))
+    check("  預設串流（第三方API也帶stream）", REQS[0].get("stream") is True)
     tool_msgs = [m for m in REQS[-1]["messages"] if m["role"] == "tool"]
     check("  指令結果（結束碼、輸出）回給模型", any('"exit_code": 0' in m["content"] for m in tool_msgs), tool_msgs[-1:])
     st, au = req("GET", "/api/admin/audit?limit=200")
@@ -214,7 +246,7 @@ def main():
     SCRIPT[:] = []                               # 假模型一直回 list_files
     st, t = req("POST", "/api/agent/tasks", {"node": "n1", "folder": "網頁", "model": model, "prompt": "一直列"})
     t = wait(t["id"], ("failed", "done"))
-    check("步數上限：到了就停、講清楚", t["state"] == "failed" and "4 步" in (t["error"] or "") and t["steps"] == 4, (t["state"], t.get("error")))
+    check("步數上限：到了就停、講清楚", t["state"] == "failed" and "4步" in (t["error"] or "") and t["steps"] == 4, (t["state"], t.get("error")))
     x.AGENT_MAX_STEPS = 40
 
     # ---- 6. 模型不支援 tools

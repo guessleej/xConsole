@@ -1268,6 +1268,16 @@ input.switch:checked::after { transform: translateX(18px); }
 .agent-step details { flex-basis: 100%; }
 .agent-step pre { max-height: 220px; overflow: auto; background: var(--card); padding: 8px; border-radius: 8px; white-space: pre-wrap; }
 .agent-side { position: sticky; top: 78px; max-height: calc(100vh - 100px); overflow-y: auto; }
+.agent-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 10px; border-radius: var(--radius-sm); background: rgba(191, 24, 31, .07); font-size: 15px; color: var(--ink-2); }
+.agent-live[hidden], .agent-stream[hidden], .agent-stream [hidden] { display: none; }
+.agent-live-label { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.agent-live-meta { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.agent-live-spin { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--brand); border-right-color: transparent; animation: spin 1s linear infinite; }
+.agent-stream { display: flex; flex-direction: column; gap: 8px; }
+.agent-stream-text { white-space: pre-wrap; }
+.agent-think { align-self: flex-start; max-width: min(92ch, 94%); padding: 6px 10px; border-radius: var(--radius-sm); background: var(--panel); color: var(--ink-2); }
+.agent-think summary { cursor: pointer; font-size: 14px; }
+.agent-think pre { max-height: 240px; overflow: auto; white-space: pre-wrap; margin-top: 6px; }
 .plan-item { padding: 4px 0 4px 22px; position: relative; font-size: 14.5px; }
 .plan-item::before { content: ""; position: absolute; left: 4px; top: 10px; width: 10px; height: 10px; border-radius: 50%; background: rgba(22, 32, 42, .15); }
 .plan-item.done { color: var(--ink-3); text-decoration: line-through; }

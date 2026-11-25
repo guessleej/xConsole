@@ -26568,5 +26568,790 @@
 "en": "The new machine or the original slot no longer exists",
 "ja": "新しい端末または元の枠がもうありません",
 "ko": "새 컴퓨터 또는 원래 자리가 더 이상 없습니다"
+},
+"・{0}輪": {
+"en": " · {0} rounds",
+"ja": "・{0}回",
+"ko": " · {0}회"
+},
+"輪": {
+"en": " rounds",
+"ja": "回",
+"ko": "회"
+},
+"開新任務": {
+"en": "New task",
+"ja": "新しいタスク",
+"ko": "새 작업"
+},
+"不接前面的任務，從頭交代一件新的事": {
+"en": "Start fresh with a new task instead of continuing this one",
+"ja": "このタスクを続けず、新しい依頼を最初から始めます",
+"ko": "이 작업을 이어가지 않고 새 작업을 처음부터 시작합니다"
+},
+"交給Agent": {
+"en": "Hand to Agent",
+"ja": "Agentに任せる",
+"ko": "Agent에게 맡기기"
+},
+"檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方Agent會寫給你自己跑": {
+"en": "Files can only be changed in your own working folders; your account cannot run commands, so Agent will write down what you need to run yourself",
+"ja": "変更できるのは自分の作業フォルダー内のファイルだけです。このアカウントはコマンドを実行できないため、実行が必要な箇所はAgentが書き出します",
+"ko": "자신의 작업 폴더 안 파일만 바꿀 수 있습니다. 이 계정은 명령을 실행할 수 없으므로 실행이 필요한 부분은 Agent가 적어 드립니다"
+},
+"接著交代": {
+"en": "Continue",
+"ja": "続けて依頼",
+"ko": "이어서 요청"
+},
+"會接在這件任務後面：Agent看得到前面的交代、做過的操作與結論": {
+"en": "This continues the current task: Agent can see the earlier requests, the actions taken and the conclusions",
+"ja": "このタスクの続きになります。Agentはこれまでの依頼、実行した操作、結論を参照できます",
+"ko": "이 작업에 이어집니다. Agent는 이전 요청, 수행한 작업과 결론을 볼 수 있습니다"
+},
+"接著交代：要改哪裡、再加什麼（Enter送出，Shift+Enter換行）": {
+"en": "Follow up: what to change or add (Enter to send, Shift+Enter for a new line)",
+"ja": "続けて依頼：どこを直すか、何を足すか（Enterで送信、Shift+Enterで改行）",
+"ko": "이어서 요청: 무엇을 고치거나 추가할지 (Enter 전송, Shift+Enter 줄바꿈)"
+},
+"描述要做的事，越具體越好（Enter送出，Shift+Enter換行）": {
+"en": "Describe the task, the more specific the better (Enter to send, Shift+Enter for a new line)",
+"ja": "やることを具体的に書いてください（Enterで送信、Shift+Enterで改行）",
+"ko": "할 일을 구체적으로 적어 주세요 (Enter 전송, Shift+Enter 줄바꿈)"
+},
+"它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成；做完還可以接著交代要改的地方。": {
+"en": "It plans, creates files, writes code and runs tests in the working folder until done; afterwards you can follow up with changes.",
+"ja": "作業フォルダー内で計画、ファイル作成、コーディング、テストを完了まで自分で進めます。終わった後も続けて修正を依頼できます。",
+"ko": "작업 폴더에서 계획, 파일 생성, 코드 작성, 테스트를 끝날 때까지 스스로 진행합니다. 끝난 뒤에도 이어서 수정을 요청할 수 있습니다."
+},
+"等你允許執行指令": {
+"en": "Waiting for you to allow a command",
+"ja": "コマンド実行の許可待ち",
+"ko": "명령 실행 허용 대기 중"
+},
+"正在準備修改": {
+"en": "Preparing edit of ",
+"ja": "修正を準備中：",
+"ko": "수정 준비 중: "
+},
+"正在寫": {
+"en": "Writing ",
+"ja": "書き込み中：",
+"ko": "작성 중: "
+},
+"{0}{1}（已產生{2}）": {
+"en": "{0}{1} ({2} generated)",
+"ja": "{0}{1}（{2}生成済み）",
+"ko": "{0}{1} ({2} 생성됨)"
+},
+"正在準備要執行的指令": {
+"en": "Preparing a command to run",
+"ja": "実行するコマンドを準備中",
+"ko": "실행할 명령 준비 중"
+},
+"正在更新計畫": {
+"en": "Updating the plan",
+"ja": "計画を更新中",
+"ko": "계획 업데이트 중"
+},
+"正在寫總結": {
+"en": "Writing the summary",
+"ja": "まとめを作成中",
+"ko": "요약 작성 중"
+},
+"正在準備{0}": {
+"en": "Preparing: {0}",
+"ja": "準備中：{0}",
+"ko": "준비 중: {0}"
+},
+"正在準備": {
+"en": "Preparing",
+"ja": "準備中",
+"ko": "준비 중"
+},
+"正在執行指令：{0}": {
+"en": "Running command: {0}",
+"ja": "コマンド実行中：{0}",
+"ko": "명령 실행 중: {0}"
+},
+"正在執行指令": {
+"en": "Running command",
+"ja": "コマンド実行中",
+"ko": "명령 실행 중"
+},
+"正在{0}{1}": {
+"en": "{0} {1}",
+"ja": "{0}中：{1}",
+"ko": "{0} 중: {1}"
+},
+"正在": {
+"en": "Working: ",
+"ja": "実行中：",
+"ko": "진행 중: "
+},
+"正在回答": {
+"en": "Answering",
+"ja": "回答中",
+"ko": "답변 중"
+},
+"正在處理模型的回覆": {
+"en": "Processing the model's reply",
+"ja": "モデルの応答を処理中",
+"ko": "모델 응답 처리 중"
+},
+"正在思考": {
+"en": "Thinking",
+"ja": "考え中",
+"ko": "생각 중"
+},
+"用時{0}:{1}・第{2}/{3}步": {
+"en": "Elapsed {0}:{1} · step {2}/{3}",
+"ja": "経過 {0}:{1}・{2}/{3}ステップ",
+"ko": "경과 {0}:{1} · {2}/{3}단계"
+},
+"用時": {
+"en": "Elapsed",
+"ja": "経過",
+"ko": "경과"
+},
+"Agent完成了": {
+"en": "Agent finished",
+"ja": "Agentが完了しました",
+"ko": "Agent가 완료했습니다"
+},
+" 這一輪之後的指令不再詢問": {
+"en": " Don't ask again for commands in this round",
+"ja": " このラウンドでは以降のコマンドを確認しない",
+"ko": " 이번 회차에서는 이후 명령을 묻지 않기"
+},
+"修改檔案": {
+"en": "Edit file",
+"ja": "ファイル修正",
+"ko": "파일 수정"
+},
+"（第{0}行起）": {
+"en": " (from line {0})",
+"ja": "（{0}行目から）",
+"ko": " ({0}행부터)"
+},
+"行起": {
+"en": "from line",
+"ja": "行目から",
+"ko": "행부터"
+},
+"換了{0}處": {
+"en": "Replaced {0} occurrence(s)",
+"ja": "{0}か所を置換",
+"ko": "{0}곳 바꿈"
+},
+"換了": {
+"en": "Replaced",
+"ja": "置換",
+"ko": "바꿈"
+},
+"處": {
+"en": "occurrence(s)",
+"ja": "か所",
+"ko": "곳"
+},
+"結束碼{0}{1}": {
+"en": "Exit code {0}{1}",
+"ja": "終了コード {0}{1}",
+"ko": "종료 코드 {0}{1}"
+},
+"需要時用list_files、read_file了解現況（read_file回的內容帶行號，大檔用start_line分段讀；也讀得了PDF、Word、Excel）；改既有檔案的一段用edit_file，建新檔或整份重寫用write_file。": {
+"en": "Use list_files and read_file to understand the current state when needed (read_file returns numbered lines; read large files in parts with start_line; it can also read PDF, Word and Excel); use edit_file to change part of an existing file, and write_file to create a file or rewrite it entirely.",
+"ja": "必要に応じてlist_filesとread_fileで現状を確認します（read_fileは行番号付きで返し、大きなファイルはstart_lineで分割して読みます。PDF、Word、Excelも読めます）。既存ファイルの一部を変えるにはedit_file、新規作成や全体の書き直しにはwrite_fileを使います。",
+"ko": "필요하면 list_files와 read_file로 현재 상태를 파악합니다(read_file은 행 번호가 붙은 내용을 돌려주며, 큰 파일은 start_line으로 나눠 읽습니다. PDF, Word, Excel도 읽을 수 있습니다). 기존 파일의 일부를 바꿀 때는 edit_file, 새로 만들거나 통째로 다시 쓸 때는 write_file을 씁니다."
+},
+"工作資料夾裡的相對路徑": {
+"en": "Path relative to the working folder",
+"ja": "作業フォルダー内の相対パス",
+"ko": "작업 폴더 기준 상대 경로"
+},
+"這是同一件任務的追問：前幾輪的交代、做過的操作與結論在前面的對話裡，工作資料夾裡是之前做好的檔案。先看清楚現況再接著改，不要從頭重做。": {
+"en": "This is a follow-up on the same task: the earlier requests, actions taken and conclusions are in the conversation above, and the working folder holds the files made so far. Check the current state first and continue from there; do not start over.",
+"ja": "これは同じタスクの続きの依頼です。これまでの依頼、実行した操作、結論は上の会話にあり、作業フォルダーには以前作ったファイルがあります。現状を確認してから続けて修正し、最初からやり直さないでください。",
+"ko": "같은 작업에 대한 후속 요청입니다. 이전 요청, 수행한 작업과 결론은 위 대화에 있고, 작업 폴더에는 이전에 만든 파일이 있습니다. 현재 상태를 먼저 확인한 뒤 이어서 고치고, 처음부터 다시 하지 마세요."
+},
+"{0}{1}是空的。": {
+"en": "{0} {1} is empty.",
+"ja": "{0}{1}は空です。",
+"ko": "{0} {1}은(는) 비어 있습니다."
+},
+"是空的": {
+"en": "is empty",
+"ja": "は空です",
+"ko": "비어 있습니다"
+},
+"共{0}行": {
+"en": "{0} lines in total",
+"ja": "全{0}行",
+"ko": "총 {0}행"
+},
+"總行數不明（檔案很大）": {
+"en": "total line count unknown (very large file)",
+"ja": "総行数不明（ファイルが大きいため）",
+"ko": "총 행 수 알 수 없음(파일이 매우 큼)"
+},
+"{0}{1}：{2}，第{3}行之後沒有內容。": {
+"en": "{0} {1}: {2}; nothing after line {3}.",
+"ja": "{0}{1}：{2}。{3}行目以降は内容がありません。",
+"ko": "{0} {1}: {2}, {3}행 이후에는 내용이 없습니다."
+},
+"行之後沒有內容": {
+"en": "nothing after this line",
+"ja": "行目以降は内容なし",
+"ko": "행 이후 내용 없음"
+},
+"{0}{1}：{2}，這次是第{3}～{4}行。": {
+"en": "{0} {1}: {2}; this is lines {3}-{4}.",
+"ja": "{0}{1}：{2}。今回は{3}～{4}行目です。",
+"ko": "{0} {1}: {2}, 이번은 {3}~{4}행입니다."
+},
+"這次是第": {
+"en": "this is line",
+"ja": "今回は",
+"ko": "이번은"
+},
+"讀一個檔案，回帶行號的內容與總行數；大檔用start_line與max_lines分段讀。也讀得了PDF、Word、Excel、PowerPoint（回抽出來的文字）": {
+"en": "Read a file; returns numbered lines and the total line count. Read large files in parts with start_line and max_lines. Also reads PDF, Word, Excel and PowerPoint (returns the extracted text)",
+"ja": "ファイルを読み、行番号付きの内容と総行数を返します。大きなファイルはstart_lineとmax_linesで分割して読みます。PDF、Word、Excel、PowerPointも読めます（抽出したテキストを返します）",
+"ko": "파일을 읽어 행 번호가 붙은 내용과 총 행 수를 돌려줍니다. 큰 파일은 start_line과 max_lines로 나눠 읽습니다. PDF, Word, Excel, PowerPoint도 읽을 수 있습니다(추출한 텍스트를 돌려줌)"
+},
+"建立新檔或整份覆寫（最多2 MB），上層資料夾會自動建立；只改既有檔案的一段請用edit_file": {
+"en": "Create a new file or overwrite it entirely (up to 2 MB); parent folders are created automatically. To change only part of an existing file, use edit_file",
+"ja": "新規作成または全体を上書きします（最大2 MB）。上位フォルダーは自動で作られます。既存ファイルの一部だけ変えるにはedit_fileを使います",
+"ko": "새 파일을 만들거나 통째로 덮어씁니다(최대 2 MB). 상위 폴더는 자동으로 만들어집니다. 기존 파일의 일부만 바꾸려면 edit_file을 쓰세요"
+},
+"把檔案裡的一段原文換成新內容。old_text要跟檔案裡的一字不差（含縮排與空白、不含read_file顯示的行號），而且只出現一次；不確定就先read_file。replace_all=true會把出現的地方全部換掉": {
+"en": "Replace a passage in a file with new content. old_text must match the file exactly (including indentation and spaces, without the line numbers shown by read_file) and appear only once; if unsure, read_file first. replace_all=true replaces every occurrence",
+"ja": "ファイル内の一部の原文を新しい内容に置き換えます。old_textはファイルの内容と完全に一致し（インデントや空白を含み、read_fileが表示する行番号は含めない）、一度だけ現れる必要があります。不明な場合は先にread_fileしてください。replace_all=trueですべて置き換えます",
+"ko": "파일 안의 원문 일부를 새 내용으로 바꿉니다. old_text는 파일 내용과 정확히 같아야 하며(들여쓰기와 공백 포함, read_file이 보여 주는 행 번호 제외) 한 번만 나타나야 합니다. 확실하지 않으면 먼저 read_file 하세요. replace_all=true면 모두 바꿉니다"
+},
+"用run_command執行指令（每一條都要使用者按允許，被拒絕就換別的做法或說明原因）。不要執行會刪除工作資料夾以外檔案、改系統設定或要互動輸入的指令。全部做完呼叫finish並寫總結。": {
+"en": "Run commands with run_command (each one needs the user to click Allow; if denied, try another approach or explain why). Do not run commands that delete files outside the working folder, change system settings or need interactive input. When everything is done, call finish with a summary.",
+"ja": "コマンドはrun_commandで実行します（毎回ユーザーの許可が必要で、拒否されたら別の方法にするか理由を説明します）。作業フォルダー外のファイルを削除する、システム設定を変える、対話入力が必要なコマンドは実行しないでください。すべて終わったらfinishを呼んでまとめを書きます。",
+"ko": "명령은 run_command로 실행합니다(매번 사용자가 허용해야 하며, 거부되면 다른 방법을 쓰거나 이유를 설명합니다). 작업 폴더 밖의 파일을 지우거나 시스템 설정을 바꾸거나 대화형 입력이 필요한 명령은 실행하지 마세요. 모두 끝나면 finish를 호출하고 요약을 쓰세요."
+},
+"（被拒絕）": {
+"en": " (denied)",
+"ja": "（拒否）",
+"ko": " (거부됨)"
+},
+"（這一輪出錯停下：{0}）": {
+"en": "(this round stopped on an error: {0})",
+"ja": "（このラウンドはエラーで停止：{0}）",
+"ko": "(이번 회차는 오류로 멈춤: {0})"
+},
+"這一輪出錯停下": {
+"en": "this round stopped on an error",
+"ja": "このラウンドはエラーで停止",
+"ko": "이번 회차는 오류로 멈춤"
+},
+"（這一輪沒有留下結論）": {
+"en": "(no conclusion recorded for this round)",
+"ja": "（このラウンドの結論は残っていません）",
+"ko": "(이번 회차에는 결론이 남아 있지 않음)"
+},
+"第{0}輪：交代「{1}」，結果：{2}": {
+"en": "Round {0}: asked \"{1}\", result: {2}",
+"ja": "第{0}回：依頼「{1}」、結果：{2}",
+"ko": "{0}회차: 요청 \"{1}\", 결과: {2}"
+},
+"輪：交代「": {
+"en": ": asked \"",
+"ja": "回：依頼「",
+"ko": "회차: 요청 \""
+},
+"」，結果": {
+"en": "\", result",
+"ja": "」、結果",
+"ko": "\", 결과"
+},
+"是空的。": {
+"en": "is empty.",
+"ja": "は空です。",
+"ko": "비어 있습니다."
+},
+"，第": {
+"en": ", line ",
+"ja": "、",
+"ko": ", "
+},
+"行之後沒有內容。": {
+"en": "and after has no content.",
+"ja": "行目以降は内容がありません。",
+"ko": "행 이후에는 내용이 없습니다."
+},
+"，這次是第": {
+"en": "; this is lines ",
+"ja": "。今回は",
+"ko": ", 이번은 "
+},
+"行。": {
+"en": ".",
+"ja": "行目です。",
+"ko": "행입니다."
+},
+"後面還有，要接著讀請用start_line={0}。": {
+"en": "There is more; to keep reading use start_line={0}.",
+"ja": "続きがあります。続けて読むにはstart_line={0}を使います。",
+"ko": "뒤에 더 있습니다. 이어서 읽으려면 start_line={0}을 쓰세요."
+},
+"後面還有，要接著讀請用start_line=": {
+"en": "There is more; to keep reading use start_line=",
+"ja": "続きがあります。続けて読むにはstart_line=",
+"ko": "뒤에 더 있습니다. 이어서 읽으려면 start_line="
+},
+"已經讀到結尾。": {
+"en": "Reached the end.",
+"ja": "最後まで読みました。",
+"ko": "끝까지 읽었습니다."
+},
+"這台的代理版本較舊，還不能讀PDF與Office檔；請管理者先更新這台": {
+"en": "The agent on this machine is too old to read PDF and Office files; ask an administrator to update this machine first",
+"ja": "このマシンのエージェントは古く、PDFとOfficeファイルを読めません。管理者に先にこのマシンの更新を依頼してください",
+"ko": "이 장비의 에이전트가 오래되어 PDF와 Office 파일을 읽을 수 없습니다. 관리자에게 먼저 이 장비를 업데이트해 달라고 하세요"
+},
+"\n……（文件太長，後面沒有抽出來）": {
+"en": "\n... (document too long; the rest was not extracted)",
+"ja": "\n……（文書が長すぎるため、後半は抽出していません）",
+"ko": "\n... (문서가 너무 길어 뒷부분은 추출하지 않음)"
+},
+"文件": {
+"en": "Document",
+"ja": "文書",
+"ko": "문서"
+},
+"這是二進位檔，不顯示內容；read_file讀得了文字檔與PDF、Word、Excel、PowerPoint": {
+"en": "This is a binary file and its content is not shown; read_file can read text files and PDF, Word, Excel and PowerPoint",
+"ja": "バイナリファイルのため内容は表示しません。read_fileが読めるのはテキストファイルとPDF、Word、Excel、PowerPointです",
+"ko": "바이너리 파일이라 내용을 표시하지 않습니다. read_file은 텍스트 파일과 PDF, Word, Excel, PowerPoint를 읽을 수 있습니다"
+},
+"已經有一個Agent任務在進行，請等它做完或按停止": {
+"en": "An Agent task is already running; wait for it to finish or click Stop",
+"ja": "すでにAgentのタスクが実行中です。完了を待つか停止を押してください",
+"ko": "이미 Agent 작업이 진행 중입니다. 끝날 때까지 기다리거나 중지를 누르세요"
+},
+"需要執行才能驗證的地方，寫清楚使用者要自己執行哪一行。全部做完呼叫finish並寫總結。": {
+"en": "Where something must be run to verify, state exactly which line the user should run themselves. When everything is done, call finish with a summary.",
+"ja": "実行しないと確認できない箇所は、ユーザーが自分で実行する行を明記します。すべて終わったらfinishを呼んでまとめを書きます。",
+"ko": "실행해야 확인할 수 있는 부분은 사용자가 직접 실행할 줄을 분명히 적습니다. 모두 끝나면 finish를 호출하고 요약을 쓰세요."
+},
+"你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑；指令在這個資料夾裡用{1}執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；": {
+"en": "You are a programming assistant working on the user's own machine; explain things to the user in Traditional Chinese (Taiwan usage). You can only act through the provided tools, and every file path is relative to the working folder \"{0}\"; commands run in this folder with {1}. Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step; ",
+"ja": "あなたはユーザー自身のマシンで作業するプログラミングアシスタントです。ユーザーへの説明は繁体字中国語（台湾の用語）で行います。提供されたツールだけで作業し、ファイルパスはすべて作業フォルダー「{0}」からの相対パスです。コマンドはこのフォルダー内で{1}で実行します。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します。",
+"ko": "당신은 사용자 자신의 장비에서 일하는 프로그래밍 도우미이며, 사용자에게는 번체 중국어(대만 용어)로 설명합니다. 제공된 도구로만 작업하며 모든 파일 경로는 작업 폴더 \"{0}\" 기준 상대 경로입니다. 명령은 이 폴더에서 {1}로 실행합니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며, 단계마다 계획을 업데이트합니다. "
+},
+"執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫": {
+"en": ". Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step",
+"ja": "で実行します。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します",
+"ko": "로 실행합니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며 단계마다 계획을 업데이트합니다"
+},
+"列出檔案{0}": {
+"en": "List files {0}",
+"ja": "ファイル一覧 {0}",
+"ko": "파일 목록 {0}"
+},
+"讀檔{0}": {
+"en": "Read {0}",
+"ja": "読み込み {0}",
+"ko": "읽기 {0}"
+},
+"寫檔{0}": {
+"en": "Write {0}",
+"ja": "書き込み {0}",
+"ko": "쓰기 {0}"
+},
+"修改{0}": {
+"en": "Edit {0}",
+"ja": "修正 {0}",
+"ko": "수정 {0}"
+},
+"執行指令{0}": {
+"en": "Run command {0}",
+"ja": "コマンド実行 {0}",
+"ko": "명령 실행 {0}"
+},
+"（出錯）": {
+"en": " (error)",
+"ja": "（エラー）",
+"ko": " (오류)"
+},
+"（這一輪出錯停下：": {
+"en": "(this round stopped on an error: ",
+"ja": "（このラウンドはエラーで停止：",
+"ko": "(이번 회차는 오류로 멈춤: "
+},
+"」，結果：": {
+"en": "\", result: ",
+"ja": "」、結果：",
+"ko": "\", 결과: "
+},
+"好的，我知道前情了。": {
+"en": "OK, I have the background.",
+"ja": "わかりました。これまでの経緯を把握しました。",
+"ko": "알겠습니다. 이전 상황을 파악했습니다."
+},
+"模型的回應太大（超過16 MB），已中止": {
+"en": "The model's response is too large (over 16 MB); stopped",
+"ja": "モデルの応答が大きすぎるため（16 MB超）中止しました",
+"ko": "모델 응답이 너무 커서(16 MB 초과) 중단했습니다"
+},
+"代理回的不是JSON": {
+"en": "The agent did not return JSON",
+"ja": "エージェントの応答がJSONではありません",
+"ko": "에이전트가 JSON이 아닌 응답을 보냈습니다"
+},
+"這筆第三方API已經被刪掉了": {
+"en": "This third-party API has been deleted",
+"ja": "このサードパーティAPIは削除されています",
+"ko": "이 외부 API는 이미 삭제되었습니다"
+},
+"這筆第三方API沒有設預設模型": {
+"en": "This third-party API has no default model",
+"ja": "このサードパーティAPIには既定のモデルがありません",
+"ko": "이 외부 API에는 기본 모델이 설정되어 있지 않습니다"
+},
+"對方送回串流，但這裡要的是一般回應": {
+"en": "The service sent a stream, but a regular response was expected here",
+"ja": "相手がストリームを返しましたが、ここでは通常の応答が必要です",
+"ko": "상대가 스트림을 보냈지만 여기서는 일반 응답이 필요합니다"
+},
+"……（這一行太長，後面省略）": {
+"en": "... (line too long; the rest is omitted)",
+"ja": "……（この行は長すぎるため後半を省略）",
+"ko": "... (줄이 너무 길어 뒷부분 생략)"
+},
+"這台的代理版本較舊，還沒有edit_file；這次請改用write_file整份重寫，並請管理者更新這台": {
+"en": "The agent on this machine is too old for edit_file; use write_file to rewrite the whole file this time, and ask an administrator to update this machine",
+"ja": "このマシンのエージェントは古く、edit_fileがありません。今回はwrite_fileで全体を書き直し、管理者にこのマシンの更新を依頼してください",
+"ko": "이 장비의 에이전트가 오래되어 edit_file이 없습니다. 이번에는 write_file로 통째로 다시 쓰고, 관리자에게 이 장비를 업데이트해 달라고 하세요"
+},
+"主控台重新啟動，這一輪中斷了；已經做好的檔案還在工作資料夾裡，可以直接接著交代": {
+"en": "The console restarted and this round was interrupted; the files already made are still in the working folder, and you can simply follow up",
+"ja": "コンソールが再起動したため、このラウンドは中断されました。作成済みのファイルは作業フォルダーに残っており、そのまま続けて依頼できます",
+"ko": "콘솔이 다시 시작되어 이번 회차가 중단되었습니다. 이미 만든 파일은 작업 폴더에 남아 있으니 바로 이어서 요청할 수 있습니다"
+},
+"模型要是本機欄位（kind=local, slot）或第三方API（kind=provider, id）": {
+"en": "The model must be a local slot (kind=local, slot) or a third-party API (kind=provider, id)",
+"ja": "モデルはローカルのスロット（kind=local, slot）かサードパーティAPI（kind=provider, id）である必要があります",
+"ko": "모델은 로컬 슬롯(kind=local, slot) 또는 외부 API(kind=provider, id)여야 합니다"
+},
+"第三方API用的是單位付費的金鑰，只有管理員能用": {
+"en": "Third-party APIs use keys paid for by the organization; only administrators can use them",
+"ja": "サードパーティAPIは組織が費用を払うキーを使うため、管理者だけが使えます",
+"ko": "외부 API는 기관이 비용을 내는 키를 쓰므로 관리자만 쓸 수 있습니다"
+},
+"沒有這筆第三方API": {
+"en": "No such third-party API",
+"ja": "このサードパーティAPIはありません",
+"ko": "해당 외부 API가 없습니다"
+},
+"這筆第三方API沒有設預設模型，請指定模型": {
+"en": "This third-party API has no default model; please choose one",
+"ja": "このサードパーティAPIには既定のモデルがありません。モデルを指定してください",
+"ko": "이 외부 API에는 기본 모델이 없습니다. 모델을 지정하세요"
+},
+"有人正在用Agent，這台一次只跑一件；請稍後再試": {
+"en": "Someone is using Agent; this machine runs one task at a time. Please try again later",
+"ja": "他の人がAgentを使用中です。このマシンでは一度に一件だけ実行します。しばらくしてから再試行してください",
+"ko": "다른 사람이 Agent를 쓰고 있습니다. 이 장비는 한 번에 한 작업만 실행합니다. 잠시 후 다시 시도하세요"
+},
+"只能接著交代自己的任務": {
+"en": "You can only follow up on your own tasks",
+"ja": "続けて依頼できるのは自分のタスクだけです",
+"ko": "자신의 작업에만 이어서 요청할 수 있습니다"
+},
+"請寫要接著交代的事（最多8000字）": {
+"en": "Write what to do next (up to 8000 characters)",
+"ja": "続けて依頼する内容を書いてください（最大8000文字）",
+"ko": "이어서 요청할 내용을 적어 주세요(최대 8000자)"
+},
+"你是在使用者自己機器上工作的程式設計助理，用繁體中文（台灣用語）跟使用者說明。你只能用提供的工具做事，所有檔案路徑都是相對於工作資料夾「{0}」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；": {
+"en": "You are a programming assistant working on the user's own machine; explain things to the user in Traditional Chinese (Taiwan usage). You can only act through the provided tools, and every file path is relative to the working folder \"{0}\". This account cannot run commands, only read and write files. Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step; ",
+"ja": "あなたはユーザー自身のマシンで作業するプログラミングアシスタントです。ユーザーへの説明は繁体字中国語（台湾の用語）で行います。提供されたツールだけで作業し、ファイルパスはすべて作業フォルダー「{0}」からの相対パスです。このアカウントはコマンドを実行できず、ファイルの読み書きだけができます。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します。",
+"ko": "당신은 사용자 자신의 장비에서 일하는 프로그래밍 도우미이며, 사용자에게는 번체 중국어(대만 용어)로 설명합니다. 제공된 도구로만 작업하며 모든 파일 경로는 작업 폴더 \"{0}\" 기준 상대 경로입니다. 이 계정은 명령을 실행할 수 없고 파일 읽기와 쓰기만 할 수 있습니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며, 단계마다 계획을 업데이트합니다. "
+},
+"」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫": {
+"en": "\". This account cannot run commands, only read and write files. Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step",
+"ja": "」からの相対パスです。このアカウントはコマンドを実行できず、ファイルの読み書きだけができます。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します",
+"ko": "\" 기준 상대 경로입니다. 이 계정은 명령을 실행할 수 없고 파일 읽기와 쓰기만 할 수 있습니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며 단계마다 계획을 업데이트합니다"
+},
+"執行。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；": {
+"en": ". Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step; ",
+"ja": "で実行します。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します。",
+"ko": "로 실행합니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며 단계마다 계획을 업데이트합니다. "
+},
+"（結束碼{0}）": {
+"en": " (exit code {0})",
+"ja": "（終了コード {0}）",
+"ko": " (종료 코드 {0})"
+},
+"（這一輪被使用者停止，沒做完）": {
+"en": "(this round was stopped by the user before finishing)",
+"ja": "（このラウンドはユーザーが停止し、完了していません）",
+"ko": "(이번 회차는 사용자가 중지해 끝나지 않음)"
+},
+"（主控台重新啟動，這一輪中斷了）": {
+"en": "(the console restarted and this round was interrupted)",
+"ja": "（コンソールが再起動し、このラウンドは中断されました）",
+"ko": "(콘솔이 다시 시작되어 이번 회차가 중단됨)"
+},
+"（更早幾輪的細節已省略，只留結論摘要；需要時請重新讀檔確認現況）\n": {
+"en": "(Details of earlier rounds are omitted and only their conclusions are kept; re-read files to check the current state when needed)\n",
+"ja": "（それ以前のラウンドの詳細は省略し、結論の要約だけを残しています。必要に応じてファイルを読み直して現状を確認してください）\n",
+"ko": "(그 이전 회차의 세부 내용은 생략하고 결론 요약만 남겼습니다. 필요하면 파일을 다시 읽어 현재 상태를 확인하세요)\n"
+},
+"對方回的不是JSON（網址可能不是OpenAI相容的API）": {
+"en": "The service did not return JSON (the URL may not be an OpenAI-compatible API)",
+"ja": "相手の応答がJSONではありません（URLがOpenAI互換APIではない可能性があります）",
+"ko": "상대가 JSON이 아닌 응답을 보냈습니다(URL이 OpenAI 호환 API가 아닐 수 있음)"
+},
+"已達{0}步上限，這一輪停在這裡；可以看已完成的部分，再接著交代下一步": {
+"en": "Reached the {0}-step limit; this round stops here. Review what is done, then follow up with the next step",
+"ja": "{0}ステップの上限に達したため、このラウンドはここで止まります。完了した部分を確認して、続けて次を依頼できます",
+"ko": "{0}단계 한도에 도달해 이번 회차는 여기서 멈춥니다. 완료된 부분을 보고 이어서 다음 단계를 요청할 수 있습니다"
+},
+"步上限，這一輪停在這裡；可以看已完成的部分，再接著交代下一步": {
+"en": "-step limit reached; this round stops here. Review what is done, then follow up with the next step",
+"ja": "ステップの上限に達したため、このラウンドはここで止まります。完了した部分を確認して、続けて次を依頼できます",
+"ko": "단계 한도에 도달해 이번 회차는 여기서 멈춥니다. 완료된 부분을 보고 이어서 다음 단계를 요청할 수 있습니다"
+},
+"已超過30分鐘上限，這一輪停在這裡；可以再接著交代": {
+"en": "Exceeded the 30-minute limit; this round stops here. You can follow up to continue",
+"ja": "30分の上限を超えたため、このラウンドはここで止まります。続けて依頼できます",
+"ko": "30분 한도를 넘어 이번 회차는 여기서 멈춥니다. 이어서 요청할 수 있습니다"
+},
+"工作資料夾「{0}」已經不在了，請開新任務": {
+"en": "The working folder \"{0}\" no longer exists; please start a new task",
+"ja": "作業フォルダー「{0}」はもうありません。新しいタスクを始めてください",
+"ko": "작업 폴더 \"{0}\"가 더 이상 없습니다. 새 작업을 시작하세요"
+},
+"工作資料夾「": {
+"en": "The working folder \"",
+"ja": "作業フォルダー「",
+"ko": "작업 폴더 \""
+},
+"」已經不在了，請開新任務": {
+"en": "\" no longer exists; please start a new task",
+"ja": "」はもうありません。新しいタスクを始めてください",
+"ko": "\"가 더 이상 없습니다. 새 작업을 시작하세요"
+},
+"從第幾行開始，預設1": {
+"en": "Line to start from, default 1",
+"ja": "開始行、既定は1",
+"ko": "시작할 행, 기본값 1"
+},
+"最多讀幾行，預設{0}": {
+"en": "Maximum number of lines to read, default {0}",
+"ja": "読む最大行数、既定は{0}",
+"ko": "읽을 최대 행 수, 기본값 {0}"
+},
+"最多讀幾行，預設": {
+"en": "Maximum number of lines to read, default",
+"ja": "読む最大行数、既定は",
+"ko": "읽을 최대 행 수, 기본값"
+},
+"檔案的完整內容": {
+"en": "Full content of the file",
+"ja": "ファイルの全内容",
+"ko": "파일 전체 내용"
+},
+"要被換掉的原文": {
+"en": "Original text to replace",
+"ja": "置き換える原文",
+"ko": "바꿀 원문"
+},
+"換成的新內容": {
+"en": "New content to put in its place",
+"ja": "置き換え後の内容",
+"ko": "바꿔 넣을 새 내용"
+},
+"全部替換，預設false": {
+"en": "Replace every occurrence, default false",
+"ja": "すべて置換、既定はfalse",
+"ko": "모두 바꾸기, 기본값 false"
+},
+"」的路徑。這個帳號不能執行指令，只能讀寫檔案。做法：先用update_plan列出步驟，再一步一步做，每做完一步更新計畫；": {
+"en": "\". This account cannot run commands, only read and write files. Approach: first list the steps with update_plan, then work through them one by one, updating the plan after each step; ",
+"ja": "」からの相対パスです。このアカウントはコマンドを実行できず、ファイルの読み書きだけができます。進め方：まずupdate_planで手順を挙げ、一つずつ進め、終わるたびに計画を更新します。",
+"ko": "\" 기준 상대 경로입니다. 이 계정은 명령을 실행할 수 없고 파일 읽기와 쓰기만 할 수 있습니다. 방법: 먼저 update_plan으로 단계를 나열하고 하나씩 진행하며 단계마다 계획을 업데이트합니다. "
+},
+"（結束碼": {
+"en": " (exit code ",
+"ja": "（終了コード ",
+"ko": " (종료 코드 "
+},
+"（這一輪做過的操作：\n": {
+"en": "(Actions taken in this round:\n",
+"ja": "（このラウンドで行った操作：\n",
+"ko": "(이번 회차에서 수행한 작업:\n"
+},
+"代理回{0}": {
+"en": "Agent returned {0}",
+"ja": "エージェントの応答 {0}",
+"ko": "에이전트 응답 {0}"
+},
+"模型的串流中斷了（{0}）": {
+"en": "The model's stream was cut off ({0})",
+"ja": "モデルのストリームが途切れました（{0}）",
+"ko": "모델 스트림이 끊겼습니다({0})"
+},
+"模型的串流中斷了": {
+"en": "The model's stream was cut off",
+"ja": "モデルのストリームが途切れました",
+"ko": "모델 스트림이 끊겼습니다"
+},
+"（整個資料夾）": {
+"en": "(whole folder)",
+"ja": "（フォルダー全体）",
+"ko": "(폴더 전체)"
+},
+"模型的串流中斷了（": {
+"en": "The model's stream was cut off (",
+"ja": "モデルのストリームが途切れました（",
+"ko": "모델 스트림이 끊겼습니다("
+},
+"；大檔請拆成幾個小檔，或先寫骨架再用edit_file分段補上": {
+"en": "; split a large file into smaller ones, or write a skeleton first and fill it in with edit_file",
+"ja": "。大きなファイルは小さく分けるか、骨組みを先に書いてedit_fileで少しずつ補ってください",
+"ko": ". 큰 파일은 작은 파일 여러 개로 나누거나, 뼈대를 먼저 쓰고 edit_file로 나눠 채우세요"
+},
+"工具參數不是完整的JSON": {
+"en": "The tool arguments are not complete JSON",
+"ja": "ツールの引数が完全なJSONではありません",
+"ko": "도구 인자가 완전한 JSON이 아닙니다"
+},
+"（輸出到了單次上限被截斷）": {
+"en": " (the output hit the per-reply limit and was cut off)",
+"ja": "（出力が1回の上限に達して切れました）",
+"ko": " (출력이 1회 한도에 도달해 잘림)"
+},
+"old_text與new_text都要是文字": {
+"en": "old_text and new_text must both be text",
+"ja": "old_textとnew_textはどちらも文字列である必要があります",
+"ko": "old_text와 new_text는 모두 텍스트여야 합니다"
+},
+"old_text不能是空的；要新建或整份重寫請用write_file": {
+"en": "old_text cannot be empty; to create or rewrite a file use write_file",
+"ja": "old_textは空にできません。新規作成や全体の書き直しにはwrite_fileを使います",
+"ko": "old_text는 비워 둘 수 없습니다. 새로 만들거나 통째로 다시 쓰려면 write_file을 쓰세요"
+},
+"old_text跟new_text一樣，沒有要改的": {
+"en": "old_text is the same as new_text; nothing to change",
+"ja": "old_textとnew_textが同じで、変更する内容がありません",
+"ko": "old_text와 new_text가 같아 바꿀 것이 없습니다"
+},
+"沒有這個檔案：{0}（要新建請用write_file）": {
+"en": "No such file: {0} (use write_file to create it)",
+"ja": "ファイルがありません：{0}（新規作成はwrite_fileで）",
+"ko": "파일이 없습니다: {0}(새로 만들려면 write_file)"
+},
+"要新建請用write_file": {
+"en": "use write_file to create it",
+"ja": "新規作成はwrite_fileで",
+"ko": "새로 만들려면 write_file"
+},
+"{0}超過2 MB，edit_file改不了": {
+"en": "{0} is over 2 MB; edit_file cannot change it",
+"ja": "{0}は2 MBを超えるため、edit_fileでは変更できません",
+"ko": "{0}은(는) 2 MB를 넘어 edit_file로 바꿀 수 없습니다"
+},
+"超過2 MB，edit_file改不了": {
+"en": "is over 2 MB; edit_file cannot change it",
+"ja": "は2 MBを超えるため、edit_fileでは変更できません",
+"ko": "2 MB를 넘어 edit_file로 바꿀 수 없습니다"
+},
+"在{0}裡找不到old_text（要一字不差，含縮排與空白）；請先用read_file看實際內容再改": {
+"en": "old_text was not found in {0} (it must match exactly, including indentation and spaces); read_file first to see the actual content",
+"ja": "{0}にold_textが見つかりません（インデントや空白を含め完全一致が必要です）。先にread_fileで実際の内容を確認してください",
+"ko": "{0}에서 old_text를 찾지 못했습니다(들여쓰기와 공백까지 정확히 같아야 함). 먼저 read_file로 실제 내용을 확인하세요"
+},
+"裡找不到old_text（要一字不差，含縮排與空白）；請先用read_file看實際內容再改": {
+"en": ": old_text not found (it must match exactly, including indentation and spaces); read_file first to see the actual content",
+"ja": "にold_textが見つかりません（インデントや空白を含め完全一致が必要です）。先にread_fileで実際の内容を確認してください",
+"ko": "에서 old_text를 찾지 못했습니다(들여쓰기와 공백까지 정확히 같아야 함). 먼저 read_file로 실제 내용을 확인하세요"
+},
+"old_text在{0}裡出現{1}次；請多帶前後幾行讓它只出現一次，或設replace_all=true全部替換": {
+"en": "old_text appears {1} times in {0}; include a few surrounding lines so it appears only once, or set replace_all=true to replace them all",
+"ja": "old_textは{0}に{1}回出現します。前後の行を含めて一度だけ現れるようにするか、replace_all=trueですべて置換してください",
+"ko": "old_text가 {0}에 {1}번 나타납니다. 앞뒤 몇 줄을 더 넣어 한 번만 나타나게 하거나 replace_all=true로 모두 바꾸세요"
+},
+"old_text在": {
+"en": "old_text in ",
+"ja": "old_textは",
+"ko": "old_text가 "
+},
+"裡出現": {
+"en": " appears ",
+"ja": "に",
+"ko": "에 "
+},
+"次；請多帶前後幾行讓它只出現一次，或設replace_all=true全部替換": {
+"en": " times; include a few surrounding lines so it appears only once, or set replace_all=true to replace them all",
+"ja": "回出現します。前後の行を含めて一度だけ現れるようにするか、replace_all=trueですべて置換してください",
+"ko": "번 나타납니다. 앞뒤 몇 줄을 더 넣어 한 번만 나타나게 하거나 replace_all=true로 모두 바꾸세요"
+},
+"改完會超過2 MB（{0} MB），請拆成幾個檔": {
+"en": "After the edit the file would exceed 2 MB ({0} MB); split it into several files",
+"ja": "変更後は2 MBを超えます（{0} MB）。複数のファイルに分けてください",
+"ko": "수정 후 2 MB를 넘습니다({0} MB). 여러 파일로 나누세요"
+},
+"改完會超過2 MB": {
+"en": "After the edit the file would exceed 2 MB",
+"ja": "変更後は2 MBを超えます",
+"ko": "수정 후 2 MB를 넘습니다"
+},
+"MB），請拆成幾個檔": {
+"en": "MB); split it into several files",
+"ja": "MB）。複数のファイルに分けてください",
+"ko": "MB). 여러 파일로 나누세요"
+},
+"{0}有{1} MB，文件最大15 MB": {
+"en": "{0} is {1} MB; documents can be at most 15 MB",
+"ja": "{0}は{1} MBです。文書は最大15 MBです",
+"ko": "{0}은(는) {1} MB입니다. 문서는 최대 15 MB입니다"
+},
+"MB，文件最大15 MB": {
+"en": "MB; documents can be at most 15 MB",
+"ja": "MBです。文書は最大15 MBです",
+"ko": "MB입니다. 문서는 최대 15 MB입니다"
+},
+"start與lines要是整數": {
+"en": "start and lines must be integers",
+"ja": "startとlinesは整数である必要があります",
+"ko": "start와 lines는 정수여야 합니다"
+},
+"（要新建請用write_file）": {
+"en": " (use write_file to create it)",
+"ja": "（新規作成はwrite_fileで）",
+"ko": " (새로 만들려면 write_file)"
+},
+"{0}不是UTF-8文字檔，edit_file改不了；請用write_file整份重寫": {
+"en": "{0} is not a UTF-8 text file, so edit_file cannot change it; rewrite it with write_file",
+"ja": "{0}はUTF-8のテキストファイルではないため、edit_fileでは変更できません。write_fileで全体を書き直してください",
+"ko": "{0}은(는) UTF-8 텍스트 파일이 아니어서 edit_file로 바꿀 수 없습니다. write_file로 통째로 다시 쓰세요"
+},
+"不是UTF-8文字檔，edit_file改不了；請用write_file整份重寫": {
+"en": "is not a UTF-8 text file, so edit_file cannot change it; rewrite it with write_file",
+"ja": "はUTF-8のテキストファイルではないため、edit_fileでは変更できません。write_fileで全体を書き直してください",
+"ko": "UTF-8 텍스트 파일이 아니어서 edit_file로 바꿀 수 없습니다. write_file로 통째로 다시 쓰세요"
+},
+"改完會超過2 MB（": {
+"en": "After the edit the file would exceed 2 MB (",
+"ja": "変更後は2 MBを超えます（",
+"ko": "수정 후 2 MB를 넘습니다("
+},
+" MB），請拆成幾個檔": {
+"en": " MB); split it into several files",
+"ja": " MB）。複数のファイルに分けてください",
+"ko": " MB). 여러 파일로 나누세요"
+},
+" MB，文件最大15 MB": {
+"en": " MB; documents can be at most 15 MB",
+"ja": " MBです。文書は最大15 MBです",
+"ko": " MB입니다. 문서는 최대 15 MB입니다"
 }
 }
