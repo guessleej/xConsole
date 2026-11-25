@@ -25983,5 +25983,125 @@
 "en": "This computer is managed by your school or company: here you can only check status, chat, and see installed models. Changing models or settings must be done by an administrator in the console",
 "ja": "このコンピューターは学校または会社が一元管理しています。ここでは状態の確認、チャット、インストール済みモデルの閲覧のみ可能です。モデルや設定の変更は管理者がコンソールで行います",
 "ko": "이 컴퓨터는 학교나 회사에서 통합 관리합니다. 여기서는 상태 확인, 대화, 설치된 모델 보기만 할 수 있으며, 모델과 설정 변경은 관리자가 콘솔에서 해야 합니다"
+},
+"{0}：從同群組的 {1} 互傳並核對 SHA-256": {
+"en": "{0}: transferring from {1} in the same group and checking SHA-256",
+"ja": "{0}：同じグループの {1} から転送して SHA-256 を照合",
+"ko": "{0}: 같은 그룹의 {1}에서 전송하고 SHA-256 확인"
+},
+"內部鏡像還沒上線，網路來源用這台設定的 Hugging Face 位址": {
+"en": "The internal mirror isn't available yet; downloads use the Hugging Face address set on this machine",
+"ja": "内部ミラーはまだ使えません。ネットからの取得にはこの端末で設定した Hugging Face のアドレスを使います",
+"ko": "내부 미러는 아직 지원되지 않습니다. 인터넷 다운로드는 이 컴퓨터에 설정된 Hugging Face 주소를 사용합니다"
+},
+"{0}：等同群組的其他機器下載好再互傳": {
+"en": "{0}: waiting for another machine in the group to finish downloading, then transferring",
+"ja": "{0}：同じグループの別の端末がダウンロードを終えるのを待ってから転送します",
+"ko": "{0}: 같은 그룹의 다른 컴퓨터가 다운로드를 마치면 전송합니다"
+},
+"{0}：互傳票證快到期，等主控台下一輪": {
+"en": "{0}: the transfer ticket is about to expire; waiting for the console's next round",
+"ja": "{0}：転送チケットの期限が近いため、コンソールの次の割り当てを待ちます",
+"ko": "{0}: 전송 티켓이 곧 만료되어 콘솔의 다음 배정을 기다립니다"
+},
+"{0}：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
+"en": "{0}: the group only allows transfers within the group, but no reachable machine in the group has this model",
+"ja": "{0}：グループ内転送のみ許可されていますが、このモデルを持つ接続可能な端末がグループ内にありません",
+"ko": "{0}: 그룹 내 전송만 허용되지만 이 모델을 가진 연결 가능한 컴퓨터가 그룹에 없습니다"
+},
+"{0}：核對 {1} 的 SHA-256（之後才能送給同群組的機器）": {
+"en": "{0}: checking the SHA-256 of {1} (required before sending it to machines in the group)",
+"ja": "{0}：{1} の SHA-256 を照合中（照合後にグループ内の端末へ送れます）",
+"ko": "{0}: {1}의 SHA-256 확인 중(확인 후 그룹 내 컴퓨터로 보낼 수 있음)"
+},
+"{0}：跟 {1} 互傳沒成功（{2}）": {
+"en": "{0}: transfer from {1} failed ({2})",
+"ja": "{0}：{1} からの転送に失敗しました（{2}）",
+"ko": "{0}: {1}에서 전송 실패({2})"
+},
+"{0}：互傳完了但存放區掃不到": {
+"en": "{0}: the transfer finished but the model wasn't found in storage",
+"ja": "{0}：転送は完了しましたが保存領域にモデルが見つかりません",
+"ko": "{0}: 전송은 끝났지만 저장 영역에서 모델을 찾을 수 없습니다"
+},
+"{0} 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）": {
+"en": "The SHA-256 of {0} doesn't match the console's value and was deleted (the sender's file may be damaged or altered)",
+"ja": "{0} の SHA-256 がコンソールの値と一致しないため削除しました（送信元のファイルが壊れているか改ざんされた可能性があります）",
+"ko": "{0}의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음)"
+},
+"互傳安排裡的檔名或 sha256 不對：{0}": {
+"en": "The file name or sha256 in the transfer plan is invalid: {0}",
+"ja": "転送計画のファイル名または sha256 が不正です：{0}",
+"ko": "전송 계획의 파일 이름 또는 sha256이 잘못되었습니다: {0}"
+},
+"核對通過": {
+"en": "verified",
+"ja": "照合済み",
+"ko": "확인 완료"
+},
+"跟 Hugging Face 公布的不同，這台不送": {
+"en": "doesn't match Hugging Face's published value; this machine won't send it",
+"ja": "Hugging Face の公開値と一致しないため、この端末からは送りません",
+"ko": "Hugging Face 공개 값과 달라 이 컴퓨터에서는 보내지 않습니다"
+},
+"票證不對": {
+"en": "Invalid ticket",
+"ja": "チケットが不正です",
+"ko": "티켓이 올바르지 않습니다"
+},
+"票證格式不對": {
+"en": "Malformed ticket",
+"ja": "チケットの形式が不正です",
+"ko": "티켓 형식이 올바르지 않습니다"
+},
+"票證過期": {
+"en": "Ticket expired",
+"ja": "チケットの期限切れ",
+"ko": "티켓 만료"
+},
+"票證已經用過": {
+"en": "Ticket already used",
+"ja": "チケットは使用済みです",
+"ko": "이미 사용한 티켓입니다"
+},
+"票證不是給這個檔的": {
+"en": "The ticket is not for this file",
+"ja": "このファイル用のチケットではありません",
+"ko": "이 파일용 티켓이 아닙니다"
+},
+"互傳埠只收同一個網段的機器": {
+"en": "The transfer port only accepts machines on the same subnet",
+"ja": "転送ポートは同じサブネットの端末からのみ受け付けます",
+"ko": "전송 포트는 같은 서브넷의 컴퓨터만 받습니다"
+},
+"互傳埠只提供模型檔": {
+"en": "The transfer port only serves model files",
+"ja": "転送ポートはモデルファイルのみ提供します",
+"ko": "전송 포트는 모델 파일만 제공합니다"
+},
+"這台沒有核對過的這個檔": {
+"en": "This machine has no verified copy of this file",
+"ja": "この端末には照合済みのこのファイルがありません",
+"ko": "이 컴퓨터에는 확인된 이 파일이 없습니다"
+},
+"這台同時送的份數到上限（{0} 份），稍後再試": {
+"en": "This machine is already sending the maximum number of copies ({0}); try again later",
+"ja": "この端末は同時送信数の上限（{0}）に達しています。しばらくしてから再試行してください",
+"ko": "이 컴퓨터는 동시 전송 수 상한({0})에 도달했습니다. 잠시 후 다시 시도하세요"
+},
+"試連的參數不對": {
+"en": "Invalid connection-test parameters",
+"ja": "接続テストのパラメーターが不正です",
+"ko": "연결 테스트 매개변수가 올바르지 않습니다"
+},
+"埠不對": {
+"en": "Invalid port",
+"ja": "ポートが不正です",
+"ko": "포트가 올바르지 않습니다"
+},
+"沒有位址": {
+"en": "No address",
+"ja": "アドレスがありません",
+"ko": "주소 없음"
 }
 }

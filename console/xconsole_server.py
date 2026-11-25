@@ -1406,6 +1406,96 @@ ALIGN_STATE = {}                  # 機器 → {"at", "state"} 或 {"at", "error
 ALIGN_EVERY = 60
 
 
+# ---- 工作站互傳（清單 #12）：排程前請收方試連送方，連得到的才發票證；每台同時最多送 2 份，拿到的再傳下一台（樹狀）。
+# 群組裡還沒有任何一台有的模型，只讓一台（種子）從網路拿，其他台等它；連不到任何送方的就照舊從網路（或這台設定的鏡像）拿。
+PEER_TICKET_TTL = 60
+PEER_PROBE_TTL = 600
+PEER_MAX = 2
+PEER_STALE = 300
+PEER_PROBE = {}                   # (收方, 送方) → (連得上的位址或 None, 試連時間)
+PEER_LOAD = {}                    # 送方 → {(收方, 模型): 發票證的時間}
+
+
+def peer_ticket(sender, rel, receiver):
+    """一次性票證：本文（編號、檔名、到期、收方）＋用送方權杖簽的 HMAC。送方用自己的權杖驗，主控台與送方之外沒人簽得出來。"""
+    body = base64.urlsafe_b64encode(json.dumps({"n": secrets.token_hex(12), "f": rel, "x": time.time() + PEER_TICKET_TTL,
+                                                 "r": receiver}, separators=(",", ":")).encode()).decode().rstrip("=")
+    return body + "." + hmac.new(node_token(sender).encode(), body.encode(), hashlib.sha256).hexdigest()
+
+
+def _peer_state(nid, gid):
+    a = ALIGN_STATE.get(nid) or {}
+    st = a.get("state") or {}
+    if st.get("group_id") != gid or time.time() - a.get("at", 0) > PEER_STALE:
+        return None
+    return st
+
+
+def _peer_reach(recv, sender, peer):
+    key = (recv["id"], sender["id"])
+    hit = PEER_PROBE.get(key)
+    if hit and time.time() - hit[1] < PEER_PROBE_TTL:
+        return hit[0]
+    code, out = call_node(recv["id"], "/peer/probe", "POST",
+                          {"addrs": peer.get("addrs") or [], "port": peer.get("port"), "cert": peer.get("cert")}, timeout=30)
+    addr = out.get("addr") if code == 200 and out.get("ok") else None
+    PEER_PROBE[key] = (addr, time.time())
+    return addr
+
+
+def peer_plan(g, n, members):
+    """給 n 這一輪的互傳安排：{模型: {"offers": [...]} 或 {"wait": True}}；沒寫到的模型＝這台自己從網路拿。"""
+    s = g.get("settings") or {}
+    if "group" not in (s.get("sources") or []):
+        return None
+    mine = ((_peer_state(n["id"], g["id"]) or {}).get("peer") or {}).get("specs") or {}
+    others = [(m, _peer_state(m["id"], g["id"])) for m in members if m["id"] != n["id"]]
+    others = [(m, st) for m, st in others if st and not m.get("revoked")]
+    online = sorted([n] + [m for m, _ in others], key=lambda x: x["id"])
+    net_ok = bool(set(s.get("sources") or []) - {"group"})
+    plans = {}
+    for spec in [x for x in s.get("models") or [] if x != "auto"]:
+        if spec in mine:
+            continue
+        has = [(m, st["peer"]) for m, st in others if spec in ((st.get("peer") or {}).get("specs") or {})]
+        holders = [(m, peer) for m, peer in has if peer.get("listening")]
+        if not has:
+            # 還沒有人有：只讓一台（沒出錯的第一台）從網路拿，其他等它
+            seed = next((m for m in online if not ((_peer_state(m["id"], g["id"]) or {}).get("error"))), None)
+            if net_ok and seed and seed["id"] != n["id"]:
+                plans[spec] = {"wait": True}
+            continue
+        offers, busy = [], False
+        for m, peer in sorted(holders, key=lambda h: len(_peer_load(h[0]["id"]))):
+            addr = _peer_reach(n, m, peer)
+            if not addr:
+                continue
+            load = _peer_load(m["id"])
+            if len(load) >= PEER_MAX and (n["id"], spec) not in load:
+                busy = True
+                continue
+            load[(n["id"], spec)] = time.time()
+            offers.append({"node": m["id"], "name": m.get("name"), "addr": addr, "port": peer["port"], "cert": peer["cert"],
+                           "files": [{**f, "ticket": peer_ticket(m, f["rel"], n["id"])} for f in peer["specs"][spec]]})
+            if len(offers) >= PEER_MAX:
+                break
+        if offers:
+            plans[spec] = {"offers": offers}
+        elif busy:
+            plans[spec] = {"wait": True}       # 連得到的都在送別台：等下一輪，不改走網路
+    return plans
+
+
+def _peer_load(sender_id):
+    """送方手上還在送的（收方還沒拿到、10 分鐘內發過票證）。收方拿到了就不算。"""
+    load = PEER_LOAD.setdefault(sender_id, {})
+    for (recv, spec), at in list(load.items()):
+        got = spec in (((ALIGN_STATE.get(recv) or {}).get("state") or {}).get("peer") or {}).get("specs", {})
+        if got or time.time() - at > 600:
+            load.pop((recv, spec), None)
+    return load
+
+
 def align_once():
     cfg = fleet()
     gmap = {g["name"]: g for g in cfg.get("groups", [])}
@@ -1420,6 +1510,10 @@ def align_once():
         # 預設設定的群組（例如原本的群組被刪、機器移到未分類）也要送：代理才會放掉舊群組的鎖定與限制
         # ponytail: 一台一台依序送；連不到的伺服器各等 20 秒，機器多了再改並行
         body = {"group_id": g["id"], "version": g["version"], "settings": g["settings"], "now": time.time()}
+        members = [m for m in cfg["nodes"] if (m.get("group") or groups.DEFAULT) == g["name"]]
+        peers = peer_plan(g, n, members)
+        if peers is not None:
+            body["peers"] = peers            # 一次性票證：只在這一輪的請求裡，不落地
         if hf_token():
             body["hf_token"] = hf_token()        # 受限模型要下載才帶；代理只放記憶體、不寫檔
         code, out = call_node(n["id"], "/group/sync", "POST", body, timeout=20)

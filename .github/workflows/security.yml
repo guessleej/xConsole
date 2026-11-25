@@ -51,6 +51,8 @@ jobs:
         run: cd console && python test_console_id.py
       - name: 本機使用者通道（只放行使用者層操作、坐在電腦前的人才能用、稽核、主控台先驗通道擁有者）
         run: python agent/test_user_channel.py
+      - name: 工作站互傳（票證、只送核對過的檔、同網段、同時2份、續傳、sha256、排程）
+        run: python agent/test_peer.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
       - name: 安全指令（停用、恢復、清除、撤銷身分；離線排著、連上先送、後下覆蓋先下、重送不重做）
