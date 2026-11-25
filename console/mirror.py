@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 REPO_RX = re.compile(r"[A-Za-z0-9][\w.-]{0,95}/[A-Za-z0-9][\w.-]{0,95}")
-PATH_RX = re.compile(r"[\w.+-]+(?:/[\w.+-]+){0,3}")
+PART_RX = re.compile(r"[\w.+-]{1,200}")         # 檔名逐段比：一段一段比是線性的，不會被刻意的長字串拖慢
 CHUNK = 8 << 20
 
 
@@ -24,7 +24,9 @@ class Pending(Exception):
 
 
 def _safe(repo, path=None):
-    if not REPO_RX.fullmatch(repo or "") or (path is not None and (not PATH_RX.fullmatch(path) or ".." in path.split("/"))):
+    parts = (path or "").split("/")
+    if not REPO_RX.fullmatch(repo or "") or (path is not None and (len(path) > 400 or len(parts) > 4 or ".." in parts
+                                                                    or not all(PART_RX.fullmatch(x) for x in parts))):
         raise ValueError("模型名稱或檔名不合法")
 
 
