@@ -127,7 +127,7 @@ def loading():
 
     api = modules.API(x.MODULES, x.MODULES.dir)
     public = {k for k in dir(api) if not k.startswith("_")}
-    check("合約：api開放的就是這幾個", public == {"CORE_API", "scope", "route", "static", "store", "audit", "routes", "static_dir", "namespaces"},
+    check("合約：api開放的就是這幾個", public == {"CORE_API", "scope", "route", "static", "store", "audit", "console_id", "routes", "static_dir", "namespaces"},
           sorted(public))
     check("  第五節其他擴充點這一版明確回「還沒開放」", all(callable(getattr(api, n)) for n in modules.NOT_YET))
 
@@ -218,7 +218,13 @@ def http():
     check("  全域資料：限定群組的帳號 → 404", vw.req("GET", "/api/ent/templates/t-g")[0] == 404)
     check("  查不到那筆 → 404", vw.req("GET", "/api/ent/templates/none")[0] == 404)
     check("  管理員碰得到全域資料", admin.req("GET", "/api/ent/templates/t-g")[0] == 200)
-    check("全域（scope.GLOBAL）：管理員 → 200", admin.req("GET", "/api/ent/license")[0] == 200)
+    st, o = admin.req("GET", "/api/ent/license")
+    check("全域（scope.GLOBAL）：管理員 → 200", st == 200, (st, o))
+    cid = x._ModCore.console_id
+    check("api.console_id()：拿到主控台安裝時產生的識別碼，與狀態頁、識別碼檔一致",
+          modules.CONSOLE_ID_RX.fullmatch(cid) and o.get("console_id") == cid
+          and admin.req("GET", "/api/modules")[1].get("console_id") == cid
+          and open(os.path.join(x.STATE_DIR, "console_id")).read().strip() == cid, (o, cid))
     st, o = vw.req("GET", "/api/ent/boom")
     check("  限定群組的帳號 → 403", st == 403, (st, o))
     st, o = admin.req("GET", "/api/ent/boom")

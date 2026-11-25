@@ -34,7 +34,7 @@ def register(api):
         return {"ok": True}
 
     def license_info(req):
-        return {"license": "ok"}
+        return {"license": "ok", "console_id": api.console_id()}
 
     def boom(req):
         raise RuntimeError("模組裡的錯誤：內部路徑 /secret/path")

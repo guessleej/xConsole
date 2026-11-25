@@ -25933,5 +25933,20 @@
 "en": "Malformed safety command",
 "ja": "安全指示の形式が正しくありません",
 "ko": "안전 명령 형식이 올바르지 않습니다"
+},
+"主控台識別碼": {
+"en": "Console ID",
+"ja": "コンソールID",
+"ko": "콘솔 ID"
+},
+"企業版授權綁這個識別碼。申請或續約授權時把它交給云碩；重開機、升級、換憑證都不會變，換一台主控台才會不同。": {
+"en": "The Enterprise license is bound to this ID. Send it to xCloudinfo when you apply for or renew a license. It stays the same across restarts, upgrades and certificate changes; only a different console has a different ID.",
+"ja": "エンタープライズ版のライセンスはこのIDに紐づきます。ライセンスの申請や更新の際は xCloudinfo にお渡しください。再起動、アップグレード、証明書の変更では変わらず、別のコンソールでのみ異なります。",
+"ko": "엔터프라이즈 라이선스는 이 ID에 연결됩니다. 라이선스를 신청하거나 갱신할 때 xCloudinfo에 전달하세요. 재시작, 업그레이드, 인증서 교체로는 바뀌지 않으며 다른 콘솔에서만 달라집니다."
+},
+"主控台識別碼檔內容不正確，已改名為 {0} 並產生新的；企業版授權要請云碩依新識別碼重簽": {
+"en": "The console ID file was invalid; renamed it to {0} and generated a new one. Ask xCloudinfo to re-sign the Enterprise license for the new ID",
+"ja": "コンソールIDファイルの内容が正しくないため {0} に名前を変更し、新しいIDを生成しました。新しいIDでエンタープライズ版ライセンスの再発行を xCloudinfo に依頼してください",
+"ko": "콘솔 ID 파일 내용이 올바르지 않아 {0}(으)로 이름을 바꾸고 새 ID를 생성했습니다. 새 ID로 엔터프라이즈 라이선스를 다시 서명하도록 xCloudinfo에 요청하세요"
 }
 }

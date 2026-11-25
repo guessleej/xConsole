@@ -47,6 +47,8 @@ jobs:
         run: cd agent && python test_win_runtime.py
       - name: 企業版模組的擴充合約（簽章、sha256、權限、core_api、路由scope、資料範圍與加密、網頁上傳）
         run: python test/test_module_contract.py
+      - name: 主控台識別碼（第一次產生、之後不變、同時啟動只會有一個）
+        run: cd console && python test_console_id.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
       - name: 安全指令（停用、恢復、清除、撤銷身分；離線排著、連上先送、後下覆蓋先下、重送不重做）

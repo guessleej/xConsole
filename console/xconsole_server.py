@@ -2340,6 +2340,7 @@ class _ModCore:
     """企業版模組載入器拿得到的核心功能：資料庫、加密、稽核、群組清單。其他一律拿不到。"""
     db, lock = STORE.db, STORE.lock
     desktop = DESKTOP
+    console_id = modules.console_id(STATE_DIR)
 
     @staticmethod
     def seal(data):
