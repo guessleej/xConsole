@@ -4459,6 +4459,7 @@ async function settingsGroups(wrap) {
   const g = d.groups.find((x) => x.id === S.groupEdit);
   if (g) {
     wrap.appendChild(groupEditor(g, d));
+    wrap.appendChild(await groupHistory(g));
     wrap.appendChild(groupMembers(g));
   }
   if (isAdmin()) wrap.appendChild(await joinCodesCard());
@@ -4466,6 +4467,53 @@ async function settingsGroups(wrap) {
 
 const GROUP_PHASE = { queued: "收到，排隊中", preparing: "準備中", waiting_boot: "已準備，等下次開機套用", waiting_time: "已準備，等指定時間套用",
   applying: "套用中", done: "已套用", failed: "失敗", idle: "—" };
+
+const GROUP_FIELD_NAMES = { models: "模型", allowed_models: "只准用的模型", profile: "執行參數", reserve_user_gib: "保留記憶體",
+  gpu_power_limit: "功耗上限", storage_root: "存放位置", sources: "模型來源", locked: "鎖定", apply_at: "套用時機" };
+
+async function groupHistory(g) {
+  const c = card("設定歷史", "每改一次設定留一版；退回某一版會產生新的版本號，各台照新版本重新準備與套用");
+  let d;
+  try { d = await api(`/api/groups/${g.id}/history`); } catch (ex) { c.appendChild(el("p", "note warn", ex.message)); return c; }
+  if (d.history.length < 2) {
+    c.appendChild(el("p", "small muted", `還沒有舊版本。之後每存一次不同的設定，這裡就多一版，最多保留最近 ${d.max} 版。`));
+    return c;
+  }
+  const tbl = el("table", "api-table");
+  const hr = el("tr");
+  ["版本", "時間（台北時間）", "誰改的", "說明", "跟目前設定不同的地方", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+  tbl.appendChild(hr);
+  d.history.forEach((h) => {
+    const tr = el("tr");
+    tr.appendChild(el("td", "mono", `v${h.version}`));
+    tr.appendChild(el("td", "nowrap", new Date(h.at * 1000).toLocaleString(uiLocale(), { hour12: false, timeZone: "Asia/Taipei" })));
+    tr.appendChild(el("td", null, h.by || "—"));
+    tr.appendChild(el("td", null, h.note || "—"));
+    tr.appendChild(el("td", "small", h.current ? "目前使用中" : h.diff.length ? h.diff.map((k) => GROUP_FIELD_NAMES[k] || k).join("、") : "內容相同"));
+    const td = el("td", "nowrap");
+    if (!h.current && h.diff.length && canOperate()) {
+      const b = el("button", "btn sm", "退回這一版");
+      b.onclick = () => modal({
+        title: `把「${g.name}」退回 v${h.version}`, hasInput: false, confirmText: "退回",
+        bodyNode: el("p", "small muted", `會用 v${h.version} 的設定產生新的一版 v${g.version + 1}，改到的項目：${h.diff.map((k) => GROUP_FIELD_NAMES[k] || k).join("、")}。各台照這一版的套用時機重新準備與套用。`),
+        onConfirm: async () => {
+          try {
+            const r = await api(`/api/groups/${g.id}/rollback`, { method: "POST", body: { version: h.version } });
+            toast(r.changed ? `已退回，設定版本升到 v${r.group.version}` : "這一版跟目前設定相同，版本不動", "ok");
+          } catch (ex) { toast(ex.message, "bad"); }
+          render();
+        },
+      });
+      td.appendChild(b);
+    }
+    tr.appendChild(td);
+    tbl.appendChild(tr);
+  });
+  const tw = el("div", "md-table-wrap");
+  tw.appendChild(tbl);
+  c.appendChild(tw);
+  return c;
+}
 
 function groupMembers(g) {
   const c = card("各台進度", `設定 v${g.version}；就緒 ${g.ready}/${g.members}、已套用 ${g.done}/${g.members}`);

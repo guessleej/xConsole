@@ -4836,6 +4836,118 @@
 "pattern": false
 },
 {
+"zh": "功耗上限",
+"pattern": false
+},
+{
+"zh": "存放位置",
+"pattern": false
+},
+{
+"zh": "模型來源",
+"pattern": false
+},
+{
+"zh": "鎖定",
+"pattern": false
+},
+{
+"zh": "套用時機",
+"pattern": false
+},
+{
+"zh": "設定歷史",
+"pattern": false
+},
+{
+"zh": "每改一次設定留一版；退回某一版會產生新的版本號，各台照新版本重新準備與套用",
+"pattern": false
+},
+{
+"zh": "還沒有舊版本。之後每存一次不同的設定，這裡就多一版，最多保留最近 {0} 版。",
+"pattern": true
+},
+{
+"zh": "還沒有舊版本。之後每存一次不同的設定，這裡就多一版，最多保留最近",
+"pattern": false
+},
+{
+"zh": "版",
+"pattern": false
+},
+{
+"zh": "版本",
+"pattern": false
+},
+{
+"zh": "時間（台北時間）",
+"pattern": false
+},
+{
+"zh": "誰改的",
+"pattern": false
+},
+{
+"zh": "跟目前設定不同的地方",
+"pattern": false
+},
+{
+"zh": "目前使用中",
+"pattern": false
+},
+{
+"zh": "內容相同",
+"pattern": false
+},
+{
+"zh": "退回這一版",
+"pattern": false
+},
+{
+"zh": "把「{0}」退回 v{1}",
+"pattern": true
+},
+{
+"zh": "把「",
+"pattern": false
+},
+{
+"zh": "」退回 v",
+"pattern": false
+},
+{
+"zh": "會用 v{0} 的設定產生新的一版 v{1}，改到的項目：{2}。各台照這一版的套用時機重新準備與套用。",
+"pattern": true
+},
+{
+"zh": "會用 v",
+"pattern": false
+},
+{
+"zh": "的設定產生新的一版 v",
+"pattern": false
+},
+{
+"zh": "改到的項目",
+"pattern": false
+},
+{
+"zh": "各台照這一版的套用時機重新準備與套用",
+"pattern": false
+},
+{
+"zh": "已退回，設定版本升到 v{0}",
+"pattern": true
+},
+{
+"zh": "已退回，設定版本升到 v",
+"pattern": false
+},
+{
+"zh": "這一版跟目前設定相同，版本不動",
+"pattern": false
+},
+{
 "zh": "各台進度",
 "pattern": false
 },
@@ -4949,10 +5061,6 @@
 },
 {
 "zh": "鎖定（使用者在自己那台不能改）",
-"pattern": false
-},
-{
-"zh": "套用時機",
 "pattern": false
 },
 {
@@ -10004,10 +10112,6 @@
 "pattern": true
 },
 {
-"zh": "版",
-"pattern": false
-},
-{
 "zh": "下一個版本",
 "pattern": false
 },
@@ -11976,6 +12080,10 @@
 "pattern": false
 },
 {
+"zh": "沒有這個群組",
+"pattern": false
+},
+{
 "zh": "目前沒有待配對的 CSR",
 "pattern": false
 },
@@ -12061,6 +12169,10 @@
 },
 {
 "zh": "已經有同名的群組",
+"pattern": false
+},
+{
+"zh": "要指定退回哪一版（version）",
 "pattern": false
 },
 {
@@ -12193,10 +12305,6 @@
 },
 {
 "zh": " 字）",
-"pattern": false
-},
-{
-"zh": "沒有這個群組",
 "pattern": false
 },
 {
@@ -12392,6 +12500,14 @@
 "pattern": false
 },
 {
+"zh": "v{0} 的設定現在不合法，不能退回：{1}",
+"pattern": true
+},
+{
+"zh": "的設定現在不合法，不能退回",
+"pattern": false
+},
+{
 "zh": "「未分類」是預設群組，不能刪除",
 "pattern": false
 },
@@ -12405,6 +12521,10 @@
 },
 {
 "zh": "沒有連得上的機器可以讀 Hugging Face",
+"pattern": false
+},
+{
+"zh": " 的設定現在不合法，不能退回：",
 "pattern": false
 },
 {
@@ -14692,6 +14812,26 @@
 "pattern": false
 },
 {
+"zh": "沒有 v{0} 這一版（只保留最近 {1} 版）",
+"pattern": true
+},
+{
+"zh": "沒有 v",
+"pattern": false
+},
+{
+"zh": "這一版（只保留最近",
+"pattern": false
+},
+{
+"zh": "退回 v{0}",
+"pattern": true
+},
+{
+"zh": "退回 v",
+"pattern": false
+},
+{
 "zh": "「未分類」是預設群組，不能改名",
 "pattern": false
 },
@@ -14809,6 +14949,14 @@
 },
 {
 "zh": "模型存放位置要是完整路徑（例：/data/xconsole 或 D:\\xconsole），不能有 ..",
+"pattern": false
+},
+{
+"zh": " 這一版（只保留最近 ",
+"pattern": false
+},
+{
+"zh": " 版）",
 "pattern": false
 },
 {

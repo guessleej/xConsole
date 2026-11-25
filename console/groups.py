@@ -16,6 +16,9 @@ LOCKABLE = ("models", "profile", "reserve_user_gib", "allowed_models", "gpu_powe
 APPLY = ("now", "boot", "at")
 NAME_RX = re.compile(r"[^\x00-\x1f<>\"'`\\]{1,30}")
 MODEL_RX = re.compile(r"[A-Za-z0-9][\w./:+-]{0,159}")
+HISTORY_MAX = 20
+FIELD_NAMES = ("models", "allowed_models", "profile", "reserve_user_gib", "gpu_power_limit", "storage_root",
+               "sources", "locked", "apply_at")
 
 
 def defaults():
@@ -136,9 +139,44 @@ def ensure(cfg):
     return added
 
 
-def update(g, name=None, kind=None, settings=None, taken=()):
-    """改名、改種類、改設定，全部檢查過才動。設定內容真的不同才把版本號加一。
-    taken：別的群組已用的名稱。回 (新名稱, 設定有沒有變)。"""
+def _same(a, b):
+    return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+
+
+def diff(a, b):
+    """兩份設定哪幾項不同，回欄位名稱的清單（依 FIELD_NAMES 的順序）。"""
+    a, b = a or defaults(), b or defaults()
+    return [k for k in FIELD_NAMES if not _same(a.get(k), b.get(k))]
+
+
+def history(g):
+    """這個群組留著的每一版設定，新的在前；每筆標出跟目前設定差在哪幾項。"""
+    cur = g.get("settings") or defaults()
+    return [dict(h, current=h["version"] == g["version"], diff=diff(h["settings"], cur))
+            for h in reversed(g.get("history") or [])]
+
+
+def rollback(g, version, by=""):
+    """把某一版的設定拿回來，當成新的一版（版本號照樣往上加，代理才會重新對齊）。回 (目標那一筆, 設定有沒有變)。"""
+    h = next((x for x in g.get("history") or [] if x["version"] == version), None)
+    if h is None:
+        raise LookupError(f"沒有 v{version} 這一版（只保留最近 {HISTORY_MAX} 版）")
+    old = {k: v for k, v in h["settings"].items() if k in defaults()}   # 舊版沒有的新欄位由 check 補預設值
+    _, changed = update(g, settings=old, by=by, note=f"退回 v{version}")
+    return h, changed
+
+
+def _record(g, by, note):
+    hs = g.setdefault("history", [])
+    if not hs:                                       # 第一次留紀錄：把改之前那一版補進來，才退得回去
+        hs.append({"version": int(g.get("version") or 1), "settings": g.get("settings") or defaults(),
+                   "at": int(g.get("updated") or time.time()), "by": "", "note": ""})
+    return hs, {"by": str(by or "")[:64], "note": note}
+
+
+def update(g, name=None, kind=None, settings=None, taken=(), by="", note=""):
+    """改名、改種類、改設定，全部檢查過才動。設定內容真的不同才把版本號加一，並留一筆歷史（最多 HISTORY_MAX 版）。
+    taken：別的群組已用的名稱；by：誰改的；note：這一版的說明（例：退回 v3）。回 (新名稱, 設定有沒有變)。"""
     new_name = g["name"] if name is None or name == g["name"] else check_name(name)   # 沒改名就不重驗（舊名稱可能有現在不收的字元）
     if g["name"] == DEFAULT and new_name != DEFAULT:
         raise ValueError("「未分類」是預設群組，不能改名")
@@ -150,11 +188,15 @@ def update(g, name=None, kind=None, settings=None, taken=()):
     g["name"] = new_name
     if kind is not None:
         g["kind"] = kind
-    changed = new_s is not None and json.dumps(new_s, sort_keys=True) != json.dumps(g.get("settings") or defaults(), sort_keys=True)
+    changed = new_s is not None and not _same(new_s, g.get("settings") or defaults())
+    now = int(time.time())
     if changed:
+        hs, meta = _record(g, by, note)
         g["settings"] = new_s
         g["version"] = int(g.get("version") or 0) + 1
-    g["updated"] = int(time.time())
+        hs.append(dict(meta, version=g["version"], settings=new_s, at=now))
+        del hs[:-HISTORY_MAX]
+    g["updated"] = now
     return g["name"], changed
 
 
