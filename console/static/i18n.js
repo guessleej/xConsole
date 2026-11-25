@@ -73,7 +73,7 @@ function i18nLoad(dict) {
   I18N.patterns.sort((a, b) => b.len - a.len);
   pieces.sort((a, b) => b.length - a.length);
   I18N.pieces = pieces;
-  I18N.re = pieces.length ? new RegExp(pieces.slice(0, 4000).map(reEsc).join("|"), "g") : null;
+  I18N.re = pieces.length ? new RegExp(pieces.map(reEsc).join("|"), "g") : null;
 }
 
 // 使用者與伺服器給的資料（機器名、對話標題、模型、資料夾、設定檔、角色…）不是介面文字，不翻：
