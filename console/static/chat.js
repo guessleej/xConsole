@@ -1275,7 +1275,7 @@ function paintGen(m, b, acts) {
     const r2 = msgActs(m, acts, true);
     const toPage = el("button", "link-btn", g.kind === "video" ? "到影片頁" : "到畫圖頁");
     toPage.onclick = () => go(g.kind === "video" ? "video" : "image");
-    r2.appendChild(toPage);
+    r2.append(toPage, sdFolderButton(g.node, "link-btn"));
     row.replaceWith(r2);
   }
 }

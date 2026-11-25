@@ -1373,6 +1373,7 @@ async function viewCreate(kind) {
   head.appendChild(el("span", "spacer"));
   const dl = el("button", "btn sm", kind === "image" ? "下載畫圖模型" : "下載影片模型");
   dl.onclick = () => { S.libTab = "sd"; S.sdSub = "rec"; go("models"); };
+  head.appendChild(sdFolderButton(n.id));
   if (isAdmin()) head.appendChild(dl);
   wrap.appendChild(head);
   const holder = el("div");

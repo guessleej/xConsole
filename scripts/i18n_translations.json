@@ -14160,9 +14160,9 @@
 "ko": "이 작업은 실행 중이 아닙니다"
 },
 "這件沒有產出": {
-"en": "This job has no output",
-"ja": "このジョブには出力がありません",
-"ko": "이 작업에는 출력이 없습니다"
+"en": "This item has no output",
+"ja": "この作品には出力がありません",
+"ko": "이 작품에는 출력이 없습니다"
 },
 "這份 PDF 抽不出文字（可能是掃描的圖片）。請改附圖片給看得懂圖的模型，或先做 OCR": {
 "en": "No text could be extracted from this PDF (it may be scanned images). Attach images for a vision-capable model instead, or run OCR first",
@@ -28128,5 +28128,200 @@
 "en": "Error packaging for machines of the same type (this machine still works normally): ",
 "ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：",
 "ko": "같은 기종용 패키지를 만드는 중 오류(이 머신은 정상 사용 가능): "
+},
+"能畫也能改圖": {
+"en": "Can generate and edit",
+"ja": "生成も編集も可能",
+"ko": "생성·편집 모두 가능"
+},
+"只能畫圖": {
+"en": "Generate only",
+"ja": "生成のみ",
+"ko": "생성만 가능"
+},
+"這顆只能改圖：先選一張要修改的圖片": {
+"en": "This model only edits images: choose an image to edit first",
+"ja": "このモデルは画像編集専用です。先に編集する画像を選んでください",
+"ko": "이 모델은 이미지 편집 전용입니다. 먼저 편집할 이미지를 선택하세요"
+},
+"這顆要先選一張圖片當第一格畫面": {
+"en": "This model needs an image for the first frame",
+"ja": "このモデルは最初のフレームにする画像が必要です",
+"ko": "이 모델은 첫 프레임으로 쓸 이미지가 필요합니다"
+},
+"左邊填好按「產生」，進度與結果會出現在這裡；產過的都在下面的作品牆。": {
+"en": "Fill in the form on the left and press Generate. Progress and results appear here; everything you have made is in the gallery below.",
+"ja": "左のフォームに入力して「生成」を押すと、進捗と結果がここに表示されます。これまでの作品は下のギャラリーにあります。",
+"ko": "왼쪽 양식을 작성하고 「생성」을 누르면 진행 상황과 결과가 여기에 표시됩니다. 만든 작품은 아래 갤러리에 있습니다."
+},
+"這件有": {
+"en": "This item has",
+"ja": "この作品には",
+"ko": "이 작품에는"
+},
+"張，會一起刪掉": {
+"en": "images; all of them will be deleted",
+"ja": "枚あり、すべて削除されます",
+"ko": "장이 있으며 모두 삭제됩니다"
+},
+"{0}這台電腦作品資料夾裡的檔案也一起刪除，刪了救不回來。": {
+"en": "{0}The files in this computer's output folder are deleted too, and cannot be recovered.",
+"ja": "{0}このコンピューターの作品フォルダー内のファイルも削除され、元に戻せません。",
+"ko": "{0}이 컴퓨터의 작품 폴더에 있는 파일도 함께 삭제되며 복구할 수 없습니다."
+},
+"這台電腦作品資料夾裡的檔案也一起刪除，刪了救不回來": {
+"en": "The files in this computer's output folder are deleted too, and cannot be recovered",
+"ja": "このコンピューターの作品フォルダー内のファイルも削除され、元に戻せません",
+"ko": "이 컴퓨터의 작품 폴더에 있는 파일도 함께 삭제되며 복구할 수 없습니다"
+},
+"刪除這件作品？": {
+"en": "Delete this item?",
+"ja": "この作品を削除しますか？",
+"ko": "이 작품을 삭제할까요?"
+},
+"點一下全螢幕看": {
+"en": "Click to view full screen",
+"ja": "クリックで全画面表示",
+"ko": "클릭하면 전체 화면으로 보기"
+},
+"複製提示詞": {
+"en": "Copy prompt",
+"ja": "プロンプトをコピー",
+"ko": "프롬프트 복사"
+},
+"開啟作品資料夾": {
+"en": "Open output folder",
+"ja": "作品フォルダーを開く",
+"ko": "작품 폴더 열기"
+},
+"作品存放位置": {
+"en": "Output folder location",
+"ja": "作品の保存場所",
+"ko": "작품 저장 위치"
+},
+"作品存在產生它的那台電腦上，到那台的這個資料夾就找得到：": {
+"en": "Outputs are stored on the computer that generated them, in this folder:",
+"ja": "作品は生成したコンピューターの次のフォルダーに保存されています：",
+"ko": "작품은 생성한 컴퓨터의 다음 폴더에 저장되어 있습니다:"
+},
+"今天": {
+"en": "Today",
+"ja": "今日",
+"ko": "오늘"
+},
+"作品": {
+"en": "Gallery",
+"ja": "作品",
+"ko": "작품"
+},
+"找提示詞": {
+"en": "Search prompts",
+"ja": "プロンプトを検索",
+"ko": "프롬프트 검색"
+},
+"時間範圍": {
+"en": "Time range",
+"ja": "期間",
+"ko": "기간"
+},
+"全螢幕看這件": {
+"en": "View this item full screen",
+"ja": "この作品を全画面で見る",
+"ko": "이 작품을 전체 화면으로 보기"
+},
+"沒有符合條件的作品，換個關鍵字或時間範圍。": {
+"en": "No items match. Try another keyword or time range.",
+"ja": "条件に合う作品がありません。キーワードか期間を変えてください。",
+"ko": "조건에 맞는 작품이 없습니다. 키워드나 기간을 바꿔 보세요."
+},
+"還沒有{0}作品。產出的檔案同時存在產生它的那台電腦上：": {
+"en": "No {0} yet. Outputs are also saved on the computer that generated them:",
+"ja": "{0}の作品はまだありません。出力ファイルは生成したコンピューターにも保存されます：",
+"ko": "아직 {0} 작품이 없습니다. 출력 파일은 생성한 컴퓨터에도 저장됩니다:"
+},
+"作品。產出的檔案同時存在產生它的那台電腦上": {
+"en": "items yet. Outputs are also saved on the computer that generated them",
+"ja": "の作品。出力ファイルは生成したコンピューターにも保存されます",
+"ko": " 작품. 출력 파일은 생성한 컴퓨터에도 저장됩니다"
+},
+"作品檢視": {
+"en": "Gallery viewer",
+"ja": "作品ビューアー",
+"ko": "작품 뷰어"
+},
+"上一件作品": {
+"en": "Previous item",
+"ja": "前の作品",
+"ko": "이전 작품"
+},
+"下一件作品": {
+"en": "Next item",
+"ja": "次の作品",
+"ko": "다음 작품"
+},
+"關閉（Esc）": {
+"en": "Close (Esc)",
+"ja": "閉じる（Esc）",
+"ko": "닫기 (Esc)"
+},
+"這台的代理太舊，不會回報作品資料夾；請先更新代理": {
+"en": "This machine's agent is too old to report its output folder; update the agent first",
+"ja": "このマシンのエージェントは古いため作品フォルダーを報告できません。先にエージェントを更新してください",
+"ko": "이 장비의 에이전트가 오래되어 작품 폴더를 알려 주지 않습니다. 먼저 에이전트를 업데이트하세요"
+},
+"作品資料夾在另一台機器上，這裡打不開；請複製路徑到那台找": {
+"en": "The output folder is on another machine and cannot be opened here; copy the path and open it on that machine",
+"ja": "作品フォルダーは別のマシンにあるため、ここでは開けません。パスをコピーしてそのマシンで開いてください",
+"ko": "작품 폴더가 다른 장비에 있어 여기서 열 수 없습니다. 경로를 복사해 그 장비에서 여세요"
+},
+"近7天": {
+"en": "Last 7 days",
+"ja": "過去 7 日",
+"ko": "최근 7일"
+},
+"近30天": {
+"en": "Last 30 days",
+"ja": "過去 30 日",
+"ko": "최근 30일"
+},
+"1:1原尺寸": {
+"en": "1:1 actual size",
+"ja": "1:1 原寸",
+"ko": "1:1 원본 크기"
+},
+"標籤最多6個（含自動加上的「能改圖」或「只能改圖」）": {
+"en": "Up to 6 tags (including the automatic \"Can edit\" or \"Edit only\")",
+"ja": "タグは最大 6 個まで（自動で付く「編集可」「編集のみ」を含む）",
+"ko": "태그는 최대 6개(자동으로 붙는 「편집 가능」 또는 「편집만」 포함)"
+},
+"只能打開模型存放區、作品資料夾或Agent工作資料夾底下的資料夾": {
+"en": "Only folders in the model storage, the output folder, or Agent work folders can be opened",
+"ja": "開けるのはモデル保存先、作品フォルダー、Agent 作業フォルダー内のフォルダーだけです",
+"ko": "모델 저장소, 작품 폴더, Agent 작업 폴더 안의 폴더만 열 수 있습니다"
+},
+"這件有{0}張，會一起刪掉，": {
+"en": "This item has {0} images; all of them will be deleted. ",
+"ja": "この作品には {0} 枚あり、すべて削除されます。",
+"ko": "이 작품에는 {0}장이 있으며 모두 삭제됩니다. "
+},
+"第{0}–{1}件，共{2}件": {
+"en": "Items {0}–{1} of {2}",
+"ja": "{2} 件中 {0}–{1} 件目",
+"ko": "총 {2}개 중 {0}–{1}번째"
+},
+"第{0}批": {
+"en": "Batch {0}",
+"ja": "第 {0} グループ",
+"ko": "{0}번째 묶음"
+},
+"{0}格": {
+"en": "{0} frames",
+"ja": "{0} フレーム",
+"ko": "{0}프레임"
+},
+"{0}張": {
+"en": "{0} images",
+"ja": "{0} 枚",
+"ko": "{0}장"
 }
 }

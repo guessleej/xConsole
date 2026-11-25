@@ -110,8 +110,8 @@ USER_ROUTES = [
     ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers|assistant/tools)"),
     ("GET", r"/api/chats/(blob/[0-9a-f]{16}|[0-9a-f]{12})"),
     ("GET", r"/api/agent/tasks/[0-9a-f]{12}"),
-    ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend)"),
-    ("GET", r"/api/node/[\w.-]+/sd/jobs(/[0-9a-f]{8}(/output(/[0-3])?|/init)?)?"),
+    ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend|sd/folder)"),
+    ("GET", r"/api/node/[\w.-]+/sd/jobs(/[0-9a-f]{8}(/output(/[0-3])?|/thumb/[0-3]|/init)?)?"),
     ("POST", r"/api/(logout|account/password|chats/save|chats/delete-all|extract|preview|agent/tasks|keys/create|assistant|assistant/continue)"),
     ("GET", r"/api/issues/(mine|checking)"),          # 問題回報（清單 #19）：每個人都能回報、看自己的回條
     ("POST", r"/api/issues"),
@@ -119,7 +119,7 @@ USER_ROUTES = [
     ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop|delete)"),
     ("POST", r"/api/node/[\w.-]+/chat/[\w.-]+"),
     ("POST", r"/api/node/[\w.-]+/agent/(folders/create|fs/list|fs/read)"),
-    ("POST", r"/api/node/[\w.-]+/sd/(generate|admit)"),
+    ("POST", r"/api/node/[\w.-]+/sd/(generate|admit|folder/open)"),
     ("POST", r"/api/node/[\w.-]+/sd/jobs/[0-9a-f]{8}/(cancel|delete)"),
     ("POST", r"/api/keys/[0-9a-f]{8}/(update|revoke)"),
 ]
@@ -663,6 +663,15 @@ def same_machine(node_host, url_host):
     if mine and all(ipaddress.ip_address(a.split("%")[0]).is_loopback for a in mine):
         mine |= {a for a in theirs if is_local_address(a)}
     return theirs if theirs and theirs <= mine else set()
+
+
+def node_on_this_machine(host):
+    """節點位址解析出來的每一個位址都在主控台這台的網卡上（單機版記成127.0.0.1，也可能記成本機網卡位址）。"""
+    try:
+        addrs = {i[4][0] for i in socket.getaddrinfo(str(host or ""), None)}
+    except (OSError, UnicodeError):
+        return False
+    return bool(addrs) and all(ipaddress.ip_address(a.split("%")[0]).is_loopback or is_local_address(a) for a in addrs)
 
 
 def apiinfo_brief(node_id, slot_id, timeout=20):
@@ -3839,6 +3848,20 @@ class Handler(BaseHTTPRequestHandler):
         """非管理員只能碰自己建的 Agent 資料夾（升級前建的、管理員連結的外部資料夾都沒有擁有者＝只有管理員能用）。"""
         return self.is_admin or STORE.folder_owner(node_id, str(folder or "")) == self.user
 
+    def _sd_folder(self, node_id):
+        """作品資料夾的位置，與能不能直接用檔案總管打開：桌面版、那台代理就在主控台這台、看網頁的人也坐在這台，
+        三個都成立才開得到人眼前；否則只給路徑讓人複製，不給一顆按了在別台跳視窗的按鈕。"""
+        code, out = call_node(node_id, "/sd/jobs", timeout=30)
+        if code != 200:
+            return code, out
+        path = out.get("dir") if isinstance(out, dict) else None
+        if not path:
+            return 409, {"error": "這台的代理太舊，不會回報作品資料夾；請先更新代理"}
+        node = next((n for n in fleet()["nodes"] if n["id"] == node_id), None)
+        here = bool(DESKTOP and node and node_on_this_machine(node.get("host"))
+                    and (getattr(self, "loopback", False) or is_local_address(self.ip)))
+        return 200, {"path": path, "can_open": here}
+
     def _sd_job_mine(self, node_id, jid):
         if self.is_admin:
             return True
@@ -4774,7 +4797,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/sd/catalog":
             return self._json(200, {"items": SD_CATALOG.load(), "roles": recommend.SD_ROLES, "kinds": recommend.SD_KINDS,
                                     "samplers": recommend.SD_SAMPLERS})
-        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output(?:/[0-3])?|/init)?)?", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/folder", path)
+        if m:
+            return self._json(*self._sd_folder(m.group(1)))
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs(/[0-9a-f]{8}(?:/output(?:/[0-3])?|/thumb/[0-3]|/init)?)?", path)
         if m:
             if m.group(2) and not self._sd_job_mine(m.group(1), m.group(2)[1:9]):
                 return self._json(404, {"error": "沒有這件產出"})
@@ -5575,6 +5601,16 @@ class Handler(BaseHTTPRequestHandler):
                             {"message": out.get("error")} | ({"job": out.get("id"), "size": f"{body.get('width')}x{body.get('height')}",
                                                              "count": body.get("count") or 1, "init_image": bool(body.get("init_image"))}
                                                             if act == "generate" else {"freed_gib": out.get("freed_gib")}))
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/sd/folder/open", path)
+        if m:
+            code, info = self._sd_folder(m.group(1))
+            if code != 200:
+                return self._json(code, info)
+            if not info["can_open"]:
+                return self._json(409, {"error": "作品資料夾在另一台機器上，這裡打不開；請複製路徑到那台找", "path": info["path"]})
+            code, out = call_node(m.group(1), "/desktop/open", "POST", {"path": info["path"]}, timeout=20)
+            self._audit("sd.folder.open", m.group(1), code == 200, {"message": out.get("error")})
             return self._json(code, out)
         m = re.fullmatch(r"/api/node/([\w.-]+)/sd/jobs/([0-9a-f]{8})/(cancel|delete)", path)
         if m:

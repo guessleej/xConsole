@@ -7743,7 +7743,7 @@ SD_CN_RX = re.compile(r"(?<![a-z0-9])(qwen|wan|z[-_ ]?image|hunyuan|minimax|hidr
                       r"moonshot|baichuan|internlm|doubao)(?![a-z])", re.I)
 SD_JOBS_FILE = os.path.join(STATE_DIR, "sd-jobs.json")
 GEN_DIR = os.path.join(STATE_DIR, "gen")
-SD_KEEP = 30                     # 產出只留最近 30 件
+SD_KEEP = 300                    # 作品牆翻得到的件數；更早的連檔案一起刪，作品資料夾才不會無限長大
 SD_RAM_SELF = 2.0                # sd-cli 自己（讀檔緩衝、CPU 端張量）要的系統記憶體，GiB
 SD_COMPUTE = {"image": 2.0, "video": 0.3}   # 每百萬像素（影片是每一格）的計算緩衝，GiB；經驗值，產過一次改用實測
 SD_PROGRESS_RX = re.compile(r"\|\s*(\d+)/(\d+)\s*-\s*([\d.]+)\s*(s/it|it/s)")
@@ -8287,6 +8287,9 @@ def _gen_run(j, argv, env, mm, fl):
                                                 "secs": j["secs"], "s_per_it": j.get("s_per_it"), "at": j["ended"]}
                 _sd_save(rows)
     _sd_jobs_save()
+    if j["state"] == "done" and j["kind"] == "image":
+        for i in range(len(sd_outs(j))):
+            sd_thumb(j["id"], i)
 
 
 def tail_text(path, n=8192):
@@ -8338,10 +8341,9 @@ SD_FLAT_BPMB = 1.0        # VP8 關鍵格每個 16×16 區塊不到 1 位元組�
 SD_LOUD_DB = -3.0         # 聲音平均音量高於這個＝整段推到滿格（滿格雜訊實測 0 dB，正常約 -25～-45 dB）
 
 
-def png_stats(path):
-    """PNG 的亮度平均與標準差（0～255，不算透明度）。只解 8 位元、無交錯的格式（sd-cli 寫的就是這種），其他回 None。"""
-    with open(path, "rb") as fh:
-        d = fh.read()
+def _png_decode(d):
+    """解PNG的掃描線：回 (寬, 高, 色彩型態, 每像素位元組, 逐列還原好的bytearray產生器)。
+    只解8位元、無交錯的格式（sd-cli寫的就是這種），其他或殘缺的檔回None。"""
     if d[:8] != b"\x89PNG\r\n\x1a\n":
         return None
     i, idat, hdr = 8, [], None
@@ -8358,38 +8360,99 @@ def png_stats(path):
         return None
     w, h, ct = hdr[0], hdr[1], hdr[3]
     bpp = {0: 1, 2: 3, 4: 2, 6: 4}[ct]
-    col = 1 if ct in (0, 4) else 3                       # 灰階看 1 個通道，彩色看 RGB
     raw, st = zlib.decompress(b"".join(idat)), w * bpp
     if len(raw) < h * (st + 1):                          # 掃描線比宣告的高度少：殘缺的檔，不判
         return None
-    prev, tot, sq, cnt = bytearray(st), 0, 0, 0
-    for y in range(h):
-        f, row = raw[y * (st + 1)], bytearray(raw[y * (st + 1) + 1:(y + 1) * (st + 1)])
-        for x in range(st) if f else ():
-            a = row[x - bpp] if x >= bpp else 0
-            b = prev[x]
-            if f == 1:
-                row[x] = (row[x] + a) & 255
-            elif f == 2:
-                row[x] = (row[x] + b) & 255
-            elif f == 3:
-                row[x] = (row[x] + ((a + b) >> 1)) & 255
-            elif f == 4:
-                c = prev[x - bpp] if x >= bpp else 0
-                p = a + b - c
-                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                row[x] = (row[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
-        prev = row
-        if y % 4 == 0:                                  # ponytail: 每 4 列抽 1 列算統計就夠判斷單色，省一半以上時間
-            for x in range(0, st, bpp * 4):
-                v = sum(row[x:x + col]) / col
-                tot += v
-                sq += v * v
-                cnt += 1
+
+    def rows():
+        prev = bytearray(st)
+        for y in range(h):
+            f, row = raw[y * (st + 1)], bytearray(raw[y * (st + 1) + 1:(y + 1) * (st + 1)])
+            for x in range(st) if f else ():
+                a = row[x - bpp] if x >= bpp else 0
+                b = prev[x]
+                if f == 1:
+                    row[x] = (row[x] + a) & 255
+                elif f == 2:
+                    row[x] = (row[x] + b) & 255
+                elif f == 3:
+                    row[x] = (row[x] + ((a + b) >> 1)) & 255
+                elif f == 4:
+                    c = prev[x - bpp] if x >= bpp else 0
+                    p = a + b - c
+                    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                    row[x] = (row[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+            prev = row
+            yield row
+    return w, h, ct, bpp, rows()
+
+
+def png_stats(path):
+    """PNG的亮度平均與標準差（0～255，不算透明度）；看不懂的格式回None。"""
+    with open(path, "rb") as fh:
+        dec = _png_decode(fh.read())
+    if not dec:
+        return None
+    _w, _h, ct, bpp, rows = dec
+    col = 1 if ct in (0, 4) else 3                       # 灰階看1個通道，彩色看RGB
+    tot, sq, cnt = 0, 0, 0
+    for y, row in enumerate(rows):
+        if y % 4:                                       # 每4列抽1列就夠判斷單色，省一半以上時間
+            continue
+        for x in range(0, len(row), bpp * 4):
+            v = sum(row[x:x + col]) / col
+            tot += v
+            sq += v * v
+            cnt += 1
     if not cnt:
         return None
     m = tot / cnt
     return m, math.sqrt(max(0.0, sq / cnt - m * m))
+
+
+def _png_chunk(t, data):
+    return len(data).to_bytes(4, "big") + t + data + (zlib.crc32(t + data) & 0xFFFFFFFF).to_bytes(4, "big")
+
+
+SD_THUMB_SIDE = 384      # 作品牆縮圖的長邊；高解析度螢幕上一格約190 CSS像素，兩倍剛好清楚
+
+
+def png_thumb(src, dst, side=SD_THUMB_SIDE):
+    """把PNG縮成長邊side的小圖（最近鄰取樣，保留原比例與透明度）存到dst。看不懂的格式回False。
+    作品牆一次十幾張，直接送原圖每批要傳幾十MB；只用標準函式庫，因為代理不能多裝影像套件。"""
+    with open(src, "rb") as fh:
+        dec = _png_decode(fh.read())
+    if not dec:
+        return False
+    w, h, ct, bpp, rows = dec
+    k = max(w, h) / side if max(w, h) > side else 1.0
+    tw, th = max(1, round(w / k)), max(1, round(h / k))
+    xs = [min(w - 1, int(x * k)) * bpp for x in range(tw)]
+    want = {}
+    for ty in range(th):
+        want.setdefault(min(h - 1, int(ty * k)), []).append(ty)
+    alpha = ct in (4, 6)
+    out_ct, out_bpp = (6, 4) if alpha else (2, 3)
+    lines = [b""] * th
+    for y, row in enumerate(rows):
+        if y not in want:
+            continue
+        line = bytearray(1 + tw * out_bpp)               # 第一個位元組是掃描線濾鏡0（不濾）
+        for tx, sx in enumerate(xs):
+            px = row[sx:sx + bpp]
+            if ct in (0, 4):
+                px = bytes((px[0], px[0], px[0])) + px[1:]
+            line[1 + tx * out_bpp:1 + (tx + 1) * out_bpp] = px
+        for ty in want[y]:
+            lines[ty] = bytes(line)
+    png = (b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", tw, th, 8, out_ct, 0, 0, 0))
+           + _png_chunk(b"IDAT", zlib.compress(b"".join(lines), 6)) + _png_chunk(b"IEND", b""))
+    tmp = f"{dst}.{secrets.token_hex(3)}.tmp"            # 網頁同時要同一張時兩邊各寫各的，最後換名，不會讀到半張
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(png)
+    os.replace(tmp, dst)
+    return True
 
 
 def _ebml_num(fh):
@@ -8581,21 +8644,31 @@ def sd_generate(body):
         if _GEN["proc"] is not None or any(x["state"] == "running" for x in _GEN["jobs"]):
             return 409, {"error": "一次只產一件：前一件還在產，等它完成或取消"}
         _GEN["jobs"].insert(0, j)
-        for old in _GEN["jobs"][SD_KEEP:]:
-            _sd_files_rm(old)
-        del _GEN["jobs"][SD_KEEP:]
+        _sd_trim_locked()
     _sd_jobs_save()
     p = pools(reg, hardware())
     threading.Thread(target=_gen_run, args=(j, argv, env, p["memory_model"], p["floors"]), daemon=True).start()
     return 200, {"ok": True, "id": jid, "admit": verdict}
 
 
+def _sd_trim_locked():
+    """超過保留件數的舊作品連檔案一起刪（呼叫時要拿著 _GEN_LOCK）。"""
+    for old in _GEN["jobs"][SD_KEEP:]:
+        _sd_files_rm(old)
+    del _GEN["jobs"][SD_KEEP:]
+
+
 def _sd_log(jid):
     return engine_file("sd", f"-{jid}.log")
 
 
+def _sd_thumb_name(jid, i):
+    return f"{jid}-t{i}.png"
+
+
 def _sd_files_rm(j):
-    for f in [os.path.join(GEN_DIR, x) for x in sd_outs(j) + ([j["init"]] if j.get("init") else [])] + [_sd_log(j["id"])]:
+    files = sd_outs(j) + ([j["init"]] if j.get("init") else []) + [_sd_thumb_name(j["id"], i) for i in range(4)]
+    for f in [os.path.join(GEN_DIR, x) for x in files] + [_sd_log(j["id"])]:
         if os.path.isfile(f):
             os.remove(f)
 
@@ -8642,6 +8715,32 @@ def sd_output(jid, i=0, init=False):
     with open(f, "rb") as fh:
         data = base64.b64encode(fh.read()).decode()
     return 200, {"mime": "video/webm" if f.endswith(".webm") else "image/png", "name": outs[i], "b64": data, "count": len(outs)}
+
+
+def sd_thumb(jid, i=0):
+    """作品牆用的第i張縮圖：第一次要時才縮、之後讀快取。影片或看不懂的格式回原檔（網頁照樣顯示，只是比較大）。"""
+    j = _sd_job(jid)
+    if not j or j["state"] != "done":
+        return 404, {"error": "這件沒有產出"}
+    outs = sd_outs(j)
+    if not 0 <= i < len(outs):
+        return 404, {"error": "沒有這一張"}
+    src = os.path.join(GEN_DIR, outs[i])
+    if not src.endswith(".png") or not os.path.isfile(src):
+        return sd_output(jid, i)
+    # 檔名用紀錄裡的編號（不是網址上的），而且正規化之後一定要在作品資料夾裡
+    root = os.path.realpath(GEN_DIR)
+    dst = os.path.realpath(os.path.join(root, _sd_thumb_name(j["id"], int(i))))
+    if not dst.startswith(root + os.sep):
+        return sd_output(jid, i)
+    try:
+        if not os.path.isfile(dst) and not png_thumb(src, dst):
+            return sd_output(jid, i)
+        with open(dst, "rb") as fh:
+            data = base64.b64encode(fh.read()).decode()
+    except (OSError, ValueError, zlib.error, struct.error):
+        return sd_output(jid, i)
+    return 200, {"mime": "image/png", "name": outs[i], "b64": data, "count": len(outs), "thumb": True}
 
 
 def sd_cancel(jid):
@@ -8860,7 +8959,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/sd/library":
             return self._send(200, sd_library())
         if path == "/sd/jobs":
-            return self._send(200, {"jobs": sd_jobs_list()})
+            return self._send(200, {"jobs": sd_jobs_list(), "dir": GEN_DIR})
+        m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})/thumb/([0-3])", path)
+        if m:
+            return self._send(*sd_thumb(m.group(1), int(m.group(2))))
         m = re.fullmatch(r"/sd/jobs/([0-9a-f]{8})(?:/(output)(?:/([0-3]))?|/(init))?", path)
         if m:
             if m.group(2) or m.group(4):
@@ -9050,12 +9152,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(403, {"error": "這台沒有開「讓模型操作這台的桌面」，請到這台的設定打開", "disabled": True})
             return self._send(*desktop_call("POST", "/desktop/act", body, timeout=60))
         if path == "/desktop/open":
-            # 只開模型存放區、畫圖模型區與 Agent 工作資料夾底下的資料夾（「開啟位置」用），不必打開操作電腦
-            full = os.path.realpath(str(body.get("path") or ""))
-            reg = registry()
-            roots = [gguf_root(reg), sd_root(reg), AGENT_ROOT, *agent_links(reg).values(), *model_dirs(reg)]
-            if not any(full == os.path.realpath(r) or full.startswith(os.path.realpath(r) + os.sep) for r in roots if r):
-                return self._send(400, {"error": "只能打開模型存放區或 Agent 工作資料夾底下的資料夾"})
+            full = desktop_open_target(body.get("path"))
+            if full is None:
+                return self._send(400, {"error": "只能打開模型存放區、作品資料夾或Agent工作資料夾底下的資料夾"})
+            if full == os.path.realpath(GEN_DIR):
+                os.makedirs(GEN_DIR, mode=0o700, exist_ok=True)       # 還沒產過作品時資料夾還不存在
             return self._send(*desktop_call("POST", "/desktop/open", {"path": full}, timeout=20))
         if path == "/agent/folders/link":
             return self._send(*agent_link(body.get("path"), body.get("name")))
@@ -9575,6 +9676,22 @@ def desktop_act_direct(body):
     except (RuntimeError, ValueError, OSError) as ex:
         return 400, {"error": str(ex)}
     return 200, {"ok": True}
+
+
+def desktop_open_target(path):
+    """「開啟位置」能打開的資料夾：模型存放區、畫圖模型區、Agent工作資料夾底下的，以及作品資料夾本身（不含底下）。
+    一律先realpath再比對，「..」與指向外面的捷徑都會還原成真正的位置，跳不出去。不在範圍內回None。"""
+    raw = str(path or "")
+    if not raw or "\x00" in raw:
+        return None
+    full = os.path.realpath(raw)
+    if full == os.path.realpath(GEN_DIR):
+        return full
+    reg = registry()
+    roots = [gguf_root(reg), sd_root(reg), AGENT_ROOT, *agent_links(reg).values(), *model_dirs(reg)]
+    if any(full == os.path.realpath(r) or full.startswith(os.path.realpath(r) + os.sep) for r in roots if r):
+        return full
+    return None
 
 
 def desktop_open_direct(path):

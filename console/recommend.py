@@ -794,6 +794,20 @@ def sd_pick(plans):
     return min(rest, key=lambda p: (p["level"] != "smooth", p["size_gib"])) if rest else None
 
 
+# 畫圖模型的改圖能力：清單defaults的image（ref＝照一句話改圖）與needs_image決定，標籤與下拉選單都由這裡推出來
+SD_EDIT_TAGS = {"both": "能改圖", "only": "只能改圖"}
+
+
+def sd_edit_cap(kind, defaults):
+    """回both（能畫也能改圖）、only（只能改圖）、draw（只能畫圖）；影片模型回None。"""
+    if kind != "image":
+        return None
+    d = defaults or {}
+    if d.get("image") == "ref":
+        return "only" if d.get("needs_image") else "both"
+    return "draw"
+
+
 def recommend_sd(state, sdlib, catalog):
     cap = sd_capacity(state)
     lib = sdlib or {}
@@ -827,7 +841,8 @@ def recommend_sd(state, sdlib, catalog):
     rank = {"smooth": 0, "ok": 1, "no": 2, "unknown": 3}
     order = sorted(items, key=lambda x: (rank[x["level"]], x["order"]))
     return {"capacity": cap, "items": items, "featured": next((x["repo"] for x in order if x["level"] == "smooth"), None),
-            "models": lib.get("models") or [], "root": lib.get("root"), "free_gib": lib.get("free_gib"),
+            "models": [{**m, "edit": sd_edit_cap(m.get("kind"), m.get("defaults"))} for m in lib.get("models") or []],
+            "root": lib.get("root"), "free_gib": lib.get("free_gib"),
             "sd_cli": lib.get("sd_cli"), "building": lib.get("building")}
 
 
@@ -937,4 +952,12 @@ def check_sd_fields(body):
     if err:
         return None, err
     out["defaults"] = d
+    # 「能改圖／只能改圖」標籤跟著參考圖的用法走，管理者改了用法不必記得另外改標籤
+    tags = [t for t in out["tags"] if t not in SD_EDIT_TAGS.values()]
+    cap_tag = SD_EDIT_TAGS.get(sd_edit_cap(kind, d))
+    if cap_tag:
+        tags.insert(min(1, len(tags)), cap_tag)
+    if len(tags) > 6:
+        return None, "標籤最多6個（含自動加上的「能改圖」或「只能改圖」）"
+    out["tags"] = tags
     return out, None

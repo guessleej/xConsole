@@ -527,7 +527,7 @@ pre.log {
 .modal h3 { font-size: 20px; margin-bottom: 8px; }
 .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-input[type="password"], input[type="text"], input[type="number"], input[type="datetime-local"], select {
+input[type="password"], input[type="text"], input[type="number"], input[type="datetime-local"], .sd-wall-bar input[type="search"], select {
   width: 100%;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
@@ -1051,11 +1051,51 @@ textarea.short { min-height: 48px; }
   min-height: 160px; overflow: hidden; }
 .sd-media img, .sd-media video { display: block; max-width: 100%; max-height: 380px; object-fit: contain; }
 .sd-prompt { color: var(--ink-2); margin: 6px 0 0; overflow-wrap: anywhere; max-height: 3.2em; overflow: hidden; }
-.scrollbox.sd-recent { max-height: 190px; }
-.sd-job { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; width: 100%; text-align: left; padding: 7px 10px;
-  border: 0; background: transparent; border-radius: 8px; cursor: pointer; color: inherit; font: inherit; align-items: center; }
-.sd-job:hover { background: var(--panel); }
-.sd-job-p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+.sd-go-why { margin: 6px 0 0; text-align: right; }
+.sd-media img.zoomable { cursor: zoom-in; }
+/* 作品牆：一批固定12件，格子高度固定，縮圖在格子裡照原比例縮放（不裁切），讀進來時版面不跳 */
+.sd-wall-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.sd-wall-bar .tabbar { margin-bottom: 0; }
+.sd-wall-bar input[type="search"] { width: min(240px, 100%); }
+.sd-wall-bar select { width: auto; padding-right: 32px; }
+.sd-wall-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 14px; min-height: 120px; }
+.sd-tile { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sd-tile-shot { position: relative; height: 176px; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--panel);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; color: inherit; font: inherit; }
+.sd-tile-shot:disabled { cursor: default; }
+.sd-tile-shot img, .sd-tile-shot video { max-width: 100%; max-height: 100%; aspect-ratio: var(--ar); object-fit: contain; display: block; }
+.sd-tile-shot:hover:not(:disabled) { box-shadow: 0 8px 22px rgba(22, 32, 42, .18); }
+.sd-tile-state { font-size: 15px; font-weight: 600; }
+.sd-tile-badge { position: absolute; right: 6px; bottom: 6px; font-size: 14px; padding: 1px 8px; border-radius: 999px;
+  background: rgba(10, 18, 25, .78); color: #fff; }
+.sd-tile-badge.warn { left: 6px; right: auto; background: #9a4a05; }
+.sd-tile-p { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.sd-tile-acts { display: flex; flex-wrap: wrap; gap: 2px; margin-left: -6px; }
+.link-btn.danger-t:hover { color: var(--bad); }
+.sd-wall-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.sd-wall-foot .tabbar { margin-bottom: 0; }
+.sd-wall-empty { grid-column: 1 / -1; padding: 18px; background: var(--panel); border-radius: var(--radius-sm); }
+.sd-wall-empty p { margin: 0 0 8px; }
+/* 全螢幕檢視器：一律深底，圖片照片色彩不受頁面深淺色影響 */
+html.viewer-open { overflow: hidden; }
+.sd-viewer { position: fixed; inset: 0; z-index: 260; background: rgba(6, 10, 14, .96); display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto; color: #e8eef2; }
+.sd-viewer-top { display: flex; align-items: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+.sd-viewer-pos { font-size: 15px; font-variant-numeric: tabular-nums; }
+.sd-viewer-stage { display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; padding: 0 72px; }
+.sd-viewer-stage img, .sd-viewer-stage video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.sd-viewer-stage.actual { overflow: auto; align-items: flex-start; justify-content: flex-start; }
+.sd-viewer-stage.actual img { max-width: none; max-height: none; margin: auto; }
+.sd-viewer-wait { font-size: 16px; }
+.sd-viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 52px; height: 72px; border: 0; border-radius: 12px;
+  background: rgba(255, 255, 255, .12); color: #fff; font-size: 40px; line-height: 1; cursor: pointer; }
+.sd-viewer-nav:hover:not(:disabled) { background: rgba(255, 255, 255, .22); }
+.sd-viewer-nav:disabled { visibility: hidden; }
+.sd-viewer-nav.prev { left: 12px; }
+.sd-viewer-nav.next { right: 12px; }
+.sd-viewer-cap { padding: 10px 16px 14px; font-size: 15px; max-height: 4.6em; overflow: auto; overflow-wrap: anywhere; color: #d5dee5; }
+.sd-viewer .btn:not(.primary) { background: rgba(255, 255, 255, .12); color: #fff; }
+.sd-viewer .btn:not(.primary):hover { background: rgba(255, 255, 255, .22); }
 .steps[hidden] { display: none; }
 /* 畫圖清單的表格與元件列欄位多（repo、檔名、種類），用比一般寬版更寬的彈窗，repo 不會一字一行 */
 .modal.wide.xwide { width: min(1040px, 100%); }
@@ -1067,6 +1107,10 @@ textarea.short { min-height: 48px; }
   .grid.sd-gen { grid-template-columns: 1fr; }
   .grid.sd-gen .form-row { grid-template-columns: 1fr 1fr; }       /* 尺寸、步數這些短欄位兩個一排，手機上不會拉成一長條 */
   .sd-media img, .sd-media video { max-height: 240px; }
+  .sd-wall-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .sd-tile-shot { height: 140px; }
+  .sd-viewer-stage { padding: 0 8px; }
+  .sd-viewer-nav { width: 40px; height: 56px; font-size: 30px; }
   .sd-part, .sd-parts.exact .sd-part { grid-template-columns: 1fr 1fr; }
 }
 
