@@ -1411,6 +1411,10 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .grp-form .wide { grid-column: 1 / -1; }
 .grp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 15px; }
 .grp-checks label { display: inline-flex; align-items: center; gap: 6px; }
+.grp-hours { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; }
+.grp-hour { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; }
+.grp-hour label { display: inline-flex; align-items: center; gap: 4px; }
+.grp-hour input[type=time] { width: 8.5em; }
 @media (max-width: 720px) { .grp-form { grid-template-columns: 1fr; } }
 
 /* ---- 對話：收藏、分類、標籤；拖檔進來的提示 */

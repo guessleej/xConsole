@@ -53,6 +53,8 @@ jobs:
         run: python agent/test_user_channel.py
       - name: 工作站互傳（票證、只送核對過的檔、同網段、同時2份、續傳、sha256、排程）
         run: python agent/test_peer.py
+      - name: 內部鏡像與下載限速（代理權杖、sha256、續傳、驗主控台憑證、時段）
+        run: cd console && python test_mirror.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
       - name: 安全指令（停用、恢復、清除、撤銷身分；離線排著、連上先送、後下覆蓋先下、重送不重做）

@@ -4292,6 +4292,10 @@
 "pattern": false
 },
 {
+"zh": "內部鏡像",
+"pattern": false
+},
+{
 "zh": "推理引擎",
 "pattern": false
 },
@@ -4325,6 +4329,78 @@
 },
 {
 "zh": "企業版模組",
+"pattern": false
+},
+{
+"zh": "群組設定的「模型可以從哪裡取得」勾了「內部鏡像」，群組裡的機器就跟主控台拿，不必每台都連外網",
+"pattern": false
+},
+{
+"zh": "主控台從 Hugging Face 取得每個檔都會核對 SHA-256，對不上就刪掉重下載。受限模型用「設定 › 推理引擎」裡的 Hugging Face 令牌。",
+"pattern": false
+},
+{
+"zh": "先下載的模型（作者/模型）",
+"pattern": false
+},
+{
+"zh": "量化（空的就是這個 repo 全部的 GGUF）",
+"pattern": false
+},
+{
+"zh": "先下載到內部鏡像",
+"pattern": false
+},
+{
+"zh": "存放在 {0}・剩 {1} GiB",
+"pattern": true
+},
+{
+"zh": "失敗：{0}",
+"pattern": true
+},
+{
+"zh": "內部鏡像還沒有任何模型。群組裡的機器第一次要模型時主控台會自動下載，也可以在上面先下載。",
+"pattern": false
+},
+{
+"zh": "從內部鏡像刪除 {0}",
+"pattern": true
+},
+{
+"zh": "從內部鏡像刪除",
+"pattern": false
+},
+{
+"zh": "刪掉主控台上這個模型的 {0} 個檔（約 {1} GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載。",
+"pattern": true
+},
+{
+"zh": "刪掉主控台上這個模型的",
+"pattern": false
+},
+{
+"zh": "個檔（約",
+"pattern": false
+},
+{
+"zh": "GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載",
+"pattern": false
+},
+{
+"zh": "已刪除",
+"pattern": false
+},
+{
+"zh": "排進 {0} 個檔",
+"pattern": true
+},
+{
+"zh": "排進",
+"pattern": false
+},
+{
+"zh": "這個 repo 沒有符合的 GGUF",
 "pattern": false
 },
 {
@@ -4728,10 +4804,6 @@
 "pattern": false
 },
 {
-"zh": "內部鏡像",
-"pattern": false
-},
-{
 "zh": "立即",
 "pattern": false
 },
@@ -4822,10 +4894,6 @@
 {
 "zh": "已刪除，{0} 台移到「未分類」",
 "pattern": true
-},
-{
-"zh": "已刪除",
-"pattern": false
 },
 {
 "zh": "台移到「未分類」",
@@ -5077,6 +5145,54 @@
 },
 {
 "zh": "顯卡功耗上限（瓦，空的就是不限）",
+"pattern": false
+},
+{
+"zh": "下載限速（每台 Mbps，空的就是不限）",
+"pattern": false
+},
+{
+"zh": "一",
+"pattern": false
+},
+{
+"zh": "二",
+"pattern": false
+},
+{
+"zh": "三",
+"pattern": false
+},
+{
+"zh": "四",
+"pattern": false
+},
+{
+"zh": "五",
+"pattern": false
+},
+{
+"zh": "六",
+"pattern": false
+},
+{
+"zh": "日",
+"pattern": false
+},
+{
+"zh": "刪除這段",
+"pattern": false
+},
+{
+"zh": "到",
+"pattern": false
+},
+{
+"zh": "加一段限速時段",
+"pattern": false
+},
+{
+"zh": "限速時段（每台機器自己的時間；沒有時段就是整天都限）",
 "pattern": false
 },
 {
@@ -7802,10 +7918,6 @@
 {
 "zh": "裝好了",
 "pattern": false
-},
-{
-"zh": "失敗：{0}",
-"pattern": true
 },
 {
 "zh": "裝好了。回模型庫的「畫圖與影片」下載一顆模型就能產圖。",
@@ -11456,6 +11568,10 @@
 "pattern": false
 },
 {
+"zh": "內部鏡像只提供檔案清單、模型資訊與下載檔案",
+"pattern": false
+},
+{
 "zh": "檢視帳號只能看，不能操作",
 "pattern": false
 },
@@ -11873,6 +11989,10 @@
 },
 {
 "zh": "已經有一個 Agent 任務在進行，請等它做完或按停止",
+"pattern": false
+},
+{
+"zh": "內部鏡像只給加入主控台的機器用",
 "pattern": false
 },
 {
@@ -15032,6 +15152,18 @@
 "pattern": false
 },
 {
+"zh": "限速要寫每秒幾 Mbps 與哪些時段",
+"pattern": false
+},
+{
+"zh": "限速（Mbps）",
+"pattern": false
+},
+{
+"zh": "限速時段最多 8 段",
+"pattern": false
+},
+{
 "zh": "群組名稱 1～30 個字，不能有引號、角括號或反斜線",
 "pattern": false
 },
@@ -15173,6 +15305,14 @@
 },
 {
 "zh": "模型存放位置要是完整路徑（例：/data/xconsole 或 D:\\xconsole），不能有 ..",
+"pattern": false
+},
+{
+"zh": "限速時段要選星期幾（1 是星期一，7 是星期日）",
+"pattern": false
+},
+{
+"zh": "限速時段的開始與結束時間要像 08:00、17:00，而且不能一樣",
 "pattern": false
 },
 {
@@ -16037,6 +16177,122 @@
 },
 {
 "zh": "執行環境包太大",
+"pattern": false
+},
+{
+"zh": "模型名稱或檔名不合法",
+"pattern": false
+},
+{
+"zh": "內部鏡像正在從 Hugging Face 下載 {0}（{1}%），稍後再試",
+"pattern": true
+},
+{
+"zh": "內部鏡像正在從 Hugging Face 下載",
+"pattern": false
+},
+{
+"zh": "%），稍後再試",
+"pattern": false
+},
+{
+"zh": "檔名不合法",
+"pattern": false
+},
+{
+"zh": "{0} 沒有 {1}",
+"pattern": true
+},
+{
+"zh": "內部鏡像下載 {0} 失敗（{1}），已重新排隊",
+"pattern": true
+},
+{
+"zh": "內部鏡像下載",
+"pattern": false
+},
+{
+"zh": "已重新排隊",
+"pattern": false
+},
+{
+"zh": "內部鏡像正在從 Hugging Face 下載 ",
+"pattern": false
+},
+{
+"zh": "讀不到 {0} 的檔案清單",
+"pattern": true
+},
+{
+"zh": "的檔案清單",
+"pattern": false
+},
+{
+"zh": "內部鏡像下載 ",
+"pattern": false
+},
+{
+"zh": " 失敗（",
+"pattern": false
+},
+{
+"zh": "），已重新排隊",
+"pattern": false
+},
+{
+"zh": "讀不到檔案清單",
+"pattern": false
+},
+{
+"zh": "大小不對（{0}／{1}），下次會接著下載",
+"pattern": true
+},
+{
+"zh": "大小不對",
+"pattern": false
+},
+{
+"zh": "下次會接著下載",
+"pattern": false
+},
+{
+"zh": "這個模型還在下載，等下載完再刪",
+"pattern": false
+},
+{
+"zh": "讀不到 ",
+"pattern": false
+},
+{
+"zh": " 的檔案清單",
+"pattern": false
+},
+{
+"zh": "大小不對（",
+"pattern": false
+},
+{
+"zh": "），下次會接著下載",
+"pattern": false
+},
+{
+"zh": "SHA-256 跟 Hugging Face 公布的不同，已刪除，會重新下載",
+"pattern": false
+},
+{
+"zh": "內部鏡像連不到 Hugging Face，也還沒有這個模型的資料",
+"pattern": false
+},
+{
+"zh": "Hugging Face 回 {0}",
+"pattern": true
+},
+{
+"zh": "Hugging Face 回",
+"pattern": false
+},
+{
+"zh": "Hugging Face 回 ",
 "pattern": false
 },
 {
@@ -16952,6 +17208,14 @@
 "pattern": false
 },
 {
+"zh": "{0}：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載",
+"pattern": true
+},
+{
+"zh": "連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載",
+"pattern": false
+},
+{
 "zh": "{0}：查不到 Hugging Face 上的檔案（{1}）",
 "pattern": true
 },
@@ -16993,10 +17257,6 @@
 },
 {
 "zh": "保留給使用者的記憶體",
-"pattern": false
-},
-{
-"zh": "內部鏡像還沒上線，網路來源用這台設定的 Hugging Face 位址",
 "pattern": false
 },
 {
@@ -17336,10 +17596,6 @@
 "pattern": false
 },
 {
-"zh": "讀不到 ",
-"pattern": false
-},
-{
 "zh": "剛啟動",
 "pattern": false
 },
@@ -17409,14 +17665,6 @@
 },
 {
 "zh": "名稱格式是「作者/模型」，例：unsloth/gemma-4-E4B-it-GGUF",
-"pattern": false
-},
-{
-"zh": "Hugging Face 回 {0}",
-"pattern": true
-},
-{
-"zh": "Hugging Face 回",
 "pattern": false
 },
 {
@@ -18280,6 +18528,10 @@
 "pattern": false
 },
 {
+"zh": "：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載",
+"pattern": false
+},
+{
 "zh": "：查不到 Hugging Face 上的檔案（",
 "pattern": false
 },
@@ -18624,10 +18876,6 @@
 "pattern": false
 },
 {
-"zh": "Hugging Face 回 ",
-"pattern": false
-},
-{
 "zh": "連不到 Hugging Face：{0}",
 "pattern": true
 },
@@ -18674,10 +18922,6 @@
 {
 "zh": "{0} 大小不對（{1}／{2}），可能連線中斷，重新下載會接續",
 "pattern": true
-},
-{
-"zh": "大小不對",
-"pattern": false
 },
 {
 "zh": "可能連線中斷，重新下載會接續",
@@ -20029,6 +20273,10 @@
 },
 {
 "zh": "試過所有位址與代理伺服器",
+"pattern": false
+},
+{
+"zh": "內部鏡像還在準備",
 "pattern": false
 },
 {

@@ -26103,5 +26103,135 @@
 "en": "No address",
 "ja": "アドレスがありません",
 "ko": "주소 없음"
+},
+"群組設定的「模型可以從哪裡取得」勾了「內部鏡像」，群組裡的機器就跟主控台拿，不必每台都連外網": {
+"en": "When a group's model sources include \"Internal mirror\", machines in the group download from the console instead of each going to the internet",
+"ja": "グループ設定の「モデルの取得元」で「内部ミラー」を選ぶと、グループ内の端末はコンソールから取得し、各端末が外部に接続する必要がありません",
+"ko": "그룹 설정의 '모델 가져올 곳'에서 '내부 미러'를 선택하면 그룹의 컴퓨터가 콘솔에서 받아 각자 외부 인터넷에 연결할 필요가 없습니다"
+},
+"主控台從 Hugging Face 取得每個檔都會核對 SHA-256，對不上就刪掉重下載。受限模型用「設定 › 推理引擎」裡的 Hugging Face 令牌。": {
+"en": "The console checks the SHA-256 of every file it gets from Hugging Face and deletes and re-downloads anything that doesn't match. Gated models use the Hugging Face token under Settings › Inference engine.",
+"ja": "コンソールは Hugging Face から取得した各ファイルの SHA-256 を照合し、一致しなければ削除して再ダウンロードします。制限付きモデルには「設定 › 推論エンジン」の Hugging Face トークンを使います。",
+"ko": "콘솔은 Hugging Face에서 받은 모든 파일의 SHA-256을 확인하고 맞지 않으면 삭제 후 다시 받습니다. 제한된 모델은 '설정 › 추론 엔진'의 Hugging Face 토큰을 사용합니다."
+},
+"先下載的模型（作者/模型）": {
+"en": "Model to download in advance (owner/model)",
+"ja": "事前にダウンロードするモデル（作者/モデル）",
+"ko": "미리 받을 모델(작성자/모델)"
+},
+"量化（空的就是這個 repo 全部的 GGUF）": {
+"en": "Quantization (leave empty for all GGUF files in the repo)",
+"ja": "量子化（空欄ならこの repo のすべての GGUF）",
+"ko": "양자화(비워 두면 이 repo의 모든 GGUF)"
+},
+"先下載到內部鏡像": {
+"en": "Download to internal mirror now",
+"ja": "内部ミラーへ事前にダウンロード",
+"ko": "내부 미러로 미리 받기"
+},
+"內部鏡像還沒有任何模型。群組裡的機器第一次要模型時主控台會自動下載，也可以在上面先下載。": {
+"en": "The internal mirror has no models yet. The console downloads a model automatically the first time a machine in the group asks for it, or you can download it in advance above.",
+"ja": "内部ミラーにはまだモデルがありません。グループの端末が初めてモデルを要求したときにコンソールが自動でダウンロードします。上で事前にダウンロードすることもできます。",
+"ko": "내부 미러에 아직 모델이 없습니다. 그룹의 컴퓨터가 처음 모델을 요청하면 콘솔이 자동으로 받으며, 위에서 미리 받을 수도 있습니다."
+},
+"從內部鏡像刪除 {0}": {
+"en": "Delete {0} from the internal mirror",
+"ja": "内部ミラーから {0} を削除",
+"ko": "내부 미러에서 {0} 삭제"
+},
+"下載限速（每台 Mbps，空的就是不限）": {
+"en": "Download rate limit (Mbps per machine, empty for no limit)",
+"ja": "ダウンロード速度制限（端末ごとの Mbps、空欄なら無制限）",
+"ko": "다운로드 속도 제한(컴퓨터당 Mbps, 비워 두면 제한 없음)"
+},
+"刪除這段": {
+"en": "Remove this period",
+"ja": "この時間帯を削除",
+"ko": "이 시간대 삭제"
+},
+"到": {
+"en": "to",
+"ja": "から",
+"ko": "~"
+},
+"加一段限速時段": {
+"en": "Add a rate-limit period",
+"ja": "速度制限の時間帯を追加",
+"ko": "속도 제한 시간대 추가"
+},
+"限速時段（每台機器自己的時間；沒有時段就是整天都限）": {
+"en": "Rate-limit periods (each machine's local time; no periods means all day)",
+"ja": "速度制限の時間帯（各端末の現地時刻。時間帯がなければ終日制限）",
+"ko": "속도 제한 시간대(각 컴퓨터의 현지 시간, 시간대가 없으면 하루 종일 제한)"
+},
+"內部鏡像只提供檔案清單、模型資訊與下載檔案": {
+"en": "The internal mirror only provides file lists, model info, and file downloads",
+"ja": "内部ミラーはファイル一覧、モデル情報、ファイルのダウンロードのみ提供します",
+"ko": "내부 미러는 파일 목록, 모델 정보, 파일 다운로드만 제공합니다"
+},
+"內部鏡像只給加入主控台的機器用": {
+"en": "The internal mirror is only for machines joined to this console",
+"ja": "内部ミラーはこのコンソールに参加した端末専用です",
+"ko": "내부 미러는 이 콘솔에 가입한 컴퓨터 전용입니다"
+},
+"限速要寫每秒幾 Mbps 與哪些時段": {
+"en": "The rate limit needs Mbps and the periods it applies to",
+"ja": "速度制限には Mbps と適用する時間帯が必要です",
+"ko": "속도 제한에는 Mbps와 적용 시간대가 필요합니다"
+},
+"限速（Mbps）": {
+"en": "Rate limit (Mbps)",
+"ja": "速度制限（Mbps）",
+"ko": "속도 제한(Mbps)"
+},
+"限速時段最多 8 段": {
+"en": "At most 8 rate-limit periods",
+"ja": "速度制限の時間帯は最大 8 つです",
+"ko": "속도 제한 시간대는 최대 8개입니다"
+},
+"限速時段要選星期幾（1 是星期一，7 是星期日）": {
+"en": "Pick the days for each rate-limit period (1 is Monday, 7 is Sunday)",
+"ja": "速度制限の時間帯は曜日を選んでください（1 が月曜、7 が日曜）",
+"ko": "속도 제한 시간대의 요일을 선택하세요(1은 월요일, 7은 일요일)"
+},
+"限速時段的開始與結束時間要像 08:00、17:00，而且不能一樣": {
+"en": "Rate-limit periods need start and end times like 08:00 and 17:00, and they can't be the same",
+"ja": "速度制限の開始・終了時刻は 08:00、17:00 のように指定し、同じにはできません",
+"ko": "속도 제한 시작·종료 시간은 08:00, 17:00처럼 지정하며 같을 수 없습니다"
+},
+"內部鏡像正在從 Hugging Face 下載 {0}（{1}%），稍後再試": {
+"en": "The internal mirror is downloading {0} from Hugging Face ({1}%); try again shortly",
+"ja": "内部ミラーが Hugging Face から {0} をダウンロード中です（{1}%）。しばらくしてから再試行してください",
+"ko": "내부 미러가 Hugging Face에서 {0}을(를) 받는 중입니다({1}%). 잠시 후 다시 시도하세요"
+},
+"內部鏡像下載 {0} 失敗（{1}），已重新排隊": {
+"en": "The internal mirror failed to download {0} ({1}); it has been queued again",
+"ja": "内部ミラーの {0} のダウンロードに失敗しました（{1}）。再度キューに入れました",
+"ko": "내부 미러의 {0} 다운로드 실패({1}), 다시 대기열에 넣었습니다"
+},
+"讀不到 {0} 的檔案清單": {
+"en": "Couldn't read the file list for {0}",
+"ja": "{0} のファイル一覧を読み取れません",
+"ko": "{0}의 파일 목록을 읽을 수 없습니다"
+},
+"讀不到檔案清單": {
+"en": "Couldn't read the file list",
+"ja": "ファイル一覧を読み取れません",
+"ko": "파일 목록을 읽을 수 없습니다"
+},
+"內部鏡像連不到 Hugging Face，也還沒有這個模型的資料": {
+"en": "The internal mirror can't reach Hugging Face and has no data for this model yet",
+"ja": "内部ミラーは Hugging Face に接続できず、このモデルのデータもまだありません",
+"ko": "내부 미러가 Hugging Face에 연결할 수 없고 이 모델 데이터도 아직 없습니다"
+},
+"{0}：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
+"en": "{0}: can't reach the console's internal mirror, and the group doesn't allow downloading directly from Hugging Face",
+"ja": "{0}：コンソールの内部ミラーに接続できず、グループでは Hugging Face からの直接ダウンロードも許可されていません",
+"ko": "{0}: 콘솔의 내부 미러에 연결할 수 없고 그룹이 Hugging Face 직접 다운로드도 허용하지 않습니다"
+},
+"內部鏡像還在準備": {
+"en": "The internal mirror is still preparing",
+"ja": "内部ミラーは準備中です",
+"ko": "내부 미러가 아직 준비 중입니다"
 }
 }

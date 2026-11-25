@@ -18,12 +18,14 @@ NAME_RX = re.compile(r"[^\x00-\x1f<>\"'`\\]{1,30}")
 MODEL_RX = re.compile(r"[A-Za-z0-9][\w./:+-]{0,159}")
 HISTORY_MAX = 20
 FIELD_NAMES = ("models", "allowed_models", "profile", "reserve_user_gib", "gpu_power_limit", "storage_root",
-               "sources", "locked", "apply_at")
+               "sources", "locked", "apply_at", "rate_limit")
+HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 def defaults():
     return {"models": [], "profile": {}, "locked": [], "reserve_user_gib": None, "storage_root": "",
-            "sources": ["huggingface"], "allowed_models": [], "apply_at": {"mode": "now"}, "gpu_power_limit": None}
+            "sources": ["huggingface"], "allowed_models": [], "apply_at": {"mode": "now"}, "gpu_power_limit": None,
+            "rate_limit": None}
 
 
 def _num(v, lo, hi, name, integer=False):
@@ -109,6 +111,26 @@ def check(s):
         out["apply_at"] = {"mode": a["mode"]}
     if s.get("gpu_power_limit") is not None:
         out["gpu_power_limit"] = _num(s["gpu_power_limit"], 30, 3000, "顯卡功耗上限（瓦）", True)
+    if s.get("rate_limit") is not None:
+        out["rate_limit"] = _rate_limit(s["rate_limit"])
+    return out
+
+
+def _rate_limit(r):
+    """下載限速（清單 #13）：上課或上班時段每台最多用多少頻寬。沒給時段＝整天都限。時間是每台機器自己的時區。"""
+    if not isinstance(r, dict) or set(r) - {"mbps", "hours"}:
+        raise ValueError("限速要寫每秒幾 Mbps 與哪些時段")
+    out = {"mbps": _num(r.get("mbps"), 1, 100000, "限速（Mbps）", True), "hours": []}
+    hours = r.get("hours") or []
+    if not isinstance(hours, list) or len(hours) > 8:
+        raise ValueError("限速時段最多 8 段")
+    for h in hours:
+        days = h.get("days") if isinstance(h, dict) else None
+        if not isinstance(days, list) or not days or any(not isinstance(d, int) or isinstance(d, bool) or not 1 <= d <= 7 for d in days):
+            raise ValueError("限速時段要選星期幾（1 是星期一，7 是星期日）")
+        if not HHMM_RX.fullmatch(str(h.get("from") or "")) or not HHMM_RX.fullmatch(str(h.get("to") or "")) or h["from"] == h["to"]:
+            raise ValueError("限速時段的開始與結束時間要像 08:00、17:00，而且不能一樣")
+        out["hours"].append({"days": sorted(set(days)), "from": h["from"], "to": h["to"]})
     return out
 
 
