@@ -179,6 +179,68 @@ $("#login-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ---------------------------------------------------------------- 即時問題回報（清單 #19）
+   錯誤出現的地方就有回報鈕：回報人只寫一句話，畫面、機器、哪個數字由系統帶入；送出當下回條。 */
+S.checking = new Set();
+async function loadChecking() {
+  try { S.checking = new Set((await api("/api/issues/checking", { noRelogin: true })).targets || []); } catch (_) { /* 沒登入時不用 */ }
+}
+
+function reportBtn(target, label = "回報數字有誤") {
+  const b = el("button", "linkbtn report-btn", S.checking.has(target) ? "查核中" : label);
+  b.type = "button";
+  if (S.checking.has(target)) b.title = "有人回報這個數字，云碩正在查核";
+  b.onclick = (e) => { e.stopPropagation(); reportModal({ target, label }); };
+  return b;
+}
+
+function reportModal(extra = {}, preset = "") {
+  const body = el("div");
+  body.appendChild(el("p", "note", extra.target ? `回報：${extra.target}` : "哪裡不對？寫一句話就好，畫面與機器會自動帶上。"));
+  const ta = el("textarea");
+  ta.maxLength = 500;
+  ta.value = preset;
+  ta.placeholder = "例：這台明明還有 20 GiB，這裡卻寫 2 GiB";
+  body.appendChild(ta);
+  const blk = el("input");
+  blk.type = "checkbox";
+  const bl = el("label", "grp-checks");
+  bl.append(blk, document.createTextNode("現在完全不能用（列為緊急）"));
+  body.appendChild(bl);
+  const files = el("input");
+  files.type = "file";
+  files.multiple = true;
+  files.accept = "image/*,audio/*,video/*";
+  const fl = el("label", "field wide", "附截圖、錄音或錄影（選填，最多 5 個）");
+  fl.appendChild(files);
+  body.appendChild(fl);
+  const auto = [`畫面 ${S.view}`, S.node ? `機器 ${S.node}` : "", extra.target ? `對象 ${extra.target}` : ""].filter(Boolean).join("、");
+  body.appendChild(el("p", "small muted", `會一起送：${auto}`));
+  modal({ title: "回報問題", bodyNode: body, hasInput: true, confirmText: "送出", onConfirm: async () => {
+    const text = ta.value.trim();
+    if (!text) { toast("寫一句話說明哪裡不對", "bad"); reportModal(extra, ""); return; }
+    let r;
+    try {
+      r = await api("/api/issues", { method: "POST", body: { text, blocking: blk.checked, page: S.view, target: extra.target || "",
+        context: { 畫面: S.view, 機器: S.node || "", 對象: extra.target || "" } } });
+    } catch (ex) { toast(ex.message, "bad"); reportModal(extra, text); return; }
+    const bad = [];
+    for (const f of [...files.files].slice(0, 5)) {
+      const res = await fetch(`/api/issues/${r.id}/attach`, { method: "POST", credentials: "same-origin", body: f,
+        headers: { "Content-Type": "application/octet-stream", "X-XConsole-Upload": "1", "X-Filename": encodeURIComponent(f.name) } });
+      if (!res.ok) bad.push(`${f.name}：${((await res.json().catch(() => ({}))).error) || res.status}`);
+    }
+    const d = el("div");
+    d.appendChild(el("p", "note", `工單 #${r.id}・${r.level}${r.senior ? "（主管帳號，自動列緊急）" : ""}`));
+    d.appendChild(el("p", null, r.level === "緊急" ? `已立刻通知云碩；${taipei(r.reply_due)} 前會有人回覆，預計 ${taipei(r.due)} 處理完。`
+      : `預計 ${taipei(r.due)} 前處理完。處理進度可以到「我的帳號」看。`));
+    if (bad.length) d.appendChild(el("p", "note bad", `有附件沒收到：${bad.join("；")}`));
+    modal({ title: "已收到回報", bodyNode: d, confirmText: "好" });
+  } });
+}
+
+$("#report").addEventListener("click", () => reportModal());
+
 $("#logout").addEventListener("click", async () => {
   try { await api("/api/logout", { method: "POST" }); } catch (_) { /* 失敗也要回登入頁 */ }
   showLogin();
@@ -4100,6 +4162,7 @@ function hfRepoOf(text) {
 
 const SETTINGS_TABS = [
   ["machines", "機器"], ["groups", "群組"], ["mirror", "內部鏡像"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
+  ["issues", "問題回報"],
   ["logs", "記錄"], ["users", "使用者帳號"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
   ["modules", "企業版模組"],
 ];
@@ -4135,7 +4198,125 @@ function viewSettings() {
   main.appendChild(wrap);
   ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
      users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand, me: myAccountInto,
-     modules: settingsModules, mirror: settingsMirror, ...Object.fromEntries(ENT_PAGES.map((p) => [p.key, p.render])) }[tab] || settingsMachines)(wrap);
+     modules: settingsModules, mirror: settingsMirror, issues: settingsIssues, ...Object.fromEntries(ENT_PAGES.map((p) => [p.key, p.render])) }[tab] || settingsMachines)(wrap);
+}
+
+/* ---------------------------------------------------------------- 問題回報（清單 #19）
+   通知名單、主管帳號、郵件伺服器在這裡設；沒設好的地方頁面最上面講清楚。下面是所有工單，點進去改進度、回覆、標查核中。 */
+const ISSUE_STATES = ["已受理", "處理中", "已完成", "已結案"];
+
+async function settingsIssues(wrap) {
+  const c = card("問題回報", "長官或使用者看到數字不對，按畫面上的「回報」就會到這裡；緊急件會立刻寄信給云碩");
+  wrap.appendChild(c);
+  const body = el("div");
+  c.appendChild(body);
+  let r;
+  try { r = await api("/api/issues"); } catch (ex) { body.appendChild(el("p", "note bad", ex.message)); return; }
+  r.warnings.forEach((w) => body.appendChild(el("p", "note bad", w)));
+  body.appendChild(el("p", "small muted", `處理中 ${r.open} 件，其中緊急 ${r.urgent_open} 件`));
+  const lines = (a) => (a || []).join("\n");
+  const form = el("div", "grp-form");
+  const fTo = groupField(form, "云碩收件人（email，一行一個）", el("textarea"), true);
+  fTo.value = lines(r.cfg.recipients);
+  const fSchool = groupField(form, "學校窗口（處理完一起通知，email，一行一個）", el("textarea"), true);
+  fSchool.value = lines(r.cfg.school);
+  const fSen = groupField(form, "主管帳號（送出的回報自動列緊急，一行一個登入帳號，例如校長、副校長）", el("textarea"), true);
+  fSen.value = lines(r.cfg.seniors);
+  const fRh = groupField(form, "緊急件初步回覆時限（小時）", groupInputBox("number", r.cfg.urgent_reply_hours, { min: 0.25, max: 24, step: 0.25 }));
+  const fNd = groupField(form, "一般件預計完成（天）", groupInputBox("number", r.cfg.normal_days, { min: 1, max: 30, step: 1 }));
+  const fHost = groupField(form, "郵件伺服器（SMTP）", groupInputBox("text", r.smtp.host || "", { placeholder: "smtp.office365.com" }));
+  const fPort = groupField(form, "埠", groupInputBox("number", r.smtp.port || "", { min: 1, max: 65535, placeholder: "587" }));
+  const fSec = el("select");
+  [["starttls", "STARTTLS（587）"], ["ssl", "SSL（465）"], ["none", "不加密（只限內網的轉信主機）"]].forEach(([v, t]) => {
+    const o = el("option", null, t); o.value = v; o.selected = v === (r.smtp.security || "starttls"); fSec.appendChild(o);
+  });
+  groupField(form, "加密方式", fSec);
+  const fUser = groupField(form, "登入帳號（沒有就留空）", groupInputBox("text", r.smtp.user || "", { autocomplete: "off" }));
+  const fPw = groupField(form, r.smtp.password_set ? "密碼（已設定；留空就沿用）" : "密碼", groupInputBox("password", "", { autocomplete: "new-password" }));
+  const fFrom = groupField(form, "寄件人（email）", groupInputBox("text", r.smtp.from || "", { placeholder: "xconsole@example.edu.tw" }));
+  c.appendChild(form);
+  const act = el("div", "slot-actions");
+  const save = el("button", "btn primary", "儲存");
+  const test = el("button", "btn", "寄測試信給云碩收件人");
+  act.append(save, test);
+  c.appendChild(act);
+  const ls = (t) => t.value.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  save.onclick = async () => {
+    try {
+      await api("/api/issues/settings", { method: "POST", body: {
+        cfg: { recipients: ls(fTo), school: ls(fSchool), seniors: ls(fSen), urgent_reply_hours: Number(fRh.value), normal_days: Number(fNd.value) },
+        smtp: { host: fHost.value.trim(), port: fPort.value ? Number(fPort.value) : null, security: fSec.value, user: fUser.value.trim(),
+          password: fPw.value, from: fFrom.value.trim() } } });
+      toast("已儲存", "ok");
+      S.settingsTab = "issues";
+      go("settings");
+    } catch (ex) { toast(ex.message, "bad"); }
+  };
+  test.onclick = async () => {
+    try { const t = await api("/api/issues/test-mail", { method: "POST", body: {} }); toast(`已寄給 ${t.to.join("、")}`, "ok"); } catch (ex) { toast(ex.message, "bad"); }
+  };
+
+  const tc = card("工單", "點一筆看說明、附件與寄信紀錄，改進度或回覆；回覆與處理完都會通知回報人");
+  wrap.appendChild(tc);
+  if (!r.items.length) { tc.appendChild(el("p", "small muted", "還沒有人回報。")); return; }
+  const t = el("table", "tbl");
+  r.items.forEach((x) => {
+    const tr = el("tr");
+    tr.className = "clickable";
+    const td = el("td");
+    td.appendChild(el("div", null, `#${x.id}・${x.text}`));
+    td.appendChild(el("div", "small muted", `${x.by}・${x.page}${x.target ? "・" + x.target : ""}`));
+    tr.appendChild(td);
+    tr.appendChild(el("td", "small nowrap " + (x.level === "緊急" && ["已受理", "處理中"].includes(x.state) ? "bad-t" : ""),
+      `${x.level}・${x.state}${x.checking ? "・查核中" : ""}`));
+    tr.appendChild(el("td", "small nowrap muted", taipei(x.at)));
+    tr.onclick = () => issueDetail(x);
+    t.appendChild(tr);
+  });
+  tc.appendChild(t);
+}
+
+function issueDetail(x) {
+  const d = el("div");
+  d.appendChild(el("p", null, x.text));
+  d.appendChild(el("p", "small muted", `${x.by}（${x.role || "—"}）・${taipei(x.at)}・${x.level}・預計 ${taipei(x.due)} 前處理完`));
+  const ctx = Object.entries(x.context || {}).filter(([, v]) => v).map(([k, v]) => `${k}：${v}`).join("、");
+  if (ctx) d.appendChild(el("p", "small", `當時的畫面：${ctx}`));
+  (x.files || []).forEach((f) => {
+    const a = el("a", "linkbtn", `附件：${f.name}（${fmt(f.size / 2 ** 20)} MB）`);
+    a.href = `/api/issues/${x.id}/file/${f.id}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    d.appendChild(el("div")).appendChild(a);
+  });
+  (x.replies || []).forEach((rp) => d.appendChild(el("p", "small", `${taipei(rp.at)} ${rp.by}：${rp.text}`)));
+  const fail = (x.mails || []).filter((m) => !m.ok);
+  if (fail.length) d.appendChild(el("p", "note bad", `有 ${fail.length} 封通知沒寄出去：${fail[fail.length - 1].error}`));
+  const st = el("select");
+  ISSUE_STATES.forEach((v) => { const o = el("option", null, v); o.value = v; o.selected = v === x.state; st.appendChild(o); });
+  const f1 = el("label", "field", "進度");
+  f1.appendChild(st);
+  d.appendChild(f1);
+  const ck = el("input");
+  ck.type = "checkbox";
+  ck.checked = !!x.checking;
+  const cl = el("label", "grp-checks");
+  cl.append(ck, document.createTextNode("查核中（用到這個數字的畫面會提醒）"));
+  d.appendChild(cl);
+  const rp = el("textarea");
+  rp.placeholder = "回覆回報人（會寄信通知他）";
+  const f2 = el("label", "field wide", "回覆");
+  f2.appendChild(rp);
+  d.appendChild(f2);
+  modal({ title: `工單 #${x.id}`, bodyNode: d, hasInput: true, confirmText: "儲存", onConfirm: async () => {
+    try {
+      await api(`/api/issues/${x.id}/update`, { method: "POST", body: { state: st.value, checking: ck.checked, reply: rp.value.trim() || null } });
+      toast("已更新", "ok");
+      loadChecking();
+      S.settingsTab = "issues";
+      go("settings");
+    } catch (ex) { toast(ex.message, "bad"); }
+  } });
 }
 
 /* ---------------------------------------------------------------- 內部鏡像（清單 #13）
@@ -5747,6 +5928,23 @@ function myAccountInto(wrap) {
   c.appendChild(el("p", "small muted", "你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。"));
   wrap.appendChild(c);
   passwordCard(wrap, { ...S.me, username: S.me.user });
+  const mine = card("我的回報", "回報過的問題與處理進度");
+  wrap.appendChild(mine);
+  api("/api/issues/mine").then((r) => {
+    if (!r.items.length) { mine.appendChild(el("p", "small muted", "還沒有回報過。畫面右上角的旗子可以回報問題。")); return; }
+    const t = el("table", "tbl");
+    r.items.forEach((x) => {
+      const tr = el("tr");
+      const td = el("td");
+      td.appendChild(el("div", null, `#${x.id}・${x.text}`));
+      if (x.replies.length) td.appendChild(el("div", "small muted", `云碩回覆：${x.replies[x.replies.length - 1].text}`));
+      tr.appendChild(td);
+      tr.appendChild(el("td", "small nowrap", `${x.level}・${x.state}${x.checking ? "・查核中" : ""}`));
+      tr.appendChild(el("td", "small nowrap muted", taipei(x.at)));
+      t.appendChild(tr);
+    });
+    mine.appendChild(t);
+  }).catch((ex) => mine.appendChild(el("p", "note bad", ex.message)));
 }
 
 /* ---------------------------------------------------------------- 使用者帳號（管理員）
@@ -7051,6 +7249,7 @@ async function start() {
   $("#upd-top").hidden = true;          // 換帳號登入（管理員登出、使用者登入）不能留著上一位的更新按鈕
   try { S.me = await api("/api/me"); } catch (_) { return; }
   if (S.me.must_change) { viewForcePassword(); return; }
+  loadChecking();
   if (!isAdmin() && !navItems().some(([k]) => k === topOf(S.view))) S.view = myRole() === "user" ? "chat" : "home";
   checkTlsBanner();
   checkUpdateNotice();
