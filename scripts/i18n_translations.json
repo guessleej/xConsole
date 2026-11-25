@@ -26423,5 +26423,35 @@
 "en": "This machine has no built engine package",
 "ja": "この端末にはビルド済みの推論エンジンパッケージがありません",
 "ko": "이 컴퓨터에는 빌드된 추론 엔진 패키지가 없습니다"
+},
+"保留給使用者其他程式的記憶體（GiB，加在系統記憶體的底線上）": {
+"en": "Memory reserved for the user's other programs (GiB, added to the system memory floor)",
+"ja": "ユーザーの他のプログラム用に確保するメモリ（GiB、システムメモリの下限に加算）",
+"ko": "사용자의 다른 프로그램용으로 남길 메모리(GiB, 시스템 메모리 하한에 더함)"
+},
+"先卸載模型，不讓電腦卡住（工作站建議）": {
+"en": "Unload the model first so the computer doesn't freeze (recommended for workstations)",
+"ja": "まずモデルをアンロードしてPCが固まらないようにする（ワークステーション推奨）",
+"ko": "컴퓨터가 멈추지 않도록 먼저 모델 내리기(워크스테이션 권장)"
+},
+"不動（伺服器）": {
+"en": "Leave it alone (servers)",
+"ja": "何もしない（サーバー）",
+"ko": "그대로 두기(서버)"
+},
+"使用者的程式把記憶體用光時": {
+"en": "When the user's programs use up memory",
+"ja": "ユーザーのプログラムがメモリを使い切ったとき",
+"ko": "사용자 프로그램이 메모리를 다 쓸 때"
+},
+"使用者優先要選「先卸載模型」或「不動」": {
+"en": "User priority must be \"Unload the model first\" or \"Leave it alone\"",
+"ja": "ユーザー優先は「まずモデルをアンロード」か「何もしない」を選んでください",
+"ko": "사용자 우선은 '먼저 모델 내리기' 또는 '그대로 두기' 중에서 고르세요"
+},
+"這台的其他程式把系統記憶體用到只剩 {0} GiB（底線 {1} GiB），為了不讓電腦卡住，{2} 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
+"en": "Other programs on this machine left only {0} GiB of system memory (floor {1} GiB), so this model was unloaded at {2} to keep the computer from freezing. Close programs you don't need, then press Start to use it again",
+"ja": "この端末の他のプログラムがシステムメモリを {0} GiB まで使ったため（下限 {1} GiB）、PCが固まらないよう {2} にこのモデルをアンロードしました。不要なプログラムを閉じてから「起動」を押すと再び使えます",
+"ko": "이 컴퓨터의 다른 프로그램이 시스템 메모리를 {0} GiB만 남겨(하한 {1} GiB) 컴퓨터가 멈추지 않도록 {2}에 이 모델을 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
 }
 }

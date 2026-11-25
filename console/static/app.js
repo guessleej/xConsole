@@ -4764,7 +4764,12 @@ function groupEditor(g, d) {
   groupField(form, "思考", fThink);
   const fTemp = groupField(form, "溫度（0～2）", groupInputBox("number", num(p.temperature), { min: 0, max: 2, step: 0.05 }));
   const fTopP = groupField(form, "top_p（0～1）", groupInputBox("number", num(p.top_p), { min: 0, max: 1, step: 0.05 }));
-  const fRes = groupField(form, "保留給使用者其他程式的記憶體（GiB）", groupInputBox("number", num(st.reserve_user_gib), { min: 0, step: 1 }));
+  const fRes = groupField(form, "保留給使用者其他程式的記憶體（GiB，加在系統記憶體的底線上）", groupInputBox("number", num(st.reserve_user_gib), { min: 0, step: 1 }));
+  const fUser = el("select");
+  [["unload", "先卸載模型，不讓電腦卡住（工作站建議）"], ["keep", "不動（伺服器）"]].forEach(([v, t]) => {
+    const o = el("option", null, t); o.value = v; o.selected = v === (st.user_first || "unload"); fUser.appendChild(o);
+  });
+  groupField(form, "使用者的程式把記憶體用光時", fUser);
   const fPow = groupField(form, "顯卡功耗上限（瓦，空的就是不限）", groupInputBox("number", num(st.gpu_power_limit), { min: 30, step: 10 }));
   const rl = st.rate_limit || {};
   const fRate = groupField(form, "下載限速（每台 Mbps，空的就是不限）", groupInputBox("number", num(rl.mbps), { min: 1, step: 10 }));
@@ -4851,6 +4856,7 @@ function groupEditor(g, d) {
       rate_limit: n(fRate) === null ? null : { mbps: n(fRate), hours: [...hoursBox.children].map((r) => r.read()) },
       sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
       locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
+      user_first: fUser.value,
       overrides: { ...(st.overrides || {}), ...Object.fromEntries(Object.entries(ovBoxes).map(([k, t]) => [k, ls(t)])) },
     };
     try {

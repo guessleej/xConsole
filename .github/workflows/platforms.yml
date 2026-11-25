@@ -58,6 +58,8 @@ jobs:
         run: python agent/test_user_channel.py
       - name: 工作站互傳（三種系統的網段判斷與互傳埠）
         run: python agent/test_peer.py
+      - name: 工作站准入
+        run: python agent/test_userfirst.py
       - name: 內部鏡像與下載限速
         run: python console/test_mirror.py
       - name: 推理引擎一次編譯分發

@@ -18,14 +18,15 @@ NAME_RX = re.compile(r"[^\x00-\x1f<>\"'`\\]{1,30}")
 MODEL_RX = re.compile(r"[A-Za-z0-9][\w./:+-]{0,159}")
 HISTORY_MAX = 20
 FIELD_NAMES = ("models", "allowed_models", "profile", "reserve_user_gib", "gpu_power_limit", "storage_root",
-               "sources", "locked", "apply_at", "rate_limit", "overrides")
+               "sources", "locked", "apply_at", "rate_limit", "overrides", "user_first")
+USER_FIRST = ("unload", "keep")                      # 使用者的程式把記憶體吃光時：先卸載模型（工作站預設）、或不動
 HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 def defaults():
     return {"models": [], "profile": {}, "locked": [], "reserve_user_gib": None, "storage_root": "",
             "sources": ["huggingface"], "allowed_models": [], "apply_at": {"mode": "now"}, "gpu_power_limit": None,
-            "rate_limit": None, "overrides": {}}
+            "rate_limit": None, "overrides": {}, "user_first": "unload"}
 
 
 def _num(v, lo, hi, name, integer=False):
@@ -113,6 +114,10 @@ def check(s):
         out["gpu_power_limit"] = _num(s["gpu_power_limit"], 30, 3000, "顯卡功耗上限（瓦）", True)
     if s.get("rate_limit") is not None:
         out["rate_limit"] = _rate_limit(s["rate_limit"])
+    uf = s.get("user_first", "unload")
+    if uf not in USER_FIRST:
+        raise ValueError("使用者優先要選「先卸載模型」或「不動」")
+    out["user_first"] = uf
     ov = s.get("overrides") or {}
     if not isinstance(ov, dict) or len(ov) > 32:
         raise ValueError("依機型覆寫最多 32 種機型")
