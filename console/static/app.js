@@ -7222,8 +7222,8 @@ async function start() {
   $("#app").hidden = false;
   $("#upd-top").hidden = true;          // 換帳號登入（管理員登出、使用者登入）不能留著上一位的更新按鈕
   try { S.me = await api("/api/me"); } catch (_) { return; }
-  loadChecking();
   if (S.me.must_change) { viewForcePassword(); return; }
+  loadChecking();
   if (!isAdmin() && !navItems().some(([k]) => k === topOf(S.view))) S.view = myRole() === "user" ? "chat" : "home";
   checkTlsBanner();
   checkUpdateNotice();

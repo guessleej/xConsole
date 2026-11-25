@@ -21,7 +21,17 @@ from email.message import EmailMessage
 STATES = ("已受理", "處理中", "已完成", "已結案")
 OPEN = ("已受理", "處理中")
 LEVELS = ("緊急", "一般")
-EMAIL_RX = re.compile(r"(?=.{3,254}$)[^@\s,;<>]+@[^@\s.,;<>]+(?:\.[^@\s.,;<>]+)+")
+_EMAIL_BAD = set(" \t\r\n,;<>")
+
+
+def is_email(s):
+    """一個 @、網域至少兩段、不含空白與分隔符號。不用正規表示式：輸入是使用者給的，避免回溯。"""
+    s = str(s or "")
+    if not 3 <= len(s) <= 254 or s.count("@") != 1 or _EMAIL_BAD & set(s):
+        return False
+    local, domain = s.split("@")
+    labels = domain.split(".")
+    return bool(local) and len(labels) >= 2 and all(labels)
 DEFAULT_CFG = {"recipients": [], "school": [], "seniors": [], "urgent_reply_hours": 1, "normal_days": 3}
 ESCALATE_EVERY = 3600
 OVERDUE_EVERY = 86400
@@ -53,7 +63,7 @@ def check_cfg(body):
     out = dict(DEFAULT_CFG)
     for k, name in (("recipients", "云碩收件人"), ("school", "學校窗口")):
         rows = [str(x).strip() for x in body.get(k) or [] if str(x).strip()]
-        bad = [x for x in rows if not EMAIL_RX.fullmatch(x)]
+        bad = [x for x in rows if not is_email(x)]
         if bad or len(rows) > 30:
             raise ValueError(f"{name}要是 email（一行一個，最多 30 個）：{'、'.join(bad[:3])}")
         out[k] = list(dict.fromkeys(rows))
@@ -255,8 +265,8 @@ class Issues:
         if event in ("urgent", "escalate"):
             return list(cfg.get("recipients") or [])
         if event == "overdue":
-            return list(dict.fromkeys((cfg.get("recipients") or []) + [s for s in cfg.get("seniors") or [] if EMAIL_RX.fullmatch(s)]))
-        reporter = [it["by"]] if EMAIL_RX.fullmatch(it["by"] or "") else []
+            return list(dict.fromkeys((cfg.get("recipients") or []) + [s for s in cfg.get("seniors") or [] if is_email(s)]))
+        reporter = [it["by"]] if is_email(it["by"] or "") else []
         return list(dict.fromkeys(reporter + (cfg.get("school") or [] if event == "resolved" else [])))
 
     def _later(self, iid, event, cfg):

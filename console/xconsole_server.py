@@ -5984,7 +5984,7 @@ class Handler(BaseHTTPRequestHandler):
                 if sm.get("security", "starttls") not in ("starttls", "ssl", "none"):
                     raise ValueError("加密方式要是 STARTTLS、SSL 或不加密")
                 frm = str(sm.get("from") or "").strip()
-                if frm and not issues.EMAIL_RX.fullmatch(frm):
+                if frm and not issues.is_email(frm):
                     raise ValueError("寄件人要是 email")
             except ValueError as exc:
                 return self._json(400, {"error": str(exc)})
@@ -6003,7 +6003,7 @@ class Handler(BaseHTTPRequestHandler):
                                                      "smtp_host": host, "password_changed": bool(pw)})
             return self._json(200, {"ok": True})
         if path == "/api/issues/test-mail":
-            to = [x for x in issue_cfg().get("recipients") or [] if issues.EMAIL_RX.fullmatch(x)]
+            to = [x for x in issue_cfg().get("recipients") or [] if issues.is_email(x)]
             ok, why = issue_mailer(to, "[xConsole] 問題回報測試信", "這是問題回報的測試信。收到就代表郵件伺服器與通知名單都設好了。")
             self._audit("issue.test_mail", "", ok, {"to": len(to), "error": why})
             return self._json(200 if ok else 502, {"ok": ok, "error": why, "to": to})
