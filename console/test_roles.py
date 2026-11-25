@@ -155,7 +155,7 @@ EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/(histor
                     r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
                     r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
 EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
-                      r"POST /api/groups/a{8}/(update|rollback)",
+                      r"POST /api/groups/a{8}/(update|rollback)", r"POST /api/groups/a{8}/rejoin/a/(approve|reject)",
                       r"POST /api/node/a/slots/add"]
 
 

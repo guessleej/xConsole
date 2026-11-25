@@ -4687,6 +4687,39 @@ function groupMembers(g) {
   return c;
 }
 
+// 還原卡（清單 #18）：沒有接回憑證、但主機板識別碼跟某一格一樣的機器，先當新機器納管，等管理者或老師核准才接回那一格
+function rejoinPendingBox(g) {
+  const box = el("div", "grp-plan");
+  box.appendChild(el("h3", null, "待核准接回"));
+  box.appendChild(el("p", "note", "主機板識別碼不是秘密、照抄得到，所以要人確認：確定是同一台（例如還原卡把系統碟還原了）才按「接回」。"));
+  const names = Object.fromEntries((S.fleet?.nodes || []).map((n) => [n.id, n.name]));
+  const t = el("table", "tbl");
+  g.rejoin_pending.forEach((p) => {
+    const tr = el("tr");
+    const td = el("td");
+    td.appendChild(el("div", null, `${names[p.node] || p.node} 想接回原來的 ${names[p.claims] || p.claims}`));
+    td.appendChild(el("div", "small muted", `${taipei(p.at)}・${p.why}`));
+    tr.appendChild(td);
+    const acts = el("td", "row-acts");
+    [["approve", "接回", "btn sm primary"], ["reject", "當成新機器", "btn sm"]].forEach(([act, label, cls]) => {
+      const b = el("button", cls, label);
+      b.disabled = !canOperate();
+      b.onclick = async () => {
+        try {
+          await api(`/api/groups/${g.id}/rejoin/${encodeURIComponent(p.node)}/${act}`, { method: "POST", body: {} });
+          toast(act === "approve" ? "已接回原來那一格" : "已當成新機器", "ok");
+          tr.remove();
+        } catch (ex) { toast(ex.message, "bad"); }
+      };
+      acts.appendChild(b);
+    });
+    tr.appendChild(acts);
+    t.appendChild(tr);
+  });
+  box.appendChild(t);
+  return box;
+}
+
 // 混合機型（清單 #14）：每種機型會拿到哪一版、大概多快、放不下給替代方案；可依機型覆寫（一行一個，空的就照群組設定）
 function groupPlanBox(g, ovBoxes) {
   const box = el("div", "grp-plan");
@@ -4776,6 +4809,12 @@ function groupEditor(g, d) {
   const lapRow = el("label", "grp-checks");
   lapRow.append(fLaptop, document.createTextNode("筆電省電：用電池時不下載、不換上大模型；計費網路（例如手機熱點）時不下載"));
   groupField(form, "筆電", lapRow, true);
+  const fRejoin = el("input");
+  fRejoin.type = "checkbox";
+  fRejoin.checked = !!st.allow_rejoin;
+  const rjRow = el("label", "grp-checks");
+  rjRow.append(fRejoin, document.createTextNode("允許接回（還原卡）：機器拿得出那一格的接回憑證就接回；拿不出來但主機板識別碼一樣的，列進待核准"));
+  groupField(form, "還原卡", rjRow, true);
   const fPow = groupField(form, "顯卡功耗上限（瓦，空的就是不限）", groupInputBox("number", num(st.gpu_power_limit), { min: 30, step: 10 }));
   const rl = st.rate_limit || {};
   const fRate = groupField(form, "下載限速（每台 Mbps，空的就是不限）", groupInputBox("number", num(rl.mbps), { min: 1, step: 10 }));
@@ -4837,6 +4876,7 @@ function groupEditor(g, d) {
   const local = at ? new Date(at.getTime() - at.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
   const fAt = groupField(form, "指定時間（選「指定時間」才用）", groupInputBox("datetime-local", local));
   c.appendChild(form);
+  if ((g.rejoin_pending || []).length) c.appendChild(rejoinPendingBox(g));
   const ovBoxes = {};
   c.appendChild(groupPlanBox(g, ovBoxes));
 
@@ -4862,7 +4902,7 @@ function groupEditor(g, d) {
       rate_limit: n(fRate) === null ? null : { mbps: n(fRate), hours: [...hoursBox.children].map((r) => r.read()) },
       sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
       locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
-      user_first: fUser.value, laptop_care: fLaptop.checked,
+      user_first: fUser.value, laptop_care: fLaptop.checked, allow_rejoin: fRejoin.checked,
       overrides: { ...(st.overrides || {}), ...Object.fromEntries(Object.entries(ovBoxes).map(([k, t]) => [k, ls(t)])) },
     };
     try {

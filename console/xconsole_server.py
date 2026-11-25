@@ -134,6 +134,7 @@ OPERATOR_ROUTES = [
     ("POST", r"/api/node/[\w.-]+/(all/(start|stop|restart)|admit/[\w.-]+|profile/[\w.-]+)"),
     ("POST", r"/api/node/[\w.-]+/slots/add"),         # 只限空欄位：這台還沒有欄位時，按「啟動模型」會先自動建一格
     ("POST", r"/api/groups/[0-9a-f]{8}/(update|rollback)"),
+    ("POST", r"/api/groups/[0-9a-f]{8}/rejoin/[\w.-]{1,64}/(approve|reject)"),   # 那間教室的老師也能核准接回
 ]
 ROLES = ("admin", "operator", "viewer", "user")
 ROLE_NAMES = {"admin": "管理員", "operator": "維運", "viewer": "檢視", "user": "使用者"}
@@ -1924,7 +1925,9 @@ except OSError:
 print(json.dumps({"code": sys.stdin.readline().strip(), "hostname": socket.gethostname(), "port": 9401, "ips": ips,
                   "linger": os.environ.get("XC_LINGER", "yes") == "yes", "push": True,
                   "token": open(os.path.join(home, ".xconsole", "token")).read().strip(),
-                  "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read()}))
+                  "cert": open(os.path.join(home, ".xconsole", "agent-cert.pem")).read(),
+                  "rejoin": open(os.path.join(home, ".xconsole", "rejoin.key")).read().strip()
+                  if os.path.exists(os.path.join(home, ".xconsole", "rejoin.key")) else ""}))
 """
 
 # 讀主控台對加入的回應：印出訊息；主控台連不進這台時，把通道的位址與通道憑證寫給代理（代理每 5 秒看一次）。
@@ -1948,6 +1951,12 @@ if d.get("link") == "push" and c.get("url") and c.get("cert"):
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(data)
         os.replace(tmp, os.path.join(sd, name))
+if d.get("ok") and d.get("rejoin"):
+    tmp = os.path.join(sd, "rejoin.key.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(d["rejoin"])
+    os.replace(tmp, os.path.join(sd, "rejoin.key"))
 """
 assert "'" not in JOIN_SAVE_PY and "'" not in JOIN_PAYLOAD_PY
 
@@ -2204,6 +2213,11 @@ def _join_node(handler, body):
             # 工作站：防火牆擋連入、IP 會換。改由這台用長輪詢連回主控台，權杖由它第一次連回時證明
             link, good = "push", ip
         nid = gname = None
+        via = ""                                    # 接回：rejoin（憑證）、pending（等核准）
+        new_rk = secrets.token_urlsafe(32)          # 這次發的接回憑證：只回給這台一次，主控台只存雜湊
+        old_rk = str(body.get("rejoin") or "")
+        hwid = str(body.get("hwid") or "")
+        hwid = hwid if re.fullmatch(r"[0-9a-f]{64}", hwid) else ""
 
         def put(cfg):
             nonlocal nid, gname
@@ -2221,12 +2235,23 @@ def _join_node(handler, body):
                 _put(cfg)
 
         def _put(cfg):
-            nonlocal nid
-            # 加入一律新增一台；只有管理者產碼時指定「重新安裝哪一台」才覆寫那一筆。
-            # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）
+            nonlocal nid, via
+            # 加入一律新增一台；只有管理者產碼時指定「重新安裝哪一台」、或拿得出那一格的接回憑證，才覆寫那一筆。
+            # 以前自動以位址或憑證比對「同一台」：持碼者在 IP 被接手、或主機名稱解析被偽造時能藉此搶走既有機器（資安審查）。
+            # 主機板識別碼不是秘密、照抄得到，所以只拿來提「可能是哪一台」給管理者核准，不能直接接回
+            g = next((x for x in cfg.get("groups", []) if x["name"] == gname), None)
+            allow = bool(((g or {}).get("settings") or {}).get("allow_rejoin"))
             same = next((n for n in cfg["nodes"] if n["id"] == j.get("replace")), None)
+            if not same and allow and re.fullmatch(r"[A-Za-z0-9_-]{20,128}", old_rk):
+                h = hashlib.sha256(old_rk.encode()).hexdigest()
+                same = next((n for n in cfg["nodes"] if (n.get("group") or groups.DEFAULT) == gname and n.get("rejoin_hash")
+                             and hmac.compare_digest(n["rejoin_hash"], h)), None)
+                via = "rejoin" if same else ""
             if same:                                   # 指定重新安裝的那台：換新的權杖、位址與憑證，名稱群組不動
-                same.update(host=good, agent_port=port, link=link, token=tls.seal(CERTS.p, token.encode()))
+                same.update(host=good, agent_port=port, link=link, token=tls.seal(CERTS.p, token.encode()),
+                            rejoin_hash=hashlib.sha256(new_rk.encode()).hexdigest())     # 舊的接回憑證當場作廢
+                if hwid:
+                    same["hwid"] = hwid
                 same.pop("revoked", None)              # 撤銷身分之後重新加入
                 nid = same["id"]
                 return
@@ -2236,8 +2261,16 @@ def _join_node(handler, body):
             nid = base if base not in taken else next(f"{base}-{i}" for i in itertools.count(2) if f"{base}-{i}" not in taken)
             cfg["nodes"].append({"id": nid, "name": jname or hostname, "host": good,
                                  "group": gname, "agent_port": port, "link": link,
-                                 "token": tls.seal(CERTS.p, token.encode())})
+                                 "token": tls.seal(CERTS.p, token.encode()),
+                                 "rejoin_hash": hashlib.sha256(new_rk.encode()).hexdigest(), **({"hwid": hwid} if hwid else {})})
             groups.ensure(cfg)
+            claims = [n for n in cfg["nodes"] if n["id"] != nid and (n.get("group") or groups.DEFAULT) == gname
+                      and hwid and n.get("hwid") == hwid]
+            if allow and len(claims) == 1 and g is not None:
+                # 沒有接回憑證、主機板識別碼跟某一格一樣：先當新機器納管，同時列進「待核准接回」，管理者核准才接回那一格
+                g.setdefault("rejoin_pending", []).append({"node": nid, "claims": claims[0]["id"], "at": int(time.time()),
+                                                           "why": "主機板識別碼跟那一格一樣（識別碼不是秘密，要人確認）"})
+                via = "pending"
         update_fleet(put)
         if nid is None:
             return fail("加入碼在驗證期間被作廢，或它的群組被刪掉了；請在主控台重新產生加入碼", j)
@@ -2251,12 +2284,14 @@ def _join_node(handler, body):
     name = next((n["name"] for n in fleet()["nodes"] if n["id"] == nid), nid)
     JOINS.finish(j, nid, name, ip, bool(body.get("linger")))
     STORE.audit(j["by"], ip, "node.join", nid, True, {"host": good, "port": port, "link": link, "code": j["id"],
-                                                       "fingerprint256": r["summary"]["fingerprint256"]})
+                                                       "fingerprint256": r["summary"]["fingerprint256"], **({"via": via} if via else {})})
+    note = {"rejoin": "用接回憑證接回原來那一格。", "pending": "看起來是原本的某一台，已列進待核准接回，管理者核准後接回原來那一格。"}.get(via, "")
     if link == "pull":
-        return 200, {"ok": True, "id": nid, "message": f"已加入主控台：{name}（{good}）。回到網頁就看得到這台。"}
+        return 200, {"ok": True, "id": nid, "rejoin": new_rk, "via": via,
+                     "message": f"已加入主控台：{name}（{good}）。{note}回到網頁就看得到這台。"}
     host = urlparse(f"https://{j['console']}").hostname or ""
     # 安裝腳本把這些寫進 ~/.xconsole/agent-link.json：代理看到就開始連回通道埠，只認發給它的通道憑證
-    return 200, {"ok": True, "id": nid, "link": "push",
+    return 200, {"ok": True, "id": nid, "link": "push", "rejoin": new_rk, "via": via,
                  "console": dict(link_payload(), node=nid,
                                  url=f"https://{'[' + host + ']' if ':' in host else host}:{LINK_PORT}"),
                  "message": f"已加入主控台：{name}。主控台連不進這台（防火牆擋連入），改由這台主動連回，"
@@ -4520,7 +4555,7 @@ class Handler(BaseHTTPRequestHandler):
                 if os.path.exists(tf):
                     r, _ = tls.inspect_trusted_ca(open(tf, "rb").read())
                     fp = (r.get("summary") or {}).get("fingerprint256")
-                out.append({**{k: v for k, v in n.items() if k != "token"},
+                out.append({**{k: v for k, v in n.items() if k not in ("token", "rejoin_hash", "hwid")},
                             "trusted": os.path.exists(tf) or n.get("link") == "user", "trust_fingerprint": fp})
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
@@ -5583,6 +5618,38 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(409, {"error": err[0]})
             self._audit("group.create", g["name"], True, {"kind": g["kind"]})
             return self._json(200, {"ok": True, "group": g})
+        m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/rejoin/([\w.-]{1,64})/(approve|reject)", path)
+        if m:
+            gid, nid, act = m.groups()
+            if self.scope is not None and gid not in self.scope:
+                return self._json(404, {"error": "沒有這個群組"})
+            out = {}
+
+            def decide(cfg):
+                g = next((x for x in cfg.get("groups", []) if x["id"] == gid), None)
+                pend = next((p for p in (g or {}).get("rejoin_pending") or [] if p["node"] == nid), None)
+                if not pend:
+                    out.update(code=404, error="沒有這筆待核准接回")
+                    return
+                g["rejoin_pending"] = [p for p in g["rejoin_pending"] if p is not pend]
+                new = next((n for n in cfg["nodes"] if n["id"] == nid), None)
+                old = next((n for n in cfg["nodes"] if n["id"] == pend["claims"]), None)
+                if act == "approve":
+                    if not new or not old:
+                        out.update(code=409, error="新機器或原來那一格已經不在了")
+                        return
+                    # 接回：新加入的這台接手原來那一格的名稱，原來那一格（已經是舊身分、連不上了）拿掉
+                    new["name"] = old["name"]
+                    cfg["nodes"] = [n for n in cfg["nodes"] if n is not old]
+                    out["removed"] = old["id"]
+                out.update(code=200, node=nid, claims=pend["claims"])
+            update_fleet(decide)
+            if out.get("code") != 200:
+                return self._json(out["code"], {"error": out["error"]})
+            if out.get("removed") and os.path.exists(trust_file(out["removed"])):
+                os.remove(trust_file(out["removed"]))
+            self._audit("node.rejoin_" + act, nid, True, {"claims": out["claims"]})
+            return self._json(200, {"ok": True})
         m = re.fullmatch(r"/api/groups/([0-9a-f]{8})/rollback", path)
         if m:
             v = body.get("version")

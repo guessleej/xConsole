@@ -4,7 +4,10 @@
 主控台憑證：給了 --fingerprint 就只接受那一張（比對整張憑證的 SHA-256，主控台「加一台機器」畫面上抄得到）；
 沒給就照一般方式驗證（主控台換成正式憑證之後用這條）。兩條都不是關掉驗證。
 
-  python join.py --console 主控台位址:埠 [--fingerprint 十六進位] --home 資料夾 [--agent-port 9401] < 加入碼
+  python join.py --console 主控台位址:埠 [--fingerprint 十六進位] --home 資料夾 [--agent-port 9401] [--storage-root 不還原的資料夾] < 加入碼
+
+還原卡（清單 #18）：主控台每次加入都發一張接回憑證，存在 --storage-root（不還原的磁碟）與代理資料夾各一份；
+系統碟被還原、身分沒了之後重跑這支，就拿它接回原來那一格（群組要開「允許接回」），用過當場換新的。
 結束碼：0 加入成功；1 失敗（原因印在畫面上）。
 """
 import argparse
@@ -99,6 +102,30 @@ def save_link(sd, d):
             os.replace(tmp, os.path.join(sd, name))
 
 
+def rejoin_paths(sd, storage_root):
+    return ([os.path.join(storage_root, ".xconsole", "rejoin.key")] if storage_root else []) + [os.path.join(sd, "rejoin.key")]
+
+
+def hwid(sd):
+    """主機板識別碼的雜湊：只拿來提示主控台「可能是哪一台」給管理者核准，不能直接拿來接回（識別碼不是秘密）。"""
+    try:
+        with open(os.path.join(sd, "identity.json"), encoding="utf-8") as fh:
+            smb = str((json.load(fh).get("ids") or {}).get("smbios") or "")
+    except (OSError, ValueError):
+        return ""
+    return hashlib.sha256(smb.encode()).hexdigest() if smb and set(smb.replace("-", "")) - {"0", "F", "f"} else ""
+
+
+def save_rejoin(paths, key):
+    for p in paths:
+        os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
+        tmp = p + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(key)
+        os.replace(tmp, p)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="把這台的節點代理加入主控台；加入碼從標準輸入讀")
     ap.add_argument("--console", required=True)
@@ -106,7 +133,10 @@ def main(argv=None):
     ap.add_argument("--home", required=True)
     ap.add_argument("--agent-port", type=int, default=9401)
     ap.add_argument("--linger", default="yes")
+    ap.add_argument("--storage-root", default="")
     a = ap.parse_args(argv)
+    if a.storage_root and not os.path.isabs(a.storage_root):
+        raise SystemExit("--storage-root 要是完整路徑（例：D:\\xconsole 或 /data/xconsole）")
     if not HOST_RX.fullmatch(a.console):
         raise SystemExit("主控台位址格式不對，例：192.0.2.10:9400")
     fp = re.sub(r"[^0-9A-Fa-f]", "", a.fingerprint).upper()
@@ -117,7 +147,13 @@ def main(argv=None):
     body = {"code": code, "hostname": socket.gethostname(), "port": a.agent_port, "ips": my_ips(),
             "linger": a.linger == "yes", "push": True,
             "token": open(os.path.join(sd, "token"), encoding="utf-8").read().strip(),
-            "cert": open(os.path.join(sd, "agent-cert.pem"), encoding="utf-8").read()}
+            "cert": open(os.path.join(sd, "agent-cert.pem"), encoding="utf-8").read(), "hwid": hwid(sd)}
+    paths = rejoin_paths(sd, a.storage_root)
+    for p in paths:
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as fh:
+                body["rejoin"] = fh.read().strip()
+            break
     try:
         st, d = post(a.console, fp, body)
     except ssl.SSLCertVerificationError as ex:
@@ -127,6 +163,8 @@ def main(argv=None):
         raise SystemExit(f"連不到主控台 {a.console}：{ex}") from None
     print(d.get("message") or d.get("error") or d)
     save_link(sd, d)
+    if st == 200 and d.get("ok") and d.get("rejoin"):
+        save_rejoin(paths, d["rejoin"])             # 舊的那張主控台已經作廢
     return 0 if st == 200 and d.get("ok") else 1
 
 

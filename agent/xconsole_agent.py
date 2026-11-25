@@ -10015,7 +10015,9 @@ def _group_prepare(st, s):
         # 主控台依機型挑了量化：只准用的清單寫「作者/模型」（不限量化）也算在內
         if allowed and spec not in allowed and _group_spec(spec)[0] not in allowed:
             raise RuntimeError(f"{spec} 不在「只准用的模型」清單裡")
-    for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置")):
+    if s.get("storage_root"):
+        group_storage(st, s["storage_root"])
+    for k, label in (("gpu_power_limit", "顯卡功耗上限"),):
         if s.get(k) not in (None, "", 0):
             _gstep(st, f"{label}這一版的代理還不支援，先略過", "skip")
     reg = registry()
@@ -10035,6 +10037,36 @@ def _group_prepare(st, s):
     if specs:
         _gstep(st, "准入預檢通過（逐欄試算，實際換上時會再算一次）")
     _gstep(st, "準備完成")
+
+
+def group_storage(st, root):
+    """群組的「模型存放位置」（清單 #18）：還原卡的教室要指到不還原的磁碟。模型改放 <位置>/models，
+    接回憑證另存一份到 <位置>/.xconsole/rejoin.key：系統碟被還原、身分沒了之後，重跑安裝就拿它接回原來那一格。"""
+    models = os.path.join(root, "models")
+    try:
+        os.makedirs(models, exist_ok=True)
+        probe = os.path.join(models, ".xconsole-write-test")
+        with open(probe, "w", encoding="utf-8") as fh:
+            fh.write("ok")
+        os.remove(probe)
+    except OSError as exc:
+        raise RuntimeError(f"模型存放位置 {root} 寫不進去：{exc}") from exc
+    with REG_LOCK:
+        reg = registry()
+        if os.path.abspath(expand(reg["machine"].get("gguf_root") or GGUF_ROOT_DEFAULT)) != os.path.abspath(models):
+            reg["machine"]["gguf_root"] = models
+            save_json(REGISTRY, reg)
+            _gstep(st, f"模型改放 {models}（群組設定的存放位置）")
+    key = os.path.join(STATE_DIR, "rejoin.key")
+    dest = os.path.join(root, ".xconsole", "rejoin.key")
+    if os.path.exists(key):
+        os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
+        with open(key, "rb") as src:
+            data = src.read()
+        fd = os.open(dest + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(dest + ".tmp", dest)
 
 
 def _group_suggest(spec, slot_id, m, p):
