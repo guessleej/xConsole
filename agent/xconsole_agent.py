@@ -5222,6 +5222,7 @@ def full_state():
         "machine": reg["machine"],
         "chip": chip(reg["machine"]),
         "identity": identity_public(),
+        "disabled_by_admin": safety_public(),
         # 總覽的「安裝推理引擎」那一步用：只看檔案在不在，不跑 --version（每 15 秒一次太貴）
         "engine": {"llama_server": bool((reg["machine"].get("llama_server")
                                          and os.path.exists(expand(reg["machine"]["llama_server"])))
@@ -8749,7 +8750,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0].rstrip("/") or "/"
         if path == "/healthz":
             # 複製出來、丟掉舊身分的機器：不用登入也看得到「需要重新加入」（沒有機密，只是一個旗標）
-            return self._send(200, {"ok": True, "service": "xconsole-agent", **({"needs_rejoin": True} if IDENTITY.get("rejoin") else {})})
+            return self._send(200, {"ok": True, "service": "xconsole-agent", **({"needs_rejoin": True} if IDENTITY.get("rejoin") else {}),
+                                    **({"disabled_by_admin": True} if safety_disabled() else {})})
         if not self._auth():
             return None
         if path in ("/", "/state"):
@@ -8818,6 +8820,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0].rstrip("/") or "/"
         if not self._auth():
             return None
+        if safety_disabled() and re.fullmatch(r"/library/upload|/(llama|sd)/import", path):
+            return self._send(423, dict(DISABLED))
         if path == "/library/upload":
             # 上傳的本文是檔案的位元組，不是 JSON：參數放在網址上（都只是名稱與位置，沒有機密）
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -8843,6 +8847,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(413, {"error": "一次最多送 64 MB"})
             return self._send(*engine_import_chunk(m.group(1), g("name"), offset, total, self.rfile.read(n)))
         body = self._body()
+        if path == "/safety":
+            return self._send(*safety_run(body))
+        if safety_disabled() and not DISABLED_OK.fullmatch(path):
+            return self._send(423, dict(DISABLED))
         m = re.fullmatch(r"/(llama|sd)/import/(status|cancel|install)", path)
         if m:
             kind, act, name = m.group(1), m.group(2), str(body.get("name") or "")
@@ -10080,7 +10088,7 @@ def group_tick():
     with GROUP_LOCK:
         st = group_state()
     s, v = st.get("settings"), st.get("version")
-    if not s or not v:
+    if not s or not v or safety_disabled():         # 停用中：設定先收著，恢復時再準備與套用
         return
     try:
         if st["prepared"] < v:
@@ -10489,6 +10497,150 @@ def _watch_parent(pid):
 
 
 
+# ---------------------------------------------------------------- 安全指令（清單 #25）
+# 停用、恢復、清除、撤銷身分。主控台把指令存在資料庫裡，這台下次連上時在群組對齊之前先送來；
+# 同一個編號再送來（網路重送、主控台沒收到結果）直接回上次的結果，不重做一次。停用的狀態寫檔，重開機照樣停用。
+SAFETY_FILE = os.path.join(STATE_DIR, "safety.json")
+SAFETY_KINDS = ("disable", "enable", "wipe", "revoke")
+SAFETY_KEEP = 256
+SAFETY_LOCK = threading.Lock()
+SAFETY_ID_RX = re.compile(r"[0-9a-f]{24}")
+DISABLED = {"error": "這台已被管理者停用，請洽IT", "disabled_by_admin": True}
+# 停用中仍然可以做的：停止、看狀態類的檢查、接收群組設定（存起來，恢復後才套用）、更新代理、改這台的設定
+DISABLED_OK = re.compile(r"/safety|/group/sync|/slot/[\w.-]+/stop|/all/stop|/admit/[\w.-]+|/self/update|/machine"
+                         r"|/library/(hf|hf/profile|hf/search|hf/tree|upload/status|upload/cancel|delete|dirs)"
+                         r"|/library/download/[0-9a-f]{8}/cancel|/(llama|sd)/(build|import)/(cancel|status)|/sd/delete"
+                         r"|/sd/jobs/[0-9a-f]{8}/(cancel|delete)|/agent/(exec/cancel|folders/unlink)|/profiles/[a-z][a-z0-9_-]{0,31}/delete")
+
+
+def safety_state():
+    return load_json(SAFETY_FILE, None) or {"disabled": None, "done": {}}
+
+
+def safety_disabled():
+    return safety_state().get("disabled")
+
+
+def safety_public():
+    d = safety_disabled()
+    return {"at": d["at"], "by": d.get("by") or ""} if d else None
+
+
+def _stop_everything():
+    """停掉每個欄位並取消開機自啟。回原本開機自啟的那幾個（恢復時照原樣開回來）。"""
+    was = []
+    for slot in registry()["slots"]:
+        if not slot.get("unit"):
+            continue
+        if unit_enabled(slot["unit"]):
+            was.append(slot["id"])
+        sysctl(slot["unit"], "stop", timeout=60)
+        sysctl(slot["unit"], "disable", timeout=30)
+    return was
+
+
+def _empty(root, keep_links=True):
+    """刪掉 root 底下的每一樣東西（root 本身留著）。符號連結只刪連結，不跟進去刪別人的檔。回刪了幾項。"""
+    n = 0
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return 0
+    for f in names:
+        p = os.path.join(root, f)
+        try:
+            if os.path.islink(p) or not os.path.isdir(p):
+                os.remove(p)
+            else:
+                shutil.rmtree(p)
+            n += 1
+        except OSError:
+            pass
+    return n
+
+
+def _wipe(opts):
+    """清除這台上使用者留下的東西：Agent 工作資料夾、畫圖與影片的產出、模型服務的記錄檔；勾了才連模型一起刪。
+    連結進來給 Agent 用的外部資料夾只取消連結，不刪裡面的檔。主控台的對話不在代理這裡（清單 #22）。"""
+    _stop_everything()
+    reg = registry()
+    out = {"agent_files": _empty(AGENT_ROOT), "generated": _empty(GEN_DIR)}
+    save_json(SD_JOBS_FILE, [])
+    with REG_LOCK:
+        reg = registry()
+        out["agent_links"] = len(reg["machine"].get("agent_links") or {})
+        reg["machine"]["agent_links"] = {}
+        save_json(REGISTRY, reg)
+    logs = 0
+    for slot in reg["slots"]:
+        paths = [slot.get("log")] + ([SUP.log_path(unit_name(slot["unit"]))] if slot.get("unit") and not SYSTEMD else [])
+        for lp in paths:
+            if lp and os.path.isfile(lp):
+                try:
+                    open(lp, "w").close()        # 清空不刪：服務的設定還指著這個檔
+                    logs += 1
+                except OSError:
+                    pass
+    out["logs"] = logs
+    if opts.get("models"):
+        out["models"] = _empty(gguf_root(reg)) + _empty(sd_root(reg))     # 只刪 xConsole 自己的存放區，其他程式的模型資料夾不動
+    return out
+
+
+def _revoke():
+    """丟掉這台的身分（權杖、憑證、連回設定、群組狀態），跟判定是複製出來的一樣，要重新加入才會再被管理。"""
+    global TOKEN
+    for f in (TOKEN_FILE, LINK_FILE, LINK_CERT, GROUP_FILE):
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
+    TOKEN = ensure_token()                      # 換掉記憶體裡的權杖：主控台手上那一把立刻失效
+    rec = load_json(IDENTITY_FILE, None) or {}
+    rec["rejoin"] = {"at": int(time.time()), "reason": "管理者撤銷了這台的身分"}
+    _id_note(rec, "管理者撤銷了這台的身分：需要重新加入主控台")
+    save_json(IDENTITY_FILE, rec)
+    IDENTITY.update(rejoin=rec["rejoin"], notes=rec.get("notes") or [])
+    print("管理者撤銷了這台的身分：已丟掉權杖與連回設定，請重新加入主控台", flush=True)
+
+
+def safety_run(body):
+    cid, kind, opts = str(body.get("id") or ""), body.get("kind"), body.get("opts") or {}
+    if not SAFETY_ID_RX.fullmatch(cid) or kind not in SAFETY_KINDS or not isinstance(opts, dict):
+        return 400, {"error": "安全指令格式不對"}
+    with SAFETY_LOCK:
+        st = safety_state()
+        if cid in st["done"]:
+            return 200, dict(st["done"][cid]["result"], repeat=True)
+        res = {"kind": kind}
+        if kind == "disable":
+            if not st.get("disabled"):          # 已經停用：維持原本記下的開機自啟清單，不能被「全部已關」蓋掉
+                st["disabled"] = {"at": int(time.time()), "id": cid, "by": str(body.get("by") or "")[:64],
+                                  "was_enabled": _stop_everything()}
+            res["stopped"] = True
+        elif kind == "enable":
+            d = st.get("disabled") or {}
+            st["disabled"] = None
+            back = []
+            for slot in registry()["slots"]:
+                if slot.get("unit") and slot["id"] in (d.get("was_enabled") or []):
+                    sysctl(slot["unit"], "enable", timeout=30)
+                    if do_control(slot["id"], "start", force=True)[0] == 200:
+                        back.append(slot["id"])
+            res["started"] = back
+            GROUP_WAKE.set()                    # 停用期間收到的群組設定，現在可以套用了
+        elif kind == "wipe":
+            res.update(_wipe(opts))
+        st["done"][cid] = {"at": int(time.time()), "result": res}
+        st["done"] = dict(sorted(st["done"].items(), key=lambda kv: kv[1]["at"])[-SAFETY_KEEP:])
+        save_json(SAFETY_FILE, st)
+    if kind == "revoke":
+        # 先把結果回給主控台，再丟掉身分：這個回應還是用目前的權杖與連線送出去
+        threading.Timer(5, _revoke).start()
+    print(f"收到管理者的安全指令：{kind}", flush=True)
+    return 200, res
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
@@ -10505,7 +10657,7 @@ def main():
     if DESKTOP_AGENT:
         desktop_first_run()
     threading.Thread(target=_warm_caches, daemon=True).start()
-    if not SYSTEMD:
+    if not SYSTEMD and not safety_disabled():      # 管理者停用了：開機也不帶起模型服務
         SUP.boot()
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2

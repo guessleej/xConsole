@@ -25608,5 +25608,330 @@
 "en": "Locks",
 "ja": "ロック",
 "ko": "잠금"
+},
+"這台已被管理者停用（{0}），模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」。": {
+"en": "This machine was disabled by an administrator ({0}). Its model services are stopped and models cannot be started or changed; contact IT. Administrators can choose “Enable” under Settings → Machines → Disable / wipe.",
+"ja": "このマシンは管理者により停止されています（{0}）。モデルサービスは停止中で、起動やモデル変更はできません。IT担当者にお問い合わせください。管理者は「設定 → マシン」の「停止／消去」で「再開」を選びます。",
+"ko": "이 기기는 관리자가 사용 중지했습니다({0}). 모델 서비스가 모두 중지되어 시작하거나 모델을 바꿀 수 없습니다. IT 담당자에게 문의하세요. 관리자는 「설정 → 기기」의 「사용 중지／삭제」에서 「재개」를 선택합니다."
+},
+"這台已被管理者停用": {
+"en": "This machine was disabled by an administrator",
+"ja": "このマシンは管理者により停止されています",
+"ko": "이 기기는 관리자가 사용 중지했습니다"
+},
+"模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」": {
+"en": "Its model services are stopped and models cannot be started or changed; contact IT. Administrators can choose “Enable” under Settings → Machines → Disable / wipe",
+"ja": "モデルサービスは停止中で、起動やモデル変更はできません。IT担当者にお問い合わせください。管理者は「設定 → マシン」の「停止／消去」で「再開」を選びます",
+"ko": "모델 서비스가 모두 중지되어 시작하거나 모델을 바꿀 수 없습니다. IT 담당자에게 문의하세요. 관리자는 「설정 → 기기」의 「사용 중지／삭제」에서 「재개」를 선택합니다"
+},
+"停用／清除": {
+"en": "Disable / wipe",
+"ja": "停止／消去",
+"ko": "사용 중지／삭제"
+},
+"停掉這台所有模型服務並取消開機自啟，本機不能再啟動或換模型，群組設定先收著不套用。按「恢復」照原樣開回來。": {
+"en": "Stops every model service on this machine and turns off start at boot. Models cannot be started or changed locally, and group settings are held without being applied. “Enable” brings everything back as it was.",
+"ja": "このマシンのモデルサービスをすべて停止し、起動時の自動開始を解除します。ローカルでの起動やモデル変更はできなくなり、グループ設定は受け取るだけで適用しません。「再開」で元どおりに戻ります。",
+"ko": "이 기기의 모든 모델 서비스를 중지하고 부팅 시 자동 시작을 끕니다. 로컬에서 시작하거나 모델을 바꿀 수 없고, 그룹 설정은 받아 두기만 하고 적용하지 않습니다. 「재개」를 누르면 원래대로 돌아옵니다."
+},
+"取消停用：停用前開機自啟的模型服務照原樣開回來，停用期間收到的群組設定開始準備與套用。": {
+"en": "Lifts the disable: model services that started at boot before are brought back, and group settings received while disabled are prepared and applied.",
+"ja": "停止を解除します。停止前に自動開始していたモデルサービスを元どおり起動し、停止中に受け取ったグループ設定の準備と適用を始めます。",
+"ko": "사용 중지를 해제합니다. 중지 전에 부팅 시 자동 시작되던 모델 서비스를 원래대로 켜고, 중지 기간에 받은 그룹 설정의 준비와 적용을 시작합니다."
+},
+"停掉模型服務，刪掉Agent工作資料夾、畫圖與影片的產出、模型服務的記錄檔，取消連結進來的外部資料夾（裡面的檔案不動）。勾選後連xConsole存放區裡的模型一起刪。刪了不能復原。": {
+"en": "Stops model services and deletes Agent work folders, generated images and videos, and model service logs. Linked external folders are unlinked (their files stay). If checked, models in the xConsole storage are deleted too. This cannot be undone.",
+"ja": "モデルサービスを停止し、Agentの作業フォルダー、画像と動画の生成物、モデルサービスのログを削除します。リンクした外部フォルダーはリンクだけ解除します（中のファイルはそのまま）。チェックするとxConsoleの保存場所にあるモデルも削除します。元に戻せません。",
+"ko": "모델 서비스를 중지하고 Agent 작업 폴더, 이미지·동영상 생성물, 모델 서비스 로그를 삭제합니다. 연결한 외부 폴더는 연결만 해제합니다(안의 파일은 그대로). 체크하면 xConsole 저장소의 모델도 함께 삭제합니다. 되돌릴 수 없습니다."
+},
+"這台丟掉權杖與連回設定，主控台也不再對它下指令；要重新加入才能再管理。遺失或離職收回的機器，先排「清除」再排這一筆。": {
+"en": "The machine discards its token and connect-back settings, and the console stops sending it commands; it must rejoin to be managed again. For a lost machine or one returned by a departing employee, queue “Wipe” first, then this.",
+"ja": "このマシンはトークンと接続設定を破棄し、コンソールからも指示を送らなくなります。再び管理するには再参加が必要です。紛失や退職で回収したマシンは、先に「消去」、次にこれを登録してください。",
+"ko": "이 기기는 토큰과 연결 설정을 버리고 콘솔도 더 이상 명령을 보내지 않습니다. 다시 관리하려면 재가입해야 합니다. 분실했거나 퇴사로 회수한 기기는 먼저 「삭제」를, 그다음 이 항목을 등록하세요."
+},
+"待送": {
+"en": "Waiting",
+"ja": "送信待ち",
+"ko": "대기 중"
+},
+"送出中": {
+"en": "Sending",
+"ja": "送信中",
+"ko": "전송 중"
+},
+"被後下的取代": {
+"en": "Replaced by a later command",
+"ja": "後の指示で置き換え",
+"ko": "이후 명령으로 대체됨"
+},
+"{0} 的停用與清除": {
+"en": "Disable and wipe for {0}",
+"ja": "{0} の停止と消去",
+"ko": "{0}의 사용 중지와 삭제"
+},
+"的停用與清除": {
+"en": "disable and wipe",
+"ja": "の停止と消去",
+"ko": "의 사용 중지와 삭제"
+},
+"身分已撤銷（{0}，{1}）": {
+"en": "Identity revoked ({0}, {1})",
+"ja": "ID取り消し済み（{0}、{1}）",
+"ko": "신원 취소됨({0}, {1})"
+},
+"身分已撤銷": {
+"en": "Identity revoked",
+"ja": "ID取り消し済み",
+"ko": "신원 취소됨"
+},
+"已停用（{0}，{1}）": {
+"en": "Disabled ({0}, {1})",
+"ja": "停止中（{0}、{1}）",
+"ko": "사용 중지됨({0}, {1})"
+},
+"已停用": {
+"en": "Disabled",
+"ja": "停止中",
+"ko": "사용 중지됨"
+},
+"正常": {
+"en": "Normal",
+"ja": "正常",
+"ko": "정상"
+},
+"目前狀態：{0}": {
+"en": "Current status: {0}",
+"ja": "現在の状態：{0}",
+"ko": "현재 상태: {0}"
+},
+"目前狀態": {
+"en": "Current status",
+"ja": "現在の状態",
+"ko": "현재 상태"
+},
+"這台現在沒有連回。指令會存在主控台，沒有期限，它下次連上時在群組對齊之前先執行；還沒送出前可以取消。": {
+"en": "This machine is not connected back right now. Commands are kept on the console with no expiry and run the next time it connects, before group alignment; they can be canceled until sent.",
+"ja": "このマシンは現在接続されていません。指示はコンソールに期限なしで保存され、次に接続したときグループの同期より先に実行されます。送信前なら取り消せます。",
+"ko": "이 기기는 지금 연결되어 있지 않습니다. 명령은 기한 없이 콘솔에 보관되며 다음에 연결될 때 그룹 동기화보다 먼저 실행됩니다. 전송 전에는 취소할 수 있습니다."
+},
+"指令存在主控台，這台連得上就馬上送；連不上的話每分鐘再試，沒有期限。還沒送出前可以取消。": {
+"en": "Commands are kept on the console and sent as soon as this machine is reachable; otherwise retried every minute with no expiry. They can be canceled until sent.",
+"ja": "指示はコンソールに保存され、このマシンに接続できればすぐ送信します。接続できない場合は毎分再試行し、期限はありません。送信前なら取り消せます。",
+"ko": "명령은 콘솔에 보관되며 이 기기에 연결되면 바로 보냅니다. 연결되지 않으면 1분마다 다시 시도하고 기한은 없습니다. 전송 전에는 취소할 수 있습니다."
+},
+"指令": {
+"en": "Command",
+"ja": "指示",
+"ko": "명령"
+},
+"下指令的人": {
+"en": "Issued by",
+"ja": "指示した人",
+"ko": "명령한 사람"
+},
+"（含模型）": {
+"en": " (including models)",
+"ja": "（モデルを含む）",
+"ko": "(모델 포함)"
+},
+"上次沒送成：{0}": {
+"en": "Last attempt failed: {0}",
+"ja": "前回送信できませんでした：{0}",
+"ko": "지난번 전송 실패: {0}"
+},
+"上次沒送成": {
+"en": "Last attempt failed",
+"ja": "前回送信できませんでした",
+"ko": "지난번 전송 실패"
+},
+"要做什麼": {
+"en": "Action",
+"ja": "操作",
+"ko": "작업"
+},
+"連存放區裡的模型一起刪": {
+"en": "Also delete models in storage",
+"ja": "保存場所のモデルも削除",
+"ko": "저장소의 모델도 삭제"
+},
+"輸入這台的名稱「{0}」確認": {
+"en": "Type this machine's name “{0}” to confirm",
+"ja": "確認のためこのマシンの名前「{0}」を入力",
+"ko": "확인을 위해 이 기기 이름 “{0}” 입력"
+},
+"輸入這台的名稱「": {
+"en": "Type this machine's name “",
+"ja": "確認のためこのマシンの名前「",
+"ko": "확인을 위해 이 기기 이름 “"
+},
+"」確認": {
+"en": "” to confirm",
+"ja": "」を入力",
+"ko": "” 입력"
+},
+"已排入，取代了還沒送出的 {0} 筆": {
+"en": "Queued; replaced {0} unsent command(s)",
+"ja": "登録しました。未送信の {0} 件を置き換えました",
+"ko": "등록했습니다. 아직 보내지 않은 {0}건을 대체했습니다"
+},
+"已排入，取代了還沒送出的": {
+"en": "Queued; replaced unsent commands:",
+"ja": "登録しました。置き換えた未送信の件数：",
+"ko": "등록했습니다. 대체한 미전송 명령:"
+},
+"已排入": {
+"en": "Queued",
+"ja": "登録しました",
+"ko": "등록했습니다"
+},
+"恢復": {
+"en": "Enable",
+"ja": "再開",
+"ko": "재개"
+},
+"撤銷身分": {
+"en": "Revoke identity",
+"ja": "IDを取り消す",
+"ko": "신원 취소"
+},
+"{0} 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）": {
+"en": "{0}'s identity was revoked; it must rejoin to be managed again (in “Add a machine” choose “Which machine is being reinstalled”)",
+"ja": "{0} のIDは取り消されました。再び管理するには再参加が必要です（「マシンを追加」で「再インストールするマシン」を選択）",
+"ko": "{0}의 신원이 취소되었습니다. 다시 관리하려면 재가입해야 합니다(「기기 추가」에서 「다시 설치하는 기기」 선택)"
+},
+"的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」": {
+"en": "identity was revoked; it must rejoin to be managed again (in “Add a machine” choose “Which machine is being reinstalled”",
+"ja": "のIDは取り消されました。再び管理するには再参加が必要です（「マシンを追加」で「再インストールするマシン」を選択",
+"ko": "의 신원이 취소되었습니다. 다시 관리하려면 재가입해야 합니다(「기기 추가」에서 「다시 설치하는 기기」 선택"
+},
+" 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）": {
+"en": "'s identity was revoked; it must rejoin to be managed again (in “Add a machine” choose “Which machine is being reinstalled”)",
+"ja": " のIDは取り消されました。再び管理するには再参加が必要です（「マシンを追加」で「再インストールするマシン」を選択）",
+"ko": "의 신원이 취소되었습니다. 다시 관리하려면 재가입해야 합니다(「기기 추가」에서 「다시 설치하는 기기」 선택)"
+},
+"送安全指令出錯：{0}": {
+"en": "Error sending safety command: {0}",
+"ja": "安全指示の送信でエラー：{0}",
+"ko": "안전 명령 전송 오류: {0}"
+},
+"送安全指令出錯": {
+"en": "Error sending safety command",
+"ja": "安全指示の送信でエラー",
+"ko": "안전 명령 전송 오류"
+},
+"送安全指令出錯：": {
+"en": "Error sending safety command: ",
+"ja": "安全指示の送信でエラー：",
+"ko": "안전 명령 전송 오류: "
+},
+"上次送出後這台已經不認舊的權杖：身分已丟掉": {
+"en": "After the last send the machine no longer accepts the old token: its identity is gone",
+"ja": "前回の送信後、このマシンは古いトークンを受け付けなくなりました：IDは破棄済みです",
+"ko": "지난 전송 후 이 기기는 이전 토큰을 받지 않습니다: 신원이 이미 삭제되었습니다"
+},
+"這台的代理版本太舊，不支援安全指令，請更新代理": {
+"en": "This machine's agent is too old for safety commands; please update the agent",
+"ja": "このマシンのエージェントは古く安全指示に対応していません。エージェントを更新してください",
+"ko": "이 기기의 에이전트가 오래되어 안전 명령을 지원하지 않습니다. 에이전트를 업데이트하세요"
+},
+"指令只能是：停用、恢復、清除、撤銷身分": {
+"en": "The command must be one of: disable, enable, wipe, revoke identity",
+"ja": "指示は停止、再開、消去、ID取り消しのいずれかです",
+"ko": "명령은 사용 중지, 재개, 삭제, 신원 취소 중 하나여야 합니다"
+},
+"請輸入這台的名稱「{0}」確認": {
+"en": "Type this machine's name “{0}” to confirm",
+"ja": "確認のためこのマシンの名前「{0}」を入力してください",
+"ko": "확인을 위해 이 기기 이름 “{0}”을(를) 입력하세요"
+},
+"請輸入這台的名稱「": {
+"en": "Type this machine's name “",
+"ja": "確認のためこのマシンの名前「",
+"ko": "확인을 위해 이 기기 이름 “"
+},
+"這台的身分已撤銷，指令送不到；要先重新加入": {
+"en": "This machine's identity was revoked, so commands cannot reach it; it must rejoin first",
+"ja": "このマシンのIDは取り消されているため指示は届きません。先に再参加が必要です",
+"ko": "이 기기의 신원이 취소되어 명령이 전달되지 않습니다. 먼저 재가입해야 합니다"
+},
+"這一筆已經送出、完成或取消了，不能再取消": {
+"en": "This command was already sent, completed or canceled and cannot be canceled",
+"ja": "この指示はすでに送信、完了、または取り消し済みのため取り消せません",
+"ko": "이 명령은 이미 전송·완료·취소되어 취소할 수 없습니다"
+},
+"{0} 由管理者撤銷，要重新加入才能再管理": {
+"en": "Revoked by an administrator at {0}; must rejoin to be managed again",
+"ja": "{0} に管理者が取り消し。再び管理するには再参加が必要です",
+"ko": "{0}에 관리자가 취소함. 다시 관리하려면 재가입해야 합니다"
+},
+"由管理者撤銷，要重新加入才能再管理": {
+"en": "revoked by an administrator; must rejoin to be managed again",
+"ja": "に管理者が取り消し。再び管理するには再参加が必要です",
+"ko": "에 관리자가 취소함. 다시 관리하려면 재가입해야 합니다"
+},
+"{0} 由管理者停用，恢復後才會套用群組設定": {
+"en": "Disabled by an administrator at {0}; group settings apply after it is enabled",
+"ja": "{0} に管理者が停止。再開後にグループ設定を適用します",
+"ko": "{0}에 관리자가 사용 중지함. 재개 후 그룹 설정을 적용합니다"
+},
+"由管理者停用，恢復後才會套用群組設定": {
+"en": "disabled by an administrator; group settings apply after it is enabled",
+"ja": "に管理者が停止。再開後にグループ設定を適用します",
+"ko": "에 관리자가 사용 중지함. 재개 후 그룹 설정을 적용합니다"
+},
+" 由管理者撤銷，要重新加入才能再管理": {
+"en": " revoked by an administrator; must rejoin to be managed again",
+"ja": " に管理者が取り消し。再び管理するには再参加が必要です",
+"ko": "에 관리자가 취소함. 다시 관리하려면 재가입해야 합니다"
+},
+" 由管理者停用，恢復後才會套用群組設定": {
+"en": " disabled by an administrator; group settings apply after it is enabled",
+"ja": " に管理者が停止。再開後にグループ設定を適用します",
+"ko": "에 관리자가 사용 중지함. 재개 후 그룹 설정을 적용합니다"
+},
+"；目前離線": {
+"en": "; currently offline",
+"ja": "。現在オフライン",
+"ko": "; 현재 오프라인"
+},
+"這台已被管理者停用，請洽IT": {
+"en": "This machine was disabled by an administrator; contact IT",
+"ja": "このマシンは管理者により停止されています。IT担当者にお問い合わせください",
+"ko": "이 기기는 관리자가 사용 중지했습니다. IT 담당자에게 문의하세요"
+},
+"管理者撤銷了這台的身分": {
+"en": "An administrator revoked this machine's identity",
+"ja": "管理者がこのマシンのIDを取り消しました",
+"ko": "관리자가 이 기기의 신원을 취소했습니다"
+},
+"管理者撤銷了這台的身分：需要重新加入主控台": {
+"en": "An administrator revoked this machine's identity: it must rejoin the console",
+"ja": "管理者がこのマシンのIDを取り消しました：コンソールへの再参加が必要です",
+"ko": "관리자가 이 기기의 신원을 취소했습니다: 콘솔에 재가입해야 합니다"
+},
+"管理者撤銷了這台的身分：已丟掉權杖與連回設定，請重新加入主控台": {
+"en": "An administrator revoked this machine's identity: the token and connect-back settings were discarded; please rejoin the console",
+"ja": "管理者がこのマシンのIDを取り消しました：トークンと接続設定を破棄しました。コンソールに再参加してください",
+"ko": "관리자가 이 기기의 신원을 취소했습니다: 토큰과 연결 설정을 삭제했습니다. 콘솔에 재가입하세요"
+},
+"收到管理者的安全指令：{0}": {
+"en": "Received a safety command from the administrator: {0}",
+"ja": "管理者から安全指示を受信：{0}",
+"ko": "관리자의 안전 명령 수신: {0}"
+},
+"收到管理者的安全指令": {
+"en": "Received a safety command from the administrator",
+"ja": "管理者から安全指示を受信",
+"ko": "관리자의 안전 명령 수신"
+},
+"收到管理者的安全指令：": {
+"en": "Received a safety command from the administrator: ",
+"ja": "管理者から安全指示を受信：",
+"ko": "관리자의 안전 명령 수신: "
+},
+"安全指令格式不對": {
+"en": "Malformed safety command",
+"ja": "安全指示の形式が正しくありません",
+"ko": "안전 명령 형식이 올바르지 않습니다"
 }
 }

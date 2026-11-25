@@ -205,9 +205,10 @@ def update(g, name=None, kind=None, settings=None, taken=(), by="", note=""):
 APPLY_WAIT = {"waiting_boot": "已準備好，等下次開機套用", "waiting_time": "已準備好，等指定時間套用"}
 
 
-def member_status(g, online, align, clone=None, rejoin=None, last_seen=None):
+def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, admin=None):
     """一台機器在這個群組裡的狀態。依序判斷，越前面越要先處理：
-    疑似複製 → 離線 → 需要重新加入 → 放不下 → 失敗 → 就緒 → 準備中 → 設定不同。
+    疑似複製 → 管理者撤銷身分、停用 → 離線 → 需要重新加入 → 放不下 → 失敗 → 就緒 → 準備中 → 設定不同。
+    admin：管理者下的安全指令造成的狀態（{"code": "revoked"|"disabled", "at"}），離線也照樣標。
     align：代理回報的對齊狀態（group_public），沒有就是主控台還沒送到。回 {"code", "label", "detail", "pct"}。"""
     st = (align or {}).get("state") or {}
     err = (align or {}).get("error")
@@ -219,6 +220,11 @@ def member_status(g, online, align, clone=None, rejoin=None, last_seen=None):
                 "prepared": bool(same and st.get("prepared", 0) >= v)}       # 套用中、套用失敗也已經準備好了
     if clone:
         return out("clone", "疑似複製", "同一個身分同時從兩個地方連回，已停止下指令")
+    if admin:
+        when = time.strftime("%m/%d %H:%M", time.gmtime(admin["at"] + 8 * 3600)) + "（台北時間）"
+        if admin["code"] == "revoked":
+            return out("revoked", "身分已撤銷", f"{when} 由管理者撤銷，要重新加入才能再管理")
+        return out("disabled", "已停用", f"{when} 由管理者停用，恢復後才會套用群組設定" + ("" if online else "；目前離線"))
     if not online:
         return out("offline", "離線", f"上次連線 {last_seen}" if last_seen else "還沒連上過")
     if rejoin:
