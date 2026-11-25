@@ -26569,15 +26569,1570 @@
 "ja": "新しい端末または元の枠がもうありません",
 "ko": "새 컴퓨터 또는 원래 자리가 더 이상 없습니다"
 },
-"定時任務": {
-"en": "Scheduled tasks",
-"ja": "定期タスク",
-"ko": "예약 작업"
+"回報數字有誤": {
+"en": "Report wrong number",
+"ja": "数値の誤りを報告",
+"ko": "숫자 오류 신고"
+},
+"查核中": {
+"en": "Under review",
+"ja": "確認中",
+"ko": "확인 중"
+},
+"有人回報這個數字，云碩正在查核": {
+"en": "Someone reported this number; xCloudinfo is reviewing it",
+"ja": "この数値は報告済みで、xCloudinfoが確認中です",
+"ko": "이 숫자가 신고되어 xCloudinfo가 확인 중입니다"
+},
+"回報：{0}": {
+"en": "Report: {0}",
+"ja": "報告：{0}",
+"ko": "신고: {0}"
+},
+"回報": {
+"en": "Report",
+"ja": "報告",
+"ko": "신고"
+},
+"哪裡不對？寫一句話就好，畫面與機器會自動帶上。": {
+"en": "What is wrong? One sentence is enough; the page and machine are attached automatically.",
+"ja": "何がおかしいですか？一言で十分です。画面とマシンは自動で添付されます。",
+"ko": "무엇이 잘못되었나요? 한 문장이면 됩니다. 화면과 머신은 자동으로 첨부됩니다."
+},
+"例：這台明明還有 20 GiB，這裡卻寫 2 GiB": {
+"en": "e.g. This machine has 20 GiB free but it shows 2 GiB",
+"ja": "例：このマシンは20 GiB空いているのに2 GiBと表示される",
+"ko": "예: 이 머신은 20 GiB가 남았는데 2 GiB로 표시됨"
+},
+"現在完全不能用（列為緊急）": {
+"en": "Completely unusable now (mark as urgent)",
+"ja": "今まったく使えない（緊急扱い）",
+"ko": "지금 전혀 사용할 수 없음(긴급으로 분류)"
+},
+"附截圖、錄音或錄影（選填，最多 5 個）": {
+"en": "Attach screenshots, audio or video (optional, up to 5)",
+"ja": "スクリーンショット・録音・録画を添付（任意、最大5個）",
+"ko": "스크린샷, 녹음 또는 녹화 첨부(선택, 최대 5개)"
+},
+"畫面 {0}": {
+"en": "Page {0}",
+"ja": "画面 {0}",
+"ko": "화면 {0}"
+},
+"畫面": {
+"en": "Page",
+"ja": "画面",
+"ko": "화면"
+},
+"機器 {0}": {
+"en": "Machine {0}",
+"ja": "マシン {0}",
+"ko": "머신 {0}"
+},
+"對象 {0}": {
+"en": "Target {0}",
+"ja": "対象 {0}",
+"ko": "대상 {0}"
+},
+"會一起送：{0}": {
+"en": "Sent along: {0}",
+"ja": "一緒に送信：{0}",
+"ko": "함께 전송: {0}"
+},
+"會一起送": {
+"en": "Sent along",
+"ja": "一緒に送信",
+"ko": "함께 전송"
+},
+"回報問題": {
+"en": "Report a problem",
+"ja": "問題を報告",
+"ko": "문제 신고"
+},
+"寫一句話說明哪裡不對": {
+"en": "Write one sentence about what is wrong",
+"ja": "何がおかしいか一言書いてください",
+"ko": "무엇이 잘못되었는지 한 문장으로 적어 주세요"
+},
+"（主管帳號，自動列緊急）": {
+"en": " (manager account, marked urgent automatically)",
+"ja": "（管理職アカウントのため自動で緊急）",
+"ko": "(관리자 계정, 자동으로 긴급 분류)"
+},
+"工單 #{0}・{1}{2}": {
+"en": "Ticket #{0} · {1}{2}",
+"ja": "チケット #{0}・{1}{2}",
+"ko": "티켓 #{0} · {1}{2}"
+},
+"工單 #": {
+"en": "Ticket #",
+"ja": "チケット #",
+"ko": "티켓 #"
+},
+"已立刻通知云碩；{0} 前會有人回覆，預計 {1} 處理完。": {
+"en": "xCloudinfo has been notified right away; someone will reply by {0}, expected to be resolved by {1}.",
+"ja": "xCloudinfoにすぐ通知しました。{0}までに返信があり、{1}までに対応予定です。",
+"ko": "xCloudinfo에 즉시 알렸습니다. {0}까지 답변이 있고 {1}까지 처리될 예정입니다."
+},
+"已立刻通知云碩": {
+"en": "xCloudinfo has been notified right away",
+"ja": "xCloudinfoにすぐ通知しました",
+"ko": "xCloudinfo에 즉시 알렸습니다"
+},
+"前會有人回覆，預計": {
+"en": "someone will reply by then, expected by",
+"ja": "までに返信があり、対応予定は",
+"ko": "까지 답변이 있고, 처리 예정은"
+},
+"處理完": {
+"en": "resolved",
+"ja": "対応完了",
+"ko": "처리 완료"
+},
+"預計 {0} 前處理完。處理進度可以到「我的帳號」看。": {
+"en": "Expected to be resolved by {0}. Track progress under My account.",
+"ja": "{0}までに対応予定です。進捗は「マイアカウント」で確認できます。",
+"ko": "{0}까지 처리될 예정입니다. 진행 상황은 '내 계정'에서 볼 수 있습니다."
+},
+"預計": {
+"en": "Expected",
+"ja": "予定",
+"ko": "예정"
+},
+"前處理完。處理進度可以到「我的帳號」看": {
+"en": "to be resolved by then. Track progress under My account",
+"ja": "までに対応予定。進捗は「マイアカウント」で確認できます",
+"ko": "까지 처리 예정. 진행 상황은 '내 계정'에서 볼 수 있습니다"
+},
+"有附件沒收到：{0}": {
+"en": "Some attachments were not received: {0}",
+"ja": "受け取れなかった添付があります：{0}",
+"ko": "받지 못한 첨부가 있습니다: {0}"
+},
+"有附件沒收到": {
+"en": "Some attachments were not received",
+"ja": "受け取れなかった添付があります",
+"ko": "받지 못한 첨부가 있습니다"
+},
+"已收到回報": {
+"en": "Report received",
+"ja": "報告を受け付けました",
+"ko": "신고가 접수되었습니다"
+},
+"好": {
+"en": "OK",
+"ja": "OK",
+"ko": "확인"
+},
+"問題回報": {
+"en": "Problem reports",
+"ja": "問題報告",
+"ko": "문제 신고"
+},
+"已受理": {
+"en": "Received",
+"ja": "受付済み",
+"ko": "접수됨"
+},
+"處理中": {
+"en": "In progress",
+"ja": "対応中",
+"ko": "처리 중"
+},
+"已結案": {
+"en": "Closed",
+"ja": "クローズ",
+"ko": "종결"
+},
+"長官或使用者看到數字不對，按畫面上的「回報」就會到這裡；緊急件會立刻寄信給云碩": {
+"en": "When managers or users see a wrong number and press Report, it lands here; urgent ones are emailed to xCloudinfo right away",
+"ja": "管理職や利用者が画面の「報告」を押すとここに届きます。緊急のものはすぐxCloudinfoにメールされます",
+"ko": "관리자나 사용자가 화면의 '신고'를 누르면 여기로 옵니다. 긴급 건은 즉시 xCloudinfo에 메일로 보냅니다"
+},
+"處理中 {0} 件，其中緊急 {1} 件": {
+"en": "{0} open, {1} urgent",
+"ja": "対応中 {0} 件、うち緊急 {1} 件",
+"ko": "처리 중 {0}건, 그중 긴급 {1}건"
+},
+"件，其中緊急": {
+"en": "open, urgent",
+"ja": "件、うち緊急",
+"ko": "건, 그중 긴급"
+},
+"件": {
+"en": "items",
+"ja": "件",
+"ko": "건"
+},
+"云碩收件人（email，一行一個）": {
+"en": "xCloudinfo recipients (email, one per line)",
+"ja": "xCloudinfoの宛先（メール、1行に1つ）",
+"ko": "xCloudinfo 수신자(이메일, 한 줄에 하나)"
+},
+"學校窗口（處理完一起通知，email，一行一個）": {
+"en": "School contacts (notified when resolved, email, one per line)",
+"ja": "学校の窓口（対応完了時に通知、メール、1行に1つ）",
+"ko": "학교 담당자(처리 완료 시 알림, 이메일, 한 줄에 하나)"
+},
+"主管帳號（送出的回報自動列緊急，一行一個登入帳號，例如校長、副校長）": {
+"en": "Manager accounts (their reports are urgent automatically; one login per line, e.g. president, vice president)",
+"ja": "管理職アカウント（報告は自動で緊急、1行に1つのログイン名。例：学長、副学長）",
+"ko": "관리자 계정(신고가 자동으로 긴급, 한 줄에 로그인 하나. 예: 총장, 부총장)"
+},
+"緊急件初步回覆時限（小時）": {
+"en": "First-reply deadline for urgent reports (hours)",
+"ja": "緊急の初回返信期限（時間）",
+"ko": "긴급 건 1차 답변 기한(시간)"
+},
+"一般件預計完成（天）": {
+"en": "Expected resolution for normal reports (days)",
+"ja": "通常の対応予定（日）",
+"ko": "일반 건 처리 예정(일)"
+},
+"郵件伺服器（SMTP）": {
+"en": "Mail server (SMTP)",
+"ja": "メールサーバー（SMTP）",
+"ko": "메일 서버(SMTP)"
+},
+"不加密（只限內網的轉信主機）": {
+"en": "No encryption (internal relay only)",
+"ja": "暗号化なし（社内リレーのみ）",
+"ko": "암호화 없음(내부 릴레이 전용)"
+},
+"加密方式": {
+"en": "Encryption",
+"ja": "暗号化方式",
+"ko": "암호화 방식"
+},
+"登入帳號（沒有就留空）": {
+"en": "Login (leave empty if none)",
+"ja": "ログイン名（なければ空欄）",
+"ko": "로그인 계정(없으면 비워 둠)"
+},
+"密碼（已設定；留空就沿用）": {
+"en": "Password (set; leave empty to keep)",
+"ja": "パスワード（設定済み、空欄なら維持）",
+"ko": "비밀번호(설정됨, 비우면 유지)"
+},
+"寄件人（email）": {
+"en": "Sender (email)",
+"ja": "差出人（メール）",
+"ko": "발신자(이메일)"
+},
+"寄測試信給云碩收件人": {
+"en": "Send a test email to xCloudinfo recipients",
+"ja": "xCloudinfoの宛先にテストメールを送る",
+"ko": "xCloudinfo 수신자에게 테스트 메일 보내기"
+},
+"已寄給 {0}": {
+"en": "Sent to {0}",
+"ja": "{0} に送信しました",
+"ko": "{0}에게 보냈습니다"
+},
+"已寄給": {
+"en": "Sent to",
+"ja": "送信先",
+"ko": "보낸 대상"
+},
+"工單": {
+"en": "Tickets",
+"ja": "チケット",
+"ko": "티켓"
+},
+"點一筆看說明、附件與寄信紀錄，改進度或回覆；回覆與處理完都會通知回報人": {
+"en": "Click one to see the description, attachments and mail log, change progress or reply; replies and resolution notify the reporter",
+"ja": "1件クリックで説明・添付・送信履歴を表示し、進捗変更や返信ができます。返信と対応完了は報告者に通知されます",
+"ko": "하나를 누르면 설명, 첨부, 메일 기록을 보고 진행 상황을 바꾸거나 답변할 수 있습니다. 답변과 처리 완료는 신고자에게 알립니다"
+},
+"還沒有人回報。": {
+"en": "No reports yet.",
+"ja": "まだ報告はありません。",
+"ko": "아직 신고가 없습니다."
+},
+"・查核中": {
+"en": " · under review",
+"ja": "・確認中",
+"ko": " · 확인 중"
+},
+"{0}（{1}）・{2}・{3}・預計 {4} 前處理完": {
+"en": "{0} ({1}) · {2} · {3} · expected by {4}",
+"ja": "{0}（{1}）・{2}・{3}・{4}までに対応予定",
+"ko": "{0}({1}) · {2} · {3} · {4}까지 처리 예정"
+},
+"前處理完": {
+"en": "to be resolved by",
+"ja": "までに対応予定",
+"ko": "까지 처리 예정"
+},
+"當時的畫面：{0}": {
+"en": "Page at the time: {0}",
+"ja": "当時の画面：{0}",
+"ko": "당시 화면: {0}"
+},
+"當時的畫面": {
+"en": "Page at the time",
+"ja": "当時の画面",
+"ko": "당시 화면"
+},
+"附件：{0}（{1} MB）": {
+"en": "Attachment: {0} ({1} MB)",
+"ja": "添付：{0}（{1} MB）",
+"ko": "첨부: {0}({1} MB)"
+},
+"有 {0} 封通知沒寄出去：{1}": {
+"en": "{0} notifications were not sent: {1}",
+"ja": "{0} 通の通知が送信できませんでした：{1}",
+"ko": "알림 {0}통을 보내지 못했습니다: {1}"
+},
+"封通知沒寄出去": {
+"en": "notifications were not sent",
+"ja": "通の通知が送信できませんでした",
+"ko": "통의 알림을 보내지 못했습니다"
+},
+"進度": {
+"en": "Progress",
+"ja": "進捗",
+"ko": "진행 상황"
+},
+"查核中（用到這個數字的畫面會提醒）": {
+"en": "Under review (pages using this number will show a notice)",
+"ja": "確認中（この数値を使う画面に注意を表示）",
+"ko": "확인 중(이 숫자를 쓰는 화면에 안내 표시)"
+},
+"回覆回報人（會寄信通知他）": {
+"en": "Reply to the reporter (they are emailed)",
+"ja": "報告者に返信（メールで通知されます）",
+"ko": "신고자에게 답변(메일로 알림)"
+},
+"回覆": {
+"en": "Reply",
+"ja": "返信",
+"ko": "답변"
+},
+"工單 #{0}": {
+"en": "Ticket #{0}",
+"ja": "チケット #{0}",
+"ko": "티켓 #{0}"
+},
+"我的回報": {
+"en": "My reports",
+"ja": "自分の報告",
+"ko": "내 신고"
+},
+"回報過的問題與處理進度": {
+"en": "Problems you reported and their progress",
+"ja": "報告した問題と対応状況",
+"ko": "신고한 문제와 처리 상황"
+},
+"還沒有回報過。畫面右上角的旗子可以回報問題。": {
+"en": "No reports yet. Use the flag at the top right to report a problem.",
+"ja": "まだ報告していません。右上の旗アイコンから報告できます。",
+"ko": "아직 신고한 적이 없습니다. 오른쪽 위 깃발로 문제를 신고할 수 있습니다."
+},
+"云碩回覆：{0}": {
+"en": "xCloudinfo replied: {0}",
+"ja": "xCloudinfoの返信：{0}",
+"ko": "xCloudinfo 답변: {0}"
+},
+"云碩回覆": {
+"en": "xCloudinfo replied",
+"ja": "xCloudinfoの返信",
+"ko": "xCloudinfo 답변"
+},
+"對話答覆：{0}": {
+"en": "Chat answer: {0}",
+"ja": "チャットの回答：{0}",
+"ko": "채팅 답변: {0}"
+},
+"對話答覆": {
+"en": "Chat answer",
+"ja": "チャットの回答",
+"ko": "채팅 답변"
+},
+"回報答錯": {
+"en": "Report wrong answer",
+"ja": "誤答を報告",
+"ko": "오답 신고"
+},
+"一": {
+"en": "Mon",
+"ja": "月",
+"ko": "월"
+},
+"二": {
+"en": "Tue",
+"ja": "火",
+"ko": "화"
+},
+"三": {
+"en": "Wed",
+"ja": "水",
+"ko": "수"
+},
+"四": {
+"en": "Thu",
+"ja": "木",
+"ko": "목"
+},
+"五": {
+"en": "Fri",
+"ja": "金",
+"ko": "금"
+},
+"六": {
+"en": "Sat",
+"ja": "土",
+"ko": "토"
+},
+"日": {
+"en": "Sun",
+"ja": "日",
+"ko": "일"
+},
+"存放在 {0}・剩 {1} GiB": {
+"en": "Stored in {0} · {1} GiB free",
+"ja": "{0}に保存・残り{1} GiB",
+"ko": "{0}에 저장 · 남은 용량 {1} GiB"
+},
+"llama.cpp {0}・從 {1} 收進來・{2}": {
+"en": "llama.cpp {0} · taken in from {1} · {2}",
+"ja": "llama.cpp {0}・{1}から取り込み・{2}",
+"ko": "llama.cpp {0} · {1}에서 가져옴 · {2}"
+},
+"收進來": {
+"en": "taken in",
+"ja": "取り込み",
+"ko": "가져옴"
+},
+"的推理引擎包": {
+"en": " inference engine package",
+"ja": "の推論エンジンパッケージ",
+"ko": " 추론 엔진 패키지"
+},
+"從內部鏡像刪除": {
+"en": "Delete from internal mirror",
+"ja": "内部ミラーから削除",
+"ko": "내부 미러에서 삭제"
+},
+"刪掉主控台上這個模型的 {0} 個檔（約 {1} GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載。": {
+"en": "Delete the {0} files of this model on the console (about {1} GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed.",
+"ja": "コンソール上のこのモデルのファイル{0}個（約{1} GiB）を削除します。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします。",
+"ko": "콘솔에 있는 이 모델 파일 {0}개(약 {1} GiB)를 삭제합니다. 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다."
+},
+"刪掉主控台上這個模型的": {
+"en": "Delete this model's files on the console: ",
+"ja": "コンソール上のこのモデルのファイルを削除：",
+"ko": "콘솔의 이 모델 파일 삭제: "
+},
+"個檔（約": {
+"en": " files (about ",
+"ja": " 個のファイル（約",
+"ko": " 개 파일(약 "
+},
+"GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載": {
+"en": "GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed",
+"ja": "GiB）。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします",
+"ko": "GiB). 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다"
+},
+"排進 {0} 個檔": {
+"en": "Queued {0} files",
+"ja": "{0}個のファイルをキューに入れました",
+"ko": "파일 {0}개를 대기열에 넣었습니다"
 },
 "排進": {
 "en": "queue",
 "ja": "キューに入れる",
 "ko": "대기열에 넣기"
+},
+"這個 repo 沒有符合的 GGUF": {
+"en": "This repo has no matching GGUF",
+"ja": "このリポジトリに合うGGUFがありません",
+"ko": "이 저장소에는 맞는 GGUF가 없습니다"
+},
+"想接回原來的": {
+"en": "Wants to reconnect as the original ",
+"ja": "元の",
+"ko": "원래의 "
+},
+"還讀不到": {
+"en": "Can't read yet",
+"ja": "まだ読めません",
+"ko": "아직 읽을 수 없음"
+},
+"的硬體，等它們連上主控台再看": {
+"en": "'s hardware; check again once they connect to the console",
+"ja": "のハードウェア。コンソールに接続されてから確認してください",
+"ko": "의 하드웨어. 콘솔에 연결된 뒤 다시 확인하세요"
+},
+"這個群組還沒有機器。": {
+"en": "This group has no machines yet.",
+"ja": "このグループにはまだマシンがありません。",
+"ko": "이 그룹에는 아직 머신이 없습니다."
+},
+"放不下：改用": {
+"en": "Doesn't fit: use ",
+"ja": "収まりません：代わりに",
+"ko": "공간 부족: 대신 "
+},
+"空的就照群組設定": {
+"en": "Leave empty to follow the group settings",
+"ja": "空欄ならグループ設定に従います",
+"ko": "비워 두면 그룹 설정을 따릅니다"
+},
+"還讀不到硬體的": {
+"en": "Hardware not read yet for ",
+"ja": "ハードウェアをまだ読めていない：",
+"ko": "아직 하드웨어를 읽지 못함: "
+},
+"可放模型約": {
+"en": "Room for models about ",
+"ja": "モデルの置き場 約",
+"ko": "모델용 공간 약 "
+},
+"・可放模型約 ": {
+"en": " · room for models about ",
+"ja": "・モデルの置き場 約",
+"ko": " · 모델용 공간 약 "
+},
+"不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例": {
+"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
+"ja": "はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
+"ko": "은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
+},
+":Q4_K_M），或先加進推薦清單": {
+"en": ":Q4_K_M), or add it to the recommended list first",
+"ja": "：Q4_K_M）、先におすすめリストに追加してください",
+"ko": ":Q4_K_M) 먼저 추천 목록에 추가하세요"
+},
+"在這種機型上連用硬碟都跑不動，請改小一點的模型": {
+"en": " can't run on this kind of machine even from disk; choose a smaller model",
+"ja": "はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
+"ko": "은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
+},
+" 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 ": {
+"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
+"ja": " はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
+"ko": " 은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
+},
+" 在這種機型上連用硬碟都跑不動，請改小一點的模型": {
+"en": " can't run on this kind of machine even from disk; choose a smaller model",
+"ja": " はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
+"ko": " 은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
+},
+"已加入主控台：{0}（{1}）。{2}回到網頁就看得到這台。": {
+"en": "Added to the console: {0} ({1}). {2}Go back to the web page to see this machine.",
+"ja": "コンソールに追加しました：{0}（{1}）。{2}ウェブページに戻るとこのマシンが見えます。",
+"ko": "콘솔에 추가했습니다: {0}({1}). {2}웹 페이지로 돌아가면 이 머신이 보입니다."
+},
+"回到網頁就看得到這台。": {
+"en": "Go back to the web page to see this machine.",
+"ja": "ウェブページに戻るとこのマシンが見えます。",
+"ko": "웹 페이지로 돌아가면 이 머신이 보입니다."
+},
+"[xConsole] 問題回報測試信": {
+"en": "[xConsole] Problem report test email",
+"ja": "[xConsole] 問題報告のテストメール",
+"ko": "[xConsole] 문제 신고 테스트 메일"
+},
+"這是問題回報的測試信。收到就代表郵件伺服器與通知名單都設好了。": {
+"en": "This is a test email for problem reports. If you received it, the mail server and recipient list are set up.",
+"ja": "問題報告のテストメールです。届いていればメールサーバーと通知先の設定は完了しています。",
+"ko": "문제 신고 테스트 메일입니다. 받았다면 메일 서버와 알림 대상이 설정된 것입니다."
+},
+"跟 {0} 拿推理引擎包沒成功：{1}": {
+"en": "Getting the inference engine package from {0} failed: {1}",
+"ja": "{0}から推論エンジンパッケージを取得できませんでした：{1}",
+"ko": "{0}에서 추론 엔진 패키지를 받지 못했습니다: {1}"
+},
+"跟": {
+"en": "From",
+"ja": "取得元",
+"ko": "출처"
+},
+"拿推理引擎包沒成功": {
+"en": "Getting the inference engine package failed",
+"ja": "推論エンジンパッケージを取得できませんでした",
+"ko": "추론 엔진 패키지를 받지 못했습니다"
+},
+"跟 ": {
+"en": "From ",
+"ja": "取得元 ",
+"ko": "출처 "
+},
+" 拿推理引擎包沒成功：": {
+"en": " getting the inference engine package failed: ",
+"ja": " 推論エンジンパッケージを取得できませんでした：",
+"ko": " 추론 엔진 패키지를 받지 못했습니다: "
+},
+"問題回報催辦出錯：{0}": {
+"en": "Problem report escalation failed: {0}",
+"ja": "問題報告の督促でエラー：{0}",
+"ko": "문제 신고 독촉 오류: {0}"
+},
+"問題回報催辦出錯": {
+"en": "Problem report escalation failed",
+"ja": "問題報告の督促でエラー",
+"ko": "문제 신고 독촉 오류"
+},
+"問題回報催辦出錯：": {
+"en": "Problem report escalation failed: ",
+"ja": "問題報告の督促でエラー：",
+"ko": "문제 신고 독촉 오류: "
+},
+"主機板識別碼跟那一格一樣（識別碼不是秘密，要人確認）": {
+"en": "The motherboard ID matches that slot (the ID isn't a secret; a person must confirm)",
+"ja": "マザーボードIDがその枠と同じです（IDは秘密ではないので人が確認します）",
+"ko": "메인보드 ID가 그 칸과 같습니다(ID는 비밀이 아니므로 사람이 확인해야 합니다)"
+},
+"附件最大 40 MB，要帶 X-XConsole-Upload 與 application/octet-stream": {
+"en": "Attachments are up to 40 MB and need X-XConsole-Upload and application/octet-stream",
+"ja": "添付は最大40 MBで、X-XConsole-Uploadとapplication/octet-streamが必要です",
+"ko": "첨부는 최대 40 MB이며 X-XConsole-Upload와 application/octet-stream이 필요합니다"
+},
+"沒有這個附件": {
+"en": "No such attachment",
+"ja": "その添付はありません",
+"ko": "해당 첨부가 없습니다"
+},
+"郵件伺服器要寫主機名稱或 IP（例：smtp.office365.com）": {
+"en": "Mail server must be a host name or IP (e.g. smtp.office365.com)",
+"ja": "メールサーバーはホスト名かIPを指定してください（例：smtp.office365.com）",
+"ko": "메일 서버는 호스트 이름이나 IP여야 합니다(예: smtp.office365.com)"
+},
+"埠要是 1～65535": {
+"en": "Port must be 1-65535",
+"ja": "ポートは1～65535です",
+"ko": "포트는 1~65535여야 합니다"
+},
+"加密方式要是 STARTTLS、SSL 或不加密": {
+"en": "Encryption must be STARTTLS, SSL or none",
+"ja": "暗号化方式はSTARTTLS、SSL、なしのいずれかです",
+"ko": "암호화 방식은 STARTTLS, SSL, 없음 중 하나여야 합니다"
+},
+"寄件人要是 email": {
+"en": "Sender must be an email address",
+"ja": "差出人はメールアドレスにしてください",
+"ko": "발신자는 이메일이어야 합니다"
+},
+"」的覆寫": {
+"en": "” override",
+"ja": "」の上書き",
+"ko": "' 덮어쓰기"
+},
+"主控台識別碼檔內容不正確，已改名為": {
+"en": "The console ID file is invalid; it was renamed to ",
+"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
+"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
+},
+"並產生新的；企業版授權要請云碩依新識別碼重簽": {
+"en": "and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
+"ja": "新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
+"ko": "새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
+},
+"主控台識別碼檔內容不正確，已改名為 ": {
+"en": "The console ID file is invalid; it was renamed to ",
+"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
+"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
+},
+" 並產生新的；企業版授權要請云碩依新識別碼重簽": {
+"en": " and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
+"ja": " 新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
+"ko": " 새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
+},
+"模型名稱或檔名不合法": {
+"en": "Invalid model name or file name",
+"ja": "モデル名またはファイル名が正しくありません",
+"ko": "모델 이름 또는 파일 이름이 올바르지 않습니다"
+},
+"內部鏡像正在從 Hugging Face 下載": {
+"en": "The internal mirror is downloading from Hugging Face",
+"ja": "内部ミラーがHugging Faceからダウンロード中です",
+"ko": "내부 미러가 Hugging Face에서 내려받는 중입니다"
+},
+"%），稍後再試": {
+"en": "%); try again later",
+"ja": "%）。しばらくしてからもう一度",
+"ko": "%). 잠시 후 다시 시도하세요"
+},
+"檔名不合法": {
+"en": "Invalid file name",
+"ja": "ファイル名が正しくありません",
+"ko": "파일 이름이 올바르지 않습니다"
+},
+"{0} 沒有 {1}": {
+"en": "{0} has no {1}",
+"ja": "{0}に{1}がありません",
+"ko": "{0}에 {1}이(가) 없습니다"
+},
+"內部鏡像下載": {
+"en": "Internal mirror download",
+"ja": "内部ミラーのダウンロード",
+"ko": "내부 미러 다운로드"
+},
+"已重新排隊": {
+"en": "Queued again",
+"ja": "再度キューに入れました",
+"ko": "다시 대기열에 넣었습니다"
+},
+"內部鏡像正在從 Hugging Face 下載 ": {
+"en": "The internal mirror is downloading from Hugging Face ",
+"ja": "内部ミラーがHugging Faceからダウンロード中：",
+"ko": "내부 미러가 Hugging Face에서 내려받는 중: "
+},
+"的檔案清單": {
+"en": "'s file list",
+"ja": "のファイル一覧",
+"ko": "의 파일 목록"
+},
+"內部鏡像下載 ": {
+"en": "Internal mirror download ",
+"ja": "内部ミラーのダウンロード：",
+"ko": "내부 미러 다운로드: "
+},
+" 失敗（": {
+"en": " failed (",
+"ja": " 失敗（",
+"ko": " 실패("
+},
+"），已重新排隊": {
+"en": "), queued again",
+"ja": "）、再度キューに入れました",
+"ko": "), 다시 대기열에 넣었습니다"
+},
+"大小不對（{0}／{1}），下次會接著下載": {
+"en": "Wrong size ({0}/{1}); the download will resume next time",
+"ja": "サイズが違います（{0}／{1}）。次回続きからダウンロードします",
+"ko": "크기가 다릅니다({0}/{1}). 다음에 이어서 내려받습니다"
+},
+"下次會接著下載": {
+"en": "The download will resume next time",
+"ja": "次回続きからダウンロードします",
+"ko": "다음에 이어서 내려받습니다"
+},
+"這個模型還在下載，等下載完再刪": {
+"en": "This model is still downloading; delete it when the download finishes",
+"ja": "このモデルはまだダウンロード中です。終わってから削除してください",
+"ko": "이 모델은 아직 내려받는 중입니다. 끝난 뒤 삭제하세요"
+},
+" 的檔案清單": {
+"en": "'s file list",
+"ja": " のファイル一覧",
+"ko": "의 파일 목록"
+},
+"大小不對（": {
+"en": "Wrong size (",
+"ja": "サイズが違います（",
+"ko": "크기가 다릅니다("
+},
+"），下次會接著下載": {
+"en": "); the download will resume next time",
+"ja": "）。次回続きからダウンロードします",
+"ko": "). 다음에 이어서 내려받습니다"
+},
+"SHA-256 跟 Hugging Face 公布的不同，已刪除，會重新下載": {
+"en": "The SHA-256 doesn't match what Hugging Face publishes; deleted and will download again",
+"ja": "SHA-256がHugging Faceの公開値と違うため削除しました。再ダウンロードします",
+"ko": "SHA-256이 Hugging Face 공개 값과 달라 삭제했습니다. 다시 내려받습니다"
+},
+"云碩收件人": {
+"en": "xCloudinfo recipients",
+"ja": "xCloudinfoの宛先",
+"ko": "xCloudinfo 수신자"
+},
+"學校窗口": {
+"en": "School contacts",
+"ja": "学校の窓口",
+"ko": "학교 담당자"
+},
+"主管帳號最多 50 個": {
+"en": "Up to 50 manager accounts",
+"ja": "管理職アカウントは最大50個",
+"ko": "관리자 계정은 최대 50개"
+},
+"郵件伺服器或收件人沒設": {
+"en": "Mail server or recipients not set",
+"ja": "メールサーバーまたは宛先が未設定です",
+"ko": "메일 서버 또는 수신자가 설정되지 않았습니다"
+},
+"回報人：{0}": {
+"en": "Reporter: {0}",
+"ja": "報告者：{0}",
+"ko": "신고자: {0}"
+},
+"回報人": {
+"en": "Reporter",
+"ja": "報告者",
+"ko": "신고자"
+},
+"時間：{0}": {
+"en": "Time: {0}",
+"ja": "日時：{0}",
+"ko": "시간: {0}"
+},
+"時間": {
+"en": "Time",
+"ja": "日時",
+"ko": "시간"
+},
+"頁面：{0}": {
+"en": "Page: {0}",
+"ja": "ページ：{0}",
+"ko": "페이지: {0}"
+},
+"頁面": {
+"en": "Page",
+"ja": "ページ",
+"ko": "페이지"
+},
+"對象：{0}": {
+"en": "Target: {0}",
+"ja": "対象：{0}",
+"ko": "대상: {0}"
+},
+"說明：{0}": {
+"en": "Description: {0}",
+"ja": "説明：{0}",
+"ko": "설명: {0}"
+},
+"進度：{0}{1}": {
+"en": "Progress: {0}{1}",
+"ja": "進捗：{0}{1}",
+"ko": "진행 상황: {0}{1}"
+},
+"{0}要是 email（一行一個，最多 30 個）：{1}": {
+"en": "{0} must be email addresses (one per line, up to 30): {1}",
+"ja": "{0}はメールアドレスにしてください（1行に1つ、最大30個）：{1}",
+"ko": "{0}은(는) 이메일이어야 합니다(한 줄에 하나, 최대 30개): {1}"
+},
+"要是 email（一行一個，最多 30 個": {
+"en": "must be email addresses (one per line, up to 30",
+"ja": "はメールアドレスにしてください（1行に1つ、最大30個",
+"ko": "은(는) 이메일이어야 합니다(한 줄에 하나, 최대 30개"
+},
+"{0}要在 {1}～{2} 之間": {
+"en": "{0} must be between {1} and {2}",
+"ja": "{0}は{1}～{2}の範囲にしてください",
+"ko": "{0}은(는) {1}~{2} 사이여야 합니다"
+},
+"說明最多 {0} 字；細節可以附截圖或錄音": {
+"en": "Description is limited to {0} characters; attach a screenshot or recording for details",
+"ja": "説明は最大{0}文字です。詳細はスクリーンショットや録音を添付してください",
+"ko": "설명은 최대 {0}자입니다. 자세한 내용은 스크린샷이나 녹음을 첨부하세요"
+},
+"說明最多": {
+"en": "Description is limited to",
+"ja": "説明は最大",
+"ko": "설명은 최대"
+},
+"字；細節可以附截圖或錄音": {
+"en": "characters; attach a screenshot or recording for details",
+"ja": "文字です。詳細はスクリーンショットや録音を添付してください",
+"ko": "자입니다. 자세한 내용은 스크린샷이나 녹음을 첨부하세요"
+},
+"沒有這張工單": {
+"en": "No such ticket",
+"ja": "そのチケットはありません",
+"ko": "해당 티켓이 없습니다"
+},
+"每張工單最多附 {0} 個檔": {
+"en": "Each ticket can have up to {0} attachments",
+"ja": "1チケットの添付は最大{0}個です",
+"ko": "티켓당 첨부는 최대 {0}개입니다"
+},
+"每張工單最多附": {
+"en": "Each ticket can have up to",
+"ja": "1チケットの添付は最大",
+"ko": "티켓당 첨부는 최대"
+},
+"只收圖片（PNG、JPG、GIF、WebP）、錄音（MP3、M4A、WAV、OGG）與錄影（MP4、WebM）": {
+"en": "Only images (PNG, JPG, GIF, WebP), audio (MP3, M4A, WAV, OGG) and video (MP4, WebM) are accepted",
+"ja": "画像（PNG、JPG、GIF、WebP）、録音（MP3、M4A、WAV、OGG）、録画（MP4、WebM）のみ受け付けます",
+"ko": "이미지(PNG, JPG, GIF, WebP), 녹음(MP3, M4A, WAV, OGG), 녹화(MP4, WebM)만 받습니다"
+},
+"這個檔太大：{0} 最多 {1} MB": {
+"en": "File too large: {0} is limited to {1} MB",
+"ja": "ファイルが大きすぎます：{0}は最大{1} MB",
+"ko": "파일이 너무 큽니다: {0}은(는) 최대 {1} MB"
+},
+"這個檔太大": {
+"en": "File too large",
+"ja": "ファイルが大きすぎます",
+"ko": "파일이 너무 큽니다"
+},
+"緊急回報": {
+"en": "Urgent report",
+"ja": "緊急の報告",
+"ko": "긴급 신고"
+},
+"緊急回報逾時沒人接手": {
+"en": "Urgent report not picked up in time",
+"ja": "緊急の報告が期限内に対応されていません",
+"ko": "긴급 신고를 기한 내에 아무도 맡지 않음"
+},
+"回報逾期": {
+"en": "Report overdue",
+"ja": "報告の期限超過",
+"ko": "신고 기한 초과"
+},
+"回報已處理完": {
+"en": "Report resolved",
+"ja": "報告の対応が完了しました",
+"ko": "신고 처리 완료"
+},
+"回報有新回覆": {
+"en": "New reply on report",
+"ja": "報告に新しい返信があります",
+"ko": "신고에 새 답변이 있습니다"
+},
+"回報人：": {
+"en": "Reporter: ",
+"ja": "報告者：",
+"ko": "신고자: "
+},
+"時間：": {
+"en": "Time: ",
+"ja": "日時：",
+"ko": "시간: "
+},
+"頁面：": {
+"en": "Page: ",
+"ja": "ページ：",
+"ko": "페이지: "
+},
+"對象：": {
+"en": "Target: ",
+"ja": "対象：",
+"ko": "대상: "
+},
+"說明：": {
+"en": "Description: ",
+"ja": "説明：",
+"ko": "설명: "
+},
+"進度：": {
+"en": "Progress: ",
+"ja": "進捗：",
+"ko": "진행 상황: "
+},
+"最新回覆：{0}": {
+"en": "Latest reply: {0}",
+"ja": "最新の返信：{0}",
+"ko": "최신 답변: {0}"
+},
+"最新回覆": {
+"en": "Latest reply",
+"ja": "最新の返信",
+"ko": "최신 답변"
+},
+"附件 {0} 個：留在主控台，請登入後到「設定 › 問題回報」查看": {
+"en": "{0} attachments: kept on the console; sign in and open Settings > Problem reports to view",
+"ja": "添付 {0} 個：コンソールに保存。ログインして「設定 › 問題報告」で確認してください",
+"ko": "첨부 {0}개: 콘솔에 보관됨. 로그인 후 '설정 › 문제 신고'에서 확인하세요"
+},
+"個：留在主控台，請登入後到「設定 › 問題回報」查看": {
+"en": "attachments: kept on the console; sign in and open Settings > Problem reports to view",
+"ja": "個：コンソールに保存。ログインして「設定 › 問題報告」で確認してください",
+"ko": "개: 콘솔에 보관됨. 로그인 후 '설정 › 문제 신고'에서 확인하세요"
+},
+"沒有收件人": {
+"en": "No recipients",
+"ja": "宛先がありません",
+"ko": "수신자가 없습니다"
+},
+"通知名單上沒有云碩收件人：緊急回報寄不出去": {
+"en": "No xCloudinfo recipients on the list: urgent reports cannot be emailed",
+"ja": "通知先にxCloudinfoの宛先がありません：緊急の報告を送信できません",
+"ko": "알림 목록에 xCloudinfo 수신자가 없습니다: 긴급 신고를 보낼 수 없습니다"
+},
+"郵件伺服器還沒設好：工單照建，但不會寄信": {
+"en": "Mail server not set up: tickets are still created but no email is sent",
+"ja": "メールサーバー未設定：チケットは作成されますがメールは送信されません",
+"ko": "메일 서버 미설정: 티켓은 만들어지지만 메일은 보내지 않습니다"
+},
+"最近一次寄信失敗（{0}）：{1}": {
+"en": "Last email failed ({0}): {1}",
+"ja": "直近のメール送信に失敗（{0}）：{1}",
+"ko": "최근 메일 발송 실패({0}): {1}"
+},
+"最近一次寄信失敗": {
+"en": "Last email failed",
+"ja": "直近のメール送信に失敗",
+"ko": "최근 메일 발송 실패"
+},
+"要是 email（一行一個，最多 30 個）：": {
+"en": " must be email addresses (one per line, up to 30): ",
+"ja": "はメールアドレスにしてください（1行に1つ、最大30個）：",
+"ko": "은(는) 이메일이어야 합니다(한 줄에 하나, 최대 30개): "
+},
+"沒有寄信程式": {
+"en": "No mailer configured",
+"ja": "メール送信機能がありません",
+"ko": "메일 발송기가 없습니다"
+},
+"說明最多 ": {
+"en": "Description is limited to ",
+"ja": "説明は最大 ",
+"ko": "설명은 최대 "
+},
+" 字；細節可以附截圖或錄音": {
+"en": " characters; attach a screenshot or recording for details",
+"ja": " 文字です。詳細はスクリーンショットや録音を添付してください",
+"ko": "자입니다. 자세한 내용은 스크린샷이나 녹음을 첨부하세요"
+},
+"每張工單最多附 ": {
+"en": "Each ticket can have up to ",
+"ja": "1チケットの添付は最大 ",
+"ko": "티켓당 첨부는 최대 "
+},
+" 個檔": {
+"en": " attachments",
+"ja": " 個です",
+"ko": "개입니다"
+},
+"這個檔太大：": {
+"en": "File too large: ",
+"ja": "ファイルが大きすぎます：",
+"ko": "파일이 너무 큽니다: "
+},
+" 最多 ": {
+"en": " is limited to ",
+"ja": " は最大 ",
+"ko": " 최대 "
+},
+"最新回覆：": {
+"en": "Latest reply: ",
+"ja": "最新の返信：",
+"ko": "최신 답변: "
+},
+"附件 ": {
+"en": "Attachments: ",
+"ja": "添付 ",
+"ko": "첨부 "
+},
+" 個：留在主控台，請登入後到「設定 › 問題回報」查看": {
+"en": " attachments: kept on the console; sign in and open Settings > Problem reports to view",
+"ja": " 個：コンソールに保存。ログインして「設定 › 問題報告」で確認してください",
+"ko": "개: 콘솔에 보관됨. 로그인 후 '설정 › 문제 신고'에서 확인하세요"
+},
+"最近一次寄信失敗（": {
+"en": "Last email failed (",
+"ja": "直近のメール送信に失敗（",
+"ko": "최근 메일 발송 실패("
+},
+"進度只能是：": {
+"en": "Progress must be one of: ",
+"ja": "進捗は次のいずれかです：",
+"ko": "진행 상황은 다음 중 하나여야 합니다: "
+},
+"（查核中）": {
+"en": " (under review)",
+"ja": "（確認中）",
+"ko": "(확인 중)"
+},
+"'\n# 主控台備妥的Windows執行環境包（內附Python與相依、Visual C++執行階段）的sha256；空的＝沒有，改用這台的Python\n$RT = '": {
+"en": "'\n# sha256 of the Windows runtime package prepared by the console (bundles Python, dependencies and the Visual C++ runtime); empty = none, use this machine's Python\n$RT = '",
+"ja": "'\n# コンソールが用意したWindows実行環境パッケージ（Python・依存関係・Visual C++ランタイム同梱）のsha256。空＝なし、このマシンのPythonを使う\n$RT = '",
+"ko": "'\n# 콘솔이 준비한 Windows 실행 환경 패키지(Python, 의존성, Visual C++ 런타임 포함)의 sha256. 비어 있음 = 없음, 이 머신의 Python 사용\n$RT = '"
+},
+"xConsole 工作站互傳": {
+"en": "xConsole workstation transfer",
+"ja": "xConsoleワークステーション間転送",
+"ko": "xConsole 워크스테이션 간 전송"
+},
+"這台的其他程式把系統記憶體用到只剩": {
+"en": "Other programs on this machine left only ",
+"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは",
+"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
+},
+"GiB），為了不讓電腦卡住": {
+"en": "GiB), so to keep the computer from freezing",
+"ja": "GiB）。パソコンが固まらないよう",
+"ko": "GiB)입니다. 컴퓨터가 멈추지 않도록"
+},
+"先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
+"en": "unloaded this model first. Close programs you don't need, then click Start to use it again",
+"ja": "このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
+"ko": "이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
+},
+"等太久了（超過 4 小時）": {
+"en": "Waited too long (over 4 hours)",
+"ja": "待ち時間が長すぎます（4時間超）",
+"ko": "너무 오래 기다렸습니다(4시간 초과)"
+},
+"沒有主控台的網址": {
+"en": "No console URL",
+"ja": "コンソールのURLがありません",
+"ko": "콘솔 URL이 없습니다"
+},
+"這台的其他程式把系統記憶體用到只剩 ": {
+"en": "Other programs on this machine left only ",
+"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは ",
+"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
+},
+" GiB（底線 ": {
+"en": " GiB of system memory (floor ",
+"ja": " GiB（下限 ",
+"ko": " GiB(하한 "
+},
+" GiB），為了不讓電腦卡住，": {
+"en": " GiB), so to keep the computer from freezing,",
+"ja": " GiB）。パソコンが固まらないよう、",
+"ko": " GiB)입니다. 컴퓨터가 멈추지 않도록,"
+},
+" 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
+"en": " unloaded this model first. Close programs you don't need, then click Start to use it again",
+"ja": " このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
+"ko": " 이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
+},
+"用電池中": {
+"en": "On battery",
+"ja": "バッテリー駆動中",
+"ko": "배터리 사용 중"
+},
+"接上電源再": {
+"en": "plug in, then ",
+"ja": "電源につないでから",
+"ko": "전원을 연결한 뒤 "
+},
+"從同群組的": {
+"en": "from the same group's ",
+"ja": "同じグループの",
+"ko": "같은 그룹의 "
+},
+"互傳並核對 SHA-256": {
+"en": "transfer and verify SHA-256",
+"ja": "転送してSHA-256を照合",
+"ko": "전송하고 SHA-256 확인"
+},
+"連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
+"en": "Can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
+"ja": "コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
+"ko": "콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
+},
+"電量": {
+"en": "Battery",
+"ja": "電池残量",
+"ko": "배터리"
+},
+"，接上電源再": {
+"en": ", plug in, then ",
+"ja": "、電源につないでから",
+"ko": ", 전원을 연결한 뒤 "
+},
+"平台名稱不合法：{0}": {
+"en": "Invalid platform name: {0}",
+"ja": "プラットフォーム名が正しくありません：{0}",
+"ko": "플랫폼 이름이 올바르지 않습니다: {0}"
+},
+"平台名稱不合法": {
+"en": "Invalid platform name",
+"ja": "プラットフォーム名が正しくありません",
+"ko": "플랫폼 이름이 올바르지 않습니다"
+},
+"跟主控台拿推理引擎沒成功": {
+"en": "Getting the inference engine from the console failed",
+"ja": "コンソールから推論エンジンを取得できませんでした",
+"ko": "콘솔에서 추론 엔진을 받지 못했습니다"
+},
+"同機型編好的推理引擎在這台裝不起來": {
+"en": "The inference engine built on the same model of machine won't install here",
+"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません",
+"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다"
+},
+"互傳埠的防火牆規則{0}不了（要以系統管理員或 SYSTEM 執行）：{1}": {
+"en": "Couldn't {0} the firewall rule for the transfer port (needs administrator or SYSTEM): {1}",
+"ja": "転送ポートのファイアウォール規則を{0}できません（管理者かSYSTEMで実行が必要）：{1}",
+"ko": "전송 포트 방화벽 규칙을 {0}할 수 없습니다(관리자 또는 SYSTEM으로 실행 필요): {1}"
+},
+"互傳埠的防火牆規則": {
+"en": "Firewall rule for the transfer port",
+"ja": "転送ポートのファイアウォール規則",
+"ko": "전송 포트 방화벽 규칙"
+},
+"不了（要以系統管理員或 SYSTEM 執行": {
+"en": "failed (needs administrator or SYSTEM",
+"ja": "できません（管理者かSYSTEMで実行が必要",
+"ko": "실패(관리자 또는 SYSTEM으로 실행 필요"
+},
+"互傳安排裡的檔名或 sha256 不對": {
+"en": "The file name or sha256 in the transfer plan is wrong",
+"ja": "転送計画のファイル名かsha256が正しくありません",
+"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다"
+},
+"的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過": {
+"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered",
+"ja": "のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性",
+"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음"
+},
+"等同群組的其他機器下載好再互傳": {
+"en": "Wait for other machines in the group to finish downloading, then transfer",
+"ja": "同じグループのほかのマシンのダウンロード完了を待ってから転送します",
+"ko": "같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
+},
+"互傳票證快到期，等主控台下一輪": {
+"en": "The transfer ticket is about to expire; waiting for the console's next round",
+"ja": "転送チケットの期限が近いので、コンソールの次の回を待ちます",
+"ko": "전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
+},
+"：從同群組的 ": {
+"en": ": from the same group's ",
+"ja": "：同じグループの",
+"ko": ": 같은 그룹의 "
+},
+" 互傳並核對 SHA-256": {
+"en": " transfer and verify SHA-256",
+"ja": " から転送してSHA-256を照合",
+"ko": " 에서 전송하고 SHA-256 확인"
+},
+"放行": {
+"en": "allow",
+"ja": "許可",
+"ko": "허용"
+},
+"加": {
+"en": "add",
+"ja": "追加",
+"ko": "추가"
+},
+"本機使用者通道開不起來：資料夾 {0} 別人寫得進去": {
+"en": "The local user channel can't open: others can write to folder {0}",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー{0}にほかの人が書き込めます",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 {0}에 다른 사람이 쓸 수 있습니다"
+},
+"本機使用者通道開不起來：資料夾": {
+"en": "The local user channel can't open: folder",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더"
+},
+"別人寫得進去": {
+"en": "others can write to it",
+"ja": "ほかの人が書き込めます",
+"ko": "다른 사람이 쓸 수 있습니다"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}": {
+"en": "The local user channel can't open (another program may have taken the name): {0}",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：{0}",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): {0}"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱": {
+"en": "The local user channel can't open (another program may have taken the name",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음"
+},
+"群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
+"en": "The group only allows transfers within the group, but no reachable machine in the group has this model",
+"ja": "グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
+"ko": "그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
+},
+"：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
+"en": ": can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
+"ja": "：コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
+"ko": ": 콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
+},
+"寫不進去": {
+"en": "can't be written",
+"ja": "書き込めません",
+"ko": "쓸 수 없습니다"
+},
+"模型改放": {
+"en": "Models moved to",
+"ja": "モデルの置き場を変更",
+"ko": "모델 위치 변경"
+},
+"群組設定的存放位置": {
+"en": "Storage location set by the group",
+"ja": "グループ設定の保存場所",
+"ko": "그룹에서 정한 저장 위치"
+},
+"（電量 ": {
+"en": " (battery ",
+"ja": "（電池残量 ",
+"ko": " (배터리 "
+},
+"平台名稱不合法：": {
+"en": "Invalid platform name: ",
+"ja": "プラットフォーム名が正しくありません：",
+"ko": "플랫폼 이름이 올바르지 않습니다: "
+},
+"跟主控台拿推理引擎沒成功：": {
+"en": "Getting the inference engine from the console failed: ",
+"ja": "コンソールから推論エンジンを取得できませんでした：",
+"ko": "콘솔에서 추론 엔진을 받지 못했습니다: "
+},
+"同機型編好的推理引擎在這台裝不起來：": {
+"en": "The inference engine built on the same model of machine won't install here: ",
+"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません：",
+"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다: "
+},
+"推理引擎裝不起來": {
+"en": "The inference engine won't install",
+"ja": "推論エンジンをインストールできません",
+"ko": "추론 엔진을 설치할 수 없습니다"
+},
+"不了（要以系統管理員或 SYSTEM 執行）：": {
+"en": "failed (needs administrator or SYSTEM): ",
+"ja": "できません（管理者かSYSTEMで実行が必要）：",
+"ko": "실패(관리자 또는 SYSTEM으로 실행 필요): "
+},
+"互傳安排裡的檔名或 sha256 不對：": {
+"en": "The file name or sha256 in the transfer plan is wrong: ",
+"ja": "転送計画のファイル名かsha256が正しくありません：",
+"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다: "
+},
+" 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）": {
+"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered)",
+"ja": " のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性）",
+"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음)"
+},
+"的 SHA-256（之後才能送給同群組的機器": {
+"en": "'s SHA-256 (needed before it can be sent to machines in the group",
+"ja": "のSHA-256（照合後にグループ内のマシンへ送れます",
+"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음"
+},
+"：等同群組的其他機器下載好再互傳": {
+"en": ": wait for other machines in the group to finish downloading, then transfer",
+"ja": "：同じグループのほかのマシンのダウンロード完了を待ってから転送します",
+"ko": ": 같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
+},
+"：互傳票證快到期，等主控台下一輪": {
+"en": ": the transfer ticket is about to expire; waiting for the console's next round",
+"ja": "：転送チケットの期限が近いので、コンソールの次の回を待ちます",
+"ko": ": 전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
+},
+"拒絕：不是坐在這台電腦前的人": {
+"en": "Refused: not the person sitting at this computer",
+"ja": "拒否：このパソコンの前にいる人ではありません",
+"ko": "거부: 이 컴퓨터 앞에 있는 사람이 아닙니다"
+},
+"拒絕：不是使用者層的操作": {
+"en": "Refused: not a user-level operation",
+"ja": "拒否：ユーザー層の操作ではありません",
+"ko": "거부: 사용자 수준 작업이 아닙니다"
+},
+"本機使用者通道開不起來：{0}": {
+"en": "The local user channel can't open: {0}",
+"ja": "ローカルユーザーチャネルを開けません：{0}",
+"ko": "로컬 사용자 채널을 열 수 없습니다: {0}"
+},
+"本機使用者通道開不起來": {
+"en": "The local user channel can't open",
+"ja": "ローカルユーザーチャネルを開けません",
+"ko": "로컬 사용자 채널을 열 수 없습니다"
+},
+"本機使用者通道開不起來：資料夾 ": {
+"en": "The local user channel can't open: folder ",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー ",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 "
+},
+" 別人寫得進去": {
+"en": " others can write to it",
+"ja": " ほかの人が書き込めます",
+"ko": " 다른 사람이 쓸 수 있습니다"
+},
+"本機通道的另一端關了": {
+"en": "The other end of the local channel closed",
+"ja": "ローカルチャネルの相手側が閉じました",
+"ko": "로컬 채널의 상대편이 닫혔습니다"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：": {
+"en": "The local user channel can't open (another program may have taken the name): ",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): "
+},
+"本機使用者通道處理請求失敗：{0}: {1}": {
+"en": "The local user channel failed to handle a request: {0}: {1}",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした：{0}: {1}",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: {0}: {1}"
+},
+"本機使用者通道處理請求失敗": {
+"en": "The local user channel failed to handle a request",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다"
+},
+"本機使用者通道：{0}（只開放使用者層操作，稽核在 {1}）": {
+"en": "Local user channel: {0} (user-level operations only; audit log at {1})",
+"ja": "ローカルユーザーチャネル：{0}（ユーザー層の操作のみ、監査ログは{1}）",
+"ko": "로컬 사용자 채널: {0}(사용자 수준 작업만, 감사 기록은 {1})"
+},
+"本機使用者通道": {
+"en": "Local user channel",
+"ja": "ローカルユーザーチャネル",
+"ko": "로컬 사용자 채널"
+},
+"只開放使用者層操作，稽核在": {
+"en": "user-level operations only; audit log at",
+"ja": "ユーザー層の操作のみ、監査ログは",
+"ko": "사용자 수준 작업만, 감사 기록 위치"
+},
+"互傳完了但存放區掃不到": {
+"en": "Transfer finished but the storage area doesn't show the files",
+"ja": "転送は終わりましたが保存場所に見つかりません",
+"ko": "전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
+},
+"：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
+"en": ": the group only allows transfers within the group, but no reachable machine in the group has this model",
+"ja": "：グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
+"ko": ": 그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
+},
+"模型存放位置 ": {
+"en": "Model storage location ",
+"ja": "モデルの保存場所 ",
+"ko": "모델 저장 위치 "
+},
+" 寫不進去：": {
+"en": " can't be written: ",
+"ja": " に書き込めません：",
+"ko": " 에 쓸 수 없습니다: "
+},
+"模型改放 ": {
+"en": "Models moved to ",
+"ja": "モデルの置き場を変更：",
+"ko": "모델 위치 변경: "
+},
+"（群組設定的存放位置）": {
+"en": " (storage location set by the group)",
+"ja": "（グループ設定の保存場所）",
+"ko": " (그룹에서 정한 저장 위치)"
+},
+"換上這顆": {
+"en": "Switch to this model",
+"ja": "このモデルに切り替え",
+"ko": "이 모델로 교체"
+},
+"GiB 的模型": {
+"en": "GiB model",
+"ja": "GiBのモデル",
+"ko": "GiB 모델"
+},
+"推理引擎裝不起來：": {
+"en": "The inference engine won't install: ",
+"ja": "推論エンジンをインストールできません：",
+"ko": "추론 엔진을 설치할 수 없습니다: "
+},
+"這台同時送的份數到上限": {
+"en": "This machine is already sending as many copies as it can",
+"ja": "このマシンの同時送信数が上限です",
+"ko": "이 머신의 동시 전송 수가 한도입니다"
+},
+"份），稍後再試": {
+"en": " copies); try again later",
+"ja": "件）。しばらくしてからもう一度",
+"ko": "개). 잠시 후 다시 시도하세요"
+},
+"：核對 ": {
+"en": ": verifying ",
+"ja": "：照合 ",
+"ko": ": 확인 "
+},
+" 的 SHA-256（之後才能送給同群組的機器）": {
+"en": "'s SHA-256 (needed before it can be sent to machines in the group)",
+"ja": " のSHA-256（照合後にグループ内のマシンへ送れます）",
+"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음)"
+},
+"互傳沒成功": {
+"en": "Transfer failed",
+"ja": "転送に失敗しました",
+"ko": "전송 실패"
+},
+"本機使用者通道開不起來：": {
+"en": "The local user channel can't open: ",
+"ja": "ローカルユーザーチャネルを開けません：",
+"ko": "로컬 사용자 채널을 열 수 없습니다: "
+},
+"本機使用者通道處理請求失敗：": {
+"en": "The local user channel failed to handle a request: ",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした：",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: "
+},
+"本機使用者通道：": {
+"en": "Local user channel: ",
+"ja": "ローカルユーザーチャネル：",
+"ko": "로컬 사용자 채널: "
+},
+"（只開放使用者層操作，稽核在 ": {
+"en": " (user-level operations only; audit log at ",
+"ja": "（ユーザー層の操作のみ、監査ログは ",
+"ko": " (사용자 수준 작업만, 감사 기록 위치 "
+},
+"：互傳完了但存放區掃不到": {
+"en": ": transfer finished but the storage area doesn't show the files",
+"ja": "：転送は終わりましたが保存場所に見つかりません",
+"ko": ": 전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
+},
+"換上這顆 ": {
+"en": "Switch to this model ",
+"ja": "このモデルに切り替え ",
+"ko": "이 모델로 교체 "
+},
+" GiB 的模型": {
+"en": " GiB model",
+"ja": " GiBのモデル",
+"ko": " GiB 모델"
+},
+"這台同時送的份數到上限（": {
+"en": "This machine is already sending as many copies as it can (",
+"ja": "このマシンの同時送信数が上限です（",
+"ko": "이 머신의 동시 전송 수가 한도입니다("
+},
+" 份），稍後再試": {
+"en": " copies); try again later",
+"ja": " 件）。しばらくしてからもう一度",
+"ko": "개). 잠시 후 다시 시도하세요"
+},
+"互傳埠 {0} 開不起來：{1}": {
+"en": "Transfer port {0} can't open: {1}",
+"ja": "転送ポート{0}を開けません：{1}",
+"ko": "전송 포트 {0}을(를) 열 수 없습니다: {1}"
+},
+"互傳埠": {
+"en": "Transfer port",
+"ja": "転送ポート",
+"ko": "전송 포트"
+},
+"開不起來": {
+"en": "can't open",
+"ja": "開けません",
+"ko": "열 수 없음"
+},
+"：跟 ": {
+"en": ": with ",
+"ja": "：相手 ",
+"ko": ": 상대 "
+},
+" 互傳沒成功（": {
+"en": " transfer failed (",
+"ja": " との転送に失敗（",
+"ko": " 와(과)의 전송 실패("
+},
+"打包給同機型的機器時出錯（這台照常能用）：{0}\n": {
+"en": "Error packing for machines of the same model (this machine still works normally): {0}\n",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：{0}\n",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): {0}\n"
+},
+"打包給同機型的機器時出錯（這台照常能用": {
+"en": "Error packing for machines of the same model (this machine still works normally",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능"
+},
+"互傳埠 ": {
+"en": "Transfer port ",
+"ja": "転送ポート ",
+"ko": "전송 포트 "
+},
+" 開不起來：": {
+"en": " can't open: ",
+"ja": " を開けません：",
+"ko": " 을(를) 열 수 없습니다: "
+},
+"打包給同機型的機器時出錯（這台照常能用）：": {
+"en": "Error packing for machines of the same model (this machine still works normally): ",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): "
+},
+"定時任務": {
+"en": "Scheduled tasks",
+"ja": "定期タスク",
+"ko": "예약 작업"
 },
 "查時間": {
 "en": "Current time",
@@ -27509,105 +29064,10 @@
 "ja": "Chat IDの形式が正しくありません。個人とグループは数字（グループは負の数）、チャンネルは@名前でも可",
 "ko": "Chat ID 형식이 올바르지 않습니다. 개인과 그룹은 숫자(그룹은 음수), 채널은 @이름도 됩니다"
 },
-"存放在 {0}・剩 {1} GiB": {
-"en": "Stored in {0} · {1} GiB free",
-"ja": "{0}に保存・残り{1} GiB",
-"ko": "{0}에 저장 · 남은 용량 {1} GiB"
-},
-"llama.cpp {0}・從 {1} 收進來・{2}": {
-"en": "llama.cpp {0} · taken in from {1} · {2}",
-"ja": "llama.cpp {0}・{1}から取り込み・{2}",
-"ko": "llama.cpp {0} · {1}에서 가져옴 · {2}"
-},
-"收進來": {
-"en": "taken in",
-"ja": "取り込み",
-"ko": "가져옴"
-},
-"的推理引擎包": {
-"en": " inference engine package",
-"ja": "の推論エンジンパッケージ",
-"ko": " 추론 엔진 패키지"
-},
-"從內部鏡像刪除": {
-"en": "Delete from internal mirror",
-"ja": "内部ミラーから削除",
-"ko": "내부 미러에서 삭제"
-},
-"刪掉主控台上這個模型的 {0} 個檔（約 {1} GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載。": {
-"en": "Delete the {0} files of this model on the console (about {1} GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed.",
-"ja": "コンソール上のこのモデルのファイル{0}個（約{1} GiB）を削除します。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします。",
-"ko": "콘솔에 있는 이 모델 파일 {0}개(약 {1} GiB)를 삭제합니다. 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다."
-},
-"刪掉主控台上這個模型的": {
-"en": "Delete this model's files on the console: ",
-"ja": "コンソール上のこのモデルのファイルを削除：",
-"ko": "콘솔의 이 모델 파일 삭제: "
-},
-"個檔（約": {
-"en": " files (about ",
-"ja": " 個のファイル（約",
-"ko": " 개 파일(약 "
-},
-"GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載": {
-"en": "GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed",
-"ja": "GiB）。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします",
-"ko": "GiB). 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다"
-},
-"排進 {0} 個檔": {
-"en": "Queued {0} files",
-"ja": "{0}個のファイルをキューに入れました",
-"ko": "파일 {0}개를 대기열에 넣었습니다"
-},
-"這個 repo 沒有符合的 GGUF": {
-"en": "This repo has no matching GGUF",
-"ja": "このリポジトリに合うGGUFがありません",
-"ko": "이 저장소에는 맞는 GGUF가 없습니다"
-},
-"想接回原來的": {
-"en": "Wants to reconnect as the original ",
-"ja": "元の",
-"ko": "원래의 "
-},
-"還讀不到": {
-"en": "Can't read yet",
-"ja": "まだ読めません",
-"ko": "아직 읽을 수 없음"
-},
-"的硬體，等它們連上主控台再看": {
-"en": "'s hardware; check again once they connect to the console",
-"ja": "のハードウェア。コンソールに接続されてから確認してください",
-"ko": "의 하드웨어. 콘솔에 연결된 뒤 다시 확인하세요"
-},
-"這個群組還沒有機器。": {
-"en": "This group has no machines yet.",
-"ja": "このグループにはまだマシンがありません。",
-"ko": "이 그룹에는 아직 머신이 없습니다."
-},
-"放不下：改用": {
-"en": "Doesn't fit: use ",
-"ja": "収まりません：代わりに",
-"ko": "공간 부족: 대신 "
-},
-"空的就照群組設定": {
-"en": "Leave empty to follow the group settings",
-"ja": "空欄ならグループ設定に従います",
-"ko": "비워 두면 그룹 설정을 따릅니다"
-},
-"還讀不到硬體的": {
-"en": "Hardware not read yet for ",
-"ja": "ハードウェアをまだ読めていない：",
-"ko": "아직 하드웨어를 읽지 못함: "
-},
 "主控台會POST一個JSON：{\"title\", \"content\", \"source\": \"xConsole\"}，可以接Teams、LINE、n8n、Home Assistant或自家系統。": {
 "en": "The console POSTs a JSON {\"title\", \"content\", \"source\": \"xConsole\"}; it can go to Teams, LINE, n8n, Home Assistant or your own system.",
 "ja": "コンソールはJSON {\"title\", \"content\", \"source\": \"xConsole\"} をPOSTします。Teams、LINE、n8n、Home Assistant、自社システムにつなげます。",
 "ko": "콘솔이 JSON {\"title\", \"content\", \"source\": \"xConsole\"}을 POST합니다. Teams, LINE, n8n, Home Assistant 또는 자체 시스템에 연결할 수 있습니다."
-},
-"'\n# 主控台備妥的Windows執行環境包（內附Python與相依、Visual C++執行階段）的sha256；空的＝沒有，改用這台的Python\n$RT = '": {
-"en": "'\n# sha256 of the Windows runtime package prepared by the console (bundles Python, dependencies and the Visual C++ runtime); empty = none, use this machine's Python\n$RT = '",
-"ja": "'\n# コンソールが用意したWindows実行環境パッケージ（Python・依存関係・Visual C++ランタイム同梱）のsha256。空＝なし、このマシンのPythonを使う\n$RT = '",
-"ko": "'\n# 콘솔이 준비한 Windows 실행 환경 패키지(Python, 의존성, Visual C++ 런타임 포함)의 sha256. 비어 있음 = 없음, 이 머신의 Python 사용\n$RT = '"
 },
 "你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。今天是{0}（星期{1}）；要算數字用calculator，不要心算。": {
 "en": "You are the xConsole chat assistant; answer in Traditional Chinese (Taiwan usage). Call tools when you need data instead of guessing; if the tools find nothing, say so. Keep answers short, in bullet points. Today is {0} ({1}); use calculator for numbers, don't do mental arithmetic.",
@@ -27619,75 +29079,10 @@
 "ja": "あなたはxConsoleコンソールのチャットアシスタントです。繁体字中国語（台湾の用語）で答えてください。資料が必要ならツールで調べ、推測しないこと。見つからなければそう言うこと。短く箇条書きで。今日は",
 "ko": "당신은 xConsole 콘솔의 채팅 도우미입니다. 번체 중국어(대만 용어)로 답하세요. 자료가 필요하면 추측하지 말고 도구로 찾고, 못 찾으면 그렇다고 말하세요. 짧게 글머리표로 답하세요. 오늘은 "
 },
-"可放模型約": {
-"en": "Room for models about ",
-"ja": "モデルの置き場 約",
-"ko": "모델용 공간 약 "
-},
-"・可放模型約 ": {
-"en": " · room for models about ",
-"ja": "・モデルの置き場 約",
-"ko": " · 모델용 공간 약 "
-},
-"不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例": {
-"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
-"ja": "はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
-"ko": "은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
-},
-":Q4_K_M），或先加進推薦清單": {
-"en": ":Q4_K_M), or add it to the recommended list first",
-"ja": "：Q4_K_M）、先におすすめリストに追加してください",
-"ko": ":Q4_K_M) 먼저 추천 목록에 추가하세요"
-},
-"在這種機型上連用硬碟都跑不動，請改小一點的模型": {
-"en": " can't run on this kind of machine even from disk; choose a smaller model",
-"ja": "はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
-"ko": "은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
-},
-" 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 ": {
-"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
-"ja": " はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
-"ko": " 은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
-},
-" 在這種機型上連用硬碟都跑不動，請改小一點的模型": {
-"en": " can't run on this kind of machine even from disk; choose a smaller model",
-"ja": " はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
-"ko": " 은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
-},
-"已加入主控台：{0}（{1}）。{2}回到網頁就看得到這台。": {
-"en": "Added to the console: {0} ({1}). {2}Go back to the web page to see this machine.",
-"ja": "コンソールに追加しました：{0}（{1}）。{2}ウェブページに戻るとこのマシンが見えます。",
-"ko": "콘솔에 추가했습니다: {0}({1}). {2}웹 페이지로 돌아가면 이 머신이 보입니다."
-},
-"跟 {0} 拿推理引擎包沒成功：{1}": {
-"en": "Getting the inference engine package from {0} failed: {1}",
-"ja": "{0}から推論エンジンパッケージを取得できませんでした：{1}",
-"ko": "{0}에서 추론 엔진 패키지를 받지 못했습니다: {1}"
-},
-"拿推理引擎包沒成功": {
-"en": "Getting the inference engine package failed",
-"ja": "推論エンジンパッケージを取得できませんでした",
-"ko": "추론 엔진 패키지를 받지 못했습니다"
-},
-"回到網頁就看得到這台。": {
-"en": "Go back to the web page to see this machine.",
-"ja": "ウェブページに戻るとこのマシンが見えます。",
-"ko": "웹 페이지로 돌아가면 이 머신이 보입니다."
-},
 "定時任務排程出錯：\n": {
 "en": "Scheduled-task scheduler error:\n",
 "ja": "定期タスクのスケジューラーでエラー：\n",
 "ko": "예약 작업 스케줄러 오류:\n"
-},
-" 拿推理引擎包沒成功：": {
-"en": " getting the inference engine package failed: ",
-"ja": " 推論エンジンパッケージを取得できませんでした：",
-"ko": " 추론 엔진 패키지를 받지 못했습니다: "
-},
-"主機板識別碼跟那一格一樣（識別碼不是秘密，要人確認）": {
-"en": "The motherboard ID matches that slot (the ID isn't a secret; a person must confirm)",
-"ja": "マザーボードIDがその枠と同じです（IDは秘密ではないので人が確認します）",
-"ko": "메인보드 ID가 그 칸과 같습니다(ID는 비밀이 아니므로 사람이 확인해야 합니다)"
 },
 "定時任務執行出錯：\n": {
 "en": "Scheduled task error:\n",
@@ -27713,615 +29108,5 @@
 "en": "{0}: at most {1} characters",
 "ja": "{0}は最大{1}文字です",
 "ko": "{0}은(는) 최대 {1}자입니다"
-},
-"」的覆寫": {
-"en": "” override",
-"ja": "」の上書き",
-"ko": "' 덮어쓰기"
-},
-"主控台識別碼檔內容不正確，已改名為": {
-"en": "The console ID file is invalid; it was renamed to ",
-"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
-"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
-},
-"並產生新的；企業版授權要請云碩依新識別碼重簽": {
-"en": "and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
-"ja": "新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
-"ko": "새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
-},
-"主控台識別碼檔內容不正確，已改名為 ": {
-"en": "The console ID file is invalid; it was renamed to ",
-"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
-"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
-},
-" 並產生新的；企業版授權要請云碩依新識別碼重簽": {
-"en": " and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
-"ja": " 新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
-"ko": " 새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
-},
-"模型名稱或檔名不合法": {
-"en": "Invalid model name or file name",
-"ja": "モデル名またはファイル名が正しくありません",
-"ko": "모델 이름 또는 파일 이름이 올바르지 않습니다"
-},
-"內部鏡像正在從 Hugging Face 下載": {
-"en": "The internal mirror is downloading from Hugging Face",
-"ja": "内部ミラーがHugging Faceからダウンロード中です",
-"ko": "내부 미러가 Hugging Face에서 내려받는 중입니다"
-},
-"%），稍後再試": {
-"en": "%); try again later",
-"ja": "%）。しばらくしてからもう一度",
-"ko": "%). 잠시 후 다시 시도하세요"
-},
-"檔名不合法": {
-"en": "Invalid file name",
-"ja": "ファイル名が正しくありません",
-"ko": "파일 이름이 올바르지 않습니다"
-},
-"{0} 沒有 {1}": {
-"en": "{0} has no {1}",
-"ja": "{0}に{1}がありません",
-"ko": "{0}에 {1}이(가) 없습니다"
-},
-"內部鏡像下載": {
-"en": "Internal mirror download",
-"ja": "内部ミラーのダウンロード",
-"ko": "내부 미러 다운로드"
-},
-"已重新排隊": {
-"en": "Queued again",
-"ja": "再度キューに入れました",
-"ko": "다시 대기열에 넣었습니다"
-},
-"內部鏡像正在從 Hugging Face 下載 ": {
-"en": "The internal mirror is downloading from Hugging Face ",
-"ja": "内部ミラーがHugging Faceからダウンロード中：",
-"ko": "내부 미러가 Hugging Face에서 내려받는 중: "
-},
-"的檔案清單": {
-"en": "'s file list",
-"ja": "のファイル一覧",
-"ko": "의 파일 목록"
-},
-"內部鏡像下載 ": {
-"en": "Internal mirror download ",
-"ja": "内部ミラーのダウンロード：",
-"ko": "내부 미러 다운로드: "
-},
-" 失敗（": {
-"en": " failed (",
-"ja": " 失敗（",
-"ko": " 실패("
-},
-"），已重新排隊": {
-"en": "), queued again",
-"ja": "）、再度キューに入れました",
-"ko": "), 다시 대기열에 넣었습니다"
-},
-"大小不對（{0}／{1}），下次會接著下載": {
-"en": "Wrong size ({0}/{1}); the download will resume next time",
-"ja": "サイズが違います（{0}／{1}）。次回続きからダウンロードします",
-"ko": "크기가 다릅니다({0}/{1}). 다음에 이어서 내려받습니다"
-},
-"下次會接著下載": {
-"en": "The download will resume next time",
-"ja": "次回続きからダウンロードします",
-"ko": "다음에 이어서 내려받습니다"
-},
-"這個模型還在下載，等下載完再刪": {
-"en": "This model is still downloading; delete it when the download finishes",
-"ja": "このモデルはまだダウンロード中です。終わってから削除してください",
-"ko": "이 모델은 아직 내려받는 중입니다. 끝난 뒤 삭제하세요"
-},
-" 的檔案清單": {
-"en": "'s file list",
-"ja": " のファイル一覧",
-"ko": "의 파일 목록"
-},
-"大小不對（": {
-"en": "Wrong size (",
-"ja": "サイズが違います（",
-"ko": "크기가 다릅니다("
-},
-"），下次會接著下載": {
-"en": "); the download will resume next time",
-"ja": "）。次回続きからダウンロードします",
-"ko": "). 다음에 이어서 내려받습니다"
-},
-"SHA-256 跟 Hugging Face 公布的不同，已刪除，會重新下載": {
-"en": "The SHA-256 doesn't match what Hugging Face publishes; deleted and will download again",
-"ja": "SHA-256がHugging Faceの公開値と違うため削除しました。再ダウンロードします",
-"ko": "SHA-256이 Hugging Face 공개 값과 달라 삭제했습니다. 다시 내려받습니다"
-},
-"xConsole 工作站互傳": {
-"en": "xConsole workstation transfer",
-"ja": "xConsoleワークステーション間転送",
-"ko": "xConsole 워크스테이션 간 전송"
-},
-"這台的其他程式把系統記憶體用到只剩": {
-"en": "Other programs on this machine left only ",
-"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは",
-"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
-},
-"GiB），為了不讓電腦卡住": {
-"en": "GiB), so to keep the computer from freezing",
-"ja": "GiB）。パソコンが固まらないよう",
-"ko": "GiB)입니다. 컴퓨터가 멈추지 않도록"
-},
-"先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
-"en": "unloaded this model first. Close programs you don't need, then click Start to use it again",
-"ja": "このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
-"ko": "이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
-},
-"等太久了（超過 4 小時）": {
-"en": "Waited too long (over 4 hours)",
-"ja": "待ち時間が長すぎます（4時間超）",
-"ko": "너무 오래 기다렸습니다(4시간 초과)"
-},
-"沒有主控台的網址": {
-"en": "No console URL",
-"ja": "コンソールのURLがありません",
-"ko": "콘솔 URL이 없습니다"
-},
-"這台的其他程式把系統記憶體用到只剩 ": {
-"en": "Other programs on this machine left only ",
-"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは ",
-"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
-},
-" GiB（底線 ": {
-"en": " GiB of system memory (floor ",
-"ja": " GiB（下限 ",
-"ko": " GiB(하한 "
-},
-" GiB），為了不讓電腦卡住，": {
-"en": " GiB), so to keep the computer from freezing,",
-"ja": " GiB）。パソコンが固まらないよう、",
-"ko": " GiB)입니다. 컴퓨터가 멈추지 않도록,"
-},
-" 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
-"en": " unloaded this model first. Close programs you don't need, then click Start to use it again",
-"ja": " このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
-"ko": " 이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
-},
-"用電池中": {
-"en": "On battery",
-"ja": "バッテリー駆動中",
-"ko": "배터리 사용 중"
-},
-"接上電源再": {
-"en": "plug in, then ",
-"ja": "電源につないでから",
-"ko": "전원을 연결한 뒤 "
-},
-"從同群組的": {
-"en": "from the same group's ",
-"ja": "同じグループの",
-"ko": "같은 그룹의 "
-},
-"互傳並核對 SHA-256": {
-"en": "transfer and verify SHA-256",
-"ja": "転送してSHA-256を照合",
-"ko": "전송하고 SHA-256 확인"
-},
-"連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
-"en": "Can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
-"ja": "コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
-"ko": "콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
-},
-"電量": {
-"en": "Battery",
-"ja": "電池残量",
-"ko": "배터리"
-},
-"，接上電源再": {
-"en": ", plug in, then ",
-"ja": "、電源につないでから",
-"ko": ", 전원을 연결한 뒤 "
-},
-"平台名稱不合法：{0}": {
-"en": "Invalid platform name: {0}",
-"ja": "プラットフォーム名が正しくありません：{0}",
-"ko": "플랫폼 이름이 올바르지 않습니다: {0}"
-},
-"平台名稱不合法": {
-"en": "Invalid platform name",
-"ja": "プラットフォーム名が正しくありません",
-"ko": "플랫폼 이름이 올바르지 않습니다"
-},
-"跟主控台拿推理引擎沒成功": {
-"en": "Getting the inference engine from the console failed",
-"ja": "コンソールから推論エンジンを取得できませんでした",
-"ko": "콘솔에서 추론 엔진을 받지 못했습니다"
-},
-"同機型編好的推理引擎在這台裝不起來": {
-"en": "The inference engine built on the same model of machine won't install here",
-"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません",
-"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다"
-},
-"互傳埠的防火牆規則{0}不了（要以系統管理員或 SYSTEM 執行）：{1}": {
-"en": "Couldn't {0} the firewall rule for the transfer port (needs administrator or SYSTEM): {1}",
-"ja": "転送ポートのファイアウォール規則を{0}できません（管理者かSYSTEMで実行が必要）：{1}",
-"ko": "전송 포트 방화벽 규칙을 {0}할 수 없습니다(관리자 또는 SYSTEM으로 실행 필요): {1}"
-},
-"互傳埠的防火牆規則": {
-"en": "Firewall rule for the transfer port",
-"ja": "転送ポートのファイアウォール規則",
-"ko": "전송 포트 방화벽 규칙"
-},
-"不了（要以系統管理員或 SYSTEM 執行": {
-"en": "failed (needs administrator or SYSTEM",
-"ja": "できません（管理者かSYSTEMで実行が必要",
-"ko": "실패(관리자 또는 SYSTEM으로 실행 필요"
-},
-"互傳安排裡的檔名或 sha256 不對": {
-"en": "The file name or sha256 in the transfer plan is wrong",
-"ja": "転送計画のファイル名かsha256が正しくありません",
-"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다"
-},
-"的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過": {
-"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered",
-"ja": "のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性",
-"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음"
-},
-"等同群組的其他機器下載好再互傳": {
-"en": "Wait for other machines in the group to finish downloading, then transfer",
-"ja": "同じグループのほかのマシンのダウンロード完了を待ってから転送します",
-"ko": "같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
-},
-"互傳票證快到期，等主控台下一輪": {
-"en": "The transfer ticket is about to expire; waiting for the console's next round",
-"ja": "転送チケットの期限が近いので、コンソールの次の回を待ちます",
-"ko": "전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
-},
-"：從同群組的 ": {
-"en": ": from the same group's ",
-"ja": "：同じグループの",
-"ko": ": 같은 그룹의 "
-},
-" 互傳並核對 SHA-256": {
-"en": " transfer and verify SHA-256",
-"ja": " から転送してSHA-256を照合",
-"ko": " 에서 전송하고 SHA-256 확인"
-},
-"放行": {
-"en": "allow",
-"ja": "許可",
-"ko": "허용"
-},
-"本機使用者通道開不起來：資料夾 {0} 別人寫得進去": {
-"en": "The local user channel can't open: others can write to folder {0}",
-"ja": "ローカルユーザーチャネルを開けません：フォルダー{0}にほかの人が書き込めます",
-"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 {0}에 다른 사람이 쓸 수 있습니다"
-},
-"本機使用者通道開不起來：資料夾": {
-"en": "The local user channel can't open: folder",
-"ja": "ローカルユーザーチャネルを開けません：フォルダー",
-"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더"
-},
-"別人寫得進去": {
-"en": "others can write to it",
-"ja": "ほかの人が書き込めます",
-"ko": "다른 사람이 쓸 수 있습니다"
-},
-"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}": {
-"en": "The local user channel can't open (another program may have taken the name): {0}",
-"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：{0}",
-"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): {0}"
-},
-"本機使用者通道開不起來（可能有別的程式先占了這個名稱": {
-"en": "The local user channel can't open (another program may have taken the name",
-"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性",
-"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음"
-},
-"群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
-"en": "The group only allows transfers within the group, but no reachable machine in the group has this model",
-"ja": "グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
-"ko": "그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
-},
-"：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
-"en": ": can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
-"ja": "：コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
-"ko": ": 콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
-},
-"寫不進去": {
-"en": "can't be written",
-"ja": "書き込めません",
-"ko": "쓸 수 없습니다"
-},
-"模型改放": {
-"en": "Models moved to",
-"ja": "モデルの置き場を変更",
-"ko": "모델 위치 변경"
-},
-"群組設定的存放位置": {
-"en": "Storage location set by the group",
-"ja": "グループ設定の保存場所",
-"ko": "그룹에서 정한 저장 위치"
-},
-"（電量 ": {
-"en": " (battery ",
-"ja": "（電池残量 ",
-"ko": " (배터리 "
-},
-"平台名稱不合法：": {
-"en": "Invalid platform name: ",
-"ja": "プラットフォーム名が正しくありません：",
-"ko": "플랫폼 이름이 올바르지 않습니다: "
-},
-"跟主控台拿推理引擎沒成功：": {
-"en": "Getting the inference engine from the console failed: ",
-"ja": "コンソールから推論エンジンを取得できませんでした：",
-"ko": "콘솔에서 추론 엔진을 받지 못했습니다: "
-},
-"同機型編好的推理引擎在這台裝不起來：": {
-"en": "The inference engine built on the same model of machine won't install here: ",
-"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません：",
-"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다: "
-},
-"推理引擎裝不起來": {
-"en": "The inference engine won't install",
-"ja": "推論エンジンをインストールできません",
-"ko": "추론 엔진을 설치할 수 없습니다"
-},
-"不了（要以系統管理員或 SYSTEM 執行）：": {
-"en": "failed (needs administrator or SYSTEM): ",
-"ja": "できません（管理者かSYSTEMで実行が必要）：",
-"ko": "실패(관리자 또는 SYSTEM으로 실행 필요): "
-},
-"互傳安排裡的檔名或 sha256 不對：": {
-"en": "The file name or sha256 in the transfer plan is wrong: ",
-"ja": "転送計画のファイル名かsha256が正しくありません：",
-"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다: "
-},
-" 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）": {
-"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered)",
-"ja": " のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性）",
-"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음)"
-},
-"的 SHA-256（之後才能送給同群組的機器": {
-"en": "'s SHA-256 (needed before it can be sent to machines in the group",
-"ja": "のSHA-256（照合後にグループ内のマシンへ送れます",
-"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음"
-},
-"：等同群組的其他機器下載好再互傳": {
-"en": ": wait for other machines in the group to finish downloading, then transfer",
-"ja": "：同じグループのほかのマシンのダウンロード完了を待ってから転送します",
-"ko": ": 같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
-},
-"：互傳票證快到期，等主控台下一輪": {
-"en": ": the transfer ticket is about to expire; waiting for the console's next round",
-"ja": "：転送チケットの期限が近いので、コンソールの次の回を待ちます",
-"ko": ": 전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
-},
-"拒絕：不是坐在這台電腦前的人": {
-"en": "Refused: not the person sitting at this computer",
-"ja": "拒否：このパソコンの前にいる人ではありません",
-"ko": "거부: 이 컴퓨터 앞에 있는 사람이 아닙니다"
-},
-"拒絕：不是使用者層的操作": {
-"en": "Refused: not a user-level operation",
-"ja": "拒否：ユーザー層の操作ではありません",
-"ko": "거부: 사용자 수준 작업이 아닙니다"
-},
-"本機使用者通道開不起來：{0}": {
-"en": "The local user channel can't open: {0}",
-"ja": "ローカルユーザーチャネルを開けません：{0}",
-"ko": "로컬 사용자 채널을 열 수 없습니다: {0}"
-},
-"本機使用者通道開不起來": {
-"en": "The local user channel can't open",
-"ja": "ローカルユーザーチャネルを開けません",
-"ko": "로컬 사용자 채널을 열 수 없습니다"
-},
-"本機使用者通道開不起來：資料夾 ": {
-"en": "The local user channel can't open: folder ",
-"ja": "ローカルユーザーチャネルを開けません：フォルダー ",
-"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 "
-},
-" 別人寫得進去": {
-"en": " others can write to it",
-"ja": " ほかの人が書き込めます",
-"ko": " 다른 사람이 쓸 수 있습니다"
-},
-"本機通道的另一端關了": {
-"en": "The other end of the local channel closed",
-"ja": "ローカルチャネルの相手側が閉じました",
-"ko": "로컬 채널의 상대편이 닫혔습니다"
-},
-"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：": {
-"en": "The local user channel can't open (another program may have taken the name): ",
-"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：",
-"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): "
-},
-"本機使用者通道處理請求失敗：{0}: {1}": {
-"en": "The local user channel failed to handle a request: {0}: {1}",
-"ja": "ローカルユーザーチャネルが要求を処理できませんでした：{0}: {1}",
-"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: {0}: {1}"
-},
-"本機使用者通道處理請求失敗": {
-"en": "The local user channel failed to handle a request",
-"ja": "ローカルユーザーチャネルが要求を処理できませんでした",
-"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다"
-},
-"本機使用者通道：{0}（只開放使用者層操作，稽核在 {1}）": {
-"en": "Local user channel: {0} (user-level operations only; audit log at {1})",
-"ja": "ローカルユーザーチャネル：{0}（ユーザー層の操作のみ、監査ログは{1}）",
-"ko": "로컬 사용자 채널: {0}(사용자 수준 작업만, 감사 기록은 {1})"
-},
-"本機使用者通道": {
-"en": "Local user channel",
-"ja": "ローカルユーザーチャネル",
-"ko": "로컬 사용자 채널"
-},
-"只開放使用者層操作，稽核在": {
-"en": "user-level operations only; audit log at",
-"ja": "ユーザー層の操作のみ、監査ログは",
-"ko": "사용자 수준 작업만, 감사 기록 위치"
-},
-"互傳完了但存放區掃不到": {
-"en": "Transfer finished but the storage area doesn't show the files",
-"ja": "転送は終わりましたが保存場所に見つかりません",
-"ko": "전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
-},
-"：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
-"en": ": the group only allows transfers within the group, but no reachable machine in the group has this model",
-"ja": "：グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
-"ko": ": 그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
-},
-"模型存放位置 ": {
-"en": "Model storage location ",
-"ja": "モデルの保存場所 ",
-"ko": "모델 저장 위치 "
-},
-" 寫不進去：": {
-"en": " can't be written: ",
-"ja": " に書き込めません：",
-"ko": " 에 쓸 수 없습니다: "
-},
-"模型改放 ": {
-"en": "Models moved to ",
-"ja": "モデルの置き場を変更：",
-"ko": "모델 위치 변경: "
-},
-"（群組設定的存放位置）": {
-"en": " (storage location set by the group)",
-"ja": "（グループ設定の保存場所）",
-"ko": " (그룹에서 정한 저장 위치)"
-},
-"換上這顆": {
-"en": "Switch to this model",
-"ja": "このモデルに切り替え",
-"ko": "이 모델로 교체"
-},
-"GiB 的模型": {
-"en": "GiB model",
-"ja": "GiBのモデル",
-"ko": "GiB 모델"
-},
-"推理引擎裝不起來：": {
-"en": "The inference engine won't install: ",
-"ja": "推論エンジンをインストールできません：",
-"ko": "추론 엔진을 설치할 수 없습니다: "
-},
-"這台同時送的份數到上限": {
-"en": "This machine is already sending as many copies as it can",
-"ja": "このマシンの同時送信数が上限です",
-"ko": "이 머신의 동시 전송 수가 한도입니다"
-},
-"份），稍後再試": {
-"en": " copies); try again later",
-"ja": "件）。しばらくしてからもう一度",
-"ko": "개). 잠시 후 다시 시도하세요"
-},
-"：核對 ": {
-"en": ": verifying ",
-"ja": "：照合 ",
-"ko": ": 확인 "
-},
-" 的 SHA-256（之後才能送給同群組的機器）": {
-"en": "'s SHA-256 (needed before it can be sent to machines in the group)",
-"ja": " のSHA-256（照合後にグループ内のマシンへ送れます）",
-"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음)"
-},
-"互傳沒成功": {
-"en": "Transfer failed",
-"ja": "転送に失敗しました",
-"ko": "전송 실패"
-},
-"本機使用者通道開不起來：": {
-"en": "The local user channel can't open: ",
-"ja": "ローカルユーザーチャネルを開けません：",
-"ko": "로컬 사용자 채널을 열 수 없습니다: "
-},
-"本機使用者通道處理請求失敗：": {
-"en": "The local user channel failed to handle a request: ",
-"ja": "ローカルユーザーチャネルが要求を処理できませんでした：",
-"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: "
-},
-"本機使用者通道：": {
-"en": "Local user channel: ",
-"ja": "ローカルユーザーチャネル：",
-"ko": "로컬 사용자 채널: "
-},
-"（只開放使用者層操作，稽核在 ": {
-"en": " (user-level operations only; audit log at ",
-"ja": "（ユーザー層の操作のみ、監査ログは ",
-"ko": " (사용자 수준 작업만, 감사 기록 위치 "
-},
-"：互傳完了但存放區掃不到": {
-"en": ": transfer finished but the storage area doesn't show the files",
-"ja": "：転送は終わりましたが保存場所に見つかりません",
-"ko": ": 전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
-},
-"換上這顆 ": {
-"en": "Switch to this model ",
-"ja": "このモデルに切り替え ",
-"ko": "이 모델로 교체 "
-},
-" GiB 的模型": {
-"en": " GiB model",
-"ja": " GiBのモデル",
-"ko": " GiB 모델"
-},
-"這台同時送的份數到上限（": {
-"en": "This machine is already sending as many copies as it can (",
-"ja": "このマシンの同時送信数が上限です（",
-"ko": "이 머신의 동시 전송 수가 한도입니다("
-},
-" 份），稍後再試": {
-"en": " copies); try again later",
-"ja": " 件）。しばらくしてからもう一度",
-"ko": "개). 잠시 후 다시 시도하세요"
-},
-"互傳埠 {0} 開不起來：{1}": {
-"en": "Transfer port {0} can't open: {1}",
-"ja": "転送ポート{0}を開けません：{1}",
-"ko": "전송 포트 {0}을(를) 열 수 없습니다: {1}"
-},
-"互傳埠": {
-"en": "Transfer port",
-"ja": "転送ポート",
-"ko": "전송 포트"
-},
-"開不起來": {
-"en": "can't open",
-"ja": "開けません",
-"ko": "열 수 없음"
-},
-"：跟 ": {
-"en": ": with ",
-"ja": "：相手 ",
-"ko": ": 상대 "
-},
-" 互傳沒成功（": {
-"en": " transfer failed (",
-"ja": " との転送に失敗（",
-"ko": " 와(과)의 전송 실패("
-},
-"打包給同機型的機器時出錯（這台照常能用）：{0}\n": {
-"en": "Error packing for machines of the same model (this machine still works normally): {0}\n",
-"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：{0}\n",
-"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): {0}\n"
-},
-"打包給同機型的機器時出錯（這台照常能用": {
-"en": "Error packing for machines of the same model (this machine still works normally",
-"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます",
-"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능"
-},
-"互傳埠 ": {
-"en": "Transfer port ",
-"ja": "転送ポート ",
-"ko": "전송 포트 "
-},
-" 開不起來：": {
-"en": " can't open: ",
-"ja": " を開けません：",
-"ko": " 을(를) 열 수 없습니다: "
-},
-"打包給同機型的機器時出錯（這台照常能用）：": {
-"en": "Error packing for machines of the same model (this machine still works normally): ",
-"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：",
-"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): "
 }
 }

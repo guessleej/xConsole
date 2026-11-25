@@ -142,7 +142,8 @@ EXPECT_USER = {
     ("GET", "/api/schedules"), ("POST", "/api/schedules/save"), ("POST", "/api/push/save"), ("POST", "/api/push/telegram/chats"),
     ("POST", "/api/logout"), ("POST", "/api/account/password"), ("POST", "/api/chats/save"), ("POST", "/api/chats/delete-all"),
     ("POST", "/api/extract"), ("POST", "/api/preview"), ("POST", "/api/agent/tasks"), ("POST", "/api/keys/create"),
-    ("POST", "/api/assistant"), ("POST", "/api/assistant/continue"),
+    ("POST", "/api/assistant"), ("POST", "/api/assistant/continue"), ("GET", "/api/issues/mine"), ("GET", "/api/issues/checking"),
+    ("POST", "/api/issues"),
 }
 EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/agent/tasks/[0-9a]{12}",
                   r"GET /api/node/a/(agent/folders|sd/recommend)", r"GET /api/node/a/sd/jobs(/[0-9a]{8}(/output(/0)?|/init)?)?",

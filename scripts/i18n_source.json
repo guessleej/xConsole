@@ -60,6 +60,146 @@
 "pattern": false
 },
 {
+"zh": "回報數字有誤",
+"pattern": false
+},
+{
+"zh": "查核中",
+"pattern": false
+},
+{
+"zh": "有人回報這個數字，云碩正在查核",
+"pattern": false
+},
+{
+"zh": "回報：{0}",
+"pattern": true
+},
+{
+"zh": "回報",
+"pattern": false
+},
+{
+"zh": "哪裡不對？寫一句話就好，畫面與機器會自動帶上。",
+"pattern": false
+},
+{
+"zh": "例：這台明明還有 20 GiB，這裡卻寫 2 GiB",
+"pattern": false
+},
+{
+"zh": "現在完全不能用（列為緊急）",
+"pattern": false
+},
+{
+"zh": "附截圖、錄音或錄影（選填，最多 5 個）",
+"pattern": false
+},
+{
+"zh": "畫面 {0}",
+"pattern": true
+},
+{
+"zh": "畫面",
+"pattern": false
+},
+{
+"zh": "機器 {0}",
+"pattern": true
+},
+{
+"zh": "機器",
+"pattern": false
+},
+{
+"zh": "對象 {0}",
+"pattern": true
+},
+{
+"zh": "對象",
+"pattern": false
+},
+{
+"zh": "會一起送：{0}",
+"pattern": true
+},
+{
+"zh": "會一起送",
+"pattern": false
+},
+{
+"zh": "回報問題",
+"pattern": false
+},
+{
+"zh": "送出",
+"pattern": false
+},
+{
+"zh": "寫一句話說明哪裡不對",
+"pattern": false
+},
+{
+"zh": "（主管帳號，自動列緊急）",
+"pattern": false
+},
+{
+"zh": "工單 #{0}・{1}{2}",
+"pattern": true
+},
+{
+"zh": "工單 #",
+"pattern": false
+},
+{
+"zh": "緊急",
+"pattern": false
+},
+{
+"zh": "已立刻通知云碩；{0} 前會有人回覆，預計 {1} 處理完。",
+"pattern": true
+},
+{
+"zh": "已立刻通知云碩",
+"pattern": false
+},
+{
+"zh": "前會有人回覆，預計",
+"pattern": false
+},
+{
+"zh": "處理完",
+"pattern": false
+},
+{
+"zh": "預計 {0} 前處理完。處理進度可以到「我的帳號」看。",
+"pattern": true
+},
+{
+"zh": "預計",
+"pattern": false
+},
+{
+"zh": "前處理完。處理進度可以到「我的帳號」看",
+"pattern": false
+},
+{
+"zh": "有附件沒收到：{0}",
+"pattern": true
+},
+{
+"zh": "有附件沒收到",
+"pattern": false
+},
+{
+"zh": "已收到回報",
+"pattern": false
+},
+{
+"zh": "好",
+"pattern": false
+},
+{
 "zh": "取消",
 "pattern": false
 },
@@ -681,10 +821,6 @@
 },
 {
 "zh": "顆",
-"pattern": false
-},
-{
-"zh": "機器",
 "pattern": false
 },
 {
@@ -4320,6 +4456,10 @@
 "pattern": false
 },
 {
+"zh": "問題回報",
+"pattern": false
+},
+{
 "zh": "使用者帳號",
 "pattern": false
 },
@@ -4338,6 +4478,166 @@
 {
 "zh": "企業版模組",
 "pattern": false
+},
+{
+"zh": "已受理",
+"pattern": false
+},
+{
+"zh": "處理中",
+"pattern": false
+},
+{
+"zh": "已完成",
+"pattern": false
+},
+{
+"zh": "已結案",
+"pattern": false
+},
+{
+"zh": "長官或使用者看到數字不對，按畫面上的「回報」就會到這裡；緊急件會立刻寄信給云碩",
+"pattern": false
+},
+{
+"zh": "處理中 {0} 件，其中緊急 {1} 件",
+"pattern": true
+},
+{
+"zh": "件，其中緊急",
+"pattern": false
+},
+{
+"zh": "件",
+"pattern": false
+},
+{
+"zh": "云碩收件人（email，一行一個）",
+"pattern": false
+},
+{
+"zh": "學校窗口（處理完一起通知，email，一行一個）",
+"pattern": false
+},
+{
+"zh": "主管帳號（送出的回報自動列緊急，一行一個登入帳號，例如校長、副校長）",
+"pattern": false
+},
+{
+"zh": "緊急件初步回覆時限（小時）",
+"pattern": false
+},
+{
+"zh": "一般件預計完成（天）",
+"pattern": false
+},
+{
+"zh": "郵件伺服器（SMTP）",
+"pattern": false
+},
+{
+"zh": "不加密（只限內網的轉信主機）",
+"pattern": false
+},
+{
+"zh": "加密方式",
+"pattern": false
+},
+{
+"zh": "登入帳號（沒有就留空）",
+"pattern": false
+},
+{
+"zh": "密碼（已設定；留空就沿用）",
+"pattern": false
+},
+{
+"zh": "密碼",
+"pattern": false
+},
+{
+"zh": "寄件人（email）",
+"pattern": false
+},
+{
+"zh": "寄測試信給云碩收件人",
+"pattern": false
+},
+{
+"zh": "已寄給 {0}",
+"pattern": true
+},
+{
+"zh": "已寄給",
+"pattern": false
+},
+{
+"zh": "工單",
+"pattern": false
+},
+{
+"zh": "點一筆看說明、附件與寄信紀錄，改進度或回覆；回覆與處理完都會通知回報人",
+"pattern": false
+},
+{
+"zh": "還沒有人回報。",
+"pattern": false
+},
+{
+"zh": "・查核中",
+"pattern": false
+},
+{
+"zh": "{0}（{1}）・{2}・{3}・預計 {4} 前處理完",
+"pattern": true
+},
+{
+"zh": "前處理完",
+"pattern": false
+},
+{
+"zh": "當時的畫面：{0}",
+"pattern": true
+},
+{
+"zh": "當時的畫面",
+"pattern": false
+},
+{
+"zh": "附件：{0}（{1} MB）",
+"pattern": true
+},
+{
+"zh": "附件",
+"pattern": false
+},
+{
+"zh": "有 {0} 封通知沒寄出去：{1}",
+"pattern": true
+},
+{
+"zh": "封通知沒寄出去",
+"pattern": false
+},
+{
+"zh": "進度",
+"pattern": false
+},
+{
+"zh": "查核中（用到這個數字的畫面會提醒）",
+"pattern": false
+},
+{
+"zh": "回覆回報人（會寄信通知他）",
+"pattern": false
+},
+{
+"zh": "回覆",
+"pattern": false
+},
+{
+"zh": "工單 #{0}",
+"pattern": true
 },
 {
 "zh": "群組設定的「模型可以從哪裡取得」勾了「內部鏡像」，群組裡的機器就跟主控台拿，不必每台都連外網",
@@ -5504,10 +5804,6 @@
 "pattern": false
 },
 {
-"zh": "已完成",
-"pattern": false
-},
-{
 "zh": "被後下的取代",
 "pattern": false
 },
@@ -5593,10 +5889,6 @@
 },
 {
 "zh": "」確認",
-"pattern": false
-},
-{
-"zh": "送出",
 "pattern": false
 },
 {
@@ -6336,10 +6628,6 @@
 "pattern": false
 },
 {
-"zh": "緊急",
-"pattern": false
-},
-{
 "zh": "估算用的假設",
 "pattern": false
 },
@@ -6544,10 +6832,6 @@
 "pattern": false
 },
 {
-"zh": "對象",
-"pattern": false
-},
-{
 "zh": "成功",
 "pattern": false
 },
@@ -6601,6 +6885,26 @@
 },
 {
 "zh": "你的對話紀錄、Agent 工作資料夾、畫圖與影片產出只有你自己看得到。管理員不會看你的對話內容。",
+"pattern": false
+},
+{
+"zh": "我的回報",
+"pattern": false
+},
+{
+"zh": "回報過的問題與處理進度",
+"pattern": false
+},
+{
+"zh": "還沒有回報過。畫面右上角的旗子可以回報問題。",
+"pattern": false
+},
+{
+"zh": "云碩回覆：{0}",
+"pattern": true
+},
+{
+"zh": "云碩回覆",
 "pattern": false
 },
 {
@@ -10128,10 +10432,6 @@
 "pattern": false
 },
 {
-"zh": "附件",
-"pattern": false
-},
-{
 "zh": "工具",
 "pattern": false
 },
@@ -10529,6 +10829,18 @@
 },
 {
 "zh": "重新生成",
+"pattern": false
+},
+{
+"zh": "對話答覆：{0}",
+"pattern": true
+},
+{
+"zh": "對話答覆",
+"pattern": false
+},
+{
+"zh": "回報答錯",
 "pattern": false
 },
 {
@@ -11077,10 +11389,6 @@
 },
 {
 "zh": "云碩科技地端 AI 機群",
-"pattern": false
-},
-{
-"zh": "密碼",
 "pattern": false
 },
 {
@@ -12412,6 +12720,14 @@
 "pattern": false
 },
 {
+"zh": "[xConsole] 問題回報測試信",
+"pattern": false
+},
+{
+"zh": "這是問題回報的測試信。收到就代表郵件伺服器與通知名單都設好了。",
+"pattern": false
+},
+{
 "zh": "這個埠只給代理連回；管理網頁在另一個埠",
 "pattern": false
 },
@@ -12673,6 +12989,14 @@
 },
 {
 "zh": "對方回應太大",
+"pattern": false
+},
+{
+"zh": "問題回報催辦出錯：{0}",
+"pattern": true
+},
+{
+"zh": "問題回報催辦出錯",
 "pattern": false
 },
 {
@@ -13064,6 +13388,10 @@
 "pattern": false
 },
 {
+"zh": "問題回報催辦出錯：",
+"pattern": false
+},
+{
 "zh": "新版已換上，從系統匣結束 xConsole 再打開就是新版",
 "pattern": false
 },
@@ -13164,6 +13492,10 @@
 "pattern": false
 },
 {
+"zh": "附件最大 40 MB，要帶 X-XConsole-Upload 與 application/octet-stream",
+"pattern": false
+},
+{
 "zh": "執行環境包要在 ",
 "pattern": false
 },
@@ -13225,6 +13557,10 @@
 },
 {
 "zh": "目前沒有待配對的 CSR",
+"pattern": false
+},
+{
+"zh": "沒有這個附件",
 "pattern": false
 },
 {
@@ -13405,6 +13741,22 @@
 },
 {
 "zh": "還沒設定搜尋端點",
+"pattern": false
+},
+{
+"zh": "郵件伺服器要寫主機名稱或 IP（例：smtp.office365.com）",
+"pattern": false
+},
+{
+"zh": "埠要是 1～65535",
+"pattern": false
+},
+{
+"zh": "加密方式要是 STARTTLS、SSL 或不加密",
+"pattern": false
+},
+{
+"zh": "寄件人要是 email",
 "pattern": false
 },
 {
@@ -17393,6 +17745,250 @@
 },
 {
 "zh": "Hugging Face 回 ",
+"pattern": false
+},
+{
+"zh": "云碩收件人",
+"pattern": false
+},
+{
+"zh": "學校窗口",
+"pattern": false
+},
+{
+"zh": "主管帳號最多 50 個",
+"pattern": false
+},
+{
+"zh": "郵件伺服器或收件人沒設",
+"pattern": false
+},
+{
+"zh": "不加密的郵件伺服器不送帳號密碼：要登入請改用 STARTTLS 或 SSL",
+"pattern": false
+},
+{
+"zh": "回報人：{0}",
+"pattern": true
+},
+{
+"zh": "回報人",
+"pattern": false
+},
+{
+"zh": "時間：{0}",
+"pattern": true
+},
+{
+"zh": "時間",
+"pattern": false
+},
+{
+"zh": "頁面：{0}",
+"pattern": true
+},
+{
+"zh": "頁面",
+"pattern": false
+},
+{
+"zh": "對象：{0}",
+"pattern": true
+},
+{
+"zh": "說明：{0}",
+"pattern": true
+},
+{
+"zh": "進度：{0}{1}",
+"pattern": true
+},
+{
+"zh": "{0}要是 email（一行一個，最多 30 個）：{1}",
+"pattern": true
+},
+{
+"zh": "要是 email（一行一個，最多 30 個",
+"pattern": false
+},
+{
+"zh": "{0}要在 {1}～{2} 之間",
+"pattern": true
+},
+{
+"zh": "說明最多 {0} 字；細節可以附截圖或錄音",
+"pattern": true
+},
+{
+"zh": "說明最多",
+"pattern": false
+},
+{
+"zh": "字；細節可以附截圖或錄音",
+"pattern": false
+},
+{
+"zh": "沒有這張工單",
+"pattern": false
+},
+{
+"zh": "每張工單最多附 {0} 個檔",
+"pattern": true
+},
+{
+"zh": "每張工單最多附",
+"pattern": false
+},
+{
+"zh": "只收圖片（PNG、JPG、GIF、WebP）、錄音（MP3、M4A、WAV、OGG）與錄影（MP4、WebM）",
+"pattern": false
+},
+{
+"zh": "這個檔太大：{0} 最多 {1} MB",
+"pattern": true
+},
+{
+"zh": "這個檔太大",
+"pattern": false
+},
+{
+"zh": "緊急回報",
+"pattern": false
+},
+{
+"zh": "緊急回報逾時沒人接手",
+"pattern": false
+},
+{
+"zh": "回報逾期",
+"pattern": false
+},
+{
+"zh": "回報已處理完",
+"pattern": false
+},
+{
+"zh": "回報有新回覆",
+"pattern": false
+},
+{
+"zh": "回報人：",
+"pattern": false
+},
+{
+"zh": "時間：",
+"pattern": false
+},
+{
+"zh": "頁面：",
+"pattern": false
+},
+{
+"zh": "對象：",
+"pattern": false
+},
+{
+"zh": "說明：",
+"pattern": false
+},
+{
+"zh": "進度：",
+"pattern": false
+},
+{
+"zh": "最新回覆：{0}",
+"pattern": true
+},
+{
+"zh": "最新回覆",
+"pattern": false
+},
+{
+"zh": "附件 {0} 個：留在主控台，請登入後到「設定 › 問題回報」查看",
+"pattern": true
+},
+{
+"zh": "個：留在主控台，請登入後到「設定 › 問題回報」查看",
+"pattern": false
+},
+{
+"zh": "沒有收件人",
+"pattern": false
+},
+{
+"zh": "通知名單上沒有云碩收件人：緊急回報寄不出去",
+"pattern": false
+},
+{
+"zh": "郵件伺服器還沒設好：工單照建，但不會寄信",
+"pattern": false
+},
+{
+"zh": "最近一次寄信失敗（{0}）：{1}",
+"pattern": true
+},
+{
+"zh": "最近一次寄信失敗",
+"pattern": false
+},
+{
+"zh": "要是 email（一行一個，最多 30 個）：",
+"pattern": false
+},
+{
+"zh": "要在 ",
+"pattern": false
+},
+{
+"zh": "沒有寄信程式",
+"pattern": false
+},
+{
+"zh": "說明最多 ",
+"pattern": false
+},
+{
+"zh": " 字；細節可以附截圖或錄音",
+"pattern": false
+},
+{
+"zh": "每張工單最多附 ",
+"pattern": false
+},
+{
+"zh": " 個檔",
+"pattern": false
+},
+{
+"zh": "這個檔太大：",
+"pattern": false
+},
+{
+"zh": " 最多 ",
+"pattern": false
+},
+{
+"zh": "最新回覆：",
+"pattern": false
+},
+{
+"zh": "附件 ",
+"pattern": false
+},
+{
+"zh": " 個：留在主控台，請登入後到「設定 › 問題回報」查看",
+"pattern": false
+},
+{
+"zh": "最近一次寄信失敗（",
+"pattern": false
+},
+{
+"zh": "進度只能是：",
+"pattern": false
+},
+{
+"zh": "（查核中）",
 "pattern": false
 },
 {
@@ -21661,10 +22257,6 @@
 },
 {
 "zh": "上下文長度與並行數要填整數",
-"pattern": false
-},
-{
-"zh": "要在 ",
 "pattern": false
 },
 {
