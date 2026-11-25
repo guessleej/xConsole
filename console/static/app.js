@@ -18,6 +18,12 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
+// 中國來源一律同一個紅底標籤（清單 #27）：只標示不擋，政府案不得使用
+function cnChip() {
+  const c = el("span", "chip cn", "中國來源");
+  c.title = "中國來源的模型：內部測試可以用，政府案不得使用";
+  return c;
+}
 const fmt = (n, d = 1) => (n === null || n === undefined || Number.isNaN(n)) ? "—" : Number(n).toFixed(d);
 const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString(uiLocale());
 
@@ -460,6 +466,7 @@ function slotCard(node, s, unified) {
   if (s.quant) c.appendChild(el("div", "quant", s.quant));
 
   const chips = el("div", "chips");
+  if (s.unit && s.cn_origin) chips.appendChild(cnChip());
   (s.caps || []).forEach((cap) => chips.appendChild(el("span", "chip", cap)));
   if (s.port) chips.appendChild(el("span", "chip brand", ":" + s.port));
   if (s.gpu_ids?.length) chips.appendChild(el("span", "chip", "卡 " + s.gpu_ids.join("、")));
@@ -647,7 +654,7 @@ async function openSwap(node, s, pre) {
     r.appendChild(t);
     const chips = el("div", "chips");
     if (engine === "llama" && m.vision) chips.appendChild(el("span", "chip", "看圖"));
-    if (m.cn_origin) chips.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+    if (m.cn_origin) chips.appendChild(cnChip());
     if (engine === "llama" && m.fits_total === false) chips.appendChild(el("span", "chip bad", "這台放不下"));
     if (engine === "llama" && m.auto_cpu_moe) chips.appendChild(el("span", "chip warn", `自動分層：${m.auto_cpu_moe} 層專家放系統記憶體`));
     if (engine === "strata" && !m.has_tokenizer) chips.appendChild(el("span", "chip", "缺 tokenizer"));
@@ -877,9 +884,9 @@ function libInstalledCard(ok, models, jobs) {
     const tr = el("tr");
     const nm = el("td");
     nm.appendChild(el("div", null, `${m.name}${m.quant ? " " + m.quant : ""}`));
+    if (m.cn_origin) nm.firstChild.append(" ", cnChip());
     nm.appendChild(el("div", "small muted", [m.engine === "llama" ? "llama.cpp" : "Strata", m.shards > 1 ? `${m.shards} 個分片` : null,
-      m.imported ? "匯入" : null, m.external ? `其他資料夾 ${m.external}` : null,
-      m.cn_origin ? "中國來源・政府案不可用" : null].filter(Boolean).join("・")));
+      m.imported ? "匯入" : null, m.external ? `其他資料夾 ${m.external}` : null].filter(Boolean).join("・")));
     tr.appendChild(nm);
     if (ok.length > 1) tr.appendChild(el("td", null, n.name));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
@@ -1094,7 +1101,7 @@ function libDownloadCard(ok, only) {
     r.results.forEach((x) => {
       const b = el("button", "hf-hit");
       b.appendChild(el("span", "mono", x.repo));
-      if (x.cn_origin) b.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+      if (x.cn_origin) b.appendChild(cnChip());
       b.appendChild(el("span", "small muted", `下載 ${int(x.downloads)}・${x.updated || ""}`));
       b.onclick = () => { fRepo.value = x.repo; sOut.hidden = true; listBtn.click(); };
       sOut.appendChild(b);
@@ -1141,7 +1148,7 @@ function libDownloadCard(ok, only) {
       found.forEach((x) => {
         const b = el("button", "hf-hit");
         b.appendChild(el("span", "mono", x.repo));
-        if (x.cn_origin) b.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+        if (x.cn_origin) b.appendChild(cnChip());
         b.appendChild(el("span", "small muted", `下載 ${int(x.downloads)}・${x.updated || ""}`));
         b.onclick = () => { fRepo.value = x.repo; listBtn.click(); };
         alt.appendChild(b);
@@ -1660,7 +1667,7 @@ function recRow(n, it, lib, ctx) {
     if (it.vision) t.appendChild(el("span", "chip info", "看圖"));
     if (isNew(it.released)) t.appendChild(el("span", "chip new", "新"));
     (it.tags || []).filter((x) => x === "自家" || x === "繁中").forEach((x) => t.appendChild(el("span", "chip" + (x === "自家" ? " brand" : ""), x)));
-    if (it.cn_origin) t.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+    if (it.cn_origin) t.appendChild(cnChip());
     if (it.released) t.appendChild(el("span", "small muted", relLabel(it.released)));
     main.appendChild(t);
     const src = (it.repo || "").split("/")[0];
@@ -2036,7 +2043,7 @@ function sdRow(n, rec, it, redraw, toGen) {
     t.appendChild(el("b", null, it.title));
     (it.tags || []).forEach((x) => t.appendChild(el("span", "chip " + (x === "畫圖" || x === "影片" ? "brand"
       : x === "帶聲音" ? "ok" : SD_TAG_INFO.has(x) ? "info" : "idle"), x)));
-    if (it.cn_origin) t.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+    if (it.cn_origin) t.appendChild(cnChip());
     if (it.released) t.appendChild(el("span", "small muted", relLabel(it.released)));
     main.appendChild(t);
     main.appendChild(el("div", "small muted", [it.vendor, it.desc].filter(Boolean).join(" · ")));
@@ -2119,7 +2126,7 @@ function sdMine(n, rec, redraw) {
     const nm = el("td");
     nm.appendChild(el("div", null, m.title));
     if (m.internal) nm.appendChild(el("span", "chip", "手動組"));
-    if (m.cn_origin) nm.appendChild(el("span", "chip warn", "中國來源・政府案不可用"));
+    if (m.cn_origin) nm.appendChild(cnChip());
     tr.appendChild(nm);
     tr.appendChild(el("td", "small nowrap", SD_KIND[m.kind]));
     tr.appendChild(el("td", "num", `${fmt(m.size_gib)} GiB`));
@@ -3574,6 +3581,16 @@ function readyCard(n) {
   return c;
 }
 
+// 一排模型名稱，中國來源的後面接紅底標籤（群組總覽、群組設定共用）
+function modelChips(names, cn) {
+  const box = el("div", "chips");
+  names.forEach((m) => {
+    box.appendChild(el("span", "chip idle mono", m));
+    if (cn.includes(m)) box.appendChild(cnChip());
+  });
+  return box;
+}
+
 function groupCard(g, members, link) {
   const card = el("section", "card rv");
   const head = el("div", "card-head");
@@ -3587,6 +3604,7 @@ function groupCard(g, members, link) {
     head.appendChild(b);
   }
   card.appendChild(head);
+  if ((g.models || []).length) card.appendChild(modelChips(g.models, g.cn_models || []));
   if (g.members) {
     const bar = el("div", "ready-bar wide");
     const fill = el("span");
@@ -4572,6 +4590,11 @@ function groupEditor(g, d) {
   fModels.value = lines(st.models);
   const fAllowed = groupField(form, "只准用的模型（一行一個；空的就是不限）", el("textarea"), true);
   fAllowed.value = lines(st.allowed_models);
+  if ((g.cn_models || []).length) {
+    const cn = el("div", "field wide", "設定裡的中國來源模型（照樣可以用，政府案不得使用）");
+    cn.appendChild(modelChips(g.cn_models, g.cn_models));
+    form.appendChild(cn);
+  }
   const num = (v) => (v === null || v === undefined ? "" : v);
   const fCtx = groupField(form, "上下文長度（token，空的就是不指定）", groupInputBox("number", num(p.ctx), { min: 512, step: 512 }));
   const fPar = groupField(form, "並行數", groupInputBox("number", num(p.parallel), { min: 1, max: 64 }));

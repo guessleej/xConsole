@@ -263,7 +263,9 @@ function statusBar(n, s) {
   const bar = el("section", "card status-bar rv");
   const dot = el("span", "run-dot");
   const name = el("div", "sb-name");
-  name.append(dot, el("b", null, s.model || s.role), el("span", "small muted", `${s.role}・埠 ${s.port || "—"}`));
+  name.append(dot, el("b", null, s.model || s.role));
+  if (s.cn_origin) name.appendChild(cnChip());
+  name.appendChild(el("span", "small muted", `${s.role}・埠 ${s.port || "—"}`));
   const pool = n.state.pools?.unified || n.state.pools?.vram;
   const ram = n.state.pools?.ram;
   const stats = el("div", "sb-stats");
@@ -1435,7 +1437,7 @@ async function settingsProviders(wrap) {
     const t = el("div");
     const name = el("b", null, p.name);
     t.appendChild(name);
-    if (p.cn_origin) t.appendChild(el("span", "chip bad", "中國來源・政府案不可用"));
+    if (p.cn_origin) t.appendChild(cnChip());
     t.appendChild(el("div", "small muted mono", `${p.base_url}・${p.default_model || "未設預設模型"}・金鑰${p.key_set ? "已設定" : "未設定"}`));
     const ed = el("button", "btn sm", "編輯");
     ed.onclick = () => openProvider(r.presets || [], p);

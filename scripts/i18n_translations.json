@@ -25948,5 +25948,15 @@
 "en": "The console ID file was invalid; renamed it to {0} and generated a new one. Ask xCloudinfo to re-sign the Enterprise license for the new ID",
 "ja": "コンソールIDファイルの内容が正しくないため {0} に名前を変更し、新しいIDを生成しました。新しいIDでエンタープライズ版ライセンスの再発行を xCloudinfo に依頼してください",
 "ko": "콘솔 ID 파일 내용이 올바르지 않아 {0}(으)로 이름을 바꾸고 새 ID를 생성했습니다. 새 ID로 엔터프라이즈 라이선스를 다시 서명하도록 xCloudinfo에 요청하세요"
+},
+"中國來源的模型：內部測試可以用，政府案不得使用": {
+"en": "China-origin model: fine for internal testing, not allowed in government projects",
+"ja": "中国由来のモデル：社内テストには使えますが、政府案件では使用できません",
+"ko": "중국 출처 모델: 내부 테스트에는 쓸 수 있지만 정부 프로젝트에는 사용할 수 없습니다"
+},
+"設定裡的中國來源模型（照樣可以用，政府案不得使用）": {
+"en": "China-origin models in these settings (still usable, not allowed in government projects)",
+"ja": "この設定に含まれる中国由来のモデル（そのまま使えますが、政府案件では使用できません）",
+"ko": "이 설정에 포함된 중국 출처 모델(그대로 쓸 수 있지만 정부 프로젝트에는 사용할 수 없음)"
 }
 }

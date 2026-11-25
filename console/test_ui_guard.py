@@ -122,5 +122,11 @@ JS = "".join(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "stat
 gb = re.findall(r"\$\{[^}]*\}\)?\s*GB(?!/s)", JS)
 check("畫面上的大小單位一律 GiB（沒有「${…} GB」）", not gb, gb[:5])
 
+# ---- 7. 中國來源一律同一個紅底標籤（清單 #27）：不准再用琥珀色警告或自己另寫文字
+chips = [c for c in re.findall(r'el\("span", "chip[^"]*", "中國來源[^"]*"\)', JS) if c != 'el("span", "chip cn", "中國來源")']
+check("中國來源標籤一律走 cnChip()，不在各頁自己寫", not chips, chips[:3])
+check("cnChip() 是紅底 .chip.cn", "function cnChip()" in JS and bool(re.search(r"\.chip\.cn\s*\{[^}]*background:\s*#b01010", CSS)))
+check("群組總覽與群組設定都標中國來源", "g.cn_models" in JS and JS.count("modelChips(") >= 3)
+
 print("\n全部通過" if OK else "\n有項目失敗")
 sys.exit(0 if OK else 1)
