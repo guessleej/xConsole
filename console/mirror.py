@@ -240,16 +240,23 @@ class Mirror:
         rows = [dict(v, name=k) for k, v in self.engines().items() if v.get("platform") == platform]
         return max(rows, key=lambda r: r.get("at", 0)) if rows else None
 
-    def engine_path(self, name):
-        if not ENGINE_RX.fullmatch(name or "") or name not in self.engines():
+    def _engine_file(self, name):
+        """包在存放區裡的完整路徑：名稱先比格式，realpath 之後確認還在引擎資料夾裡，跳出去回 None。"""
+        if not ENGINE_RX.fullmatch(name or ""):
             return None
-        full = os.path.join(self._edir(), name)
-        return full if os.path.exists(full) else None
+        base = os.path.realpath(self._edir())
+        full = os.path.realpath(os.path.join(base, name))
+        return full if full.startswith(base + os.sep) else None
+
+    def engine_path(self, name):
+        full = self._engine_file(name)
+        return full if full and name in self.engines() and os.path.exists(full) else None
 
     def engine_put(self, meta, src):
         """收一包：sha256 對得上才收，同平台舊的那包換掉。"""
         name = str(meta.get("name") or "")
-        if not ENGINE_RX.fullmatch(name) or not re.fullmatch(r"[0-9a-f]{64}", str(meta.get("sha256") or "")):
+        dest = self._engine_file(name)
+        if not dest or not re.fullmatch(r"[0-9a-f]{64}", str(meta.get("sha256") or "")):
             raise ValueError("推理引擎包的名稱或 sha256 不對")
         h = hashlib.sha256()
         with open(src, "rb") as fh:
@@ -264,22 +271,23 @@ class Mirror:
             for old in [k for k, v in idx.items() if v.get("platform") == meta.get("platform") and k != name]:
                 idx.pop(old)
                 try:
-                    os.remove(os.path.join(self._edir(), old))
+                    os.remove(self._engine_file(old) or "")
                 except OSError:
                     pass
-            os.replace(src, os.path.join(self._edir(), name))
+            os.replace(src, dest)
             idx[name] = {k: meta.get(k) for k in ("platform", "tag", "sha256", "size", "from")} | {"at": int(time.time())}
             self._save_engines(idx)
 
     def engine_delete(self, name):
-        if not ENGINE_RX.fullmatch(name or ""):
+        full = self._engine_file(name)
+        if not full:
             raise ValueError("推理引擎包名稱不合法")
         with self.lock:
             idx = self.engines()
             idx.pop(name, None)
             self._save_engines(idx)
             try:
-                os.remove(os.path.join(self._edir(), name))
+                os.remove(full)
             except OSError:
                 pass
 

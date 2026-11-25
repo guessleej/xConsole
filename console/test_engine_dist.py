@@ -131,7 +131,7 @@ else:
     exe = os.path.join(bindir, "llama-server")
     with open(exe, "w", encoding="utf-8") as fh:
         fh.write("#!/bin/sh\necho 'version: 9999 (testbuild)'\n")
-    os.chmod(exe, 0o755)
+    subprocess.run(["chmod", "700", exe], check=True)
     blob(os.path.join(bindir, "libggml-base.so"), b"fake lib")
     pk = A.engine_pack_make(exe, "b9999")
     with tarfile.open(pk["path"]) as tf:
