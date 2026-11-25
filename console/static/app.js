@@ -4111,6 +4111,13 @@ async function settingsModules(wrap) {
       body.appendChild(el("p", "note", "還沒有安裝企業版模組，主控台以一般版執行。"));
     }
     body.appendChild(el("p", "small muted", `核心API第${st.core_api}版；內建的云碩公鑰${st.keys}把。簽章是防止被竄改的模組被載入，授權由模組自己檢查。`));
+    if (st.console_id) {
+      const idRow = el("div", "slot-actions");
+      const cp = el("button", "btn sm", "複製");
+      cp.onclick = () => copyText(st.console_id);
+      idRow.append(el("span", "small", "主控台識別碼"), el("code", null, st.console_id), cp);
+      body.append(idRow, el("p", "small muted", "企業版授權綁這個識別碼。申請或續約授權時把它交給云碩；重開機、升級、換憑證都不會變，換一台主控台才會不同。"));
+    }
     const bar = el("div", "slot-actions");
     const fFile = el("input");
     fFile.type = "file";

@@ -31,9 +31,11 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
+import uuid
 import zipfile
 
 CORE_API = 1
@@ -220,6 +222,42 @@ class API:
     def audit(self, action, target="", ok=True, detail=None):
         self._loader.core.audit("ent." + str(action)[:60], str(target)[:120], bool(ok), detail)
 
+    def console_id(self):
+        return self._loader.core.console_id
+
+
+# ---------------------------------------------------------------- 主控台識別碼
+CONSOLE_ID_RX = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
+
+
+def console_id(state_dir):
+    """第一次啟動時產生、之後只讀不改：授權綁的就是它，重開機、升級、換憑證都不能變。
+    內容壞掉才換新的，舊檔改名留著，管理者可以改回原名找回原本的識別碼。"""
+    path = os.path.join(state_dir, "console_id")
+    try:
+        with open(path, "rb") as f:
+            cid = f.read(64).decode("ascii", "replace").strip()
+        if CONSOLE_ID_RX.fullmatch(cid):
+            return cid
+        bad = f"{path}.bad-{int(time.time())}"
+        os.replace(path, bad)
+        print(f"主控台識別碼檔內容不正確，已改名為 {bad} 並產生新的；企業版授權要請云碩依新識別碼重簽", flush=True)
+    except FileNotFoundError:
+        pass
+    cid = str(uuid.uuid4())
+    fd, tmp = tempfile.mkstemp(prefix="console_id.", suffix=".tmp", dir=state_dir)
+    with os.fdopen(fd, "w", encoding="ascii") as f:
+        f.write(cid + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    try:
+        os.link(tmp, path)                  # 寫完整才出現，且不覆蓋別的行程剛建好的那一份
+    except FileExistsError:
+        return console_id(state_dir)
+    finally:
+        os.unlink(tmp)
+    return cid
+
 
 # ---------------------------------------------------------------- 檢查
 def _sha(p):
@@ -397,7 +435,7 @@ def safe_extract(data, dest):
 # ---------------------------------------------------------------- 載入器
 class Modules:
     """core：主控台交給載入器的東西——db、lock、seal(bytes)->str、unseal(str)->bytes、audit(action, target, ok, detail)、
-    group_ids()->set、desktop（個人版不載入）。"""
+    group_ids()->set、desktop（個人版不載入）、console_id（主控台識別碼）。"""
 
     def __init__(self, core, root, keys=None):
         self.core, self.root = core, root
@@ -415,7 +453,8 @@ class Modules:
 
     def status(self):
         with self.lock:
-            return {**self.state, "core_api": CORE_API, "dir": self.dir, "keys": len(self.keys)}
+            return {**self.state, "core_api": CORE_API, "dir": self.dir, "keys": len(self.keys),
+                    "console_id": getattr(self.core, "console_id", "")}
 
     def _fail(self, reason, fix):
         self.state = {"loaded": False, "reason": reason, "fix": fix}
