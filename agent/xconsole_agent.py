@@ -4475,7 +4475,11 @@ def _is_hf_host(url):
 
 
 def hf_base():
-    """Hugging Face 的位址：這台的設定填了鏡像就走鏡像，沒填走官方（測試時 XCONSOLE_HF_BASE 指到本機假站）。"""
+    """Hugging Face 的位址：群組開了主控台的內部鏡像而且連得上就走它；這台的設定填了鏡像就走那個；都沒有走官方
+    （測試時 XCONSOLE_HF_BASE 指到本機假站）。"""
+    mb = mirror_base()
+    if mb:
+        return mb
     try:
         mirror = registry()["machine"].get("hf_mirror")
     except Exception:  # noqa: BLE001
@@ -4484,6 +4488,9 @@ def hf_base():
 
 
 def _hf_get(url, token="", rng=None, timeout=30):
+    mb = GROUP_MIRROR.get("base")
+    if mb and url.startswith(mb + "/"):
+        return _mirror_get(url, rng, timeout)
     h = {"User-Agent": "xconsole-agent"}
     # 令牌只送給 Hugging Face 自己（與測試用的假站）：走鏡像時不送，鏡像是第三方，送過去等於交出去
     if token and (_is_hf_host(url) or url.startswith(HF_BASE + "/")):
@@ -4893,15 +4900,17 @@ def _download_job(jid, dest):
                 mode = "ab" if have and resp.status == 206 else "wb"
                 if mode == "wb":
                     have = 0
+                th = Throttle()
                 with open(part, mode) as fh:
                     last = 0
                     while True:
                         if j["_cancel"]:
                             raise InterruptedError("已取消")
-                        chunk = resp.read(8 * 1024 * 1024)
+                        chunk = resp.read(th.chunk())
                         if not chunk:
                             break
                         fh.write(chunk)
+                        th.tick(len(chunk))
                         have += len(chunk)
                         j["done"] = done_before + have
                         if time.time() - last > 5:
@@ -4925,6 +4934,8 @@ def _download_job(jid, dest):
         j["state"] = "done"
     except InterruptedError as exc:
         j["state"], j["error"] = "cancelled", str(exc)
+    except PeerWait as exc:
+        j["state"], j["error"], j["pending"] = "failed", str(exc)[:240], True     # 內部鏡像還在準備：群組下一輪再來
     except Exception as exc:  # noqa: BLE001
         j["state"], j["error"] = "failed", str(exc)[:240]
     finally:
@@ -9796,6 +9807,10 @@ def group_sync(body):
     tok = body.get("hf_token")
     if isinstance(tok, str) and len(tok) < 400:
         GROUP_HF["token"] = tok
+    mir = body.get("mirror") if isinstance(body.get("mirror"), dict) else {}
+    urls = [u for u in mir.get("urls") or [] if isinstance(u, str) and u.startswith("https://") and len(u) < 300][:8]
+    if urls != GROUP_MIRROR["urls"] or mir.get("cert") != GROUP_MIRROR["cert"]:
+        GROUP_MIRROR.update(urls=urls, cert=str(mir.get("cert") or "")[:65536], base="", at=0.0)
     peers = body.get("peers")
     if isinstance(peers, dict) and len(peers) <= 32:
         GROUP_PEERS.update(at=time.time(), plans={str(k)[:200]: v for k, v in peers.items() if isinstance(v, dict)})
@@ -9870,6 +9885,8 @@ def _group_fetch(st, spec):
             return m
         if not srcs - {"group"}:
             raise RuntimeError(f"{spec}：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器")
+    if "huggingface" not in srcs and not mirror_base():
+        raise RuntimeError(f"{spec}：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載")
     repo, quant = _group_spec(spec)
     code, info = hf_files(repo, GROUP_HF["token"])
     if code != 200:
@@ -9895,6 +9912,8 @@ def _group_fetch(st, spec):
             st["steps"][-1]["pct"] = last = pct        # 群組總覽的「準備中（下載 x%）」
             _gsave(st)
     j = _DL[out["id"]]
+    if j.get("pending"):
+        raise PeerWait(f"{spec}：{j.get('error')}")
     if j["state"] != "done":
         raise RuntimeError(f"{spec}：下載沒完成（{j.get('error') or j['state']}）")
     _gstep(st, text)
@@ -9926,8 +9945,6 @@ def _group_prepare(st, s):
     for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置"), ("reserve_user_gib", "保留給使用者的記憶體")):
         if s.get(k) not in (None, "", 0):
             _gstep(st, f"{label}這一版的代理還不支援，先略過", "skip")
-    if "mirror" in (s.get("sources") or []):
-        _gstep(st, "內部鏡像還沒上線，網路來源用這台設定的 Hugging Face 位址", "skip")
     reg = registry()
     slots = _group_slots(reg)
     if len(specs) > len(slots):
@@ -10668,6 +10685,94 @@ def safety_run(body):
     return 200, res
 
 
+# ---- 內部鏡像與下載限速（清單 #13）
+# 群組的模型來源勾了「內部鏡像」：跟主控台拿（主控台先從 Hugging Face 取得並核對 sha256）。主控台給的是它每個網址與
+# 目前的網頁憑證，這台挑連得上的那個，用自己的代理權杖認證；Hugging Face 權杖不送過去（主控台用自己的）。
+GROUP_MIRROR = {"urls": [], "cert": "", "base": "", "at": 0.0}
+MIRROR_RECHECK = 600
+
+
+def _mirror_ctx():
+    ctx = ssl.create_default_context()                 # 正式憑證走系統信任的憑證機構
+    if GROUP_MIRROR["cert"]:
+        ctx.load_verify_locations(cadata=GROUP_MIRROR["cert"])   # 暫用自簽：信任主控台轉來的那張
+        if hasattr(ssl, "VERIFY_X509_PARTIAL_CHAIN"):
+            ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
+def mirror_base():
+    """群組開了內部鏡像就回連得上的那個網址（十分鐘重試一次），沒開或都連不上回空字串。"""
+    if "mirror" not in ((group_state().get("settings") or {}).get("sources") or []) or not GROUP_MIRROR["urls"]:
+        return ""
+    if GROUP_MIRROR["base"] or time.time() - GROUP_MIRROR["at"] < MIRROR_RECHECK:
+        return GROUP_MIRROR["base"]
+    GROUP_MIRROR["at"] = time.time()
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=_mirror_ctx()))
+    for u in GROUP_MIRROR["urls"]:
+        try:
+            with op.open(urllib.request.Request(u + "/ping", headers={"Authorization": f"Bearer {TOKEN}"}), timeout=5) as r:
+                if r.status == 200:
+                    GROUP_MIRROR["base"] = u
+                    break
+        except Exception:  # noqa: BLE001
+            continue
+    return GROUP_MIRROR["base"]
+
+
+def _mirror_get(url, rng, timeout):
+    h = {"User-Agent": "xconsole-agent", "Authorization": f"Bearer {TOKEN}"}
+    if rng:
+        h["Range"] = f"bytes={rng}-"
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=_mirror_ctx()))
+    try:
+        return op.open(urllib.request.Request(url, headers=h), timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 503:
+            raise PeerWait((json.loads(exc.read() or b"{}") or {}).get("error") or "內部鏡像還在準備") from exc
+        raise
+    except OSError:
+        GROUP_MIRROR.update(base="", at=time.time())     # 連不上了：下次重新挑網址
+        raise
+
+
+def rate_cap():
+    """群組設定的下載限速：現在落在限速時段裡（或沒設時段＝整天）就回每秒幾 byte，不限回 None。時間用這台的時區。"""
+    r = (group_state().get("settings") or {}).get("rate_limit")
+    if not r or not r.get("mbps"):
+        return None
+    if r.get("hours"):
+        t = time.localtime()
+        now, day, yday = f"{t.tm_hour:02d}:{t.tm_min:02d}", t.tm_wday + 1, (t.tm_wday - 1) % 7 + 1
+
+        def hit(h):
+            if h["from"] < h["to"]:
+                return day in h["days"] and h["from"] <= now < h["to"]
+            return (day in h["days"] and now >= h["from"]) or (yday in h["days"] and now < h["to"])     # 跨午夜
+        if not any(hit(h) for h in r["hours"]):
+            return None
+    return int(r["mbps"]) * 125000
+
+
+class Throttle:
+    """下載迴圈每讀一塊就 tick：超過限速就睡到平均速度降回來。每 5 秒重看一次限速（時段開始或結束時馬上跟著變）。"""
+
+    def __init__(self):
+        self.cap, self.t0, self.n = rate_cap(), time.monotonic(), 0
+
+    def chunk(self):
+        return min(8 << 20, max(64 << 10, self.cap // 4)) if self.cap else 8 << 20
+
+    def tick(self, n):
+        self.n += n
+        elapsed = time.monotonic() - self.t0
+        if elapsed > 5:
+            self.cap, self.t0, self.n = rate_cap(), time.monotonic(), 0
+            return
+        if self.cap and self.n / self.cap > elapsed:
+            time.sleep(self.n / self.cap - elapsed)
+
 # ---- 工作站互傳（清單 #12）
 # 同群組的機器互相傳模型檔，省下對外頻寬。送的那台另開一個只給互傳用的埠：只收同網段、只讀存放區裡核對過 sha256 的檔，
 # 每個請求都要帶主控台發的 60 秒一次性票證（用送方自己的權杖簽，主控台與送方之外沒人簽得出來）。
@@ -10974,9 +11079,11 @@ def _peer_get(off, f):
         if exc.code in (403, 503):
             raise PeerWait(f"{off.get('name') or ip}：{(json.loads(exc.read() or b'{}') or {}).get('error') or exc.code}") from exc
         raise
+    th = Throttle()
     with resp, open(part, "ab" if have and resp.status == 206 else "wb") as fh:
-        while chunk := resp.read(8 * 1024 * 1024):
+        while chunk := resp.read(th.chunk()):
             fh.write(chunk)
+            th.tick(len(chunk))
     got = _sha256_file(part)
     if not secrets.compare_digest(got, want):
         os.remove(part)

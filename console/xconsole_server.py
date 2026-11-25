@@ -27,6 +27,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import ssl
 import struct
@@ -51,6 +52,7 @@ import report  # noqa: E402
 import tls  # noqa: E402
 import agentlink  # noqa: E402
 import userchan  # noqa: E402
+import mirror  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
@@ -1514,6 +1516,8 @@ def align_once():
         peers = peer_plan(g, n, members)
         if peers is not None:
             body["peers"] = peers            # 一次性票證：只在這一輪的請求裡，不落地
+        if "mirror" in (g["settings"].get("sources") or []):
+            body["mirror"] = mirror_urls()
         if hf_token():
             body["hf_token"] = hf_token()        # 受限模型要下載才帶；代理只放記憶體、不寫檔
         code, out = call_node(n["id"], "/group/sync", "POST", body, timeout=20)
@@ -2366,12 +2370,27 @@ def provider_json(prov, method, path, body=None, timeout=120):
 HF_TOKEN_PATHS = re.compile(r"/api/node/[\w.-]+/(?:library/(?:hf|hf/tree|hf/search|download)|sd/download)")
 
 
+def mirror_urls():
+    """給群組裡的機器：主控台內部鏡像的網址（使用者會打的每個網址各一個，代理挑連得上的）與目前的網頁憑證。"""
+    names = [h for h in hostnames() if h not in ("localhost", "127.0.0.1", "::1")]
+    try:
+        with open(CERTS.live_cert, encoding="utf-8") as fh:
+            cert = fh.read()
+    except OSError:
+        cert = ""
+    return {"urls": [f"https://{'[' + h + ']' if ':' in h else h}:{PORT}/mirror" for h in names], "cert": cert}
+
+
 def hf_token():
     t = (fleet().get("hf") or {}).get("token") or ""
     try:
         return tls.unseal(CERTS.p, t).decode() if t.startswith("enc:v1:") else ""
     except Exception:  # noqa: BLE001  # 主金鑰換過或密文壞了：當作沒設，不擋下載公開模型
         return ""
+
+
+# 內部鏡像（清單 #13）：主控台先從 Hugging Face 取得並核對 sha256，群組裡的機器跟主控台拿；Hugging Face 位址測試時可指到假站
+MIRROR = mirror.Mirror(os.path.join(STATE_DIR, "mirror"), os.environ.get("XCONSOLE_HF_BASE", "https://huggingface.co"), hf_token)
 
 
 def open_with_system(path):
@@ -3388,6 +3407,47 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _mirror(self, path):
+        """群組裡的機器跟內部鏡像拿東西：用自己的代理權杖認證（Authorization 標頭），只開代理下載模型用到的幾支。"""
+        got = self.headers.get("Authorization", "")
+        node = next((n for n in fleet()["nodes"] if got.startswith("Bearer ") and node_token(n)
+                     and hmac.compare_digest(got[7:].encode(), node_token(n).encode())), None)
+        if not node or node.get("revoked"):
+            return self._json(401, {"error": "內部鏡像只給加入主控台的機器用"})
+        rest = urllib.parse.unquote(path[len("/mirror"):])
+        try:
+            if rest == "/ping":
+                return self._json(200, {"ok": True, "service": "xconsole-mirror"})
+            m = re.fullmatch(r"/api/models/([^/]+/[^/]+)(/tree/main)?", rest)
+            if m:
+                code, raw = (MIRROR.tree if m.group(2) else MIRROR.info)(m.group(1))
+                return self._send(code, raw, "application/json")
+            m = re.fullmatch(r"/([^/]+/[^/]+)/resolve/main/(.+)", rest)
+            if m:
+                return self._mirror_file(MIRROR.file(m.group(1), m.group(2)))
+        except mirror.Pending as exc:
+            return self._json(503, {"error": str(exc), "mirror_pending": True})
+        except ValueError as exc:
+            return self._json(400, {"error": str(exc)})
+        return self._json(404, {"error": "內部鏡像只提供檔案清單、模型資訊與下載檔案"})
+
+    def _mirror_file(self, full):
+        size = os.path.getsize(full)
+        m = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range", ""))
+        start = int(m.group(1)) if m and int(m.group(1)) < size else 0
+        self.send_response(206 if start else 200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(size - start))
+        if start:
+            self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
+        self.send_header("Cache-Control", "no-store")
+        self._sec_headers()
+        self.end_headers()
+        with open(full, "rb") as fh:
+            fh.seek(start)
+            while chunk := fh.read(4 << 20):
+                self.wfile.write(chunk)
+
     def _send_file(self, full, ctype):
         """大檔分塊送，不一次讀進記憶體（Windows執行環境包幾十MB）。"""
         size = os.path.getsize(full)
@@ -4220,6 +4280,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "service": "xconsole", "tls": {
                 "daysLeft": cur.get("daysLeft"), "validToTaipei": cur.get("validToTaipei"),
                 "source": cur.get("source"), "selfSigned": cur.get("selfSigned")}})
+        if path.startswith("/mirror/"):
+            return self._mirror(path)
         if path == "/api/branding":
             return self._json(200, branding())
         if path == "/branding/logo":
@@ -4489,6 +4551,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "目前沒有待配對的 CSR"})
             return self._send(200, rec["csr_pem"].encode(), "application/pkcs10",
                               {"Content-Disposition": f'attachment; filename="{rec["cn"]}.csr"'})
+        if path == "/api/mirror":
+            du = shutil.disk_usage(MIRROR.root)
+            return self._json(200, {**MIRROR.status(), "root": MIRROR.root, "free_gib": round(du.free / 2**30, 1)})
         if path == "/api/admin/usage-report":
             try:
                 days = max(1, min(400, int((q.get("days") or ["30"])[0])))
@@ -5546,6 +5611,15 @@ class Handler(BaseHTTPRequestHandler):
             except chattools.FetchError as exc:
                 return self._json(502, {"error": str(exc)})
             return self._json(200, {"results": rows})
+        if path in ("/api/mirror/prefetch", "/api/mirror/delete"):
+            repo, quant = str(body.get("repo") or "").strip(), str(body.get("quant") or "").strip()[:40]
+            try:
+                out = ({"files": MIRROR.prefetch(repo, quant)} if path.endswith("prefetch") else (MIRROR.delete(repo) or {}))
+            except (ValueError, OSError) as exc:
+                self._audit("mirror." + path.rsplit("/", 1)[1], repo, False, {"error": str(exc)[:120]})
+                return self._json(400, {"error": str(exc)})
+            self._audit("mirror." + path.rsplit("/", 1)[1], repo, True, {"quant": quant} if quant else None)
+            return self._json(200, {"ok": True, **out})
         if path == "/api/settings/hf":
             # Hugging Face 令牌：加密落地，畫面只看得到「已設定」；送 Hugging Face 時才解開（走鏡像時代理不會送）
             if body.get("clear") is True:
@@ -5741,6 +5815,7 @@ def main():
     threading.Thread(target=update_watch, daemon=True).start()
     threading.Thread(target=aligner, daemon=True).start()
     threading.Thread(target=safety_worker, daemon=True).start()
+    threading.Thread(target=MIRROR.worker, daemon=True).start()
     ALIGN_WAKE.set()
     if not DESKTOP and not winrt.meta(STATE_DIR):
         winrt.fetch(STATE_DIR, quiet=True)      # 「加一台機器」的Windows腳本要用：啟動時先試著抓一次，抓不到畫面上有按鈕

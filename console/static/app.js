@@ -4074,7 +4074,7 @@ function hfRepoOf(text) {
 }
 
 const SETTINGS_TABS = [
-  ["machines", "機器"], ["groups", "群組"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
+  ["machines", "機器"], ["groups", "群組"], ["mirror", "內部鏡像"], ["engine", "推理引擎"], ["providers", "第三方 API"], ["tls", "HTTPS 與憑證"], ["report", "使用報告"],
   ["logs", "記錄"], ["users", "使用者帳號"], ["account", "帳號與安全"], ["update", "版本與更新"], ["brand", "品牌與外觀"],
   ["modules", "企業版模組"],
 ];
@@ -4110,7 +4110,90 @@ function viewSettings() {
   main.appendChild(wrap);
   ({ machines: settingsMachines, groups: settingsGroups, engine: settingsEngine, providers: settingsProviders, tls: settingsTls, report: settingsReport,
      users: settingsUsers, account: settingsAccount, update: settingsUpdate, brand: settingsBrand, me: myAccountInto,
-     modules: settingsModules, ...Object.fromEntries(ENT_PAGES.map((p) => [p.key, p.render])) }[tab] || settingsMachines)(wrap);
+     modules: settingsModules, mirror: settingsMirror, ...Object.fromEntries(ENT_PAGES.map((p) => [p.key, p.render])) }[tab] || settingsMachines)(wrap);
+}
+
+/* ---------------------------------------------------------------- 內部鏡像（清單 #13）
+   主控台先從 Hugging Face 取得並核對 SHA-256，群組裡的機器跟主控台拿（群組設定的來源要勾「內部鏡像」）。
+   機器第一次要某個檔時主控台才去下載；也可以在這裡先下載好。下載中每 5 秒只更新進度那一塊。 */
+async function settingsMirror(wrap) {
+  const v = S.view;
+  const c = card("內部鏡像", "群組設定的「模型可以從哪裡取得」勾了「內部鏡像」，群組裡的機器就跟主控台拿，不必每台都連外網");
+  wrap.appendChild(c);
+  c.appendChild(el("p", "note", "主控台從 Hugging Face 取得每個檔都會核對 SHA-256，對不上就刪掉重下載。受限模型用「設定 › 推理引擎」裡的 Hugging Face 令牌。"));
+  const form = el("div", "grp-form");
+  const fRepo = groupField(form, "先下載的模型（作者/模型）", groupInputBox("text", "", { placeholder: "unsloth/gemma-3-4b-it-GGUF" }));
+  const fQuant = groupField(form, "量化（空的就是這個 repo 全部的 GGUF）", groupInputBox("text", "", { placeholder: "Q4_K_M" }));
+  c.appendChild(form);
+  const act = el("div", "slot-actions");
+  const go = el("button", "btn primary", "先下載到內部鏡像");
+  act.appendChild(go);
+  c.appendChild(act);
+  const list = el("div");
+  c.appendChild(list);
+  let last = "";
+  const draw = (st) => {
+    const sig = JSON.stringify(st);
+    if (sig === last) return;
+    last = sig;
+    list.textContent = "";
+    list.appendChild(el("p", "small muted", `存放在 ${st.root}・剩 ${fmt(st.free_gib)} GiB`));
+    if (st.jobs.length) {
+      const t = el("table", "tbl");
+      st.jobs.forEach((j) => {
+        const tr = el("tr");
+        tr.appendChild(el("td", "mono small", j.key));
+        tr.appendChild(el("td", "small nowrap " + (j.state === "failed" ? "bad-t" : ""), j.state === "failed" ? `失敗：${j.error || ""}`
+          : j.state === "running" ? `下載中 ${j.total ? Math.floor((100 * j.done) / j.total) : 0}%` : "排隊中"));
+        t.appendChild(tr);
+      });
+      list.appendChild(t);
+    }
+    if (!st.repos.length) {
+      list.appendChild(el("p", "note", "內部鏡像還沒有任何模型。群組裡的機器第一次要模型時主控台會自動下載，也可以在上面先下載。"));
+      return;
+    }
+    const t = el("table", "tbl");
+    st.repos.forEach((r) => {
+      const tr = el("tr");
+      const nm = el("td");
+      nm.appendChild(el("div", "mono", r.repo));
+      nm.appendChild(el("div", "small muted", r.files.map((f) => f.path).join("、")));
+      tr.appendChild(nm);
+      tr.appendChild(el("td", "num", `${fmt(r.size / 2 ** 30)} GiB`));
+      const td = el("td", "row-acts");
+      const del = el("button", "btn sm danger", "刪除");
+      del.onclick = () => modal({ title: `從內部鏡像刪除 ${r.repo}`, bodyNode: el("p", "note bad",
+        `刪掉主控台上這個模型的 ${r.files.length} 個檔（約 ${fmt(r.size / 2 ** 30)} GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載。`),
+        confirmText: "永久刪除", danger: true, onConfirm: async () => {
+          try { await api("/api/mirror/delete", { method: "POST", body: { repo: r.repo } }); toast("已刪除", "ok"); } catch (ex) { toast(ex.message, "bad"); return; }
+          load();
+        } });
+      td.appendChild(del);
+      tr.appendChild(td);
+      t.appendChild(tr);
+    });
+    list.appendChild(t);
+  };
+  const load = async () => {
+    try { draw(await api("/api/mirror")); } catch (ex) { list.textContent = ""; list.appendChild(el("p", "note bad", ex.message)); }
+  };
+  go.onclick = async () => {
+    go.disabled = true;
+    try {
+      const r = await api("/api/mirror/prefetch", { method: "POST", body: { repo: fRepo.value.trim(), quant: fQuant.value.trim() } });
+      toast(r.files.length ? `排進 ${r.files.length} 個檔` : "這個 repo 沒有符合的 GGUF", r.files.length ? "ok" : "warn");
+    } catch (ex) { toast(ex.message, "bad"); }
+    go.disabled = false;
+    load();
+  };
+  await load();
+  const tick = async () => {
+    if (S.view !== v || S.settingsTab !== "mirror" || !list.isConnected) return;
+    if (last.includes('"state":"running"') || last.includes('"state":"queued"')) await load();
+    setTimeout(tick, 5000);
+  };
+  setTimeout(tick, 5000);
 }
 
 /* ---------------------------------------------------------------- 企業版模組
@@ -4611,6 +4694,37 @@ function groupEditor(g, d) {
   const fTopP = groupField(form, "top_p（0～1）", groupInputBox("number", num(p.top_p), { min: 0, max: 1, step: 0.05 }));
   const fRes = groupField(form, "保留給使用者其他程式的記憶體（GiB）", groupInputBox("number", num(st.reserve_user_gib), { min: 0, step: 1 }));
   const fPow = groupField(form, "顯卡功耗上限（瓦，空的就是不限）", groupInputBox("number", num(st.gpu_power_limit), { min: 30, step: 10 }));
+  const rl = st.rate_limit || {};
+  const fRate = groupField(form, "下載限速（每台 Mbps，空的就是不限）", groupInputBox("number", num(rl.mbps), { min: 1, step: 10 }));
+  const hoursBox = el("div", "grp-hours");
+  const addHour = (h) => {
+    const row = el("div", "grp-hour");
+    const days = {};
+    ["一", "二", "三", "四", "五", "六", "日"].forEach((t, i) => {
+      const l = el("label");
+      const cb = el("input");
+      cb.type = "checkbox";
+      cb.checked = (h.days || []).includes(i + 1);
+      l.append(cb, document.createTextNode(t));
+      row.appendChild(l);
+      days[i + 1] = cb;
+    });
+    const from = groupInputBox("time", h.from || "08:00");
+    const to = groupInputBox("time", h.to || "17:00");
+    const del = el("button", "btn sm", "刪除這段");
+    del.type = "button";
+    del.onclick = () => row.remove();
+    row.append(from, el("span", "small muted", "到"), to, del);
+    row.read = () => ({ days: Object.keys(days).filter((k) => days[k].checked).map(Number), from: from.value, to: to.value });
+    hoursBox.appendChild(row);
+  };
+  (rl.hours || []).forEach(addHour);
+  const addBtn = el("button", "btn sm", "加一段限速時段");
+  addBtn.type = "button";
+  addBtn.onclick = () => addHour({ days: [1, 2, 3, 4, 5] });
+  const hoursWrap = el("div");
+  hoursWrap.append(hoursBox, addBtn);
+  groupField(form, "限速時段（每台機器自己的時間；沒有時段就是整天都限）", hoursWrap, true);
   const fRoot = groupField(form, "模型存放位置（完整路徑；還原卡要指到不還原的磁碟；空的用預設）", groupInputBox("text", st.storage_root || "", { placeholder: "/data/xconsole 或 D:\\xconsole" }), true);
 
   const checks = (names, on) => {
@@ -4660,6 +4774,7 @@ function groupEditor(g, d) {
     const settings = {
       models: ls(fModels), allowed_models: ls(fAllowed), profile,
       reserve_user_gib: n(fRes), gpu_power_limit: n(fPow), storage_root: fRoot.value.trim(),
+      rate_limit: n(fRate) === null ? null : { mbps: n(fRate), hours: [...hoursBox.children].map((r) => r.read()) },
       sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
       locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
     };
