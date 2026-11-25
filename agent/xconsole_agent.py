@@ -9946,6 +9946,9 @@ def _group_fetch(st, spec):
         if "group" in srcs:
             _peer_verify_existing(st, spec, m)
         return m
+    hold = laptop_hold("download")
+    if hold:
+        raise PeerWait(f"{spec}：{hold}")
     if "group" in srcs:
         if _peer_fetch(st, spec):
             m = _group_find(spec)
@@ -10131,6 +10134,9 @@ def _group_apply(st, s, only_missing=False):
             same = _slot_model_path(sl) == os.path.abspath(m["path"])
             if only_missing and same:
                 continue
+            hold = laptop_hold("load", float(m.get("size_gib") or 0))
+            if hold:
+                raise PeerWait(f"{sl['id']}：{hold}")
             _gsave(st)                         # 換之前確認沒有更新的版本進來
             text = f"{sl['id']}：{'拉回群組設定的模型 ' if only_missing else '換上 '}{spec}"
             _gstep(st, text, "run")
@@ -10754,6 +10760,96 @@ def safety_run(body):
     print(f"收到管理者的安全指令：{kind}", flush=True)
     return 200, res
 
+
+# ---- 筆電：電池與計費網路（清單 #17）
+# 群組設定開「筆電省電」（預設開）：用電池時不下載、不換上大模型；網路是計費連線（手機熱點等）時不下載。
+# 都只是先等，接上電源或換到一般網路就接著做，不算失敗。
+BIG_MODEL_GIB = 4.0                          # 用電池時超過這麼大的模型先不換上
+
+
+def parse_pmset(text):
+    """macOS `pmset -g batt`：回 (有沒有電池, 是不是用電池中, 電量 %)。"""
+    has = "InternalBattery" in text
+    pct = re.search(r"(\d+)%", text)
+    return has, has and "'Battery Power'" in text, int(pct.group(1)) if pct else None
+
+
+def parse_linux_power(base="/sys/class/power_supply"):
+    """Linux：有 type=Battery 的就是有電池；任何一個 Mains／USB 的 online=1 就是接著電。"""
+    has, ac, pct = False, False, None
+    for d in sorted(glob.glob(os.path.join(base, "*"))):
+        def rd(name, d=d):
+            try:
+                with open(os.path.join(d, name), encoding="utf-8") as fh:
+                    return fh.read().strip()
+            except OSError:
+                return ""
+        kind = rd("type")
+        if kind == "Battery":
+            has = True
+            pct = int(rd("capacity")) if rd("capacity").isdigit() else pct
+        elif kind in ("Mains", "USB", "USB_C", "USB_PD") and rd("online") == "1":
+            ac = True
+    return has, has and not ac, pct
+
+
+def parse_win_power(ac_line, flag, pct):
+    """Windows GetSystemPowerStatus：ACLineStatus 0＝用電池；BatteryFlag 128＝沒有電池、255＝不知道。"""
+    has = flag not in (128, 255)
+    return has, has and ac_line == 0, pct if 0 <= pct <= 100 else None
+
+
+def power_state():
+    if OS == "darwin":
+        _, out, _ = sh(["pmset", "-g", "batt"], timeout=10)
+        has, batt, pct = parse_pmset(out)
+    elif OS == "linux":
+        has, batt, pct = parse_linux_power()
+    else:
+        import ctypes
+
+        class SPS(ctypes.Structure):
+            _fields_ = [("ac", ctypes.c_ubyte), ("flag", ctypes.c_ubyte), ("pct", ctypes.c_ubyte), ("saver", ctypes.c_ubyte),
+                        ("life", ctypes.c_ulong), ("full", ctypes.c_ulong)]
+        st = SPS()
+        ok = ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(st))
+        has, batt, pct = parse_win_power(st.ac, st.flag, st.pct) if ok else (False, False, None)
+    return {"battery": has, "on_battery": batt, "percent": pct}
+
+
+def parse_metered(os_name, out):
+    if os_name == "linux":                    # nmcli 的 GENERAL.METERED：yes／yes (guessed)／no／unknown；用猜的也算
+        return any(x.split(":", 1)[-1].startswith("yes") for x in out.splitlines() if "METERED" in x)
+    if os_name == "windows":                  # NetworkCostType：Fixed／Variable＝計費，Unrestricted／Unknown＝不計費
+        return out.strip() in ("Fixed", "Variable")
+    return False                               # macOS 沒有對外提供「低數據模式」的查詢，不判斷
+
+
+def metered():
+    if OS == "linux" and shutil.which("nmcli"):
+        _, out, _ = sh(["nmcli", "-t", "-f", "GENERAL.METERED", "dev", "show"], timeout=10)
+        return parse_metered("linux", out)
+    if OS == "windows":
+        cmd = ("[Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime]"
+               " | Out-Null; $p=[Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile();"
+               " if ($p) { $p.GetConnectionCost().NetworkCostType }")
+        _, out, _ = sh(["powershell", "-NoProfile", "-Command", cmd], timeout=20)
+        return parse_metered("windows", out)
+    return False
+
+
+def laptop_hold(what, size_gib=0.0):
+    """群組的筆電省電開著時，這件事要不要先等。what：download（下載）或 load（換上模型）。要等回原因，不用等回空字串。"""
+    s = group_state().get("settings") or {}
+    if not s or not s.get("laptop_care", True):
+        return ""
+    p = power_state()
+    if p["on_battery"] and (what == "download" or size_gib > BIG_MODEL_GIB):
+        pct = f"（電量 {p['percent']}%）" if p.get("percent") is not None else ""
+        return f"用電池中{pct}，接上電源再{'下載' if what == 'download' else f'換上這顆 {size_gib:.0f} GiB 的模型'}"
+    if what == "download" and metered():
+        return "網路是計費連線（例如手機熱點），換到一般網路再下載"
+    return ""
 
 # ---- 推理引擎一次編譯分發（清單 #15）
 # 官方沒有預編譯版的平台（Jetson、GB10 的 aarch64 CUDA，以及其他 Linux）：群組裡同機型的挑一台編，編好打包，

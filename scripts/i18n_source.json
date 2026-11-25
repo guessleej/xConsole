@@ -5240,6 +5240,14 @@
 "pattern": false
 },
 {
+"zh": "筆電省電：用電池時不下載、不換上大模型；計費網路（例如手機熱點）時不下載",
+"pattern": false
+},
+{
+"zh": "筆電",
+"pattern": false
+},
+{
 "zh": "顯卡功耗上限（瓦，空的就是不限）",
 "pattern": false
 },
@@ -15340,6 +15348,10 @@
 "pattern": false
 },
 {
+"zh": "筆電省電要是開或關",
+"pattern": false
+},
+{
 "zh": "依機型覆寫最多 32 種機型",
 "pattern": false
 },
@@ -16828,6 +16840,22 @@
 "pattern": false
 },
 {
+"zh": "用電池中{0}，接上電源再{1}",
+"pattern": true
+},
+{
+"zh": "用電池中",
+"pattern": false
+},
+{
+"zh": "接上電源再",
+"pattern": false
+},
+{
+"zh": "網路是計費連線（例如手機熱點），換到一般網路再下載",
+"pattern": false
+},
+{
 "zh": "從主控台拿同機型編好的推理引擎（核對 SHA-256、試跑過才換上）",
 "pattern": false
 },
@@ -17553,6 +17581,18 @@
 },
 {
 "zh": "收到管理者的安全指令：",
+"pattern": false
+},
+{
+"zh": "（電量 {0}%）",
+"pattern": true
+},
+{
+"zh": "電量",
+"pattern": false
+},
+{
+"zh": "，接上電源再",
 "pattern": false
 },
 {
@@ -18904,6 +18944,10 @@
 "pattern": false
 },
 {
+"zh": "（電量 ",
+"pattern": false
+},
+{
 "zh": "平台名稱不合法：",
 "pattern": false
 },
@@ -19956,6 +20000,18 @@
 "pattern": false
 },
 {
+"zh": "換上這顆 {0} GiB 的模型",
+"pattern": true
+},
+{
+"zh": "換上這顆",
+"pattern": false
+},
+{
+"zh": "GiB 的模型",
+"pattern": false
+},
+{
 "zh": "推理引擎裝不起來：",
 "pattern": false
 },
@@ -20593,6 +20649,14 @@
 },
 {
 "zh": "試過所有位址與代理伺服器",
+"pattern": false
+},
+{
+"zh": "換上這顆 ",
+"pattern": false
+},
+{
+"zh": " GiB 的模型",
 "pattern": false
 },
 {

@@ -3155,7 +3155,7 @@
 "ko": "아래로"
 },
 "下載": {
-"en": "Download",
+"en": "download",
 "ja": "ダウンロード",
 "ko": "다운로드"
 },
@@ -26453,5 +26453,40 @@
 "en": "Other programs on this machine left only {0} GiB of system memory (floor {1} GiB), so this model was unloaded at {2} to keep the computer from freezing. Close programs you don't need, then press Start to use it again",
 "ja": "この端末の他のプログラムがシステムメモリを {0} GiB まで使ったため（下限 {1} GiB）、PCが固まらないよう {2} にこのモデルをアンロードしました。不要なプログラムを閉じてから「起動」を押すと再び使えます",
 "ko": "이 컴퓨터의 다른 프로그램이 시스템 메모리를 {0} GiB만 남겨(하한 {1} GiB) 컴퓨터가 멈추지 않도록 {2}에 이 모델을 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
+},
+"筆電省電：用電池時不下載、不換上大模型；計費網路（例如手機熱點）時不下載": {
+"en": "Laptop saving: don't download or switch to large models on battery; don't download on metered networks (such as a phone hotspot)",
+"ja": "ノートPCの節電：バッテリー駆動中はダウンロードせず大きなモデルにも切り替えない。従量制ネットワーク（スマホのテザリングなど）ではダウンロードしない",
+"ko": "노트북 절전: 배터리 사용 중에는 다운로드하지 않고 큰 모델로 바꾸지 않음, 데이터 요금제 네트워크(휴대폰 핫스팟 등)에서는 다운로드하지 않음"
+},
+"筆電": {
+"en": "Laptops",
+"ja": "ノートPC",
+"ko": "노트북"
+},
+"筆電省電要是開或關": {
+"en": "Laptop saving must be on or off",
+"ja": "ノートPCの節電はオンかオフを指定してください",
+"ko": "노트북 절전은 켜기 또는 끄기여야 합니다"
+},
+"用電池中{0}，接上電源再{1}": {
+"en": "On battery{0}; {1} once plugged in",
+"ja": "バッテリー駆動中{0}。電源につないでから{1}",
+"ko": "배터리 사용 중{0}, 전원을 연결한 뒤 {1}"
+},
+"（電量 {0}%）": {
+"en": " ({0}% charge)",
+"ja": "（残量 {0}%）",
+"ko": "(배터리 {0}%)"
+},
+"換上這顆 {0} GiB 的模型": {
+"en": "switch to this {0} GiB model",
+"ja": "この {0} GiB のモデルに切り替え",
+"ko": "이 {0} GiB 모델로 교체"
+},
+"網路是計費連線（例如手機熱點），換到一般網路再下載": {
+"en": "This is a metered connection (such as a phone hotspot); downloads resume on a regular network",
+"ja": "従量制の接続です（スマホのテザリングなど）。通常のネットワークに切り替えてからダウンロードします",
+"ko": "데이터 요금제 연결(휴대폰 핫스팟 등)입니다. 일반 네트워크로 바꾼 뒤 다운로드합니다"
 }
 }

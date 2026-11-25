@@ -4770,6 +4770,12 @@ function groupEditor(g, d) {
     const o = el("option", null, t); o.value = v; o.selected = v === (st.user_first || "unload"); fUser.appendChild(o);
   });
   groupField(form, "使用者的程式把記憶體用光時", fUser);
+  const fLaptop = el("input");
+  fLaptop.type = "checkbox";
+  fLaptop.checked = st.laptop_care !== false;
+  const lapRow = el("label", "grp-checks");
+  lapRow.append(fLaptop, document.createTextNode("筆電省電：用電池時不下載、不換上大模型；計費網路（例如手機熱點）時不下載"));
+  groupField(form, "筆電", lapRow, true);
   const fPow = groupField(form, "顯卡功耗上限（瓦，空的就是不限）", groupInputBox("number", num(st.gpu_power_limit), { min: 30, step: 10 }));
   const rl = st.rate_limit || {};
   const fRate = groupField(form, "下載限速（每台 Mbps，空的就是不限）", groupInputBox("number", num(rl.mbps), { min: 1, step: 10 }));
@@ -4856,7 +4862,7 @@ function groupEditor(g, d) {
       rate_limit: n(fRate) === null ? null : { mbps: n(fRate), hours: [...hoursBox.children].map((r) => r.read()) },
       sources: Object.keys(srcCb).filter((k) => srcCb[k].checked),
       locked: Object.keys(lockCb).filter((k) => lockCb[k].checked), apply_at: apply,
-      user_first: fUser.value,
+      user_first: fUser.value, laptop_care: fLaptop.checked,
       overrides: { ...(st.overrides || {}), ...Object.fromEntries(Object.entries(ovBoxes).map(([k, t]) => [k, ls(t)])) },
     };
     try {
