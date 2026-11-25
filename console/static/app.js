@@ -261,7 +261,10 @@ const OPS_NAV = [["home", "概覽"], ["run", "執行"], ["chat", "對話"], ["ag
   ["mykeys", "API 金鑰"], ["settings", "設定"]];
 const myRole = () => S.me?.role || "admin";
 const isAdmin = () => myRole() === "admin";
-const canOperate = () => isAdmin() || myRole() === "operator";
+// 受管的系統代理（學校或公司統一裝的）：這台只能看狀態、對話，換模型與設定由那邊的主控台管，代理也會拒絕
+const managedNode = () => !!(S.fleet?.nodes || []).find((n) => n.id === S.node)?.managed;
+const MANAGED_NOTE = "這台由學校或公司統一管理：在這裡可以看狀態、對話、看已安裝的模型；換模型、改設定請洽管理者。";
+const canOperate = () => (isAdmin() || myRole() === "operator") && !managedNode();
 const navItems = () => (isAdmin() ? NAV : myRole() === "user" ? USER_NAV : OPS_NAV);
 
 // 頂列放不下（窄螢幕、日文等較長的分頁名）就把分頁收進漢堡，不讓整頁往右溢出
@@ -3772,6 +3775,7 @@ function viewNode() {
   h.appendChild(el("span", "spacer"));
   h.append(setBtn, libBtn);
   if (st.machine.note) head.appendChild(el("p", "note", st.machine.note));
+  if (n.managed) head.appendChild(el("p", "note", MANAGED_NOTE));
   if (st.disabled_by_admin) head.appendChild(el("p", "note bad",
     `這台已被管理者停用（${taipei(st.disabled_by_admin.at)}），模型服務都停了，不能啟動或換模型，請洽IT。管理者在「設定 → 機器」按「停用／清除」選「恢復」。`));
   // 新機器從零到能用的順序軸：全部完成就不顯示（已經設好的機器不佔版面）
@@ -4703,11 +4707,13 @@ async function settingsMachines(wrap) {
     tr.appendChild(el("td", "nowrap", n.name));
     tr.appendChild(el("td", "nowrap", n.group));
     const push = n.link === "push";   // 工作站：防火牆擋連入，由那台主動連回主控台
-    tr.appendChild(Object.assign(el("td", "mono"), { textContent: push ? `${n.host}（由這台連回）` : `${n.host}:${n.agent_port || 9401}` }));
+    const local = n.link === "user";  // 受管的系統代理：經本機通道連，不走網路
+    tr.appendChild(Object.assign(el("td", "mono"), { textContent: local ? "本機通道（受管的系統代理）"
+      : push ? `${n.host}（由這台連回）` : `${n.host}:${n.agent_port || 9401}` }));
     tr.appendChild(el("td", "nowrap", live?.online ? (MM[live.state.pools.memory_model] || "—") : "—"));
     tr.appendChild(el("td", "nowrap " + (live?.online && !n.clone ? "" : "bad-t"), n.clone ? "疑似複製" : live?.online ? "在線" : (push ? "沒有連回" : "連不上")));
     tr.appendChild(Object.assign(el("td", "mono small"),
-      { textContent: push ? "不需要（連回時驗權杖）" : n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
+      { textContent: local ? "不需要（作業系統驗身分）" : push ? "不需要（連回時驗權杖）" : n.trusted ? (n.trust_fingerprint || "").slice(0, 23) + "…" : "尚未信任" }));
     const td = el("td", "row-acts");
     const e = el("button", "btn sm", "修改");
     e.onclick = () => openMachineSettings(n.id);

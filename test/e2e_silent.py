@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "console"))
 import test_joincodes as T  # noqa: E402
+import userchan  # noqa: E402
 
 WIN = os.name == "nt"
 MAC = sys.platform == "darwin"
@@ -151,6 +152,24 @@ def main():
         if not WIN and not MAC:
             check("  Linux：開機時 root 把主機板識別碼抄到 /run 給專用帳號讀", os.path.exists("/run/xconsole/smbios_uuid")
                   and idt.get("basis") == "smbios", idt)
+
+        # 本機使用者通道（清單 #28）：同一台的桌面版靠它認出這台是受管的；換模型等管理動作在通道上一律拒絕
+        got = None
+        for _ in range(15):
+            if userchan.managed():
+                got = True
+                break
+            time.sleep(1)
+        check(f"  本機使用者通道開好了（{userchan.DEFAULT}），主控台端確認是系統代理開的", got)
+        if got:
+            r = userchan.request("POST", "/slot/main/model", b"{}", timeout=10)
+            with r:
+                body = json.loads(r.read() or b"{}")
+            check("  通道上換模型一律拒絕（要請管理者在主控台做）", r.status == 403, (r.status, body))
+        if not WIN:
+            st = os.stat(userchan.DEFAULT)
+            check("  socket 權限 0666、通道資料夾只有專用帳號寫得進去",
+                  st.st_mode & 0o777 == 0o666 and not os.stat(os.path.dirname(userchan.DEFAULT)).st_mode & 0o022, oct(st.st_mode))
 
         pid = agent_pid()
         if WIN:

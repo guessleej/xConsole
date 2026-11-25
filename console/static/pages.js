@@ -188,6 +188,7 @@ function viewHome() {
   hero.appendChild(hw);
 
   const wrap = el("div", "wrap");
+  if (n.managed) wrap.appendChild(el("p", "note", MANAGED_NOTE));
   if (n.online) {
     const steps = homeSteps(n);
     const sc = el("section", "card rv");
@@ -199,8 +200,8 @@ function viewHome() {
       t.onclick = () => { g.hidden = !g.hidden; t.textContent = g.hidden ? "看步驟" : "收起步驟"; };
       sc.querySelector(".steps-head").appendChild(t);
     }
-    wrap.appendChild(sc);
-    if (st.engine?.building) watchBuild(sc, n);
+    if (!n.managed) wrap.appendChild(sc);    // 受管的機器：設定步驟是管理者的事，這裡不列
+    if (st.engine?.building && !n.managed) watchBuild(sc, n);
     if (rs) wrap.appendChild(statusBar(n, rs));
     const cached = S.rec?.[n.id];
     if (cached) {

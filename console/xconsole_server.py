@@ -50,6 +50,7 @@ import recommend  # noqa: E402
 import report  # noqa: E402
 import tls  # noqa: E402
 import agentlink  # noqa: E402
+import userchan  # noqa: E402
 import linkcert  # noqa: E402
 import groups  # noqa: E402
 import joincodes  # noqa: E402
@@ -777,6 +778,7 @@ def _read_capped(resp, deadline):
 
 LINK = agentlink.Link(log=lambda m: print(m, flush=True))
 PUSH = "push"            # node_request() 對主動連回的節點回這個當 TLS 設定：agent_open() 認得它
+USERCH = "user"          # 同一台受管系統代理的本機使用者通道（清單 #28）：不走 TLS、不帶權杖，身分由作業系統給
 
 # ---- 複製偵測（清單 #8）：同一個身分（節點權杖）有兩支代理同時在連回，就是有人把裝好的映像複製到別台。
 # 每支代理啟動時產生一個 boot 編號跟著輪詢送來。正常重啟是「舊的停了才有新的」；兩個 boot 輪流出現＝兩台同時在跑。
@@ -889,6 +891,8 @@ def node_url(node, path):
     """主控台連代理（link=pull，伺服器）用 https；代理主動連回（link=push，工作站）的排進那台的佇列。"""
     if node.get("link") == "push":
         return f"push://{node['id']}{path}"
+    if node.get("link") == "user":            # 本機使用者通道：沒有權杖，帶過去的空權杖代理不看
+        return f"user://{node['id']}{path}"
     h = node["host"]
     return f"https://{'[' + h + ']' if ':' in h and not h.startswith('[') else h}:{node.get('agent_port', 9401)}{path}"
 
@@ -904,8 +908,21 @@ def agent_open(req, ctx, timeout):
         if resp.status >= 400:
             raise urllib.error.HTTPError(req.full_url, resp.status, resp.reason, resp.headers, resp)
         return resp
+    if req.full_url.startswith("user://"):
+        nid, _, rest = req.full_url[7:].partition("/")
+        node = next((n for n in fleet()["nodes"] if n["id"] == nid), {})
+        resp = userchan.request(req.get_method(), "/" + rest, req.data, req.get_header("Content-type") or "application/json",
+                                where=node.get("channel"), owners=node.get("channel_owners"), timeout=timeout)
+        if resp.status >= 400:
+            raise urllib.error.HTTPError(req.full_url, resp.status, resp.reason, resp.headers, resp)
+        return resp
     op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
     return op.open(req, timeout=timeout)
+
+
+def node_ctx(node):
+    """怎麼連這台：主動連回的排佇列、本機通道直接連，其他用部署時取回的憑證驗證（沒有就回 None，不連）。"""
+    return {"push": PUSH, "user": USERCH}.get(node.get("link")) or tls.client_context(trust_file(node["id"]))
 
 
 def node_request(node_id, path, data, ctype="application/json"):
@@ -915,7 +932,7 @@ def node_request(node_id, path, data, ctype="application/json"):
         return None, "沒有這台機器"
     if clone_block(node):
         return None, clone_block(node)
-    ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
+    ctx = node_ctx(node)
     if ctx is None:
         return None, f"還沒信任 {node['name']} 的代理憑證"
     return urllib.request.Request(node_url(node, path), data=data, method="POST", headers={
@@ -1219,7 +1236,7 @@ def call_node(node_id, path, method="GET", body=None, timeout=40):
     if node.get("revoked"):
         return 409, {"error": f"{node['name']} 的身分已被撤銷，要重新加入才能再管理（「加一台機器」選「這是哪一台重新安裝」）",
                      "revoked": True, "offline": True}
-    ctx = PUSH if node.get("link") == "push" else tls.client_context(trust_file(node_id))
+    ctx = node_ctx(node)
     if ctx is None:
         # 沒有對方憑證就不連：不准退回不驗證或明文 http
         return 502, {"error": f"還沒信任 {node['name']} 的代理憑證，請重新執行 deploy_console.sh "
@@ -1264,6 +1281,7 @@ def fleet_state(scope=None):
         g = gmap.get(n.get("group") or groups.DEFAULT)
         nodes.append({"id": n["id"], "name": n["name"], "host": n["host"],
                       "group": n.get("group", "未分類"), "online": code == 200,
+                      "managed": n.get("link") == "user",     # 受管的系統代理：這裡只能看狀態、對話，管理要到學校或公司的主控台
                       "error": None if code == 200 else (body.get("error") or f"代理回 {code}"),
                       "state": body if code == 200 else None,
                       "clone": n.get("clone"),
@@ -4171,7 +4189,7 @@ class Handler(BaseHTTPRequestHandler):
                     r, _ = tls.inspect_trusted_ca(open(tf, "rb").read())
                     fp = (r.get("summary") or {}).get("fingerprint256")
                 out.append({**{k: v for k, v in n.items() if k != "token"},
-                            "trusted": os.path.exists(tf), "trust_fingerprint": fp})
+                            "trusted": os.path.exists(tf) or n.get("link") == "user", "trust_fingerprint": fp})
             return self._json(200, {"nodes": out})
         if path == "/api/fleet":
             return self._json(200, fleet_state(self.scope))

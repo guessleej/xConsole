@@ -10642,6 +10642,281 @@ def safety_run(body):
     return 200, res
 
 
+# ---- 本機使用者通道（清單 #28）
+# 受管的機器上，坐在電腦前的學生或員工經這個通道跟系統代理說話：只開放使用者層的操作，不看權杖，
+# 連線者是誰由作業系統給（Linux SO_PEERCRED、macOS LOCAL_PEERCRED、Windows 具名管道的用戶端身分），每筆都寫稽核。
+# 換模型、改設定、解除群組鎖定一律只走主控台通道
+USER_GET = re.compile(r"/healthz|/|/state|/group/state|/library|/apiinfo/[\w.-]+/brief")
+USER_POST = re.compile(r"/chat/[\w.-]+")
+# SYSTEM 與系統管理員全權；互動式登入的使用者（坐在電腦前或遠端桌面）可讀寫；網路上來的連線另由 PIPE_REJECT_REMOTE_CLIENTS 擋
+USER_PIPE_SDDL = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
+USER_LOG = os.path.join(STATE_DIR, "user-channel.log")
+USER_LOG_MAX = 5 * 1024 * 1024
+_USER_LOG_LOCK = threading.Lock()
+
+
+def console_uids():
+    """現在坐在這台電腦前的人：Linux 看 logind 每個座位的 ACTIVE_UID，macOS 看 /dev/console 的擁有者。"""
+    if OS == "darwin":
+        try:
+            return {os.stat("/dev/console").st_uid}
+        except OSError:
+            return set()
+    out = set()
+    for f in glob.glob("/run/systemd/seats/*"):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                out |= {int(x.split("=", 1)[1]) for x in fh if x.startswith("ACTIVE_UID=")}
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def peer_uid(sock):
+    if OS == "darwin":
+        raw = sock.getsockopt(0, 1, 76)                # SOL_LOCAL、LOCAL_PEERCRED → struct xucred，cr_uid 在第 4 個位元組
+        return struct.unpack_from("I", raw, 4)[0]
+    return struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))[1]
+
+
+def user_audit(who, method, path, verdict):
+    """本機通道的每筆請求：誰、做什麼、放行或拒絕。對話內容不記。超過 5 MB 換一份，留上一份。"""
+    line = json.dumps({"at": int(time.time()), "who": who, "method": method, "path": path, "verdict": verdict},
+                      ensure_ascii=False) + "\n"
+    with _USER_LOG_LOCK:
+        try:
+            if os.path.getsize(USER_LOG) > USER_LOG_MAX:
+                os.replace(USER_LOG, USER_LOG + ".1")
+        except OSError:
+            pass
+        fd = os.open(USER_LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as fh:
+            fh.write(line)
+
+
+class UserHandler(Handler):
+    """沿用同一套路由，先過身分與白名單。self.who、self.allowed 由各平台的 setup() 填。"""
+
+    who, allowed = "?", False
+
+    def _auth(self):
+        return True
+
+    def _gate(self, method):
+        path = self.path.split("?")[0].rstrip("/") or "/"
+        # /healthz 不帶任何資料：誰都問得到，桌面版才認得出這台是受管的，連上了再由身分決定給不給用
+        if path != "/healthz" and not self.allowed:
+            user_audit(self.who, method, path, "拒絕：不是坐在這台電腦前的人")
+            self._send(403, {"error": "這個通道只給坐在這台電腦前的人用"})
+            return False
+        if not (USER_GET if method == "GET" else USER_POST).fullmatch(path):
+            user_audit(self.who, method, path, "拒絕：不是使用者層的操作")
+            self._send(403, {"error": "這台由學校或公司統一管理：這裡只能看狀態、對話、看已安裝的模型；"
+                                     "換模型、改設定要請管理者在主控台做", "managed": True})
+            return False
+        user_audit(self.who, method, path, "放行")
+        return True
+
+    def do_GET(self):  # noqa: N802
+        if self._gate("GET"):
+            super().do_GET()
+
+    def do_POST(self):  # noqa: N802
+        if self._gate("POST"):
+            super().do_POST()
+
+
+class UnixUserHandler(UserHandler):
+    def setup(self):
+        super().setup()
+        import pwd
+        uid = peer_uid(self.request)
+        try:
+            self.who = pwd.getpwuid(uid).pw_name
+        except KeyError:
+            self.who = f"uid {uid}"
+        self.allowed = uid == 0 or uid in console_uids()
+        self.client_address = ("local-user", 0)
+
+
+def start_user_channel(where):
+    """Unix socket 檔開 0666 讓誰都連得上，誰能用由連線者身分決定；資料夾別人寫得進去就不開（可能被先放了假通道）。
+    開不起來只影響同一台的桌面版，代理照常服務主控台，所以印出原因、回 False，不結束。"""
+    if OS == "windows":
+        first = _pipe_create(where, first=True)    # 第一個執行個體當場開好：回來之後桌面版馬上連得到
+        if first is None:
+            return False
+        threading.Thread(target=_pipe_serve, args=(where, first), daemon=True).start()
+        return True
+    import socketserver
+    try:
+        st = os.stat(os.path.dirname(where))
+    except OSError as exc:
+        print(f"本機使用者通道開不起來：{exc}", flush=True)
+        return False
+    if st.st_mode & 0o022 or st.st_uid not in (0, os.getuid()):
+        print(f"本機使用者通道開不起來：資料夾 {os.path.dirname(where)} 別人寫得進去", flush=True)
+        return False
+    try:
+        os.unlink(where)
+    except FileNotFoundError:
+        pass
+    srv = socketserver.ThreadingUnixStreamServer(where, UnixUserHandler)
+    srv.daemon_threads = True
+    subprocess.run(["chmod", "666", where], check=True)      # 刻意讓誰都連得上：誰能用由連線者身分決定
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return True
+
+
+@functools.cache
+def _win32():
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    adv = ctypes.WinDLL("advapi32", use_last_error=True)
+    k32.CreateNamedPipeW.restype = wintypes.HANDLE
+    k32.CreateNamedPipeW.argtypes = [wintypes.LPCWSTR] + [wintypes.DWORD] * 6 + [ctypes.c_void_p]
+    for f in (k32.ConnectNamedPipe, k32.DisconnectNamedPipe, k32.CloseHandle, k32.FlushFileBuffers):
+        f.argtypes = [wintypes.HANDLE] + ([ctypes.c_void_p] if f is k32.ConnectNamedPipe else [])
+    k32.GetNamedPipeClientProcessId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    adv.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    adv.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                        ctypes.POINTER(wintypes.DWORD)]
+    adv.LookupAccountSidW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD),
+                                      wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)]
+    k32.ReadFile.argtypes = k32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                                                      ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+    return ctypes, wintypes, k32, adv
+
+
+class PipeIO(io.RawIOBase):
+    """具名管道的讀寫，直接呼叫 ReadFile／WriteFile（不經 C 執行階段的檔案代號，免得換行被改）。"""
+
+    def __init__(self, h):
+        self.h = h
+        self.ct, self.wt, self.k32, _ = _win32()
+
+    def readable(self):
+        return True
+
+    def writable(self):
+        return True
+
+    def readinto(self, b):
+        n = self.wt.DWORD()
+        buf = (self.ct.c_char * len(b)).from_buffer(b)
+        if not self.k32.ReadFile(self.h, buf, len(b), self.ct.byref(n), None):
+            if self.ct.get_last_error() in (109, 232):    # 對方關了管道
+                return 0
+            raise self.ct.WinError(self.ct.get_last_error())
+        return n.value
+
+    def write(self, b):
+        data, n = bytes(b), self.wt.DWORD()
+        if not self.k32.WriteFile(self.h, data, len(data), self.ct.byref(n), None):
+            raise BrokenPipeError(self.ct.get_last_error(), "本機通道的另一端關了")
+        return n.value
+
+
+def pipe_client_name(h):
+    """管道另一端行程的帳號（網域\帳號）。不扮演對方：桌面版以 SECURITY_IDENTIFICATION 連線，本來就不讓我們扮演。"""
+    ct, wt, k32, adv = _win32()
+    pid = wt.ULONG()
+    if not k32.GetNamedPipeClientProcessId(h, ct.byref(pid)):
+        return "?"
+    ph = k32.OpenProcess(0x1000, False, pid.value)          # PROCESS_QUERY_LIMITED_INFORMATION
+    if not ph:
+        return f"pid {pid.value}"
+    tok = wt.HANDLE()
+    try:
+        if not adv.OpenProcessToken(ph, 0x8, ct.byref(tok)):  # TOKEN_QUERY
+            return f"pid {pid.value}"
+        try:
+            size = wt.DWORD()
+            adv.GetTokenInformation(tok, 1, None, 0, ct.byref(size))   # TokenUser
+            buf = ct.create_string_buffer(size.value)
+            if not adv.GetTokenInformation(tok, 1, buf, size, ct.byref(size)):
+                return f"pid {pid.value}"
+            sid = ct.cast(buf, ct.POINTER(ct.c_void_p))[0]
+            name, dom = ct.create_unicode_buffer(256), ct.create_unicode_buffer(256)
+            nn, dn, use = wt.DWORD(256), wt.DWORD(256), wt.DWORD()
+            if adv.LookupAccountSidW(None, sid, name, ct.byref(nn), dom, ct.byref(dn), ct.byref(use)):
+                return f"{dom.value}\\{name.value}"
+            return f"pid {pid.value}"
+        finally:
+            k32.CloseHandle(tok)
+    finally:
+        k32.CloseHandle(ph)
+
+
+class PipeUserHandler(UserHandler):
+    """互動式登入的使用者才開得了這支管道（ACL），所以連得進來就放行；身分由管道另一端的行程帳號取得。"""
+
+    allowed = True
+
+    def setup(self):
+        self.rfile = io.BufferedReader(PipeIO(self.request))
+        self.wfile = PipeIO(self.request)
+        self.who = pipe_client_name(self.request)
+
+    def finish(self):
+        self.wfile.flush()
+
+
+@functools.cache
+def _pipe_sa():
+    ct, wt, _, adv = _win32()
+
+    class SA(ct.Structure):
+        _fields_ = [("nLength", wt.DWORD), ("lpSecurityDescriptor", ct.c_void_p), ("bInheritHandle", wt.BOOL)]
+    sd = ct.c_void_p()
+    if not adv.ConvertStringSecurityDescriptorToSecurityDescriptorW(USER_PIPE_SDDL, 1, ct.byref(sd), None):
+        raise ct.WinError(ct.get_last_error())
+    return SA(ct.sizeof(SA), sd, False)
+
+
+def _pipe_create(name, first=False):
+    """開一個管道執行個體；第一個加 FILE_FLAG_FIRST_PIPE_INSTANCE：已經有人先開了同名管道就不開。"""
+    ct, _, k32, _ = _win32()
+    try:
+        sa = _pipe_sa()
+    except OSError as exc:
+        print(f"本機使用者通道開不起來：{exc}", flush=True)
+        return None
+    h = k32.CreateNamedPipeW(r"\\.\pipe" + "\\" + name, 0x3 | (0x00080000 if first else 0), 0x8, 255, 65536, 65536, 0,
+                             ct.byref(sa))
+    if h in (None, ct.c_void_p(-1).value):
+        print(f"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{ct.WinError(ct.get_last_error())}", flush=True)
+        return None
+    return h
+
+
+def _pipe_serve(name, h):
+    ct, _, k32, _ = _win32()
+    while h is not None:
+        if k32.ConnectNamedPipe(h, None) or ct.get_last_error() == 535:     # 535：連線者比我們先到，也算接上
+            threading.Thread(target=_pipe_conn, args=(h,), daemon=True).start()
+        else:
+            k32.CloseHandle(h)
+        h = _pipe_create(name)
+
+
+def _pipe_conn(h):
+    _, _, k32, _ = _win32()
+    try:
+        PipeUserHandler(h, ("local-user", 0), None)
+    except (BrokenPipeError, ConnectionResetError):
+        pass                                        # 對方先關了
+    except Exception as exc:  # noqa: BLE001
+        print(f"本機使用者通道處理請求失敗：{type(exc).__name__}: {exc}", flush=True)
+    finally:
+        k32.FlushFileBuffers(h)
+        k32.DisconnectNamedPipe(h)
+        k32.CloseHandle(h)
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         # Windows 的主控台或管線預設 cp1252／cp950，印中文會直接例外結束：一律改 UTF-8，印不出的字換掉
@@ -10676,6 +10951,10 @@ def main():
     threading.Thread(target=disk_watchdog, daemon=True).start()       # 用硬碟執行的模型：系統記憶體快被吃光就停掉
     threading.Thread(target=gen_watch, daemon=True).start()           # 每 5 分鐘真的生 1 個 token，抓「清單回得來但算不出來」
     GROUP_WAKE.set()    # 沒有 agent-link.json 就只是每 5 秒看一次
+    if "--user-channel" in sys.argv[:-1]:
+        where = sys.argv[sys.argv.index("--user-channel") + 1]
+        if start_user_channel(where):
+            print(f"本機使用者通道：{where}（只開放使用者層操作，稽核在 {USER_LOG}）", flush=True)
     print(f"xconsole-agent 聽在 https://{bind}:{PORT}（憑證 {CERT_FILE}，權杖在 {TOKEN_FILE}）", flush=True)
     srv.serve_forever()
 

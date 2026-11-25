@@ -100,6 +100,10 @@
 "pattern": false
 },
 {
+"zh": "這台由學校或公司統一管理：在這裡可以看狀態、對話、看已安裝的模型；換模型、改設定請洽管理者。",
+"pattern": false
+},
+{
 "zh": "群組總覽",
 "pattern": false
 },
@@ -5168,6 +5172,10 @@
 "pattern": false
 },
 {
+"zh": "本機通道（受管的系統代理）",
+"pattern": false
+},
+{
 "zh": "{0}（由這台連回）",
 "pattern": true
 },
@@ -5181,6 +5189,10 @@
 },
 {
 "zh": "沒有連回",
+"pattern": false
+},
+{
+"zh": "不需要（作業系統驗身分）",
 "pattern": false
 },
 {
@@ -17004,6 +17016,30 @@
 "pattern": false
 },
 {
+"zh": "放行",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來：資料夾 {0} 別人寫得進去",
+"pattern": true
+},
+{
+"zh": "本機使用者通道開不起來：資料夾",
+"pattern": false
+},
+{
+"zh": "別人寫得進去",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來：{0}",
+"pattern": true
+},
+{
+"zh": "本機使用者通道開不起來",
+"pattern": false
+},
+{
 "zh": "--bind 只收 0.0.0.0 或 127.0.0.1",
 "pattern": false
 },
@@ -18224,6 +18260,50 @@
 "pattern": false
 },
 {
+"zh": "拒絕：不是坐在這台電腦前的人",
+"pattern": false
+},
+{
+"zh": "拒絕：不是使用者層的操作",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來：資料夾 ",
+"pattern": false
+},
+{
+"zh": " 別人寫得進去",
+"pattern": false
+},
+{
+"zh": "本機通道的另一端關了",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來：",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}",
+"pattern": true
+},
+{
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱",
+"pattern": false
+},
+{
+"zh": "本機使用者通道：{0}（只開放使用者層操作，稽核在 {1}）",
+"pattern": true
+},
+{
+"zh": "本機使用者通道",
+"pattern": false
+},
+{
+"zh": "只開放使用者層操作，稽核在",
+"pattern": false
+},
+{
 "zh": "Intel Arc 顯示卡",
 "pattern": false
 },
@@ -19157,6 +19237,26 @@
 },
 {
 "zh": "結果送不回主控台",
+"pattern": false
+},
+{
+"zh": "這個通道只給坐在這台電腦前的人用",
+"pattern": false
+},
+{
+"zh": "這台由學校或公司統一管理：這裡只能看狀態、對話、看已安裝的模型；換模型、改設定要請管理者在主控台做",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：",
+"pattern": false
+},
+{
+"zh": "本機使用者通道：",
+"pattern": false
+},
+{
+"zh": "（只開放使用者層操作，稽核在 ",
 "pattern": false
 },
 {

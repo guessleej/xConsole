@@ -150,7 +150,8 @@ if ($Console) {
   Say '4/5 開機自啟（SYSTEM）並啟動'
   $agent = Join-Path $dir 'xconsole_agent.py'
   Unregister-ScheduledTask -TaskName 'xConsole Agent' -Confirm:$false -ErrorAction SilentlyContinue
-  $act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $agent + '" --home "' + $base + '"') -WorkingDirectory $dir
+  # 本機使用者通道（具名管道 xconsole-user）：同一台的桌面版經這裡看狀態、對話，換模型與設定仍只走主控台
+  $act = New-ScheduledTaskAction -Execute $vpyw -Argument ('"' + $agent + '" --home "' + $base + '" --user-channel xconsole-user') -WorkingDirectory $dir
   $set = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
   $pri = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
   Register-ScheduledTask -TaskName 'xConsole Agent' -Action $act -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $pri -Settings $set -ErrorAction Stop | Out-Null
@@ -203,7 +204,7 @@ if ($admin) {
   # ProgramData 預設一般使用者讀得到：權杖、私鑰、帳密雜湊都在這裡，只留給 SYSTEM 與系統管理員
   ProtectDir $base
 }
-foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'linkcert.py', 'groups.py', 'joincodes.py', 'modules.py', 'winrt.py', 'gateway.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'chattools.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
+foreach ($f in 'xconsole_server.py', 'tls.py', 'agentlink.py', 'userchan.py', 'linkcert.py', 'groups.py', 'joincodes.py', 'modules.py', 'winrt.py', 'gateway.py', 'store.py', 'report.py', 'recommend.py', 'extract.py', 'chats.py', 'chattools.py', 'computer.py', 'updater.py', 'catalog_default.json', 'sd_catalog_default.json') {
   Copy-Item -Force (Join-Path $SRC "console\$f") (Join-Path $dir $f)
 }
 Copy-Item -Force (Join-Path $SRC 'console\static\*') (Join-Path $dir 'static')
