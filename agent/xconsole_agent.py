@@ -7048,6 +7048,9 @@ AGENT_ROOT = os.path.join(HOME, "xconsole-agent")
 AGENT_FOLDER_RX = re.compile(r"[^\W_][\w .-]{0,62}[\w-]|[^\W_]")
 AGENT_READ_MAX = 1 << 20
 AGENT_WRITE_MAX = 2 << 20
+AGENT_DOC_MAX = 15 << 20           # PDF、Office檔原樣交給主控台抽字的上限（跟對話附件一樣）
+AGENT_SCAN_MAX = 64 << 20          # 分段讀時為了數總行數最多掃這麼多，再大的檔回「總行數不明」，不讓一次讀檔卡住代理
+AGENT_LINES_MAX = 5000
 AGENT_OUT_MAX = 32 * 1024
 AGENT_TIMEOUT = (120, 600)          # 預設、上限（秒）
 AGENT_LIST_MAX = 2000
@@ -7361,7 +7364,39 @@ def agent_list(folder, rel=""):
     return 200, {"folder": folder, "files": rows[:AGENT_LIST_MAX], "truncated": more}
 
 
-def agent_read(folder, rel):
+def _agent_decode(data):
+    """文字檔的編碼：UTF-8（含BOM）不行就試台灣常見的Big5（cp950），都不是才用替代字元。"""
+    for enc in ("utf-8-sig", "cp950"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", "replace")
+
+
+def _agent_lines(fh, start, count):
+    """從第start行起取count行（取到的總量不超過AGENT_READ_MAX），之後接著數完總行數。
+    回 (取到的位元組, 取到幾行, 總行數或None, 是否因為大小上限少取)。"""
+    got, used, total, cut, scanned = [], 0, 0, False, 0
+    for total, line in enumerate(fh, 1):
+        scanned += len(line)
+        if start <= total < start + count and not cut:
+            if used + len(line) > AGENT_READ_MAX:
+                cut = True
+                if not got:                      # 單一行就超過上限（壓縮過的js）：至少給前段
+                    got.append(line[:AGENT_READ_MAX])
+            else:
+                got.append(line)
+                used += len(line)
+        elif scanned > AGENT_SCAN_MAX and total >= start + count:
+            return b"".join(got), len(got), None, cut
+    return b"".join(got), len(got), total, cut
+
+
+def agent_read(folder, rel, start=None, lines=None, raw=False):
+    """讀工作資料夾裡的檔案。
+    raw：原檔以base64回，PDF、Office檔由主控台的獨立行程抽字（不可信的文件不在代理行程裡解析）。
+    start／lines：從第start行起讀lines行，另回總行數與後面還有沒有；兩個都沒給就照舊回前1 MB。"""
     if not agent_enabled():
         return _agent_off()
     try:
@@ -7373,12 +7408,47 @@ def agent_read(folder, rel):
     if not os.path.isfile(full):
         return 404, {"error": f"沒有這個檔案：{rel}"}
     size = os.path.getsize(full)
+    if raw:
+        if size > AGENT_DOC_MAX:
+            return 413, {"error": f"{rel}有{size / 1048576:.1f} MB，文件最大15 MB"}
+        with open(full, "rb") as fh:
+            return 200, {"path": rel, "size": size, "b64": base64.b64encode(fh.read(AGENT_DOC_MAX)).decode()}
+    try:
+        first = max(1, int(start or 1))
+        count = max(1, min(AGENT_LINES_MAX, int(lines or 2000)))
+    except (TypeError, ValueError):
+        return 400, {"error": "start與lines要是整數"}
     with open(full, "rb") as fh:
-        data = fh.read(AGENT_READ_MAX)
-    if b"\x00" in data[:8192]:
-        return 200, {"path": rel, "size": size, "binary": True, "content": None, "truncated": size > AGENT_READ_MAX}
-    return 200, {"path": rel, "size": size, "binary": False, "content": data.decode("utf-8", "replace"),
-                 "truncated": size > AGENT_READ_MAX}
+        head = fh.read(8192)
+        if b"\x00" in head:
+            return 200, {"path": rel, "size": size, "binary": True, "content": None, "truncated": size > AGENT_READ_MAX}
+        if start is None and lines is None:
+            data = head + fh.read(AGENT_READ_MAX - len(head))
+            return 200, {"path": rel, "size": size, "binary": False, "content": data.decode("utf-8", "replace"),
+                         "truncated": size > AGENT_READ_MAX}
+        fh.seek(0)
+        data, n, total, cut = _agent_lines(fh, first, count)
+    return 200, {"path": rel, "size": size, "binary": False, "content": _agent_decode(data), "start": first, "lines": n,
+                 "total_lines": total, "more": total is None or first + n - 1 < total, "truncated": cut}
+
+
+def _agent_put(base, full, rel, data):
+    """寫進工作資料夾：上層自動建、不跟著符號連結寫出去。回 (狀態碼, 回應) 或None＝成功。"""
+    if os.path.isdir(full):
+        return 400, {"error": f"{rel} 是資料夾"}
+    parent = os.path.dirname(full)
+    os.makedirs(parent, exist_ok=True)
+    # 建完上層再驗一次：上層若是剛被換成符號連結，realpath 會跑出資料夾外
+    if not os.path.realpath(parent).startswith(base + os.sep) and os.path.realpath(parent) != base:
+        return 400, {"error": "路徑不在工作資料夾內"}
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(full, flags, 0o600)   # 只有代理帳號讀得到，Agent 寫的程式可能含機密
+    except OSError as ex:
+        return 400, {"error": f"寫不進 {rel}：{ex.strerror}"}
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    return None
 
 
 def agent_write(folder, rel, content):
@@ -7395,22 +7465,59 @@ def agent_write(folder, rel, content):
         return 404, {"error": str(ex)}
     except ValueError as ex:
         return 400, {"error": str(ex)}
-    if os.path.isdir(full):
-        return 400, {"error": f"{rel} 是資料夾"}
-    parent = os.path.dirname(full)
-    os.makedirs(parent, exist_ok=True)
-    # 建完上層再驗一次：上層若是剛被換成符號連結，realpath 會跑出資料夾外
-    if not os.path.realpath(parent).startswith(base + os.sep) and os.path.realpath(parent) != base:
-        return 400, {"error": "路徑不在工作資料夾內"}
     created = not os.path.exists(full)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        fd = os.open(full, flags, 0o600)   # 只有代理帳號讀得到，Agent 寫的程式可能含機密
-    except OSError as ex:
-        return 400, {"error": f"寫不進 {rel}：{ex.strerror}"}
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(data)
+    bad = _agent_put(base, full, rel, data)
+    if bad:
+        return bad
     return 200, {"ok": True, "path": rel, "size": len(data), "created": created}
+
+
+def agent_edit(folder, rel, old, new, replace_all=False):
+    """把檔案裡的一段原文換成新內容：原文要一字不差而且只出現一次，replace_all才全部換。
+    CRLF換行的檔案，原文用LF寫也認得，寫回時照原檔的換行；UTF-8的BOM原樣保留。"""
+    if not agent_enabled():
+        return _agent_off()
+    if not isinstance(old, str) or not isinstance(new, str):
+        return 400, {"error": "old_text與new_text都要是文字"}
+    if not old:
+        return 400, {"error": "old_text不能是空的；要新建或整份重寫請用write_file"}
+    if old == new:
+        return 400, {"error": "old_text跟new_text一樣，沒有要改的"}
+    try:
+        base, full = agent_path(folder, rel)
+    except FileNotFoundError as ex:
+        return 404, {"error": str(ex)}
+    except ValueError as ex:
+        return 400, {"error": str(ex)}
+    if not os.path.isfile(full):
+        return 404, {"error": f"沒有這個檔案：{rel}（要新建請用write_file）"}
+    if os.path.getsize(full) > AGENT_WRITE_MAX:
+        return 400, {"error": f"{rel}超過2 MB，edit_file改不了"}
+    with open(full, "rb") as fh:
+        data = fh.read(AGENT_WRITE_MAX + 1)
+    bom = data.startswith(b"\xef\xbb\xbf")
+    try:
+        text = data[3 if bom else 0:].decode("utf-8")
+    except UnicodeDecodeError:
+        return 400, {"error": f"{rel}不是UTF-8文字檔，edit_file改不了；請用write_file整份重寫"}
+    n = text.count(old)
+    if not n and "\r\n" in text and "\n" in old and "\r\n" not in old:
+        crlf = old.replace("\n", "\r\n")
+        n = text.count(crlf)
+        if n:
+            old, new = crlf, new.replace("\r\n", "\n").replace("\n", "\r\n")
+    if not n:
+        return 400, {"error": f"在{rel}裡找不到old_text（要一字不差，含縮排與空白）；請先用read_file看實際內容再改", "count": 0}
+    if n > 1 and not replace_all:
+        return 400, {"error": f"old_text在{rel}裡出現{n}次；請多帶前後幾行讓它只出現一次，或設replace_all=true全部替換",
+                     "count": n}
+    out = ((b"\xef\xbb\xbf" if bom else b"") + (text.replace(old, new) if replace_all else text.replace(old, new, 1)).encode("utf-8"))
+    if len(out) > AGENT_WRITE_MAX:
+        return 400, {"error": f"改完會超過2 MB（{len(out) / 1048576:.1f} MB），請拆成幾個檔"}
+    bad = _agent_put(base, full, rel, out)
+    if bad:
+        return bad
+    return 200, {"ok": True, "path": rel, "replaced": n if replace_all else 1, "size": len(out)}
 
 
 def agent_env():
@@ -9064,7 +9171,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/agent/fs/list":
             return self._send(*agent_list(body.get("folder"), body.get("path") or ""))
         if path == "/agent/fs/read":
-            return self._send(*agent_read(body.get("folder"), body.get("path")))
+            return self._send(*agent_read(body.get("folder"), body.get("path"), body.get("start"), body.get("lines"),
+                                          body.get("raw") is True))
+        if path == "/agent/fs/edit":
+            return self._send(*agent_edit(body.get("folder"), body.get("path"), body.get("old"), body.get("new"),
+                                          body.get("replace_all") is True))
         if path == "/agent/fs/write":
             return self._send(*agent_write(body.get("folder"), body.get("path"), body.get("content")))
         if path == "/agent/exec":

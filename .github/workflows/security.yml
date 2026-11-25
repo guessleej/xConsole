@@ -101,6 +101,8 @@ jobs:
         run: cd console && python test_chattools.py
       - name: Agent任務（等核准、拒絕、步數上限、停止、加密落地、重啟後標成已中斷、只能刪自己的、計畫收尾）
         run: cd console && python test_agent_tasks.py
+      - name: Agent追問、edit_file、read_file分段與讀文件、串流與即時狀態
+        run: cd console && python test_agent_parity.py
       - name: 每天會碰到的對齊項目（新版通知與跳過版本、載入中最後一行記錄、思考開關預設、畫面守衛）
         run: cd console && python test_daily_parity.py
       - name: 加密入口金鑰（產生、撤銷、只存雜湊、用量）

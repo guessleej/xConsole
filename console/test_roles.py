@@ -146,7 +146,7 @@ EXPECT_USER = {
 }
 EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/agent/tasks/[0-9a]{12}",
                   r"GET /api/node/a/(agent/folders|sd/recommend)", r"GET /api/node/a/sd/jobs(/[0-9a]{8}(/output(/0)?|/init)?)?",
-                  r"POST /api/chats/[0-9a]{12}/(rename|delete|meta)", r"POST /api/agent/tasks/[0-9a]{12}/(approve|stop|delete)",
+                  r"POST /api/chats/[0-9a]{12}/(rename|delete|meta)", r"POST /api/agent/tasks/[0-9a]{12}/(approve|stop|delete|continue)",
                   r"POST /api/node/a/chat/a", r"POST /api/node/a/agent/(folders/create|fs/list|fs/read)",
                   r"POST /api/node/a/sd/(generate|admit)", r"POST /api/node/a/sd/jobs/[0-9a]{8}/(cancel|delete)",
                   r"POST /api/keys/[0-9a]{8}/(update|revoke)"]

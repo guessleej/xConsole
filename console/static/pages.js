@@ -1107,6 +1107,9 @@ async function viewAgent() {
   grid.append(mainC, side);
   wrap.appendChild(grid);
 
+  // cur＝畫面上這件任務最新的狀態（輪詢時換掉）；選了任務就沿用它的工作資料夾，追問才接得上
+  let cur = tasks.find((t) => t.id === S.agentTask) || null;
+  if (cur) S.agentFolder = cur.folder;
   const bar = el("div", "chat-bar");
   const mSel = selectInput(models.length ? models : [["", "沒有可用的模型"]], S.agentModel || models[0]?.[0]);
   const fSel = selectInput([["", "選擇工作資料夾…"], ...(folders.folders || []).map((f) => [f.name,
@@ -1115,10 +1118,9 @@ async function viewAgent() {
   const linkF = el("button", "btn sm", "連結這台的資料夾");
   linkF.title = "選這台上已經有的資料夾（例：專案原始碼）給 Agent 用；系統資料夾、家目錄本身、.ssh 這類設定夾不能選";
   linkF.onclick = () => openFolderBrowser(n, (name) => { S.agentFolder = name; viewAgent(); });
-  const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}）`])], S.agentTask || "");
+  const taskLabel = (t) => `${(t.prompt || t.id).slice(0, 20)}（${TASK_STATE[t.state] || t.state}${t.turns > 1 ? `・${t.turns}輪` : ""}）`;
+  const taskSel = selectInput([["", "新任務"], ...tasks.map((t) => [t.id, taskLabel(t)])], S.agentTask || "");
   const delT = el("button", "btn sm danger", "刪除任務");
-  const curTask = tasks.find((t) => t.id === S.agentTask);
-  delT.hidden = !curTask || curTask.user !== S.me?.user || ["running", "waiting_approval"].includes(curTask.state);
   delT.title = "刪除這個任務的計畫與步驟紀錄；工作資料夾裡的檔案不會動";
   delT.onclick = () => modal({
     title: "刪除這個任務", danger: true, confirmText: "刪除", hasInput: false,
@@ -1133,7 +1135,7 @@ async function viewAgent() {
   bar.append(mSel, fSel, newF, ...(isAdmin() ? [linkF] : []), el("span", "spacer"), taskSel, delT);
   mainC.appendChild(bar);
   mSel.onchange = () => { S.agentModel = mSel.value; };
-  fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(); };
+  fSel.onchange = () => { S.agentFolder = fSel.value; drawSide(cur); controls(); };
   taskSel.onchange = () => { S.agentTask = taskSel.value; viewAgent(); };
   newF.onclick = () => {
     const d = el("div");
@@ -1148,24 +1150,59 @@ async function viewAgent() {
       catch (ex) { errNote(er, ex.message); return; }
       ov.remove();
       S.agentFolder = inp.value.trim();
+      S.agentTask = "";
       viewAgent();
     });
   };
 
   const logBox = el("div", "agent-log");
   mainC.appendChild(logBox);
+  // 即時狀態列：在想、在寫哪個檔（產生了多少）、在執行指令；用時每秒走，其他跟著輪詢換字，不重畫
+  const liveBar = el("div", "agent-live");
+  const liveLbl = el("span", "agent-live-label");
+  const liveMeta = el("span", "agent-live-meta");
+  liveBar.append(el("span", "agent-live-spin"), liveLbl, liveMeta);
+  liveBar.hidden = true;
+  mainC.appendChild(liveBar);
+  // 串流中的回答與思考過程：固定在紀錄最後一格，新的步驟插在它前面
+  const streamBox = el("div", "agent-stream");
+  const thinkD = el("details", "agent-think");
+  const thinkPre = el("pre", "mono small");
+  thinkD.append(el("summary", "small", "思考過程"), thinkPre);
+  const streamTxt = el("div", "msg assistant agent-stream-text");
+  streamBox.append(thinkD, streamTxt);
+  streamBox.hidden = true;
   const inputRow = el("div", "chat-input");
   const ta = el("textarea");
   ta.rows = 2;
-  ta.placeholder = "描述要做的事，越具體越好（Enter 送出，Shift+Enter 換行）";
   const stopB = el("button", "btn sm danger", "停止");
   stopB.hidden = true;
-  const send = el("button", "btn primary", "交給 Agent");
+  const newT = el("button", "btn sm", "開新任務");
+  newT.title = "不接前面的任務，從頭交代一件新的事";
+  newT.onclick = () => { S.agentTask = ""; viewAgent(); };
+  const send = el("button", "btn primary", "交給Agent");
+  const hint = el("span", "small muted");
   const tools = el("div", "chat-tools");
-  tools.append(el("span", "small muted", isAdmin() ? "檔案只能動工作資料夾裡的；每條指令都會先問你"
-    : "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方 Agent 會寫給你自己跑"), el("span", "spacer"), stopB, send);
+  tools.append(hint, el("span", "spacer"), stopB, newT, send);
   inputRow.append(ta, tools);
   mainC.appendChild(inputRow);
+
+  const setText = (node, s) => { if (node.textContent !== s) node.textContent = s; };
+  const isLive = (t) => !!t && (t.state === "running" || t.state === "waiting_approval");
+  const canFollow = () => !!cur && !isLive(cur) && cur.user === S.me?.user && cur.folder === fSel.value;
+  const baseHint = isAdmin() ? "檔案只能動工作資料夾裡的；每條指令都會先問你"
+    : "檔案只能動你自己的工作資料夾；你的帳號不能執行指令，需要執行的地方Agent會寫給你自己跑";
+  const controls = () => {
+    const live = isLive(cur);
+    const fu = canFollow();
+    stopB.hidden = !live;
+    send.disabled = live;
+    newT.hidden = !cur || live;
+    delT.hidden = !cur || live || cur.user !== S.me?.user;
+    setText(send, fu ? "接著交代" : "交給Agent");
+    setText(hint, fu ? "會接在這件任務後面：Agent看得到前面的交代、做過的操作與結論" : baseHint);
+    ta.placeholder = fu ? "接著交代：要改哪裡、再加什麼（Enter送出，Shift+Enter換行）" : "描述要做的事，越具體越好（Enter送出，Shift+Enter換行）";
+  };
 
   const planBox = el("div");
   const filesBox = el("div");
@@ -1174,8 +1211,8 @@ async function viewAgent() {
   const planH = el("h4", "pick-h", "計畫");
   planH.appendChild(planCount);
   side.append(planH, planBox, el("h4", "pick-h", "改動的檔案"), filesBox, el("h4", "pick-h", "工作資料夾"), treeBox);
-  // 輪詢每1.5秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播
-  const seen = { files: null, tree: null };
+  // 輪詢每秒來一次：只換有變的那幾列，進行中那一項的轉圈動畫不重播；檔案樹沒變伺服器就不再送
+  const seen = { files: null, tree: null, treeData: [], treeRev: null };
   const drawPlan = (plan) => {
     const done = plan.filter((x) => x.status === "done").length;
     const cnt = plan.length ? `${done}/${plan.length}` : "";
@@ -1198,11 +1235,13 @@ async function viewAgent() {
   const drawSide = (t) => {
     drawPlan(t?.plan || []);
     const files = t?.files || [];
+    if (t && "tree" in t) { seen.treeData = t.tree || []; seen.treeRev = t.tree_rev; }
+    if (!t) seen.treeData = [];
     const fi = (folders.folders || []).find((f) => f.name === fSel.value);
     const fk = JSON.stringify(files);
-    const tk = JSON.stringify([t?.tree || [], fSel.value, fi?.path]);
+    const tk = JSON.stringify([seen.treeData, fSel.value, fi?.path]);
     if (seen.files !== fk) { seen.files = fk; filesBox.textContent = ""; drawFiles(files); }
-    if (seen.tree !== tk) { seen.tree = tk; treeBox.textContent = ""; drawTree(t?.tree || [], fi); }
+    if (seen.tree !== tk) { seen.tree = tk; treeBox.textContent = ""; drawTree(seen.treeData, fi); }
   };
   const drawFiles = (files) => {
     if (!files.length) filesBox.appendChild(el("p", "small muted", "還沒有改動"));
@@ -1219,6 +1258,7 @@ async function viewAgent() {
       un.onclick = async () => {
         try { await api(`/api/node/${n.id}/agent/folders/unlink`, { method: "POST", body: { name: fi.name } }); } catch (ex) { toast(ex.message, "bad"); return; }
         S.agentFolder = "";
+        S.agentTask = "";
         viewAgent();
       };
       treeBox.appendChild(un);
@@ -1234,7 +1274,7 @@ async function viewAgent() {
     logBox.textContent = "";
     const e = el("div", "chat-empty");
     e.append(el("h3", null, "交給 Agent 一個任務"),
-      el("p", "small muted", "它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成。"));
+      el("p", "small muted", "它會在工作資料夾裡自己規劃、建檔、寫程式、跑測試，直到完成；做完還可以接著交代要改的地方。"));
     const ex = el("div", "chips chat-ex");
     ["做一個番茄鐘網頁，打開 index.html 就能用", "寫一個 Python 腳本，把資料夾裡的圖片批次縮到 1080p", "讀一下這個專案，寫一份 README 說明怎麼執行", "整理這個資料夾：照檔案類型分到不同子資料夾"]
       .forEach((x) => { const b = el("button", "chip-btn", x); b.onclick = () => { ta.value = x; ta.focus(); }; ex.appendChild(b); });
@@ -1242,35 +1282,95 @@ async function viewAgent() {
     logBox.appendChild(e);
   };
 
-  let shown = 0;
-  const paint = (t) => {
-    if (!shown) logBox.textContent = "";
-    const head = shown === 0 && t.prompt ? [{ type: "user", text: t.prompt }] : [];
-    // 計畫與完成在右側面板與最後的總結看得到，不在步驟裡重複列
-    head.concat((t.log || []).slice(shown)).filter((x) => !["update_plan", "finish"].includes(x.tool))
-      .forEach((x) => logBox.appendChild(agentEntry(x)));
-    shown = (t.log || []).length;
-    logBox.scrollTop = logBox.scrollHeight;
-    drawSide(t);
-    const live = t.state === "running" || t.state === "waiting_approval";
-    stopB.hidden = !live;
-    send.disabled = live;
-    delT.hidden = live || t.user !== S.me?.user;
+  // 即時狀態：文字跟著輪詢換，用時另由每秒的計時器往前走
+  let clockAt = 0;
+  const liveText = (t) => {
+    const lv = t.live || {};
+    if (t.state === "waiting_approval" || lv.phase === "approval") return "等你允許執行指令";
+    const p = lv.path || "";
+    if (lv.phase === "writing") return `${lv.tool === "edit_file" ? "正在準備修改" : "正在寫"}${p}（已產生${fmtBytes(lv.bytes || 0)}）`;
+    if (lv.phase === "calling") return lv.tool === "run_command" ? "正在準備要執行的指令" : lv.tool === "update_plan" ? "正在更新計畫"
+      : lv.tool === "finish" ? "正在寫總結" : `正在準備${TOOL_ZH[lv.tool] || lv.tool || "下一步"}`;
+    if (lv.phase === "running") return `正在執行指令：${(lv.command || "").slice(0, 80)}`;
+    if (lv.phase === "tool") return `正在${TOOL_ZH[lv.tool] || lv.tool}${p}`;
+    if (lv.phase === "answering") return "正在回答";
+    if (lv.phase === "working") return "正在處理模型的回覆";
+    return "正在思考";
+  };
+  const drawClock = () => {
+    if (!cur || !isLive(cur)) return;
+    const sec = Math.max(0, Math.floor((cur.now || 0) - (cur.turn_started || 0) + (Date.now() - clockAt) / 1000));
+    setText(liveMeta, `用時${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}・第${cur.steps || 0}/${cur.max_steps || 0}步`);
+  };
+  const clock = setInterval(() => { if (!liveBar.isConnected) { clearInterval(clock); return; } drawClock(); }, 1000);
+  const drawLive = (t) => {
+    const live = isLive(t);
+    liveBar.hidden = !live;
+    if (live) { setText(liveLbl, liveText(t)); drawClock(); }
+    const lv = live ? t.live || {} : {};
+    const text = lv.phase === "answering" ? lv.text || "" : "";
+    const think = lv.reasoning || "";
+    thinkD.hidden = !think;
+    setText(thinkPre, think);
+    streamTxt.hidden = !text;
+    setText(streamTxt, text);
+    streamBox.hidden = !text && !think;
   };
 
-  const watch = async (id) => {
+  let next = 0;
+  let lastText = null;
+  const paint = (t, fresh) => {
+    const nearEnd = logBox.scrollHeight - logBox.scrollTop - logBox.clientHeight < 80;
+    if (fresh) {
+      logBox.textContent = "";
+      next = 0;
+      lastText = null;
+      if (t.prompt) logBox.appendChild(agentEntry({ type: "user", text: t.prompt }));
+      logBox.appendChild(streamBox);
+    }
+    const from = t.log_from || 0;
+    // 計畫與完成在右側面板與每一輪的總結看得到，不在步驟裡重複列
+    (t.log || []).slice(Math.max(0, next - from)).forEach((x) => {
+      if (x.type === "text") lastText = x.text;
+      if (["update_plan", "finish"].includes(x.tool)) return;
+      logBox.insertBefore(agentEntry(x), streamBox);
+    });
+    next = t.log_next ?? from + (t.log || []).length;
+    // 能追問之前存的任務沒有「總結」這一筆：做完時照舊補在最後
+    if (t.state === "done" && t.summary && (t.turns || 1) <= 1 && !logBox.querySelector(".agent-summary") && t.summary !== lastText) {
+      logBox.insertBefore(agentEntry({ type: "summary", text: t.summary }), streamBox);
+    }
+    drawLive(t);
+    if (fresh || nearEnd) logBox.scrollTop = logBox.scrollHeight;
+    drawSide(t);
+    controls();
+  };
+
+  let watching = 0;
+  const watch = (id, fresh) => {
+    const me = ++watching;
     let asked = null;
+    let sawLive = false;
+    let first = fresh;
     const tick = async () => {
-      if (!logBox.isConnected) return;
+      if (!logBox.isConnected || me !== watching) return;
       let t;
-      try { t = await api(`/api/agent/tasks/${id}`); } catch (ex) { toast(ex.message, "bad"); return; }
-      paint(t);
+      const q = first ? "" : `?since=${next}${seen.treeRev != null ? `&tree=${seen.treeRev}` : ""}`;
+      try { t = await api(`/api/agent/tasks/${id}${q}`); } catch (ex) { toast(ex.message, "bad"); return; }
+      if (me !== watching || !logBox.isConnected) return;
+      cur = t;
+      clockAt = Date.now();
+      paint(t, first);
+      first = false;
+      const opt = [...taskSel.options].find((o) => o.value === t.id);
+      if (opt) setText(opt, taskLabel(t));
       if (t.state === "waiting_approval" && t.pending && asked !== t.pending.id) {
         asked = t.pending.id;
         askApprove(t);
       }
-      if (t.state === "running" || t.state === "waiting_approval") setTimeout(tick, 1500);
-      else if (t.state === "done") { toast("Agent 完成了", "ok"); if (t.summary && !logBox.querySelector(".agent-summary")) { const b = el("div", "msg assistant agent-summary"); renderRich(b, t.summary, false); logBox.appendChild(b); logBox.scrollTop = logBox.scrollHeight; } }
+      if (isLive(t)) { sawLive = true; setTimeout(tick, 1000); return; }
+      if (!sawLive) return;
+      if (t.state === "done") toast("Agent完成了", "ok");
       else if (t.state === "failed") toast("Agent 停在錯誤：" + (t.error || ""), "bad");
     };
     tick();
@@ -1286,7 +1386,7 @@ async function viewAgent() {
     const r = el("label", "check-row");
     const cb = el("input");
     cb.type = "checkbox";
-    r.append(cb, document.createTextNode(" 這個任務之後的指令不再詢問"));
+    r.append(cb, document.createTextNode(" 這一輪之後的指令不再詢問"));
     d.appendChild(r);
     const ov = modal({ title: "Agent 想執行一條指令", bodyNode: d, hasInput: true });
     const answer = async (allow) => {
@@ -1310,42 +1410,61 @@ async function viewAgent() {
     if (!fSel.value) { toast("先選一個工作資料夾（沒有就按「新增資料夾」）", "bad"); return; }
     const [kind, a, b] = mSel.value.split(":");
     const model = kind === "slot" ? { kind: "local", node: a, slot: b } : { kind: "provider", id: a };
+    const follow = canFollow();
     let r;
-    try { r = await api("/api/agent/tasks", { method: "POST", body: { node: n.id, folder: fSel.value, model, prompt: text } }); }
-    catch (ex) { toast(ex.message, "bad"); return; }
+    try {
+      r = follow ? await api(`/api/agent/tasks/${cur.id}/continue`, { method: "POST", body: { prompt: text, model } })
+        : await api("/api/agent/tasks", { method: "POST", body: { node: n.id, folder: fSel.value, model, prompt: text } });
+    } catch (ex) { toast(ex.message, "bad"); return; }
     ta.value = "";
+    cur = r;
     S.agentTask = r.id;
-    shown = 0;
-    watch(r.id);
+    if (!follow) {
+      taskSel.insertBefore(new Option(taskLabel(r), r.id), taskSel.options[1] || null);
+      taskSel.value = r.id;
+    }
+    controls();
+    watch(r.id, !follow);
   };
   stopB.onclick = async () => { try { await api(`/api/agent/tasks/${S.agentTask}/stop`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); } };
   imeGuard(ta, () => send.click(), { shiftNewline: true });
 
-  if (S.agentTask && tasks.some((t) => t.id === S.agentTask)) watch(S.agentTask); else { empty(); drawSide(null); }
+  controls();
+  if (cur) watch(cur.id, true); else { empty(); drawSide(null); }
 }
 
 const TASK_STATE = { running: "進行中", waiting_approval: "等你允許", done: "完成", failed: "失敗", stopped: "已停止", interrupted: "已中斷" };
 const fmtBytes = (b) => b >= 1048576 ? `${fmt(b / 1048576)} MB` : b >= 1024 ? `${fmt(b / 1024, 0)} KB` : `${b} B`;
-const TOOL_ZH = { list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", run_command: "執行指令", update_plan: "更新計畫", finish: "完成" };
+const TOOL_ZH = { list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", edit_file: "修改檔案", run_command: "執行指令", update_plan: "更新計畫", finish: "完成" };
 
 function agentEntry(x) {
   if (x.type === "user") return el("div", "msg user", x.text);
   if (x.type === "text") { const b = el("div", "msg assistant"); renderRich(b, x.text || "", false); return b; }
+  if (x.type === "summary") { const b = el("div", "msg assistant agent-summary"); renderRich(b, x.text || "", false); return b; }
+  if (x.type === "thinking") {
+    const d = el("details", "agent-think");
+    const pre = el("pre", "mono small");
+    pre.textContent = x.text || "";
+    d.append(el("summary", "small", "思考過程"), pre);
+    return d;
+  }
   if (x.type === "error") return el("p", "note bad", x.text || x.error || "錯誤");
   const r = el("div", "agent-step" + (x.type === "result" ? " result" : ""));
   if (x.type === "tool") {
     const a = x.args || {};
+    const at = a.start_line > 1 ? `（第${a.start_line}行起）` : "";
     r.append(el("span", "chip idle", TOOL_ZH[x.tool] || x.tool),
-      el("span", "mono small", a.command || a.path || (x.tool === "update_plan" ? "" : x.tool === "finish" ? "" : JSON.stringify(a).slice(0, 160))));
+      el("span", "mono small", a.command || (a.path ? a.path + at : "") || (x.tool === "update_plan" ? "" : x.tool === "finish" ? "" : JSON.stringify(a).slice(0, 160))));
   } else {
     r.append(el("span", "chip " + (x.ok === false ? "bad" : "ok"), x.ok === false ? "失敗" : "完成"), el("span", "small muted", TOOL_ZH[x.tool] || x.tool || ""));
     if (x.text) {
       let out = x.text;
       try {
         const j = JSON.parse(x.text);
-        out = j.error ? j.error : [j.stdout, j.stderr, j.content, j.files && j.files.join("\n"), j.code != null ? `結束碼 ${j.code}${j.timed_out ? "（逾時）" : ""}` : null]
+        out = j.error ? j.error : [j.stdout, j.stderr, j.content, j.note, j.files && j.files.join("\n"), j.replaced != null ? `換了${j.replaced}處` : null,
+          (j.exit_code ?? j.code) != null ? `結束碼${j.exit_code ?? j.code}${j.timed_out ? "（逾時）" : ""}` : null]
           .filter((v) => v !== undefined && v !== null && v !== "").join("\n") || x.text;
-      } catch (_) { /* 不是 JSON 就照原文 */ }
+      } catch (_) { /* 不是JSON（讀檔回的是帶行號的文字）就照原文 */ }
       const d = el("details");
       d.appendChild(el("summary", "small", "結果"));
       const pre = el("pre", "mono small");
