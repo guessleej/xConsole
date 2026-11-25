@@ -1472,3 +1472,16 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .mon-spark { width: 100%; height: 40px; display: block; }
 .mon-spark polyline { fill: none; stroke: var(--brand); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .mon-sub { min-height: 1.4em; }
+
+/* 程式碼語法高亮（highlight.js）：程式碼區塊不分主題都是深底，字色一律用深底那一組 */
+.code-block { --hl-kw: #ff9a9f; --hl-str: #a6de97; --hl-num: #86d6ee; --hl-com: #a9b6c1; --hl-fn: #cdb9ff; --hl-type: #93ccff;
+  --hl-attr: #f5c27a; --hl-add: rgba(76, 175, 80, .22); --hl-del: rgba(239, 83, 80, .22); }
+.t-kw, .t-tag { color: var(--hl-kw); font-weight: 600; }
+.t-str { color: var(--hl-str); }
+.t-num, .t-key { color: var(--hl-num); }
+.t-com { color: var(--hl-com); font-style: italic; }
+.t-fn { color: var(--hl-fn); }
+.t-type, .t-meta, .t-var { color: var(--hl-type); }
+.t-attr { color: var(--hl-attr); }
+.t-add { background: var(--hl-add); display: inline-block; width: 100%; }
+.t-del { background: var(--hl-del); display: inline-block; width: 100%; }

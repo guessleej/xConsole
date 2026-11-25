@@ -1003,27 +1003,32 @@ function codeBlock(lang, code, open) {
   const w = el("div", "code-block");
   const h = el("div", "code-head");
   const isHtml = lang === "html" || /^\s*<!doctype html|^\s*<html/i.test(code);
+  const isSvg = !isHtml && (lang === "svg" || /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(code));
   h.appendChild(el("span", "mono small", lang || "程式碼"));
   h.appendChild(el("span", "spacer"));
   if (!open) {
     const cp = el("button", "btn sm", "複製");
     cp.onclick = () => copyText(code);
-    const dl = el("button", "btn sm", isHtml ? "下載 .html" : "下載");
-    dl.onclick = () => download(isHtml ? "page.html" : `code.${extOf(lang)}`, code, (isHtml ? "text/html" : "text/plain") + ";charset=utf-8");
+    const dl = el("button", "btn sm", isHtml ? "下載 .html" : isSvg ? "下載 .svg" : "下載");
+    dl.onclick = () => download(isHtml ? "page.html" : isSvg ? "image.svg" : `code.${extOf(lang)}`, code,
+      (isHtml ? "text/html" : isSvg ? "image/svg+xml" : "text/plain") + ";charset=utf-8");
     h.append(cp, dl);
-    if (isHtml) {
-      const pv = el("button", "btn sm primary", "執行預覽");
-      pv.onclick = () => openPreview(code);
+    if (isHtml || isSvg) {
+      const pv = el("button", "btn sm primary", isSvg ? "預覽圖形" : "執行預覽");
+      // SVG 包在置中的空白頁裡給同一個沙盒預覽（拿不到主控台的登入）
+      pv.onclick = () => openPreview(isSvg ? `<!doctype html><meta charset="utf-8"><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff">${code}</body>` : code);
       h.appendChild(pv);
     }
   } else h.appendChild(el("span", "small muted", "產生中…"));
   const pre = el("pre", "mono");
-  pre.textContent = code;
+  // 產生中每0.12秒重畫一次：只在寫完時上色一次，長程式碼才不會卡
+  if (open) pre.textContent = code;
+  else HL.paint(pre, code, lang);
   w.append(h, pre);
   return w;
 }
 
-const extOf = (lang) => ({ python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", bash: "sh", sh: "sh",
+const extOf = (lang) => ({ svg: "svg", html: "html", python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", bash: "sh", sh: "sh",
   shell: "sh", css: "css", json: "json", yaml: "yml", sql: "sql", go: "go", rust: "rs", java: "java", c: "c", cpp: "cpp", markdown: "md" }[lang] || "txt");
 
 // 預覽：HTML 交給主控台存一份，回一個沙盒網址（不透明來源、30 分鐘過期），用全螢幕框架開

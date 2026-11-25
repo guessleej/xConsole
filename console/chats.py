@@ -127,6 +127,13 @@ def _clean_gen(g):
             out[k] = v
     if g.get("edit") is True:
         out["edit"] = True
+    # 接著改上一張圖：記住是改哪一件，重新產生時才找得到原圖（只存機器與工作編號，不存圖）
+    base = g.get("base")
+    if base is not None:
+        if not (isinstance(base, dict) and isinstance(base.get("node"), str) and NODE_RX.fullmatch(base["node"])
+                and isinstance(base.get("job"), str) and JOB_RX.fullmatch(base["job"])):
+            raise Bad("改圖來源的格式不對")
+        out["base"] = {"node": base["node"], "job": base["job"]}
     return out
 
 

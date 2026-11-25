@@ -26733,5 +26733,100 @@
 "en": "No model slots on this machine yet.",
 "ja": "このマシンにはまだモデルスロットがありません。",
 "ko": "이 머신에는 아직 모델 슬롯이 없습니다."
+},
+"下載 .svg": {
+"en": "Download .svg",
+"ja": ".svgをダウンロード",
+"ko": ".svg 다운로드"
+},
+"預覽圖形": {
+"en": "Preview graphic",
+"ja": "図形をプレビュー",
+"ko": "그래픽 미리보기"
+},
+"改圖": {
+"en": "Edit image",
+"ja": "画像を編集",
+"ko": "이미지 편집"
+},
+"描述想要的畫面，可以說「直式」「畫4張」；附一張圖，或接著說「把背景換成海邊」就是改圖。Enter 送出": {
+"en": "Describe the picture; you can say “portrait” or “4 images”. Attach an image, or follow up with “change the background to a beach”, to edit. Enter to send",
+"ja": "描きたい画面を説明してください。「縦長」「4枚」も指定できます。画像を添付するか「背景を海辺に変えて」と続けると編集になります。Enterで送信",
+"ko": "원하는 장면을 설명하세요. '세로', '4장'처럼 말할 수 있습니다. 이미지를 첨부하거나 '배경을 바닷가로 바꿔줘'라고 이어서 말하면 편집합니다. Enter로 보내기"
+},
+"描述影片內容，可以說「直式」「5秒」；附一張圖當第一格。Enter 送出": {
+"en": "Describe the video; you can say “portrait” or “5 seconds”. Attach an image to use as the first frame. Enter to send",
+"ja": "動画の内容を説明してください。「縦長」「5秒」も指定できます。画像を添付すると最初のフレームになります。Enterで送信",
+"ko": "영상 내용을 설명하세요. '세로', '5초'처럼 말할 수 있습니다. 이미지를 첨부하면 첫 프레임이 됩니다. Enter로 보내기"
+},
+"問點什麼（Enter 送出，Shift+Enter 換行）；要畫圖或做影片先按下面的「畫圖」「影片」，或打 /畫、/影片": {
+"en": "Ask anything (Enter to send, Shift+Enter for a new line). To make an image or video, press “Image” or “Video” below, or type /draw or /video",
+"ja": "何でも聞いてください（Enterで送信、Shift+Enterで改行）。画像や動画を作るには下の「画像生成」「動画」を押すか、/draw・/videoと入力",
+"ko": "무엇이든 물어보세요(Enter로 보내기, Shift+Enter로 줄바꿈). 이미지나 동영상을 만들려면 아래 '이미지', '동영상'을 누르거나 /draw, /video를 입력하세요"
+},
+"已下載・選了就載入": {
+"en": "downloaded · pick to load",
+"ja": "ダウンロード済み・選ぶと読み込み",
+"ko": "다운로드됨 · 선택하면 로드"
+},
+"{0}已下載・選了就載入": {
+"en": "{0} downloaded · pick to load",
+"ja": "{0}のダウンロード済み・選ぶと読み込み",
+"ko": "{0} 다운로드됨 · 선택하면 로드"
+},
+"（放不下）": {
+"en": " (doesn’t fit)",
+"ja": "（収まりません）",
+"ko": " (공간 부족)"
+},
+"會換掉{0}現在在跑的「{1}」，載入期間對話與API都暫停。": {
+"en": "This replaces “{1}” now running on {0}; chat and the API pause while it loads.",
+"ja": "{0}で実行中の「{1}」を置き換えます。読み込み中はチャットとAPIが止まります。",
+"ko": "{0}에서 실행 중인 '{1}'을 교체합니다. 로드하는 동안 채팅과 API가 멈춥니다."
+},
+"在{0}載入「{1}」。": {
+"en": "Load “{1}” on {0}.",
+"ja": "{0}で「{1}」を読み込みます。",
+"ko": "{0}에서 '{1}'을 로드합니다."
+},
+"這顆要用到硬碟才放得下，能跑但很慢。": {
+"en": "This model only fits by using the disk; it runs, but slowly.",
+"ja": "このモデルはディスクを使わないと収まりません。動きますがかなり遅くなります。",
+"ko": "이 모델은 디스크를 써야 들어갑니다. 실행은 되지만 매우 느립니다."
+},
+"要調上下文長度、思考、區網存取，到「執行」頁載入。": {
+"en": "To set context length, thinking or LAN access, load it from the Run page.",
+"ja": "コンテキスト長・思考・LANアクセスを調整するには「実行」ページで読み込んでください。",
+"ko": "컨텍스트 길이, 사고, LAN 접근을 조정하려면 '실행' 페이지에서 로드하세요."
+},
+"載入{0}？": {
+"en": "Load {0}?",
+"ja": "{0}を読み込みますか？",
+"ko": "{0}을(를) 로드할까요?"
+},
+"正在載入{0}…（大模型要一兩分鐘）": {
+"en": "Loading {0}… (large models take a minute or two)",
+"ja": "{0}を読み込み中…（大きいモデルは1〜2分かかります）",
+"ko": "{0} 로드 중… (큰 모델은 1~2분 걸립니다)"
+},
+"已載入{0}": {
+"en": "Loaded {0}",
+"ja": "{0}を読み込みました",
+"ko": "{0} 로드됨"
+},
+"{0}放不下：{1}": {
+"en": "{0} doesn’t fit: {1}",
+"ja": "{0}は収まりません：{1}",
+"ko": "{0} 공간 부족: {1}"
+},
+"載入失敗：{0}": {
+"en": "Load failed: {0}",
+"ja": "読み込みに失敗しました：{0}",
+"ko": "로드 실패: {0}"
+},
+"改圖來源的格式不對": {
+"en": "Invalid source image for editing",
+"ja": "編集元画像の形式が正しくありません",
+"ko": "편집 원본 이미지 형식이 올바르지 않습니다"
 }
 }
