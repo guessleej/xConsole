@@ -124,7 +124,7 @@ USER_ROUTES = [
 VIEWER_ROUTES = [
     ("GET", r"/api/(groups|catalog)"),
     ("GET", r"/api/groups/[0-9a-f]{8}/(history|plan)"),
-    ("GET", r"/api/node/[\w.-]+/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)"),
+    ("GET", r"/api/node/[\w.-]+/(state|counters|live|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)"),
     ("GET", r"/api/node/[\w.-]+/(logs|catalog)/[\w.-]+"),
     ("GET", r"/api/node/[\w.-]+/slot/[\w.-]+/progress"),
 ]
@@ -4713,7 +4713,7 @@ class Handler(BaseHTTPRequestHandler):
             if code == 200 and not m.group(2) and not self.is_admin and isinstance(out, dict):
                 out = {**out, "jobs": [j for j in out.get("jobs") or [] if isinstance(j, dict) and j.get("by") == self.user]}
             return self._json(code, out)
-        m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters)", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(state|counters|live)", path)
         if m:
             return self._json(*call_node(m.group(1), "/" + m.group(2)))
         m = re.fullmatch(r"/api/node/([\w.-]+)/(logs|catalog)/([\w.-]+)", path)

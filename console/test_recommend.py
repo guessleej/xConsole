@@ -249,6 +249,16 @@ def main():
     pl = lib["gguf"][0]["plan"]
     case("已安裝：附 plan、機械硬碟的載入估計、實測載入秒數",
          (pl["level"], pl["load_est_sec"], pl["load_sec"], pl["guess"]), ("smooth", R.load_seconds(17.4, True), 41, False))
+    byc = lib["gguf"][0]["plan_by_ctx"]
+    case("已安裝：執行頁每個上下文選項都先算好，KV 跟著長度變",
+         (sorted(byc, key=int), byc["8192"]["ctx"], byc["131072"]["kv_gib"] > byc["8192"]["kv_gib"]),
+         (["8192", "16384", "32768", "65536", "131072"], 8192, True))
+    tight = {"gguf": [{"id": "f/m-Q4_K_M", "quant": "Q4_K_M", "size_gib": 88.0, "mmproj_gib": 0, **{**DENSE, "ctx_train": 65536}}]}
+    R.plan_installed(AI395, tight)
+    tb = tight["gguf"][0]["plan_by_ctx"]
+    case("已安裝：超過模型訓練長度的選項不算；同一顆在小機器上8K放得下、64K就放不進最快那一層",
+         ("131072" in tb, tb["8192"]["level"] in ("smooth", "ok"), tb["65536"]["level"] in ("smooth", "ok")),
+         (False, True, False))
 
     # ---- 管理者送來的欄位
     case("中國來源也能加入推薦清單（照列、畫面標示）", R.check_fields({"repo": "unsloth/Qwen3-8B-GGUF", "title": "x"})[1], None)

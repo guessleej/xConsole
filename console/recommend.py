@@ -169,6 +169,7 @@ def speed_params(cap):
     return EFFICIENCY, LAYER_MS, False
 
 
+RUN_CTX = (8192, 16384, 32768, 65536, 131072)     # 執行頁的上下文選項，跟 pages.js 的 RUN_CTX_OPTS 一致
 CTX_STEPS = (32768, 16384, 8192)    # 跟 LocModel 一樣：放不下先把上下文縮到 16K、8K，再考慮放硬碟
 
 
@@ -444,6 +445,14 @@ def plan_installed(state, lib):
                        m.get("mmproj_gib") or 0.0, lib.get("hdd"), False)
         m["plan"] = {k: p[k] for k in PLAN_KEYS} | {"load_sec": m.get("load_sec"), "calibrated": p.get("calibrated"), "fit": p.get("fit"),
                                                    "tiered": p.get("tiered")}
+        # 執行頁換上下文長度要馬上看到放不放得下：每個選項先算好，畫面切換時不必再問一次
+        q = {"stem": stem, "quant": m.get("quant"), "size_gib": m["size_gib"]}
+        m["plan_by_ctx"] = {}
+        for ctx in RUN_CTX:
+            if m.get("ctx_train") and ctx > m["ctx_train"]:
+                continue
+            pc = _plan_quant(cap, m, q, m.get("mmproj_gib") or 0.0, lib.get("hdd"), False, ctx)
+            m["plan_by_ctx"][str(ctx)] = {k: pc[k] for k in PLAN_KEYS} | {"tiered": pc.get("tiered")}
         if m.get("measured_tok_s"):
             # 這顆在這台實際跑過：直接用實測值，不用估的
             m["plan"].update(tok_s=round(m["measured_tok_s"], 1), measured=True)
