@@ -60,6 +60,8 @@ jobs:
         run: python agent/test_peer.py
       - name: 工作站准入
         run: python agent/test_userfirst.py
+      - name: 筆電（電池與計費網路）
+        run: python agent/test_laptop.py
       - name: 內部鏡像與下載限速
         run: python console/test_mirror.py
       - name: 推理引擎一次編譯分發

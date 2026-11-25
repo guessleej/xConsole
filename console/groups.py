@@ -18,7 +18,7 @@ NAME_RX = re.compile(r"[^\x00-\x1f<>\"'`\\]{1,30}")
 MODEL_RX = re.compile(r"[A-Za-z0-9][\w./:+-]{0,159}")
 HISTORY_MAX = 20
 FIELD_NAMES = ("models", "allowed_models", "profile", "reserve_user_gib", "gpu_power_limit", "storage_root",
-               "sources", "locked", "apply_at", "rate_limit", "overrides", "user_first")
+               "sources", "locked", "apply_at", "rate_limit", "overrides", "user_first", "laptop_care")
 USER_FIRST = ("unload", "keep")                      # 使用者的程式把記憶體吃光時：先卸載模型（工作站預設）、或不動
 HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
@@ -26,7 +26,7 @@ HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 def defaults():
     return {"models": [], "profile": {}, "locked": [], "reserve_user_gib": None, "storage_root": "",
             "sources": ["huggingface"], "allowed_models": [], "apply_at": {"mode": "now"}, "gpu_power_limit": None,
-            "rate_limit": None, "overrides": {}, "user_first": "unload"}
+            "rate_limit": None, "overrides": {}, "user_first": "unload", "laptop_care": True}
 
 
 def _num(v, lo, hi, name, integer=False):
@@ -118,6 +118,10 @@ def check(s):
     if uf not in USER_FIRST:
         raise ValueError("使用者優先要選「先卸載模型」或「不動」")
     out["user_first"] = uf
+    lc = s.get("laptop_care", True)
+    if not isinstance(lc, bool):
+        raise ValueError("筆電省電要是開或關")
+    out["laptop_care"] = lc
     ov = s.get("overrides") or {}
     if not isinstance(ov, dict) or len(ov) > 32:
         raise ValueError("依機型覆寫最多 32 種機型")
