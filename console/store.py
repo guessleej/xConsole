@@ -92,6 +92,11 @@ class Store:
           id TEXT PRIMARY KEY, node TEXT, kind TEXT, opts TEXT, state TEXT, created REAL, by TEXT,
           tried REAL, error TEXT, done REAL, result TEXT, closed_by TEXT);
         CREATE INDEX IF NOT EXISTS safety_node ON safety_cmds(node, state);
+        CREATE TABLE IF NOT EXISTS comfy_workflows(
+          id TEXT PRIMARY KEY, name TEXT, kind TEXT, created REAL, updated REAL, by TEXT, body TEXT);
+        CREATE TABLE IF NOT EXISTS comfy_jobs(
+          id TEXT PRIMARY KEY, user TEXT, wf TEXT, kind TEXT, state TEXT, created REAL, updated REAL, body TEXT);
+        CREATE INDEX IF NOT EXISTS comfy_jobs_user ON comfy_jobs(user, created);
         """)
         # 舊版資料庫補欄位：對話的收藏（明文0／1）與分類標籤（使用者寫的字，跟標題一樣加密）
         have = {r[1] for r in self.db.execute("PRAGMA table_info(chats)")}
@@ -453,6 +458,61 @@ class Store:
     def agent_task_delete(self, tid, user):
         with self.lock:
             return self.db.execute("DELETE FROM agent_tasks WHERE id=? AND user=?", (tid, user)).rowcount > 0
+
+    # ---- ComfyUI：管理者匯入的工作流（API格式，不是使用者內容，明文）與產出紀錄（提示詞是使用者內容，body收enc:v1:密文）
+    WF_COLS = ("id", "name", "kind", "created", "updated", "by", "body")
+    JOB_COLS = ("id", "user", "wf", "kind", "state", "created", "updated", "body")
+
+    def comfy_wf_list(self, with_body=False):
+        cols = self.WF_COLS if with_body else self.WF_COLS[:-1]
+        with self.lock:
+            rows = self.db.execute("SELECT " + ",".join(cols) + " FROM comfy_workflows ORDER BY created").fetchall()
+        return [dict(zip(cols, r)) for r in rows]
+
+    def comfy_wf_get(self, wid):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.WF_COLS) + " FROM comfy_workflows WHERE id=?", (wid,)).fetchone()
+        return dict(zip(self.WF_COLS, r)) if r else None
+
+    def comfy_wf_put(self, row):
+        now = time.time()
+        with self.lock:
+            cur = self.db.execute("SELECT created FROM comfy_workflows WHERE id=?", (row["id"],)).fetchone()
+            self.db.execute("INSERT OR REPLACE INTO comfy_workflows(id,name,kind,created,updated,by,body) VALUES(?,?,?,?,?,?,?)",
+                            (row["id"], row["name"], row["kind"], cur[0] if cur else now, now, row.get("by") or "", row["body"]))
+
+    def comfy_wf_meta(self, wid, name, kind):
+        with self.lock:
+            return self.db.execute("UPDATE comfy_workflows SET name=?, kind=?, updated=? WHERE id=?",
+                                   (name, kind, time.time(), wid)).rowcount > 0
+
+    def comfy_wf_delete(self, wid):
+        with self.lock:
+            return self.db.execute("DELETE FROM comfy_workflows WHERE id=?", (wid,)).rowcount > 0
+
+    def comfy_job_put(self, row):
+        if not str(row.get("body") or "").startswith("enc:v1:"):
+            raise ValueError("產出紀錄沒有加密，拒絕寫入")
+        with self.lock:
+            cur = self.db.execute("SELECT created FROM comfy_jobs WHERE id=?", (row["id"],)).fetchone()
+            self.db.execute("INSERT OR REPLACE INTO comfy_jobs(id,user,wf,kind,state,created,updated,body) VALUES(?,?,?,?,?,?,?,?)",
+                            (row["id"], row["user"], row["wf"], row["kind"], row["state"], cur[0] if cur else row["created"],
+                             time.time(), row["body"]))
+
+    def comfy_job_rows(self, user=None):
+        q = "SELECT " + ",".join(self.JOB_COLS) + " FROM comfy_jobs" + (" WHERE user=?" if user is not None else "") + " ORDER BY created DESC"
+        with self.lock:
+            rows = self.db.execute(q, (user,) if user is not None else ()).fetchall()
+        return [dict(zip(self.JOB_COLS, r)) for r in rows]
+
+    def comfy_job_get(self, jid):
+        with self.lock:
+            r = self.db.execute("SELECT " + ",".join(self.JOB_COLS) + " FROM comfy_jobs WHERE id=?", (jid,)).fetchone()
+        return dict(zip(self.JOB_COLS, r)) if r else None
+
+    def comfy_job_delete(self, jid):
+        with self.lock:
+            return self.db.execute("DELETE FROM comfy_jobs WHERE id=?", (jid,)).rowcount > 0
 
     # ---- Agent 資料夾的擁有者（資料夾本身在代理那台；這裡只記是誰建的）
     def folder_owner(self, node, folder):

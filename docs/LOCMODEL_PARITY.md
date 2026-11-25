@@ -75,6 +75,15 @@
 | 44 | 載入中看得到記錄 | 載入進度卡顯示llama-server最後一行記錄（像金鑰的值遮掉）；執行頁加可展開的執行日誌，只接新增的行 | 完成（PR #84） |
 | 45 | 執行頁偵測引擎未安裝 | 沒有llama.cpp時直接顯示「先安裝推理引擎」與一鍵安裝、匯入安裝包（zip），不用等按啟動才出錯 | 完成（PR #84） |
 
+## 七、串接ComfyUI（第五批，2026-11-25在HP上實查LocModel 3.6.2後補）
+
+| # | 項目 | xConsole要做到 | 狀態 |
+|---|---|---|---|
+| 46 | 連線 | 自動找本機與納管機器上的ComfyUI（8188、8000、8189），找不到就填網址；用 `/system_stats` 驗證對方真的是ComfyUI並顯示版本；回HTML、404、401、轉址各講人話；ComfyUI可以在別台，金鑰加密、只走Authorization標頭，https驗證憑證並可匯入對方CA | 完成 |
+| 47 | ComfyUI資料夾 | 根目錄或models資料夾都收，列出diffusion_models、unet、checkpoints、text_encoders、clip、vae、loras裡的模型；畫面寫明這些檔案歸ComfyUI管、xConsole不刪 | 完成 |
+| 48 | 匯入工作流 | 收ComfyUI存的 .json與「匯出（API）」；一般格式讀 `/object_info` 轉API格式，含子圖（巢狀）、動態選單、動態群組、略過與靜音的節點；缺節點列名稱並提示ComfyUI Manager「安裝缺失節點」後重啟；缺模型講要放進哪個models子資料夾（指定了資料夾就寫完整路徑）；可命名、分圖片或影片、刪除 | 完成；ComfyUI官方範本與前端「匯出（API）」比對，圖片、影片、聲音範本317個中280個完全一致 |
+| 49 | 產生 | 上傳輸入圖片（`/upload/image`）、送 `/prompt`、WebSocket追進度（排隊、哪個節點、第幾步），WebSocket不通改輪詢 `/history`；取回 `/view` 的產出；沒有輸出節點講清楚；可取消；錯誤指出是哪個節點；提示詞、尺寸、步數、種子在網頁上填 | 完成（真的ComfyUI 0.46.0端到端：圖片、MP4、上傳、取消） |
+
 ## 五、交付
 
 - 三批各一個PR，CI全綠才合。

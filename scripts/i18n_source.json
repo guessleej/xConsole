@@ -9116,6 +9116,10 @@
 "pattern": false
 },
 {
+"zh": "選這台的ComfyUI資料夾（根目錄或models）",
+"pattern": false
+},
+{
 "zh": "選這台放著模型檔的資料夾",
 "pattern": false
 },
@@ -9441,6 +9445,10 @@
 },
 {
 "zh": "生成影片",
+"pattern": false
+},
+{
+"zh": "內建引擎",
 "pattern": false
 },
 {
@@ -10664,6 +10672,466 @@
 "pattern": false
 },
 {
+"zh": "1 連線與資料夾",
+"pattern": false
+},
+{
+"zh": "2 工作流（{0}）",
+"pattern": true
+},
+{
+"zh": "2 工作流",
+"pattern": false
+},
+{
+"zh": "3 產生",
+"pattern": false
+},
+{
+"zh": "還沒串接ComfyUI",
+"pattern": false
+},
+{
+"zh": "連上ComfyUI",
+"pattern": false
+},
+{
+"zh": "填ComfyUI的網址（或讓系統找本機的），存起來會先驗證對方真的是ComfyUI",
+"pattern": false
+},
+{
+"zh": "去設定",
+"pattern": false
+},
+{
+"zh": "指定ComfyUI資料夾",
+"pattern": false
+},
+{
+"zh": "選了才看得到它有哪些模型，缺模型時也會講清楚要放進哪個資料夾",
+"pattern": false
+},
+{
+"zh": "去指定",
+"pattern": false
+},
+{
+"zh": "匯入工作流",
+"pattern": false
+},
+{
+"zh": "在ComfyUI存好的工作流（.json）匯進來，系統會檢查缺哪些節點與模型",
+"pattern": false
+},
+{
+"zh": "去匯入",
+"pattern": false
+},
+{
+"zh": "產生{0}",
+"pattern": true
+},
+{
+"zh": "挑一個工作流、寫提示詞、按產生；進度與結果在右邊",
+"pattern": false
+},
+{
+"zh": "去產生",
+"pattern": false
+},
+{
+"zh": "ComfyUI可以在這台，也可以在別台；在別台要用 --listen 啟動",
+"pattern": false
+},
+{
+"zh": "例：http://127.0.0.1:8188",
+"pattern": false
+},
+{
+"zh": "已設定；空白＝保留原金鑰",
+"pattern": false
+},
+{
+"zh": "選填：ComfyUI前面有反向代理或登入外掛才需要",
+"pattern": false
+},
+{
+"zh": " 清掉已存的金鑰",
+"pattern": false
+},
+{
+"zh": "-----BEGIN CERTIFICATE-----\n（選填）對方是https且用自建CA或自簽憑證時，貼上對方的CA憑證",
+"pattern": false
+},
+{
+"zh": "對方的CA憑證",
+"pattern": false
+},
+{
+"zh": "已匯入一張；貼新的會換掉，空白＝保留",
+"pattern": false
+},
+{
+"zh": "不提供關閉憑證驗證的選項：匯入對方的CA才是正確做法",
+"pattern": false
+},
+{
+"zh": "找本機的ComfyUI",
+"pattern": false
+},
+{
+"zh": "找找看 8188、8000、8189 這幾個埠，以及納管的每台機器…",
+"pattern": false
+},
+{
+"zh": "沒找到正在執行的ComfyUI。請確認它有啟動；在別台的話要加 --listen，然後把網址填在上面。",
+"pattern": false
+},
+{
+"zh": "用這個：{0}{1}",
+"pattern": true
+},
+{
+"zh": "用這個",
+"pattern": false
+},
+{
+"zh": "儲存並測試",
+"pattern": false
+},
+{
+"zh": "重新測試",
+"pattern": false
+},
+{
+"zh": "中斷串接",
+"pattern": false
+},
+{
+"zh": "（沒有回報版本）",
+"pattern": false
+},
+{
+"zh": "連上了：ComfyUI {0}{1}",
+"pattern": true
+},
+{
+"zh": "連上了：ComfyUI",
+"pattern": false
+},
+{
+"zh": "沒連上：{0}",
+"pattern": true
+},
+{
+"zh": "沒連上",
+"pattern": false
+},
+{
+"zh": "已連上 ComfyUI {0}",
+"pattern": true
+},
+{
+"zh": "已連上 ComfyUI",
+"pattern": false
+},
+{
+"zh": "中斷ComfyUI串接",
+"pattern": false
+},
+{
+"zh": "清掉網址、金鑰與CA憑證；匯入的工作流與已產出的圖片、影片都留著，之後重新連上就能再用。",
+"pattern": false
+},
+{
+"zh": "網址",
+"pattern": false
+},
+{
+"zh": "ComfyUI預設是 8188 埠；ComfyUI桌面版是 8000。網際網路上的ComfyUI一律用https",
+"pattern": false
+},
+{
+"zh": "只放在 Authorization 標頭送出，不會出現在網址；存的時候加密",
+"pattern": false
+},
+{
+"zh": "ComfyUI資料夾",
+"pattern": false
+},
+{
+"zh": "選填：選了才列得出它有哪些模型，缺模型時講得出要放哪",
+"pattern": false
+},
+{
+"zh": "還沒指定",
+"pattern": false
+},
+{
+"zh": "換一個資料夾",
+"pattern": false
+},
+{
+"zh": "選資料夾",
+"pattern": false
+},
+{
+"zh": "重新掃描",
+"pattern": false
+},
+{
+"zh": "（太多了，只列前 2000 個）",
+"pattern": false
+},
+{
+"zh": "{0}：共 {1} 個模型檔{2}。這些檔案歸ComfyUI管，xConsole只讀清單，不會刪除或搬動；要刪請在ComfyUI或檔案總管裡刪。",
+"pattern": true
+},
+{
+"zh": "這些檔案歸ComfyUI管，xConsole只讀清單，不會刪除或搬動；要刪請在ComfyUI或檔案總管裡刪",
+"pattern": false
+},
+{
+"zh": "沒有模型檔",
+"pattern": false
+},
+{
+"zh": "已指定ComfyUI資料夾",
+"pattern": false
+},
+{
+"zh": "已改成不指定",
+"pattern": false
+},
+{
+"zh": "沒有連得上的機器：ComfyUI資料夾要在納管的機器上（代理會幫忙列出模型）。",
+"pattern": false
+},
+{
+"zh": "在哪台機器",
+"pattern": false
+},
+{
+"zh": "ComfyUI跟xConsole在同一台就選這台",
+"pattern": false
+},
+{
+"zh": "ComfyUI存的 .json 或「匯出（API）」的 .json 都可以",
+"pattern": false
+},
+{
+"zh": "要先連上ComfyUI才能匯入：系統要讀ComfyUI的節點定義，才看得懂工作流、檢查缺什麼。",
+"pattern": false
+},
+{
+"zh": "選 .json 檔",
+"pattern": false
+},
+{
+"zh": "還沒選檔案",
+"pattern": false
+},
+{
+"zh": "例：Z-Image 文生圖",
+"pattern": false
+},
+{
+"zh": "自動判斷（看輸出節點）",
+"pattern": false
+},
+{
+"zh": "工作流檔最大 5 MB",
+"pattern": false
+},
+{
+"zh": "先選一個 .json 檔",
+"pattern": false
+},
+{
+"zh": "沒有匯入",
+"pattern": false
+},
+{
+"zh": "已匯入「{0}」（{1}）",
+"pattern": true
+},
+{
+"zh": "已匯入「",
+"pattern": false
+},
+{
+"zh": "影片＝輸出節點是儲存影片這類",
+"pattern": false
+},
+{
+"zh": "匯入了，但還不能產生",
+"pattern": false
+},
+{
+"zh": "缺節點時：在ComfyUI打開這個工作流，用ComfyUI Manager的「安裝缺失節點」裝好、重啟ComfyUI，再回來匯入。",
+"pattern": false
+},
+{
+"zh": "已匯入的工作流",
+"pattern": false
+},
+{
+"zh": "還沒有。",
+"pattern": false
+},
+{
+"zh": "<thead><tr><th>名稱</th><th>分類</th><th>可調整的欄位</th><th>狀態</th><th></th></tr></thead>",
+"pattern": false
+},
+{
+"zh": "可調整的欄位",
+"pattern": false
+},
+{
+"zh": "已改分類",
+"pattern": false
+},
+{
+"zh": "沒有（照原樣跑）",
+"pattern": false
+},
+{
+"zh": "{0} 個問題",
+"pattern": true
+},
+{
+"zh": "個問題",
+"pattern": false
+},
+{
+"zh": "改名",
+"pattern": false
+},
+{
+"zh": "工作流改名",
+"pattern": false
+},
+{
+"zh": "刪除「{0}」",
+"pattern": true
+},
+{
+"zh": "刪除「",
+"pattern": false
+},
+{
+"zh": "只刪xConsole裡的這份工作流；ComfyUI那邊的檔案與已經產出的圖片、影片都不動。",
+"pattern": false
+},
+{
+"zh": "用ComfyUI的工作流",
+"pattern": false
+},
+{
+"zh": "還沒串接ComfyUI。",
+"pattern": false
+},
+{
+"zh": "還沒有{0}類的工作流。",
+"pattern": true
+},
+{
+"zh": "還沒有",
+"pattern": false
+},
+{
+"zh": "類的工作流",
+"pattern": false
+},
+{
+"zh": "ComfyUI連不上：{0}",
+"pattern": true
+},
+{
+"zh": "ComfyUI連不上",
+"pattern": false
+},
+{
+"zh": "去設定連線",
+"pattern": false
+},
+{
+"zh": "去匯入工作流",
+"pattern": false
+},
+{
+"zh": "請找管理員設定。",
+"pattern": false
+},
+{
+"zh": "（有問題）",
+"pattern": false
+},
+{
+"zh": "工作流",
+"pattern": false
+},
+{
+"zh": "不要出現的內容（選填）",
+"pattern": false
+},
+{
+"zh": "想要的畫面",
+"pattern": false
+},
+{
+"zh": "只收 PNG、JPEG、WebP",
+"pattern": false
+},
+{
+"zh": "這個工作流一定要先選一張圖",
+"pattern": false
+},
+{
+"zh": "不選就用工作流裡原本那張",
+"pattern": false
+},
+{
+"zh": "這個工作流沒有可以在這裡調整的欄位，會照ComfyUI裡存的設定跑。",
+"pattern": false
+},
+{
+"zh": "前面還有 {0} 件排隊・",
+"pattern": true
+},
+{
+"zh": "前面還有",
+"pattern": false
+},
+{
+"zh": "件排隊",
+"pattern": false
+},
+{
+"zh": "已經 {0} 秒",
+"pattern": true
+},
+{
+"zh": "・這台ComfyUI沒有即時進度，跑完會自動顯示",
+"pattern": false
+},
+{
+"zh": "中斷了",
+"pattern": false
+},
+{
+"zh": "第 {0} 個",
+"pattern": true
+},
+{
+"zh": "已帶入這件的設定（輸入圖片要重新選）",
+"pattern": false
+},
+{
+"zh": "這個工作流已經被刪掉了",
+"pattern": false
+},
+{
 "zh": "xConsole 模型主控台｜云碩科技",
 "pattern": false
 },
@@ -11200,6 +11668,10 @@
 "pattern": false
 },
 {
+"zh": "還沒設定ComfyUI的網址，請管理員到「畫圖 › ComfyUI › 連線與資料夾」設定",
+"pattern": false
+},
+{
 "zh": "你的帳號限定群組，請勾選要用的模型，不能選全部",
 "pattern": false
 },
@@ -11653,6 +12125,50 @@
 },
 {
 "zh": "金鑰格式不對（不能有空白，最多 512 字）",
+"pattern": false
+},
+{
+"zh": "ComfyUI回的節點定義格式不對",
+"pattern": false
+},
+{
+"zh": "名稱要 1～60 個字，不能有 < > 或控制字元",
+"pattern": false
+},
+{
+"zh": "分類只能是圖片或影片",
+"pattern": false
+},
+{
+"zh": "工作流最多 {0} 個，請先刪掉不用的",
+"pattern": true
+},
+{
+"zh": "工作流最多",
+"pattern": false
+},
+{
+"zh": "個，請先刪掉不用的",
+"pattern": false
+},
+{
+"zh": "這件的紀錄讀不回來",
+"pattern": false
+},
+{
+"zh": "沒有這個工作流，可能被管理員刪掉了；請重新整理",
+"pattern": false
+},
+{
+"zh": "同時最多 {0} 件在跑，等前面的跑完再送",
+"pattern": true
+},
+{
+"zh": "同時最多",
+"pattern": false
+},
+{
+"zh": "件在跑，等前面的跑完再送",
 "pattern": false
 },
 {
@@ -12128,6 +12644,50 @@
 "pattern": false
 },
 {
+"zh": "工作流最多 ",
+"pattern": false
+},
+{
+"zh": " 個，請先刪掉不用的",
+"pattern": false
+},
+{
+"zh": "{0}存的設定值對不上這台ComfyUI的節點定義（節點版本不同，或這個節點的欄位是ComfyUI畫面自己產生的），照順序對下去會填錯欄位。請在ComfyUI用「匯出（API）」存一份再匯入",
+"pattern": true
+},
+{
+"zh": "存的設定值對不上這台ComfyUI的節點定義（節點版本不同，或這個節點的欄位是ComfyUI畫面自己產生的），照順序對下去會填錯欄位。請在ComfyUI用「匯出（API）」存一份再匯入",
+"pattern": false
+},
+{
+"zh": "同時最多 ",
+"pattern": false
+},
+{
+"zh": " 件在跑，等前面的跑完再送",
+"pattern": false
+},
+{
+"zh": "「{0}」只收PNG、JPEG、WebP圖片",
+"pattern": true
+},
+{
+"zh": "」只收PNG、JPEG、WebP圖片",
+"pattern": false
+},
+{
+"zh": "「{0}」最大 4 MB",
+"pattern": true
+},
+{
+"zh": "」最大 4 MB",
+"pattern": false
+},
+{
+"zh": "主控台重新啟動，這件沒追完；ComfyUI那邊可能已經產好，可以到ComfyUI的output資料夾找",
+"pattern": false
+},
+{
 "zh": "自動匯入",
 "pattern": false
 },
@@ -12500,6 +13060,14 @@
 "pattern": false
 },
 {
+"zh": "要先連上ComfyUI才能匯入（讀節點定義）：",
+"pattern": false
+},
+{
+"zh": "CA 憑證讀不出來：",
+"pattern": false
+},
+{
 "zh": "舊共用金鑰（{0}）",
 "pattern": true
 },
@@ -12644,7 +13212,15 @@
 "pattern": false
 },
 {
+"zh": "還沒指定ComfyUI資料夾",
+"pattern": false
+},
+{
 "zh": "沒有這件產出",
+"pattern": false
+},
+{
+"zh": "這個檔案不見了",
 "pattern": false
 },
 {
@@ -12733,6 +13309,14 @@
 },
 {
 "zh": "只走加密入口：模型只聽這台自己，不測直連",
+"pattern": false
+},
+{
+"zh": "這台的代理版本太舊，不認得ComfyUI資料夾；請先更新代理",
+"pattern": false
+},
+{
+"zh": "沒有這個工作流",
 "pattern": false
 },
 {
@@ -12868,10 +13452,6 @@
 "pattern": false
 },
 {
-"zh": "CA 憑證讀不出來：",
-"pattern": false
-},
-{
 "zh": "舊共用金鑰（",
 "pattern": false
 },
@@ -12977,6 +13557,18 @@
 },
 {
 "zh": "加密入口會分不出要送哪一格，請換一個名稱",
+"pattern": false
+},
+{
+"zh": "名稱要 1～60 個字，分類只能是圖片或影片",
+"pattern": false
+},
+{
+"zh": "這件已經結束了",
+"pattern": false
+},
+{
+"zh": "這件還在跑，先取消再刪",
 "pattern": false
 },
 {
@@ -13465,6 +14057,482 @@
 },
 {
 "zh": "），讀不了",
+"pattern": false
+},
+{
+"zh": "寬",
+"pattern": false
+},
+{
+"zh": "高",
+"pattern": false
+},
+{
+"zh": "長度（影格數）",
+"pattern": false
+},
+{
+"zh": "秒數",
+"pattern": false
+},
+{
+"zh": "ComfyUI回報這件失敗，沒有說明",
+"pattern": false
+},
+{
+"zh": "沒有說明",
+"pattern": false
+},
+{
+"zh": "這不是ComfyUI的工作流檔（找不到節點）",
+"pattern": false
+},
+{
+"zh": "ComfyUI資料夾裡的 models/",
+"pattern": false
+},
+{
+"zh": "ComfyUI說跑完了，但歷史紀錄裡找不到這件",
+"pattern": false
+},
+{
+"zh": "網址要填，例：http://127.0.0.1:8188",
+"pattern": false
+},
+{
+"zh": "網址只收 http(s)://主機:埠/路徑（不能帶帳密、查詢字串）",
+"pattern": false
+},
+{
+"zh": "對方有回JSON，但格式不像ComfyUI的 /system_stats；這個網址可能不是ComfyUI",
+"pattern": false
+},
+{
+"zh": "工作流檔最大 8 MB",
+"pattern": false
+},
+{
+"zh": "這不是ComfyUI的工作流檔",
+"pattern": false
+},
+{
+"zh": "節點太多（最多 {0} 個）",
+"pattern": true
+},
+{
+"zh": "節點太多（最多",
+"pattern": false
+},
+{
+"zh": "這個工作流沒有輸出節點（例如「儲存圖片」Save Image、「儲存影片」Save Video），跑完不會留下檔案；請在ComfyUI加一個再匯入",
+"pattern": false
+},
+{
+"zh": "節點 #{0}（{1}）要用的 {2} 不在ComfyUI裡：請放進 {3}，然後重新整理或重啟ComfyUI",
+"pattern": true
+},
+{
+"zh": "節點 #",
+"pattern": false
+},
+{
+"zh": "要用的",
+"pattern": false
+},
+{
+"zh": "不在ComfyUI裡：請放進",
+"pattern": false
+},
+{
+"zh": "然後重新整理或重啟ComfyUI",
+"pattern": false
+},
+{
+"zh": "節點 #{0}（{1}）的 {2} 填的是 {3}，ComfyUI沒有這個選項（可選：{4}）",
+"pattern": true
+},
+{
+"zh": "填的是",
+"pattern": false
+},
+{
+"zh": "ComfyUI沒有這個選項（可選",
+"pattern": false
+},
+{
+"zh": "上傳輸入圖片到ComfyUI失敗（HTTP {0}）",
+"pattern": true
+},
+{
+"zh": "上傳輸入圖片到ComfyUI失敗（HTTP",
+"pattern": false
+},
+{
+"zh": "節點 #{0}（{1}）出錯：{2}",
+"pattern": true
+},
+{
+"zh": "出錯",
+"pattern": false
+},
+{
+"zh": "http（不加密）只准連區網私有位址或本機；網際網路上的ComfyUI請用https",
+"pattern": false
+},
+{
+"zh": "http只准連區網私有位址或本機，這個網址現在解析到外部位址，已拒絕",
+"pattern": false
+},
+{
+"zh": "{0} 的憑證驗證不過（{1}）。自建CA的ComfyUI請在連線設定匯入對方的CA憑證",
+"pattern": true
+},
+{
+"zh": "自建CA的ComfyUI請在連線設定匯入對方的CA憑證",
+"pattern": false
+},
+{
+"zh": "連不到 {0}：對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen",
+"pattern": true
+},
+{
+"zh": "對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen",
+"pattern": false
+},
+{
+"zh": "連 {0} 逾時：確認位址、防火牆，以及ComfyUI有沒有卡住",
+"pattern": true
+},
+{
+"zh": "連",
+"pattern": false
+},
+{
+"zh": "逾時：確認位址、防火牆，以及ComfyUI有沒有卡住",
+"pattern": false
+},
+{
+"zh": "ComfyUI回 {0}：需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來）",
+"pattern": true
+},
+{
+"zh": "ComfyUI回",
+"pattern": false
+},
+{
+"zh": "需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來",
+"pattern": false
+},
+{
+"zh": "這個網址沒有 {0}：不是ComfyUI，或網址的路徑不對",
+"pattern": true
+},
+{
+"zh": "這個網址沒有",
+"pattern": false
+},
+{
+"zh": "不是ComfyUI，或網址的路徑不對",
+"pattern": false
+},
+{
+"zh": "ComfyUI回 {0}：{1}",
+"pattern": true
+},
+{
+"zh": "ComfyUI沒有接受WebSocket連線（{0}）",
+"pattern": true
+},
+{
+"zh": "ComfyUI沒有接受WebSocket連線",
+"pattern": false
+},
+{
+"zh": "ComfyUI送來的WebSocket訊框太大",
+"pattern": false
+},
+{
+"zh": "節點 #{0}（{1}）{2}",
+"pattern": true
+},
+{
+"zh": "讀不出這個檔：不是JSON",
+"pattern": false
+},
+{
+"zh": "這個工作流用了舊式的群組節點（Group Node）；請在ComfyUI按「匯出（API）」存一份再匯入",
+"pattern": false
+},
+{
+"zh": "節點太多（最多 ",
+"pattern": false
+},
+{
+"zh": " 個）",
+"pattern": false
+},
+{
+"zh": "工作流裡有節點編號或類型格式不對",
+"pattern": false
+},
+{
+"zh": "節點 #{0}{1}（{2}）",
+"pattern": true
+},
+{
+"zh": "。請在ComfyUI打開這個工作流，用ComfyUI Manager的「安裝缺失節點」（Install Missing Custom Nodes）裝好，重啟ComfyUI後再試",
+"pattern": false
+},
+{
+"zh": "）要用的 ",
+"pattern": false
+},
+{
+"zh": " 不在ComfyUI裡：請放進 ",
+"pattern": false
+},
+{
+"zh": "，然後重新整理或重啟ComfyUI",
+"pattern": false
+},
+{
+"zh": "）的 ",
+"pattern": false
+},
+{
+"zh": " 填的是 ",
+"pattern": false
+},
+{
+"zh": "，ComfyUI沒有這個選項（可選：",
+"pattern": false
+},
+{
+"zh": "上傳輸入圖片到ComfyUI失敗（HTTP ",
+"pattern": false
+},
+{
+"zh": "取回產出",
+"pattern": false
+},
+{
+"zh": "ComfyUI跑完了，但沒有可以取回的圖片或影片：工作流的輸出節點可能只存到別處，或產出的不是圖片、影片、聲音",
+"pattern": false
+},
+{
+"zh": "超過 6 小時還沒跑完，已請ComfyUI停下",
+"pattern": false
+},
+{
+"zh": "已請ComfyUI停下，但過了 {0} 分鐘它還在跑這件；請到ComfyUI確認",
+"pattern": true
+},
+{
+"zh": "已請ComfyUI停下，但過了",
+"pattern": false
+},
+{
+"zh": "分鐘它還在跑這件；請到ComfyUI確認",
+"pattern": false
+},
+{
+"zh": "）出錯：",
+"pattern": false
+},
+{
+"zh": "）。自建CA的ComfyUI請在連線設定匯入對方的CA憑證",
+"pattern": false
+},
+{
+"zh": "：對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen",
+"pattern": false
+},
+{
+"zh": "連 ",
+"pattern": false
+},
+{
+"zh": " 逾時：確認位址、防火牆，以及ComfyUI有沒有卡住",
+"pattern": false
+},
+{
+"zh": "{0} 回 {1} 轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址",
+"pattern": true
+},
+{
+"zh": "轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址",
+"pattern": false
+},
+{
+"zh": "ComfyUI回的內容太大",
+"pattern": false
+},
+{
+"zh": "ComfyUI回 ",
+"pattern": false
+},
+{
+"zh": "：需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來）",
+"pattern": false
+},
+{
+"zh": "這個網址沒有 ",
+"pattern": false
+},
+{
+"zh": "：不是ComfyUI，或網址的路徑不對",
+"pattern": false
+},
+{
+"zh": "ComfyUI沒有接受WebSocket連線（",
+"pattern": false
+},
+{
+"zh": "子圖展開後節點太多（最多 {0} 個）",
+"pattern": true
+},
+{
+"zh": "子圖展開後節點太多（最多",
+"pattern": false
+},
+{
+"zh": "ComfyUI少了這些節點：",
+"pattern": false
+},
+{
+"zh": "「{0}」最多 20000 字，不能有控制字元",
+"pattern": true
+},
+{
+"zh": "」最多 20000 字，不能有控制字元",
+"pattern": false
+},
+{
+"zh": "上傳輸入圖片",
+"pattern": false
+},
+{
+"zh": "ComfyUI回的工作編號格式不對",
+"pattern": false
+},
+{
+"zh": "處理時出錯：{0}",
+"pattern": true
+},
+{
+"zh": "處理時出錯",
+"pattern": false
+},
+{
+"zh": "取消中：ComfyUI要等正在跑的這個節點做完才會停",
+"pattern": false
+},
+{
+"zh": "已請ComfyUI停下，但過了 ",
+"pattern": false
+},
+{
+"zh": " 分鐘它還在跑這件；請到ComfyUI確認",
+"pattern": false
+},
+{
+"zh": " 轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址",
+"pattern": false
+},
+{
+"zh": "對方回的不是JSON（HTTP {0}），這個網址可能不是ComfyUI，例如登入頁或別的網站",
+"pattern": true
+},
+{
+"zh": "對方回的不是JSON（HTTP",
+"pattern": false
+},
+{
+"zh": "這個網址可能不是ComfyUI，例如登入頁或別的網站",
+"pattern": false
+},
+{
+"zh": "子圖展開後節點太多（最多 ",
+"pattern": false
+},
+{
+"zh": "對應的子資料夾",
+"pattern": false
+},
+{
+"zh": "「{0}」要先選一張圖",
+"pattern": true
+},
+{
+"zh": "」要先選一張圖",
+"pattern": false
+},
+{
+"zh": "「{0}」要是數字",
+"pattern": true
+},
+{
+"zh": "」要是數字",
+"pattern": false
+},
+{
+"zh": "「{0}」要在 {1}～{2} 之間",
+"pattern": true
+},
+{
+"zh": "」要在",
+"pattern": false
+},
+{
+"zh": "ComfyUI不接受這個工作流：",
+"pattern": false
+},
+{
+"zh": "處理時出錯：",
+"pattern": false
+},
+{
+"zh": "開始產生",
+"pattern": false
+},
+{
+"zh": "對方回的不是JSON（HTTP ",
+"pattern": false
+},
+{
+"zh": "），這個網址可能不是ComfyUI，例如登入頁或別的網站",
+"pattern": false
+},
+{
+"zh": "輸入圖片",
+"pattern": false
+},
+{
+"zh": "種子要是整數，-1＝隨機",
+"pattern": false
+},
+{
+"zh": "」要在 ",
+"pattern": false
+},
+{
+"zh": "ComfyUI斷線超過 90 秒，這件沒追完；ComfyUI恢復後可以到它的output資料夾找",
+"pattern": false
+},
+{
+"zh": "這幾個節點有錯、ComfyUI不會執行它們（其他照跑）：",
+"pattern": false
+},
+{
+"zh": "執行節點 #{0}（{1}）",
+"pattern": true
+},
+{
+"zh": "執行節點 #",
+"pattern": false
+},
+{
+"zh": "ComfyUI那邊中斷了這件（有人在ComfyUI按了停止）",
 "pattern": false
 },
 {
@@ -18621,6 +19689,18 @@
 },
 {
 "zh": "請選裡面的資料夾",
+"pattern": false
+},
+{
+"zh": "不像ComfyUI資料夾（找不到models或checkpoints、diffusion_models、vae這類子資料夾）",
+"pattern": false
+},
+{
+"zh": "只能指定家目錄、資料磁碟或外接碟底下的資料夾",
+"pattern": false
+},
+{
+"zh": "這不像ComfyUI資料夾：找不到models，或models底下沒有checkpoints、diffusion_models、vae這類子資料夾",
 "pattern": false
 },
 {

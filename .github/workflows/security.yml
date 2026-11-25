@@ -95,6 +95,8 @@ jobs:
         run: cd console && python test_extract.py
       - name: 對話紀錄（加密落地、別人的看不到、搜尋、附圖 blob、取樣參數只送支援的）
         run: cd console && python test_chats.py
+      - name: ComfyUI串接（假ComfyUI端到端、官方範本與前端匯出一致、子圖、取消、金鑰只走標頭、HTTPS驗證、權限）
+        run: cd console && python test_comfy.py
       - name: 對話工具（讀網頁擋內網位址、聯網搜尋、寫檔與執行指令先問、本次對話不再詢問、一般使用者只動自己的資料夾）
         run: cd console && python test_chattools.py
       - name: Agent任務（等核准、拒絕、步數上限、停止、加密落地、重啟後標成已中斷、只能刪自己的、計畫收尾）

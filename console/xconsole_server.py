@@ -44,6 +44,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chats  # noqa: E402
+import comfy  # noqa: E402
 import chattools  # noqa: E402
 import computer  # noqa: E402
 import updater  # noqa: E402
@@ -106,7 +107,8 @@ MUST_CHANGE_OK = {("GET", "/api/me"), ("POST", "/api/account/password"), ("POST"
 # 使用者（非管理員）能用的路由：對話、Agent、畫圖影片、自己的金鑰與密碼。沒列在這裡的一律只有管理員能用：
 # 新加的路由忘了列，結果是使用者用不到，而不是不小心開放出去（console/test_roles.py 逐條檢查每一條路由都有歸屬）。
 USER_ROUTES = [
-    ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers|assistant/tools)"),
+    ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers|assistant/tools|comfy|comfy/jobs)"),
+    ("GET", r"/api/comfy/jobs/[0-9a-f]{12}(/output/[0-9]{1,2})?"),
     ("GET", r"/api/chats/(blob/[0-9a-f]{16}|[0-9a-f]{12})"),
     ("GET", r"/api/agent/tasks/[0-9a-f]{12}"),
     ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend)"),
@@ -118,6 +120,7 @@ USER_ROUTES = [
     ("POST", r"/api/node/[\w.-]+/agent/(folders/create|fs/list|fs/read)"),
     ("POST", r"/api/node/[\w.-]+/sd/(generate|admit)"),
     ("POST", r"/api/node/[\w.-]+/sd/jobs/[0-9a-f]{8}/(cancel|delete)"),
+    ("POST", r"/api/comfy/(generate|jobs/[0-9a-f]{12}/(cancel|delete))"),
     ("POST", r"/api/keys/[0-9a-f]{8}/(update|revoke)"),
 ]
 # 檢視（清單 #10）：使用者能用的，再加上看得到機器狀態與群組（唯讀）。檔案瀏覽、API串接、記錄頁不給
@@ -623,7 +626,7 @@ def _user_remove(username, me):
         STORE.key_revoke(kid, me)
     STORE.folders_reassign(username, me)             # Agent 資料夾裡的檔案不刪，改歸做這件事的管理員
     cut_agent_tasks(username, drop=True)
-    jobs = purge_sd_jobs(username)
+    jobs = purge_sd_jobs(username) + purge_comfy_jobs(username)
     transfer_legacy_auth(username, me)
     STORE.user_delete(username)
     return 200, {"ok": True, "revoked_keys": len(revoked), "deleted_jobs": jobs}
@@ -2760,6 +2763,303 @@ def provider_save(body):
         "ca": bool(ca), "cn_origin": provider_public(saved)["cn_origin"]}
 
 
+# ---------------------------------------------------------------- ComfyUI串接（畫圖、影片的另一種跑法）
+# 管理者在網頁設定網址與金鑰、匯入工作流；使用者挑工作流、填欄位、送出。主控台直接連ComfyUI，產出存在主控台這台。
+
+COMFY_DIR = os.path.join(STATE_DIR, "comfy")
+COMFY_WF_MAX = 200
+COMFY_KEEP = 200                  # 每人留最近幾件
+COMFY_LIVE_PER_USER = 3
+COMFY_IMAGE_MAX = 4 << 20
+COMFY_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
+COMFY_RUNS = {}                   # 進行中的件：id → job（跟執行緒共用，_COMFY_LOCK保護）
+_COMFY_LOCK = threading.Lock()
+_COMFY_CACHE = {"stat": (None, 0.0, None), "info": (None, 0.0, None)}
+
+
+def comfy_cfg():
+    return fleet().get("comfy") or {}
+
+
+def comfy_conn(timeout=30):
+    c = comfy_cfg()
+    if not c.get("url"):
+        raise comfy.ComfyError("還沒設定ComfyUI的網址，請管理員到「畫圖 › ComfyUI › 連線與資料夾」設定", 400)
+    k = c.get("key") or ""
+    return comfy.Conn(c["url"], tls.unseal(CERTS.p, k).decode() if k.startswith("enc:v1:") else "", c.get("ca_pem") or "", timeout)
+
+
+def _comfy_cached(slot, sig, ttl, fn):
+    with _COMFY_LOCK:
+        key, at, val = _COMFY_CACHE[slot]
+        if key == sig and time.time() - at < ttl:
+            return val
+    val = fn()
+    with _COMFY_LOCK:
+        _COMFY_CACHE[slot] = (sig, time.time(), val)
+    return val
+
+
+def comfy_status(fresh=False, admin=True):
+    """連線狀態給畫面：設定、線上與否、版本、裝置。15秒內重複問用快取。網址只給管理員看。"""
+    c = comfy_cfg()
+    out = {"configured": bool(c.get("url")), "key_set": bool(c.get("key")), "ca_set": bool(c.get("ca_pem")),
+           "online": False, "error": "", "version": ""}
+    if admin:
+        out.update(url=c.get("url") or "", folder=c.get("folder") or None)
+    if not c.get("url"):
+        return out
+
+    def probe():
+        try:
+            return {"online": True, "error": "", **comfy.system_info(comfy_conn(timeout=5))}
+        except comfy.ComfyError as exc:
+            return {"online": False, "error": exc.msg}
+    sig = (c.get("url"), c.get("key"), c.get("ca_pem"))
+    return {**out, **_comfy_cached("stat", sig, 0 if fresh else 15, probe)}
+
+
+def comfy_info(conn, fresh=False):
+    """ComfyUI的節點定義（/object_info）。匯入時一律重抓（剛裝好缺的節點要馬上認得）；產生時一分鐘內用快取。"""
+    def get():
+        d = conn.json("GET", "/object_info", timeout=120)
+        if not isinstance(d, dict) or not d:
+            raise comfy.ComfyError("ComfyUI回的節點定義格式不對")
+        return d
+    if fresh:
+        with _COMFY_LOCK:
+            _COMFY_CACHE["info"] = (None, 0.0, None)
+    return _comfy_cached("info", (conn.url, conn.key, conn.ca_pem), 60, get)
+
+
+def comfy_models_dir():
+    return (comfy_cfg().get("folder") or {}).get("models") or ""
+
+
+def comfy_wf_public(r, admin=True):
+    """缺模型的細節（伺服器上的資料夾路徑）只給管理員；使用者只知道還不能用、要找管理員。"""
+    doc = json.loads(r["body"]) if r.get("body") else {}
+    warn = doc.get("warnings") or []
+    if warn and not admin:
+        warn = ["這個工作流還缺ComfyUI的模型或節點，請找管理員補上"]
+    return {"id": r["id"], "name": r["name"], "kind": r["kind"], "created": r["created"], "updated": r["updated"],
+            "source": doc.get("source"), "nodes": len(doc.get("api") or {}), "fields": doc.get("fields") or [],
+            "warnings": warn}
+
+
+def comfy_wf_list(admin=True):
+    return [comfy_wf_public(r, admin) for r in STORE.comfy_wf_list(with_body=True)]
+
+
+def comfy_check(api, info):
+    a = comfy.analyze(api, info, comfy_models_dir())
+    block, warn = comfy.problems_text(a)
+    return a, block, warn
+
+
+def comfy_import(body, by):
+    name = str(body.get("name") or "").strip()
+    if not comfy.NAME_RX.fullmatch(name):
+        return 400, {"error": "名稱要 1～60 個字，不能有 < > 或控制字元"}
+    kind = body.get("kind") or "auto"
+    if kind not in ("auto", "image", "video"):
+        return 400, {"error": "分類只能是圖片或影片"}
+    wf = body.get("workflow")
+    raw = wf.encode() if isinstance(wf, str) else json.dumps(wf).encode() if isinstance(wf, (dict, list)) else b""
+    if len(STORE.comfy_wf_list()) >= COMFY_WF_MAX:
+        return 400, {"error": f"工作流最多 {COMFY_WF_MAX} 個，請先刪掉不用的"}
+    try:
+        fmt, d = comfy.load_workflow(raw)
+        info = comfy_info(comfy_conn(), fresh=True)
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    except comfy.ComfyError as exc:
+        return exc.code, {"error": "要先連上ComfyUI才能匯入（讀節點定義）：" + exc.msg}
+    try:
+        api, missing = comfy.ui_to_api(d, info) if fmt == "ui" else (d, [])
+    except comfy.Mismatch as exc:
+        return 400, {"error": f"{exc}存的設定值對不上這台ComfyUI的節點定義（節點版本不同，或這個節點的欄位是ComfyUI畫面自己產生的），"
+                              "照順序對下去會填錯欄位。請在ComfyUI用「匯出（API）」存一份再匯入"}
+    except ValueError as exc:
+        return 400, {"error": str(exc)}
+    a = comfy.analyze(api, info, comfy_models_dir())
+    a["missing_nodes"] = sorted(set(a["missing_nodes"]) | set(missing))
+    block, warn = comfy.problems_text(a)
+    if block:
+        return 400, {"error": block[0], "problems": block, "warnings": warn, "missing_nodes": a["missing_nodes"]}
+    row = {"id": secrets.token_hex(6), "name": name, "kind": a["kind"] if kind == "auto" else kind, "by": by,
+           "body": json.dumps({"api": api, "source": fmt, "fields": a["fields"], "warnings": warn}, ensure_ascii=False)}
+    STORE.comfy_wf_put(row)
+    return 200, {"ok": True, "workflow": comfy_wf_public(STORE.comfy_wf_get(row["id"])), "warnings": warn}
+
+
+def _comfy_doc(job):
+    keep = ("wf", "wf_name", "kind", "state", "phase", "created", "secs", "error", "warnings", "outputs", "summary", "prompt_id", "values")
+    return {k: job.get(k) for k in keep}
+
+
+def comfy_save(job):
+    STORE.comfy_job_put({"id": job["id"], "user": job["user"], "wf": job["wf"], "kind": job["kind"], "state": job["state"],
+                         "created": job["created"], "body": chat_seal(json.dumps(_comfy_doc(job), ensure_ascii=False).encode())})
+
+
+def comfy_public(job, admin=False):
+    out = {k: job.get(k) for k in ("id", "wf", "wf_name", "kind", "state", "phase", "created", "secs", "error", "summary",
+                                   "step", "steps", "done_nodes", "total_nodes", "queue", "live", "values", "warnings")}
+    out["outputs"] = [{"i": i, "mime": o["mime"], "size": o["size"], "name": o["name"]} for i, o in enumerate(job.get("outputs") or [])]
+    if admin:
+        out["by"] = job.get("user")
+    return out
+
+
+def comfy_job(jid):
+    """進行中的從記憶體拿（進度最新），其他從資料庫讀回。"""
+    with _COMFY_LOCK:
+        if jid in COMFY_RUNS:
+            return dict(COMFY_RUNS[jid])
+    r = STORE.comfy_job_get(jid)
+    if not r:
+        return None
+    try:
+        doc = json.loads(chat_unseal(r["body"]))
+    except Exception:  # noqa: BLE001
+        doc = {"state": "failed", "error": "這件的紀錄讀不回來", "created": r["created"]}
+    return {**doc, "id": r["id"], "user": r["user"], "wf": r["wf"], "kind": r["kind"], "state": r["state"], "created": r["created"]}
+
+
+def comfy_jobs(user=None):
+    out = []
+    for r in STORE.comfy_job_rows(user)[:COMFY_KEEP]:
+        j = comfy_job(r["id"])
+        if j:
+            out.append(j)
+    return out
+
+
+def comfy_generate(user, body, admin=False):
+    wf = STORE.comfy_wf_get(str(body.get("workflow") or ""))
+    if not wf:
+        return 404, {"error": "沒有這個工作流，可能被管理員刪掉了；請重新整理"}
+    with _COMFY_LOCK:
+        live = sum(1 for j in COMFY_RUNS.values() if j["user"] == user)
+    if live >= COMFY_LIVE_PER_USER:
+        return 429, {"error": f"同時最多 {COMFY_LIVE_PER_USER} 件在跑，等前面的跑完再送"}
+    api = json.loads(wf["body"])["api"]
+    try:
+        conn = comfy_conn(timeout=60)
+        a, block, warn = comfy_check(api, comfy_info(conn))
+    except comfy.ComfyError as exc:
+        return exc.code, {"error": exc.msg}
+    if block or warn:
+        return 400, {"error": (block or warn)[0], "problems": block + warn} if admin else \
+            {"error": "這個工作流還缺ComfyUI的模型或節點，請找管理員補上"}
+    values = body.get("values") if isinstance(body.get("values"), dict) else {}
+    ids = {f["id"]: f for f in a["fields"]}
+    values = {k: v for k, v in values.items() if k in ids and ids[k]["kind"] != "image" and isinstance(v, (str, int, float))}
+    uploads = []
+    for fid, url in (body.get("images") or {}).items() if isinstance(body.get("images"), dict) else ():
+        if fid not in ids or ids[fid]["kind"] != "image":
+            continue
+        m = re.fullmatch(r"data:([\w/+.-]+);base64,([A-Za-z0-9+/=]+)", str(url or ""))
+        try:
+            data = base64.b64decode(m.group(2), validate=True) if m else b""
+        except ValueError:
+            data = b""
+        kind = comfy.sniff(data) if data else None
+        if not kind or kind[0] not in COMFY_IMAGE_TYPES:
+            return 400, {"error": f"「{ids[fid]['label']}」只收PNG、JPEG、WebP圖片"}
+        if len(data) > COMFY_IMAGE_MAX:
+            return 400, {"error": f"「{ids[fid]['label']}」最大 4 MB"}
+        uploads.append((fid, data))
+    _, err = comfy.apply_values(api, a["fields"], values, {fid: "x" for fid, _ in uploads})
+    if err:
+        return 400, {"error": err}
+    text = next((str(values.get(f["id"]) or f.get("value") or "") for f in a["fields"] if f["kind"] == "text"), "")
+    jid = secrets.token_hex(6)
+    job = {"id": jid, "user": user, "wf": wf["id"], "wf_name": wf["name"], "kind": wf["kind"], "state": "running",
+           "phase": "準備中", "created": time.time(), "values": values, "fields": a["fields"], "summary": text[:300],
+           "cancel": threading.Event(), "step": 0, "steps": 0, "done_nodes": 0, "total_nodes": len(api), "queue": None,
+           "live": True, "error": "", "outputs": []}
+    out_dir = os.path.join(COMFY_DIR, jid)
+    os.makedirs(out_dir, mode=0o700, exist_ok=True)
+    comfy_save(job)
+    with _COMFY_LOCK:
+        COMFY_RUNS[jid] = job
+
+    def work():
+        try:
+            comfy.run(conn, api, uploads, job, _COMFY_LOCK, out_dir)
+        finally:
+            with _COMFY_LOCK:
+                COMFY_RUNS.pop(jid, None)
+            comfy_save(job)
+            STORE.audit(user, "", "comfy.job." + job["state"], jid, job["state"] == "done",
+                        {"workflow": wf["name"], "outputs": len(job.get("outputs") or []), "message": job.get("error") or None})
+            comfy_trim(user)
+    threading.Thread(target=work, daemon=True).start()
+    return 200, {"ok": True, "id": jid}
+
+
+def comfy_trim(user):
+    for r in STORE.comfy_job_rows(user)[COMFY_KEEP:]:
+        if r["state"] != "running":
+            comfy_job_remove(r["id"])
+
+
+def comfy_job_remove(jid):
+    shutil.rmtree(os.path.join(COMFY_DIR, jid), ignore_errors=True)
+    return STORE.comfy_job_delete(jid)
+
+
+def comfy_jobs_load():
+    """主控台啟動時：上次還在跑的件，追進度的執行緒已經不在了，標成中斷。"""
+    for r in STORE.comfy_job_rows():
+        if r["state"] == "running":
+            j = comfy_job(r["id"])
+            j.update(state="interrupted", phase="", error="主控台重新啟動，這件沒追完；ComfyUI那邊可能已經產好，可以到ComfyUI的output資料夾找")
+            comfy_save(j)
+
+
+def purge_comfy_jobs(username):
+    n = 0
+    for r in STORE.comfy_job_rows(username):
+        with _COMFY_LOCK:
+            run = COMFY_RUNS.get(r["id"])
+        if run:
+            run["cancel"].set()
+        n += comfy_job_remove(r["id"])
+    return n
+
+
+def comfy_settings(body):
+    """回 (狀態碼, 回應, 稽核摘要)。網址空白＝中斷串接（工作流與產出留著）；金鑰欄空白＝保留原金鑰。"""
+    cur = comfy_cfg()
+    url = str(body.get("url") or "").strip()
+    if not url:
+        update_fleet(lambda c: c.__setitem__("comfy", {**(c.get("comfy") or {}), "url": "", "key": "", "ca_pem": ""}))
+        return 200, {"ok": True, **comfy_status(fresh=True)}, {"cleared": True}
+    url, err = comfy.check_url(url)
+    if err:
+        return 400, {"error": err}, None
+    key_in = str(body.get("key") or "").strip()
+    if key_in and (len(key_in) > 512 or re.search(r"[\s\x00-\x1f]", key_in)):
+        return 400, {"error": "金鑰格式不對（不能有空白，最多 512 字）"}, None
+    if key_in:
+        key, change = tls.seal(CERTS.p, key_in.encode()), "換新"
+    elif body.get("clear_key") is True or url != cur.get("url"):
+        key, change = "", "清除" if cur.get("key") else "無"     # 換了網址不沿用舊金鑰，免得送到另一台
+    else:
+        key, change = cur.get("key") or "", "保留" if cur.get("key") else "無"
+    ca = "" if body.get("clear_ca") is True else cur.get("ca_pem") or ""
+    if str(body.get("ca_pem") or "").strip():
+        r, pem = tls.inspect_trusted_ca(str(body["ca_pem"]).encode())
+        if not r.get("ok"):
+            return 400, {"error": "CA 憑證讀不出來：" + "；".join(r.get("errors") or [])}, None
+        ca = pem.decode()
+    update_fleet(lambda c: c.__setitem__("comfy", {**(c.get("comfy") or {}), "url": url, "key": key, "ca_pem": ca}))
+    return 200, {"ok": True, **comfy_status(fresh=True)}, {"url": url, "credential": change, "ca": bool(ca)}
+
+
 # ---------------------------------------------------------------- 加密入口的金鑰（/v1）
 
 GATEWAY_URL_RX = re.compile(r"https://[A-Za-z0-9.\-\[\]:]{1,255}(/[\w.\-/]{0,100})?")
@@ -4609,7 +4909,7 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             q = (parse_qs(urlparse(self.path).query).get("model") or [""])[0]
             return self._json(*call_node(m.group(1), "/llama/args?model=" + urllib.parse.quote(q[:400]), timeout=30))
-        m = re.fullmatch(r"/api/node/([\w.-]+)/(agent|library)/browse", path)
+        m = re.fullmatch(r"/api/node/([\w.-]+)/(agent|library|comfy)/browse", path)
         if m:
             q = (parse_qs(urlparse(self.path).query).get("path") or [""])[0]
             return self._json(*call_node(m.group(1), f"/{m.group(2)}/browse?path=" + urllib.parse.quote(q[:1000]), timeout=30))
@@ -4692,6 +4992,32 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, out)
         if path == "/api/catalog":
             return self._json(200, {"items": CATALOG.load(), "uses": recommend.USES})
+        # ---- ComfyUI：狀態與工作流（使用者也看得到，網址只給管理員）、自動尋找、資料夾裡的模型、產出
+        if path == "/api/comfy":
+            return self._json(200, {**comfy_status(admin=self.is_admin), "workflows": comfy_wf_list(self.is_admin)})
+        if path == "/api/comfy/detect":
+            return self._json(200, {"found": comfy.detect([str(n.get("host") or "") for n in fleet()["nodes"]])})
+        if path == "/api/comfy/models":
+            f = comfy_cfg().get("folder")
+            if not f:
+                return self._json(404, {"error": "還沒指定ComfyUI資料夾"})
+            return self._json(*call_node(f["node"], "/comfy/scan", "POST", {"path": f["path"]}, timeout=60))
+        if path == "/api/comfy/jobs":
+            jobs = comfy_jobs(None if self.is_admin else self.user)
+            return self._json(200, {"jobs": [comfy_public(j, self.is_admin) for j in jobs]})
+        m = re.fullmatch(r"/api/comfy/jobs/([0-9a-f]{12})(/output/([0-9]{1,2}))?", path)
+        if m:
+            j = comfy_job(m.group(1))
+            if not j or (not self.is_admin and j.get("user") != self.user):
+                return self._json(404, {"error": "沒有這件產出"})
+            if not m.group(2):
+                return self._json(200, comfy_public(j, self.is_admin))
+            outs = j.get("outputs") or []
+            o = outs[int(m.group(3))] if int(m.group(3)) < len(outs) else None
+            full = os.path.join(COMFY_DIR, j["id"], o["file"]) if o and re.fullmatch(r"\d{1,2}\.[a-z0-9]{2,5}", str(o.get("file"))) else ""
+            if not full or not os.path.isfile(full):
+                return self._json(404, {"error": "這個檔案不見了"})
+            return self._send_file(full, o["mime"])
         # ---- 畫圖與影片
         m = re.fullmatch(r"/api/node/([\w.-]+)/sd/recommend", path)
         if m:
@@ -5444,6 +5770,70 @@ class Handler(BaseHTTPRequestHandler):
             self._audit("library.delete", f"{node_id}/{body.get('id')}", code == 200,
                         {"freed_gib": out.get("freed_gib"), "message": out.get("error")})
             return self._json(code, out)
+        # ---- ComfyUI：連線設定、資料夾、匯入工作流（管理員）；產生、取消、刪除（使用者只動自己的）
+        if path in ("/api/comfy/settings", "/api/comfy/test"):
+            if path.endswith("/test"):
+                out = comfy_status(fresh=True)
+                self._audit("comfy.test", urlparse(out.get("url") or "").hostname or "", out["online"], {"message": out.get("error") or None})
+                return self._json(200, out)
+            code, out, det = comfy_settings(body)
+            self._audit("comfy.settings", urlparse(str(body.get("url") or "")).hostname or "", code == 200, det or {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/comfy/folder":
+            node_id, fpath = str(body.get("node") or ""), str(body.get("path") or "").strip()
+            if not fpath:
+                update_fleet(lambda c: (c.get("comfy") or {}).pop("folder", None))
+                self._audit("comfy.folder", "", True, {"cleared": True})
+                return self._json(200, {"ok": True})
+            if not any(n["id"] == node_id for n in fleet()["nodes"]):
+                return self._json(404, {"error": "沒有這台機器"})
+            code, out = call_node(node_id, "/comfy/scan", "POST", {"path": fpath}, timeout=60)
+            if code == 404 and "找不到" in str(out.get("error")):
+                code, out = 400, {"error": "這台的代理版本太舊，不認得ComfyUI資料夾；請先更新代理"}
+            if code == 200:
+                update_fleet(lambda c: c.__setitem__("comfy", {**(c.get("comfy") or {}), "folder": {
+                    "node": node_id, "path": fpath, "root": out.get("root"), "models": out.get("models")}}))
+            self._audit("comfy.folder", f"{node_id}:{fpath}", code == 200, {"message": out.get("error")})
+            return self._json(code, out)
+        if path == "/api/comfy/workflows/import":
+            code, out = comfy_import(body, self.user)
+            self._audit("comfy.workflow.import", (out.get("workflow") or {}).get("id") or "", code == 200,
+                        {"name": str(body.get("name") or "")[:60], "message": out.get("error"), "warnings": len(out.get("warnings") or [])})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/comfy/workflows/([0-9a-f]{12})/(update|delete)", path)
+        if m:
+            wid, act = m.groups()
+            if act == "delete":
+                ok = STORE.comfy_wf_delete(wid)
+            else:
+                name, kind = str(body.get("name") or "").strip(), body.get("kind")
+                if not comfy.NAME_RX.fullmatch(name) or kind not in ("image", "video"):
+                    return self._json(400, {"error": "名稱要 1～60 個字，分類只能是圖片或影片"})
+                ok = STORE.comfy_wf_meta(wid, name, kind)
+            self._audit("comfy.workflow." + act, wid, ok)
+            return self._json(200 if ok else 404, {"ok": True} if ok else {"error": "沒有這個工作流"})
+        if path == "/api/comfy/generate":
+            code, out = comfy_generate(self.user, body, self.is_admin)
+            self._audit("comfy.generate", out.get("id") or str(body.get("workflow") or "")[:12], code == 200, {"message": out.get("error")})
+            return self._json(code, out)
+        m = re.fullmatch(r"/api/comfy/jobs/([0-9a-f]{12})/(cancel|delete)", path)
+        if m:
+            jid, act = m.groups()
+            j = comfy_job(jid)
+            if not j or (not self.is_admin and j.get("user") != self.user):
+                return self._json(404, {"error": "沒有這件產出"})
+            with _COMFY_LOCK:
+                run = COMFY_RUNS.get(jid)
+            if act == "cancel":
+                if not run:
+                    return self._json(409, {"error": "這件已經結束了"})
+                run["cancel"].set()
+            elif run:
+                return self._json(409, {"error": "這件還在跑，先取消再刪"})
+            else:
+                comfy_job_remove(jid)
+            self._audit(f"comfy.job.{act}", jid, True)
+            return self._json(200, {"ok": True})
         # ---- 畫圖與影片：清單增改刪、下載（照清單組好規格，或內部測試手動組）、刪除、試算、產圖
         if path in ("/api/sd/catalog/save", "/api/sd/catalog/refresh-all"):
             return self._sd_catalog_save(body, path.endswith("refresh-all"))
@@ -6060,6 +6450,7 @@ def main():
         loop.daemon_threads = True
         threading.Thread(target=loop.serve_forever, daemon=True).start()
         print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
+    comfy_jobs_load()
     n = agent_tasks_load()
     if n:
         print(f"讀回{n}件Agent任務", flush=True)

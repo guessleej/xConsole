@@ -635,6 +635,7 @@ label.field { display: block; margin-top: 12px; font-size: 14.5px; color: var(--
 }
 :root[data-theme="dark"] .tabbar button { background: rgba(255, 255, 255, .08); }
 .tabbar button[aria-current="true"] { background: var(--brand); color: #fff; }
+:root[data-theme="dark"] .tabbar button[aria-current="true"] { background: var(--brand); }
 /* 範例程式碼區塊固定高度、在區塊內捲：頁面不會因為範例長短忽長忽短 */
 pre.code {
   margin: 8px 0 0;
@@ -1456,3 +1457,19 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .ready-bar > span { display: block; height: 100%; background: var(--brand); transition: width .6s ease; }
 :root[data-theme="dark"] .ready-card { box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
 :root[data-theme="dark"] .ready-bar { background: rgba(255, 255, 255, .1); }
+
+/* ---- ComfyUI串接（comfy.js） */
+.note.ok { background: rgba(46, 125, 50, .11); }
+.src-switch { margin: 0; }
+.comfy-top { margin-bottom: 10px; }
+.comfy-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.comfy-status .bad-t { flex-basis: 100%; }
+.tab-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); margin-left: 6px; vertical-align: middle; }
+.tabbar button[aria-current="true"] .tab-dot { background: #fff; }
+.comfy-found { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.scrollbox.comfy-models { max-height: 260px; }
+.comfy-model { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; overflow-wrap: anywhere; }
+.scrollbox.comfy-wf-list { max-height: 360px; }
+.comfy-fields textarea { margin-bottom: 2px; }
+.sd-thumb.comfy-thumb-file { width: 64px; height: 64px; font-weight: 700; }
+.sd-media audio { width: 100%; margin: 24px; }

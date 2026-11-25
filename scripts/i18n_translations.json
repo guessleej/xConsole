@@ -26568,5 +26568,1345 @@
 "en": "The new machine or the original slot no longer exists",
 "ja": "新しい端末または元の枠がもうありません",
 "ko": "새 컴퓨터 또는 원래 자리가 더 이상 없습니다"
+},
+" 不在ComfyUI裡：請放進 ": {
+"en": " is not in ComfyUI: put it in ",
+"ja": " がComfyUIにありません：次に置いてください ",
+"ko": "이(가) ComfyUI에 없습니다: 다음에 넣으세요 "
+},
+" 件在跑，等前面的跑完再送": {
+"en": " jobs at once; wait for earlier ones to finish",
+"ja": " 件。前のジョブが終わってから送ってください",
+"ko": "건입니다. 앞의 작업이 끝난 뒤 보내세요"
+},
+" 個）": {
+"en": ")",
+"ja": " 個）",
+"ko": "개)"
+},
+" 個，請先刪掉不用的": {
+"en": " workflows; delete unused ones first",
+"ja": " 件。不要なものを先に削除してください",
+"ko": "개입니다. 쓰지 않는 것을 먼저 삭제하세요"
+},
+" 分鐘它還在跑這件；請到ComfyUI確認": {
+"en": " minutes it is still running this job; please check ComfyUI",
+"ja": " 分たってもまだ実行中です。ComfyUIを確認してください",
+"ko": "분이 지나도 아직 실행 중입니다. ComfyUI를 확인하세요"
+},
+" 填的是 ": {
+"en": " set to ",
+"ja": " の値は ",
+"ko": " 값은 "
+},
+" 清掉已存的金鑰": {
+"en": " Clear the saved key",
+"ja": " 保存済みのキーを消去",
+"ko": " 저장된 키 지우기"
+},
+" 轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址": {
+"en": " redirect; to avoid sending the key elsewhere, redirects aren't followed. Enter ComfyUI's actual URL",
+"ja": " リダイレクト。キーを他へ送らないためリダイレクトには従いません。ComfyUIの実際のURLを入力してください",
+"ko": " 리디렉션. 키가 다른 곳으로 가지 않도록 리디렉션을 따르지 않습니다. ComfyUI의 실제 URL을 입력하세요"
+},
+" 逾時：確認位址、防火牆，以及ComfyUI有沒有卡住": {
+"en": " timed out: check the address, firewall, and whether ComfyUI is stuck",
+"ja": " タイムアウト：アドレス、ファイアウォール、ComfyUIが固まっていないか確認してください",
+"ko": " 시간 초과: 주소, 방화벽, ComfyUI가 멈추지 않았는지 확인하세요"
+},
+"-----BEGIN CERTIFICATE-----\n（選填）對方是https且用自建CA或自簽憑證時，貼上對方的CA憑證": {
+"en": "-----BEGIN CERTIFICATE-----\n(Optional) If the server is https with a private CA or self-signed certificate, paste its CA certificate",
+"ja": "-----BEGIN CERTIFICATE-----\n（任意）相手がhttpsで独自CAまたは自己署名証明書の場合、相手のCA証明書を貼り付け",
+"ko": "-----BEGIN CERTIFICATE-----\n(선택) 상대가 https이고 자체 CA나 자체 서명 인증서를 쓰면 상대의 CA 인증서를 붙여 넣으세요"
+},
+"1 連線與資料夾": {
+"en": "1 Connection & folder",
+"ja": "1 接続とフォルダー",
+"ko": "1 연결 및 폴더"
+},
+"2 工作流": {
+"en": "2 Workflows",
+"ja": "2 ワークフロー",
+"ko": "2 워크플로"
+},
+"2 工作流（{0}）": {
+"en": "2 Workflows ({0})",
+"ja": "2 ワークフロー（{0}）",
+"ko": "2 워크플로({0})"
+},
+"3 產生": {
+"en": "3 Generate",
+"ja": "3 生成",
+"ko": "3 생성"
+},
+"<thead><tr><th>名稱</th><th>分類</th><th>可調整的欄位</th><th>狀態</th><th></th></tr></thead>": {
+"en": "<thead><tr><th>Name</th><th>Category</th><th>Adjustable fields</th><th>Status</th><th></th></tr></thead>",
+"ja": "<thead><tr><th>名前</th><th>分類</th><th>調整できる項目</th><th>状態</th><th></th></tr></thead>",
+"ko": "<thead><tr><th>이름</th><th>분류</th><th>조정 가능한 항목</th><th>상태</th><th></th></tr></thead>"
+},
+"ComfyUI不接受這個工作流：": {
+"en": "ComfyUI did not accept this workflow: ",
+"ja": "ComfyUIがこのワークフローを受け付けませんでした：",
+"ko": "ComfyUI가 이 워크플로를 받지 않았습니다: "
+},
+"ComfyUI可以在這台，也可以在別台；在別台要用 --listen 啟動": {
+"en": "ComfyUI can be on this machine or another; on another machine start it with --listen",
+"ja": "ComfyUIはこのマシンでも別のマシンでも可。別マシンなら --listen で起動",
+"ko": "ComfyUI는 이 컴퓨터나 다른 컴퓨터에 있어도 됩니다. 다른 컴퓨터라면 --listen으로 실행하세요"
+},
+"ComfyUI回": {
+"en": "ComfyUI returned",
+"ja": "ComfyUIの応答",
+"ko": "ComfyUI 응답"
+},
+"ComfyUI回 ": {
+"en": "ComfyUI returned ",
+"ja": "ComfyUIの応答 ",
+"ko": "ComfyUI 응답 "
+},
+"ComfyUI回 {0}：{1}": {
+"en": "ComfyUI returned {0}: {1}",
+"ja": "ComfyUIの応答 {0}：{1}",
+"ko": "ComfyUI 응답 {0}: {1}"
+},
+"ComfyUI回 {0}：需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來）": {
+"en": "ComfyUI returned {0}: a key is required or wrong (blocked by a reverse proxy or login extension in front of ComfyUI)",
+"ja": "ComfyUIが {0} を返しました：キーが必要か間違っています（ComfyUIの前のリバースプロキシかログイン拡張が拒否）",
+"ko": "ComfyUI가 {0}을(를) 반환: 키가 필요하거나 틀렸습니다(ComfyUI 앞의 리버스 프록시나 로그인 확장이 차단)"
+},
+"ComfyUI回報這件失敗，沒有說明": {
+"en": "ComfyUI reported this job failed without details",
+"ja": "ComfyUIがこのジョブの失敗を報告しましたが、説明はありません",
+"ko": "ComfyUI가 이 작업이 실패했다고 보고했지만 설명이 없습니다"
+},
+"ComfyUI回的內容太大": {
+"en": "ComfyUI's response is too large",
+"ja": "ComfyUIの応答が大きすぎます",
+"ko": "ComfyUI 응답이 너무 큽니다"
+},
+"ComfyUI回的工作編號格式不對": {
+"en": "ComfyUI returned a malformed job ID",
+"ja": "ComfyUIが返したジョブ番号の形式が正しくありません",
+"ko": "ComfyUI가 반환한 작업 번호 형식이 올바르지 않습니다"
+},
+"ComfyUI回的節點定義格式不對": {
+"en": "ComfyUI's node definitions are in an unexpected format",
+"ja": "ComfyUIのノード定義の形式が正しくありません",
+"ko": "ComfyUI 노드 정의 형식이 올바르지 않습니다"
+},
+"ComfyUI存的 .json 或「匯出（API）」的 .json 都可以": {
+"en": "A .json saved by ComfyUI or exported with \"Export (API)\" both work",
+"ja": "ComfyUIで保存した .json でも「エクスポート（API）」の .json でも可",
+"ko": "ComfyUI에서 저장한 .json이나 'Export (API)'로 내보낸 .json 모두 가능"
+},
+"ComfyUI少了這些節點：": {
+"en": "ComfyUI is missing these nodes: ",
+"ja": "ComfyUIに次のノードがありません：",
+"ko": "ComfyUI에 다음 노드가 없습니다: "
+},
+"ComfyUI斷線超過 90 秒，這件沒追完；ComfyUI恢復後可以到它的output資料夾找": {
+"en": "ComfyUI was disconnected for over 90 seconds and this job wasn't tracked to the end; once ComfyUI is back, check its output folder",
+"ja": "ComfyUIとの接続が90秒以上切れ、このジョブを最後まで追跡できませんでした。ComfyUIが復旧したらoutputフォルダーを確認してください",
+"ko": "ComfyUI 연결이 90초 넘게 끊겨 이 작업을 끝까지 추적하지 못했습니다. ComfyUI가 복구되면 output 폴더를 확인하세요"
+},
+"ComfyUI沒有接受WebSocket連線": {
+"en": "ComfyUI did not accept the WebSocket connection",
+"ja": "ComfyUIがWebSocket接続を受け付けませんでした",
+"ko": "ComfyUI가 WebSocket 연결을 받지 않았습니다"
+},
+"ComfyUI沒有接受WebSocket連線（": {
+"en": "ComfyUI did not accept the WebSocket connection (",
+"ja": "ComfyUIがWebSocket接続を受け付けませんでした（",
+"ko": "ComfyUI가 WebSocket 연결을 받지 않았습니다("
+},
+"ComfyUI沒有接受WebSocket連線（{0}）": {
+"en": "ComfyUI did not accept the WebSocket connection ({0})",
+"ja": "ComfyUIがWebSocket接続を受け付けませんでした（{0}）",
+"ko": "ComfyUI가 WebSocket 연결을 받지 않았습니다({0})"
+},
+"ComfyUI沒有這個選項（可選": {
+"en": "ComfyUI doesn't offer this option (choices",
+"ja": "ComfyUIにその選択肢はありません（選択肢",
+"ko": "ComfyUI에 그 선택지가 없습니다(선택지"
+},
+"ComfyUI說跑完了，但歷史紀錄裡找不到這件": {
+"en": "ComfyUI says it finished, but this job isn't in its history",
+"ja": "ComfyUIは完了と言っていますが、履歴にこのジョブがありません",
+"ko": "ComfyUI는 끝났다고 하지만 기록에서 이 작업을 찾을 수 없습니다"
+},
+"ComfyUI資料夾": {
+"en": "ComfyUI folder",
+"ja": "ComfyUIフォルダー",
+"ko": "ComfyUI 폴더"
+},
+"ComfyUI資料夾裡的 models/": {
+"en": "models/ in the ComfyUI folder",
+"ja": "ComfyUIフォルダー内の models/",
+"ko": "ComfyUI 폴더 안의 models/"
+},
+"ComfyUI跑完了，但沒有可以取回的圖片或影片：工作流的輸出節點可能只存到別處，或產出的不是圖片、影片、聲音": {
+"en": "ComfyUI finished, but there are no images or videos to fetch: the output node may save elsewhere, or the output isn't an image, video or audio",
+"ja": "ComfyUIは完了しましたが、取得できる画像や動画がありません。出力ノードが別の場所に保存しているか、出力が画像・動画・音声ではない可能性があります",
+"ko": "ComfyUI는 끝났지만 가져올 이미지나 동영상이 없습니다. 출력 노드가 다른 곳에 저장하거나 출력이 이미지·동영상·오디오가 아닐 수 있습니다"
+},
+"ComfyUI跟xConsole在同一台就選這台": {
+"en": "If ComfyUI is on the same machine as xConsole, pick this one",
+"ja": "ComfyUIがxConsoleと同じマシンならこれを選択",
+"ko": "ComfyUI가 xConsole과 같은 컴퓨터면 이것을 선택"
+},
+"ComfyUI送來的WebSocket訊框太大": {
+"en": "ComfyUI sent a WebSocket frame that is too large",
+"ja": "ComfyUIから届いたWebSocketフレームが大きすぎます",
+"ko": "ComfyUI가 보낸 WebSocket 프레임이 너무 큽니다"
+},
+"ComfyUI連不上": {
+"en": "Cannot reach ComfyUI",
+"ja": "ComfyUIに接続できません",
+"ko": "ComfyUI에 연결할 수 없음"
+},
+"ComfyUI連不上：{0}": {
+"en": "Cannot reach ComfyUI: {0}",
+"ja": "ComfyUIに接続できません：{0}",
+"ko": "ComfyUI에 연결할 수 없음: {0}"
+},
+"ComfyUI那邊中斷了這件（有人在ComfyUI按了停止）": {
+"en": "ComfyUI interrupted this job (someone pressed stop in ComfyUI)",
+"ja": "ComfyUI側でこのジョブが中断されました（ComfyUIで停止が押されました）",
+"ko": "ComfyUI 쪽에서 이 작업이 중단되었습니다(ComfyUI에서 중지를 누름)"
+},
+"ComfyUI預設是 8188 埠；ComfyUI桌面版是 8000。網際網路上的ComfyUI一律用https": {
+"en": "ComfyUI's default port is 8188; ComfyUI Desktop uses 8000. ComfyUI on the internet must use https",
+"ja": "ComfyUIの既定ポートは8188、ComfyUIデスクトップ版は8000。インターネット上のComfyUIは必ずhttps",
+"ko": "ComfyUI 기본 포트는 8188, ComfyUI 데스크톱은 8000입니다. 인터넷상의 ComfyUI는 반드시 https"
+},
+"http只准連區網私有位址或本機，這個網址現在解析到外部位址，已拒絕": {
+"en": "http is only allowed to private LAN addresses or this machine; this URL now resolves to an external address, refused",
+"ja": "httpはLANのプライベートアドレスかこのマシンのみ。このURLは現在外部アドレスに解決されるため拒否しました",
+"ko": "http는 LAN 사설 주소나 이 컴퓨터만 허용됩니다. 이 URL이 지금 외부 주소로 확인되어 거부했습니다"
+},
+"http（不加密）只准連區網私有位址或本機；網際網路上的ComfyUI請用https": {
+"en": "http (unencrypted) is only allowed to private LAN addresses or this machine; use https for ComfyUI on the internet",
+"ja": "http（暗号化なし）はLANのプライベートアドレスかこのマシンのみ。インターネット上のComfyUIはhttpsを使ってください",
+"ko": "http(암호화 없음)는 LAN 사설 주소나 이 컴퓨터만 허용됩니다. 인터넷상의 ComfyUI는 https를 사용하세요"
+},
+"{0} 個問題": {
+"en": "{0} issues",
+"ja": "{0} 件の問題",
+"ko": "문제 {0}개"
+},
+"{0} 回 {1} 轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址": {
+"en": "{0} returned a {1} redirect; to avoid sending the key elsewhere, redirects aren't followed. Enter ComfyUI's actual URL",
+"ja": "{0} が {1} リダイレクトを返しました。キーを他へ送らないためリダイレクトには従いません。ComfyUIの実際のURLを入力してください",
+"ko": "{0}이(가) {1} 리디렉션을 반환했습니다. 키가 다른 곳으로 가지 않도록 리디렉션을 따르지 않습니다. ComfyUI의 실제 URL을 입력하세요"
+},
+"{0} 的憑證驗證不過（{1}）。自建CA的ComfyUI請在連線設定匯入對方的CA憑證": {
+"en": "{0}'s certificate failed verification ({1}). For ComfyUI with a private CA, import its CA certificate in the connection settings",
+"ja": "{0} の証明書の検証に失敗しました（{1}）。独自CAのComfyUIは接続設定で相手のCA証明書をインポートしてください",
+"ko": "{0}의 인증서 검증에 실패했습니다({1}). 자체 CA를 쓰는 ComfyUI는 연결 설정에서 상대의 CA 인증서를 가져오세요"
+},
+"{0}存的設定值對不上這台ComfyUI的節點定義（節點版本不同，或這個節點的欄位是ComfyUI畫面自己產生的），照順序對下去會填錯欄位。請在ComfyUI用「匯出（API）」存一份再匯入": {
+"en": "{0}'s saved values don't match this ComfyUI's node definition (different node version, or the fields are created by ComfyUI's UI itself), so matching them in order would fill the wrong fields. Save it with \"Export (API)\" in ComfyUI and import that",
+"ja": "{0}の保存値がこのComfyUIのノード定義と合いません（ノードのバージョンが違う、またはComfyUI画面が独自に作る項目）。順番に当てはめると誤った項目に入ります。ComfyUIの「エクスポート（API）」で保存してからインポートしてください",
+"ko": "{0}의 저장값이 이 ComfyUI의 노드 정의와 맞지 않습니다(노드 버전이 다르거나 ComfyUI 화면이 자체 생성하는 항목). 순서대로 넣으면 잘못된 항목에 들어갑니다. ComfyUI의 'Export (API)'로 저장한 뒤 가져오세요"
+},
+"{0}：共 {1} 個模型檔{2}。這些檔案歸ComfyUI管，xConsole只讀清單，不會刪除或搬動；要刪請在ComfyUI或檔案總管裡刪。": {
+"en": "{0}: {1} model files{2}. These files belong to ComfyUI; xConsole only reads the list and never deletes or moves them. To delete, use ComfyUI or your file manager.",
+"ja": "{0}：モデルファイル {1} 件{2}。これらはComfyUIの管理下で、xConsoleは一覧を読むだけで削除・移動はしません。削除はComfyUIかファイルマネージャーで行ってください。",
+"ko": "{0}: 모델 파일 {1}개{2}. 이 파일은 ComfyUI 소유이며 xConsole은 목록만 읽고 삭제하거나 옮기지 않습니다. 삭제는 ComfyUI나 파일 관리자에서 하세요."
+},
+"。請在ComfyUI打開這個工作流，用ComfyUI Manager的「安裝缺失節點」（Install Missing Custom Nodes）裝好，重啟ComfyUI後再試": {
+"en": ". Open this workflow in ComfyUI, install them with ComfyUI Manager's \"Install Missing Custom Nodes\", restart ComfyUI, then try again",
+"ja": "。ComfyUIでこのワークフローを開き、ComfyUI Managerの「Install Missing Custom Nodes」で入れてComfyUIを再起動してから、もう一度試してください",
+"ko": ". ComfyUI에서 이 워크플로를 열고 ComfyUI Manager의 'Install Missing Custom Nodes'로 설치한 뒤 ComfyUI를 다시 시작하고 다시 시도하세요"
+},
+"「{0}」只收PNG、JPEG、WebP圖片": {
+"en": "\"{0}\" accepts PNG, JPEG or WebP images only",
+"ja": "「{0}」はPNG、JPEG、WebP画像のみ",
+"ko": "'{0}'은(는) PNG, JPEG, WebP 이미지만 가능"
+},
+"「{0}」最多 20000 字，不能有控制字元": {
+"en": "\"{0}\" is at most 20000 characters, without control characters",
+"ja": "「{0}」は最大20000文字、制御文字は使えません",
+"ko": "'{0}'은(는) 최대 20000자이며 제어 문자를 쓸 수 없습니다"
+},
+"「{0}」最大 4 MB": {
+"en": "\"{0}\" is at most 4 MB",
+"ja": "「{0}」は最大4 MB",
+"ko": "'{0}'은(는) 최대 4 MB"
+},
+"「{0}」要先選一張圖": {
+"en": "Choose an image for \"{0}\" first",
+"ja": "「{0}」の画像を先に選んでください",
+"ko": "'{0}'의 이미지를 먼저 선택하세요"
+},
+"「{0}」要在 {1}～{2} 之間": {
+"en": "\"{0}\" must be between {1} and {2}",
+"ja": "「{0}」は {1}～{2} の範囲にしてください",
+"ko": "'{0}'은(는) {1}~{2} 사이여야 합니다"
+},
+"「{0}」要是數字": {
+"en": "\"{0}\" must be a number",
+"ja": "「{0}」は数値にしてください",
+"ko": "'{0}'은(는) 숫자여야 합니다"
+},
+"」只收PNG、JPEG、WebP圖片": {
+"en": "\" accepts PNG, JPEG or WebP images only",
+"ja": "」はPNG、JPEG、WebP画像のみ",
+"ko": "'은(는) PNG, JPEG, WebP 이미지만 가능"
+},
+"」最多 20000 字，不能有控制字元": {
+"en": "\" is at most 20000 characters, without control characters",
+"ja": "」は最大20000文字、制御文字は使えません",
+"ko": "'은(는) 최대 20000자이며 제어 문자를 쓸 수 없습니다"
+},
+"」最大 4 MB": {
+"en": "\" is at most 4 MB",
+"ja": "」は最大4 MB",
+"ko": "'은(는) 최대 4 MB"
+},
+"」要先選一張圖": {
+"en": "\" needs an image first",
+"ja": "」の画像を先に選んでください",
+"ko": "'의 이미지를 먼저 선택하세요"
+},
+"」要在": {
+"en": "\" must be between",
+"ja": "」の範囲は",
+"ko": "'의 범위는"
+},
+"」要在 ": {
+"en": "\" must be between ",
+"ja": "」の範囲は ",
+"ko": "'의 범위는 "
+},
+"」要是數字": {
+"en": "\" must be a number",
+"ja": "」は数値にしてください",
+"ko": "'은(는) 숫자여야 합니다"
+},
+"・這台ComfyUI沒有即時進度，跑完會自動顯示": {
+"en": "・This ComfyUI has no live progress; results show automatically when done",
+"ja": "・このComfyUIはリアルタイム進捗がなく、完了すると自動表示します",
+"ko": "・이 ComfyUI는 실시간 진행 상황이 없어 끝나면 자동으로 표시합니다"
+},
+"上傳輸入圖片": {
+"en": "Uploading input images",
+"ja": "入力画像をアップロード中",
+"ko": "입력 이미지 업로드 중"
+},
+"上傳輸入圖片到ComfyUI失敗（HTTP": {
+"en": "Uploading the input image to ComfyUI failed (HTTP",
+"ja": "入力画像のComfyUIへのアップロードに失敗（HTTP",
+"ko": "입력 이미지를 ComfyUI에 업로드하지 못함(HTTP"
+},
+"上傳輸入圖片到ComfyUI失敗（HTTP ": {
+"en": "Uploading the input image to ComfyUI failed (HTTP ",
+"ja": "入力画像のComfyUIへのアップロードに失敗（HTTP ",
+"ko": "입력 이미지를 ComfyUI에 업로드하지 못함(HTTP "
+},
+"上傳輸入圖片到ComfyUI失敗（HTTP {0}）": {
+"en": "Uploading the input image to ComfyUI failed (HTTP {0})",
+"ja": "入力画像のComfyUIへのアップロードに失敗（HTTP {0}）",
+"ko": "입력 이미지를 ComfyUI에 업로드하지 못함(HTTP {0})"
+},
+"不像ComfyUI資料夾（找不到models或checkpoints、diffusion_models、vae這類子資料夾）": {
+"en": "Doesn't look like a ComfyUI folder (no models, or no subfolders like checkpoints, diffusion_models, vae)",
+"ja": "ComfyUIフォルダーではないようです（modelsやcheckpoints、diffusion_models、vaeなどのサブフォルダーがありません）",
+"ko": "ComfyUI 폴더가 아닌 것 같습니다(models나 checkpoints, diffusion_models, vae 같은 하위 폴더가 없음)"
+},
+"不在ComfyUI裡：請放進": {
+"en": "is not in ComfyUI: put it in",
+"ja": "がComfyUIにありません：次に置いてください",
+"ko": "이(가) ComfyUI에 없습니다: 다음에 넣으세요"
+},
+"不提供關閉憑證驗證的選項：匯入對方的CA才是正確做法": {
+"en": "There is no option to turn off certificate verification: importing the server's CA is the right way",
+"ja": "証明書の検証を無効にするオプションはありません。相手のCAをインポートするのが正しい方法です",
+"ko": "인증서 검증을 끄는 옵션은 없습니다. 상대의 CA를 가져오는 것이 올바른 방법입니다"
+},
+"不是ComfyUI，或網址的路徑不對": {
+"en": "it isn't ComfyUI, or the path is wrong",
+"ja": "ComfyUIではないか、パスが間違っています",
+"ko": "ComfyUI가 아니거나 경로가 틀렸습니다"
+},
+"不要出現的內容（選填）": {
+"en": "What should not appear (optional)",
+"ja": "出したくない内容（任意）",
+"ko": "나오지 않았으면 하는 내용(선택)"
+},
+"不選就用工作流裡原本那張": {
+"en": "If none is chosen, the image saved in the workflow is used",
+"ja": "選ばない場合はワークフロー内の元の画像を使用",
+"ko": "선택하지 않으면 워크플로에 저장된 원래 이미지를 사용"
+},
+"中斷ComfyUI串接": {
+"en": "Disconnect ComfyUI",
+"ja": "ComfyUIの接続を解除",
+"ko": "ComfyUI 연결 해제"
+},
+"中斷串接": {
+"en": "Disconnect",
+"ja": "接続を解除",
+"ko": "연결 해제"
+},
+"中斷了": {
+"en": "Interrupted",
+"ja": "中断しました",
+"ko": "중단됨"
+},
+"主控台重新啟動，這件沒追完；ComfyUI那邊可能已經產好，可以到ComfyUI的output資料夾找": {
+"en": "The console restarted and stopped tracking this job; ComfyUI may have finished it — check ComfyUI's output folder",
+"ja": "コンソールが再起動し、このジョブの追跡が途切れました。ComfyUI側では完了している可能性があるので、ComfyUIのoutputフォルダーを確認してください",
+"ko": "콘솔이 다시 시작되어 이 작업 추적이 끊겼습니다. ComfyUI에서는 완료됐을 수 있으니 ComfyUI의 output 폴더를 확인하세요"
+},
+"件在跑，等前面的跑完再送": {
+"en": "jobs at once; wait for earlier ones to finish",
+"ja": "件。前のジョブが終わってから送ってください",
+"ko": "건입니다. 앞의 작업이 끝난 뒤 보내세요"
+},
+"件排隊": {
+"en": "jobs waiting",
+"ja": "件待ち",
+"ko": "건 대기 중"
+},
+"例：Z-Image 文生圖": {
+"en": "e.g. Z-Image text-to-image",
+"ja": "例：Z-Image テキストから画像",
+"ko": "예: Z-Image 텍스트→이미지"
+},
+"例：http://127.0.0.1:8188": {
+"en": "e.g. http://127.0.0.1:8188",
+"ja": "例：http://127.0.0.1:8188",
+"ko": "예: http://127.0.0.1:8188"
+},
+"個問題": {
+"en": "issues",
+"ja": "件の問題",
+"ko": "개 문제"
+},
+"個，請先刪掉不用的": {
+"en": "workflows; delete unused ones first",
+"ja": "件。不要なものを先に削除してください",
+"ko": "개입니다. 쓰지 않는 것을 먼저 삭제하세요"
+},
+"儲存並測試": {
+"en": "Save and test",
+"ja": "保存してテスト",
+"ko": "저장 후 테스트"
+},
+"先選一個 .json 檔": {
+"en": "Choose a .json file first",
+"ja": "先に .json ファイルを選んでください",
+"ko": "먼저 .json 파일을 선택하세요"
+},
+"內建引擎": {
+"en": "Built-in engine",
+"ja": "内蔵エンジン",
+"ko": "내장 엔진"
+},
+"出錯": {
+"en": "failed",
+"ja": "エラー",
+"ko": "오류"
+},
+"分鐘它還在跑這件；請到ComfyUI確認": {
+"en": "minutes it is still running this job; please check ComfyUI",
+"ja": "分たってもまだ実行中です。ComfyUIを確認してください",
+"ko": "분이 지나도 아직 실행 중입니다. ComfyUI를 확인하세요"
+},
+"分類只能是圖片或影片": {
+"en": "Category must be image or video",
+"ja": "分類は画像か動画のみ",
+"ko": "분류는 이미지 또는 동영상만 가능"
+},
+"刪除「": {
+"en": "Delete \"",
+"ja": "削除「",
+"ko": "삭제 '"
+},
+"刪除「{0}」": {
+"en": "Delete \"{0}\"",
+"ja": "「{0}」を削除",
+"ko": "'{0}' 삭제"
+},
+"前面還有": {
+"en": "Queue ahead:",
+"ja": "前に",
+"ko": "앞에"
+},
+"前面還有 {0} 件排隊・": {
+"en": "{0} jobs ahead in the queue・",
+"ja": "前に {0} 件待ち・",
+"ko": "앞에 {0}건 대기 중・"
+},
+"匯入了，但還不能產生": {
+"en": "Imported, but cannot generate yet",
+"ja": "インポートしましたが、まだ生成できません",
+"ko": "가져왔지만 아직 생성할 수 없습니다"
+},
+"匯入工作流": {
+"en": "Import workflows",
+"ja": "ワークフローをインポート",
+"ko": "워크플로 가져오기"
+},
+"去匯入": {
+"en": "Import",
+"ja": "インポートへ",
+"ko": "가져오기"
+},
+"去匯入工作流": {
+"en": "Import a workflow",
+"ja": "ワークフローをインポート",
+"ko": "워크플로 가져오기"
+},
+"去指定": {
+"en": "Choose",
+"ja": "指定へ",
+"ko": "지정하기"
+},
+"去產生": {
+"en": "Generate",
+"ja": "生成へ",
+"ko": "생성하기"
+},
+"去設定": {
+"en": "Set up",
+"ja": "設定へ",
+"ko": "설정하기"
+},
+"去設定連線": {
+"en": "Set up connection",
+"ja": "接続を設定",
+"ko": "연결 설정하기"
+},
+"取回產出": {
+"en": "Fetching outputs",
+"ja": "出力を取得中",
+"ko": "출력 가져오는 중"
+},
+"取消中：ComfyUI要等正在跑的這個節點做完才會停": {
+"en": "Cancelling: ComfyUI stops only after the node it is running finishes",
+"ja": "キャンセル中：ComfyUIは実行中のノードが終わってから停止します",
+"ko": "취소 중: ComfyUI는 실행 중인 노드가 끝나야 멈춥니다"
+},
+"只刪xConsole裡的這份工作流；ComfyUI那邊的檔案與已經產出的圖片、影片都不動。": {
+"en": "Deletes only this workflow in xConsole; files in ComfyUI and already generated images and videos are untouched.",
+"ja": "xConsole内のこのワークフローだけを削除します。ComfyUI側のファイルと生成済みの画像・動画はそのままです。",
+"ko": "xConsole 안의 이 워크플로만 삭제합니다. ComfyUI 쪽 파일과 이미 생성된 이미지·동영상은 그대로입니다."
+},
+"只收 PNG、JPEG、WebP": {
+"en": "PNG, JPEG and WebP only",
+"ja": "PNG、JPEG、WebPのみ",
+"ko": "PNG, JPEG, WebP만"
+},
+"只放在 Authorization 標頭送出，不會出現在網址；存的時候加密": {
+"en": "Sent only in the Authorization header, never in the URL; encrypted when saved",
+"ja": "Authorizationヘッダーでのみ送信し、URLには出ません。保存時に暗号化",
+"ko": "Authorization 헤더로만 보내며 URL에는 나타나지 않습니다. 저장 시 암호화"
+},
+"只能指定家目錄、資料磁碟或外接碟底下的資料夾": {
+"en": "Only folders under the home folder, data disks or external drives can be chosen",
+"ja": "ホームフォルダー、データディスク、外付けドライブ配下のフォルダーのみ指定できます",
+"ko": "홈 폴더, 데이터 디스크, 외장 드라이브 아래의 폴더만 지정할 수 있습니다"
+},
+"可調整的欄位": {
+"en": "Adjustable fields",
+"ja": "調整できる項目",
+"ko": "조정 가능한 항목"
+},
+"同時最多": {
+"en": "At most",
+"ja": "同時実行は最大",
+"ko": "동시에 최대"
+},
+"同時最多 ": {
+"en": "At most ",
+"ja": "同時実行は最大 ",
+"ko": "동시에 최대 "
+},
+"同時最多 {0} 件在跑，等前面的跑完再送": {
+"en": "At most {0} jobs at once; wait for earlier ones to finish",
+"ja": "同時実行は最大 {0} 件。前のジョブが終わってから送ってください",
+"ko": "동시에 최대 {0}건입니다. 앞의 작업이 끝난 뒤 보내세요"
+},
+"名稱要 1～60 個字，不能有 < > 或控制字元": {
+"en": "Name must be 1–60 characters, without < > or control characters",
+"ja": "名前は1～60文字、< > や制御文字は使えません",
+"ko": "이름은 1~60자이며 < > 또는 제어 문자를 쓸 수 없습니다"
+},
+"名稱要 1～60 個字，分類只能是圖片或影片": {
+"en": "Name must be 1–60 characters; category must be image or video",
+"ja": "名前は1～60文字、分類は画像か動画のみ",
+"ko": "이름은 1~60자, 분류는 이미지 또는 동영상만 가능"
+},
+"在ComfyUI存好的工作流（.json）匯進來，系統會檢查缺哪些節點與模型": {
+"en": "Import a workflow (.json) saved in ComfyUI; the system checks for missing nodes and models",
+"ja": "ComfyUIで保存したワークフロー（.json）を取り込みます。足りないノードやモデルを確認します",
+"ko": "ComfyUI에서 저장한 워크플로(.json)를 가져오면 누락된 노드와 모델을 확인합니다"
+},
+"在哪台機器": {
+"en": "On which machine",
+"ja": "どのマシン",
+"ko": "어느 컴퓨터"
+},
+"執行節點 #": {
+"en": "Running node #",
+"ja": "実行中のノード #",
+"ko": "실행 중인 노드 #"
+},
+"執行節點 #{0}（{1}）": {
+"en": "Running node #{0} ({1})",
+"ja": "ノード #{0}（{1}）を実行中",
+"ko": "노드 #{0}({1}) 실행 중"
+},
+"填ComfyUI的網址（或讓系統找本機的），存起來會先驗證對方真的是ComfyUI": {
+"en": "Enter the ComfyUI URL (or let the system find a local one); saving first verifies it really is ComfyUI",
+"ja": "ComfyUIのURLを入力（またはローカルを自動検出）。保存時に本当にComfyUIか確認します",
+"ko": "ComfyUI URL을 입력하세요(또는 로컬 자동 검색). 저장 시 실제 ComfyUI인지 먼저 확인합니다"
+},
+"填的是": {
+"en": "is set to",
+"ja": "の値は",
+"ko": "값은"
+},
+"子圖展開後節點太多（最多": {
+"en": "Too many nodes after expanding subgraphs (at most",
+"ja": "サブグラフ展開後のノードが多すぎます（最大",
+"ko": "서브그래프를 펼친 뒤 노드가 너무 많습니다(최대"
+},
+"子圖展開後節點太多（最多 ": {
+"en": "Too many nodes after expanding subgraphs (at most ",
+"ja": "サブグラフ展開後のノードが多すぎます（最大 ",
+"ko": "서브그래프를 펼친 뒤 노드가 너무 많습니다(최대 "
+},
+"子圖展開後節點太多（最多 {0} 個）": {
+"en": "Too many nodes after expanding subgraphs (at most {0})",
+"ja": "サブグラフ展開後のノードが多すぎます（最大 {0} 個）",
+"ko": "서브그래프를 펼친 뒤 노드가 너무 많습니다(최대 {0}개)"
+},
+"存的設定值對不上這台ComfyUI的節點定義（節點版本不同，或這個節點的欄位是ComfyUI畫面自己產生的），照順序對下去會填錯欄位。請在ComfyUI用「匯出（API）」存一份再匯入": {
+"en": "'s saved values don't match this ComfyUI's node definition (different node version, or the fields are created by ComfyUI's UI itself), so matching them in order would fill the wrong fields. Save it with \"Export (API)\" in ComfyUI and import that",
+"ja": "の保存値がこのComfyUIのノード定義と合いません（ノードのバージョンが違う、またはComfyUI画面が独自に作る項目）。順番に当てはめると誤った項目に入ります。ComfyUIの「エクスポート（API）」で保存してからインポートしてください",
+"ko": "의 저장값이 이 ComfyUI의 노드 정의와 맞지 않습니다(노드 버전이 다르거나 ComfyUI 화면이 자체 생성하는 항목). 순서대로 넣으면 잘못된 항목에 들어갑니다. ComfyUI의 'Export (API)'로 저장한 뒤 가져오세요"
+},
+"寬": {
+"en": "Width",
+"ja": "幅",
+"ko": "너비"
+},
+"對應的子資料夾": {
+"en": "the matching subfolder",
+"ja": "対応するサブフォルダー",
+"ko": "해당 하위 폴더"
+},
+"對方回的不是JSON（HTTP": {
+"en": "The server didn't return JSON (HTTP",
+"ja": "相手の応答がJSONではありません（HTTP",
+"ko": "상대 응답이 JSON이 아닙니다(HTTP"
+},
+"對方回的不是JSON（HTTP ": {
+"en": "The server didn't return JSON (HTTP ",
+"ja": "相手の応答がJSONではありません（HTTP ",
+"ko": "상대 응답이 JSON이 아닙니다(HTTP "
+},
+"對方回的不是JSON（HTTP {0}），這個網址可能不是ComfyUI，例如登入頁或別的網站": {
+"en": "The server didn't return JSON (HTTP {0}); this URL may not be ComfyUI, e.g. a login page or another site",
+"ja": "相手の応答がJSONではありません（HTTP {0}）。このURLはComfyUIではない可能性があります（ログインページや別のサイトなど）",
+"ko": "상대 응답이 JSON이 아닙니다(HTTP {0}). 이 URL은 ComfyUI가 아닐 수 있습니다(로그인 페이지나 다른 사이트 등)"
+},
+"對方有回JSON，但格式不像ComfyUI的 /system_stats；這個網址可能不是ComfyUI": {
+"en": "The server returned JSON, but it doesn't look like ComfyUI's /system_stats; this URL may not be ComfyUI",
+"ja": "JSONは返りましたが、ComfyUIの /system_stats の形式ではありません。このURLはComfyUIではないかもしれません",
+"ko": "JSON을 반환했지만 ComfyUI의 /system_stats 형식이 아닙니다. 이 URL은 ComfyUI가 아닐 수 있습니다"
+},
+"對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen": {
+"en": "nothing is serving on this port. Make sure ComfyUI is running; for other machines add --listen",
+"ja": "このポートでサービスしていません。ComfyUIが起動しているか確認し、他のマシンから使うなら --listen を付けてください",
+"ko": "이 포트에서 서비스하지 않습니다. ComfyUI가 실행 중인지 확인하고, 다른 컴퓨터에서 쓰려면 --listen을 붙이세요"
+},
+"對方的CA憑證": {
+"en": "Server's CA certificate",
+"ja": "相手のCA証明書",
+"ko": "상대의 CA 인증서"
+},
+"工作流": {
+"en": "Workflow",
+"ja": "ワークフロー",
+"ko": "워크플로"
+},
+"工作流改名": {
+"en": "Rename workflow",
+"ja": "ワークフロー名を変更",
+"ko": "워크플로 이름 바꾸기"
+},
+"工作流最多": {
+"en": "At most",
+"ja": "最大",
+"ko": "최대"
+},
+"工作流最多 ": {
+"en": "At most ",
+"ja": "ワークフローは最大 ",
+"ko": "워크플로는 최대 "
+},
+"工作流最多 {0} 個，請先刪掉不用的": {
+"en": "At most {0} workflows; delete unused ones first",
+"ja": "ワークフローは最大 {0} 件。不要なものを先に削除してください",
+"ko": "워크플로는 최대 {0}개입니다. 쓰지 않는 것을 먼저 삭제하세요"
+},
+"工作流檔最大 5 MB": {
+"en": "Workflow files are at most 5 MB",
+"ja": "ワークフローファイルは最大5 MB",
+"ko": "워크플로 파일은 최대 5 MB"
+},
+"工作流檔最大 8 MB": {
+"en": "Workflow files are at most 8 MB",
+"ja": "ワークフローファイルは最大8 MB",
+"ko": "워크플로 파일은 최대 8 MB"
+},
+"工作流裡有節點編號或類型格式不對": {
+"en": "Node IDs or types in the workflow are malformed",
+"ja": "ワークフロー内のノード番号または種類の形式が正しくありません",
+"ko": "워크플로의 노드 번호나 종류 형식이 올바르지 않습니다"
+},
+"已匯入「": {
+"en": "Imported \"",
+"ja": "インポートしました「",
+"ko": "가져왔습니다 '"
+},
+"已匯入「{0}」（{1}）": {
+"en": "Imported \"{0}\" ({1})",
+"ja": "「{0}」（{1}）をインポートしました",
+"ko": "'{0}'({1})을(를) 가져왔습니다"
+},
+"已匯入一張；貼新的會換掉，空白＝保留": {
+"en": "One imported; pasting a new one replaces it, blank = keep",
+"ja": "1枚インポート済み。新しく貼ると置き換え、空欄＝維持",
+"ko": "하나 가져옴. 새로 붙여 넣으면 교체, 비우면 유지"
+},
+"已匯入的工作流": {
+"en": "Imported workflows",
+"ja": "インポート済みのワークフロー",
+"ko": "가져온 워크플로"
+},
+"已帶入這件的設定（輸入圖片要重新選）": {
+"en": "Settings from this job filled in (choose input images again)",
+"ja": "このジョブの設定を入れました（入力画像は選び直してください）",
+"ko": "이 작업의 설정을 채웠습니다(입력 이미지는 다시 선택하세요)"
+},
+"已指定ComfyUI資料夾": {
+"en": "ComfyUI folder set",
+"ja": "ComfyUIフォルダーを指定しました",
+"ko": "ComfyUI 폴더를 지정했습니다"
+},
+"已改分類": {
+"en": "Category changed",
+"ja": "分類を変更しました",
+"ko": "분류를 바꿨습니다"
+},
+"已改成不指定": {
+"en": "Changed to not set",
+"ja": "未指定に変更しました",
+"ko": "지정 안 함으로 바꿨습니다"
+},
+"已經 {0} 秒": {
+"en": "{0} s elapsed",
+"ja": "経過 {0} 秒",
+"ko": "{0}초 경과"
+},
+"已設定；空白＝保留原金鑰": {
+"en": "Set; blank = keep the current key",
+"ja": "設定済み。空欄＝現在のキーを維持",
+"ko": "설정됨. 비워 두면 기존 키 유지"
+},
+"已請ComfyUI停下，但過了": {
+"en": "Asked ComfyUI to stop, but after",
+"ja": "ComfyUIに停止を依頼しましたが、経過",
+"ko": "ComfyUI에 중지를 요청했지만"
+},
+"已請ComfyUI停下，但過了 ": {
+"en": "Asked ComfyUI to stop, but after ",
+"ja": "ComfyUIに停止を依頼しましたが、経過 ",
+"ko": "ComfyUI에 중지를 요청했지만 "
+},
+"已請ComfyUI停下，但過了 {0} 分鐘它還在跑這件；請到ComfyUI確認": {
+"en": "Asked ComfyUI to stop, but after {0} minutes it is still running this job; please check ComfyUI",
+"ja": "ComfyUIに停止を依頼しましたが、{0} 分たってもまだ実行中です。ComfyUIを確認してください",
+"ko": "ComfyUI에 중지를 요청했지만 {0}분이 지나도 아직 실행 중입니다. ComfyUI를 확인하세요"
+},
+"已連上 ComfyUI": {
+"en": "Connected to ComfyUI",
+"ja": "ComfyUIに接続しました",
+"ko": "ComfyUI에 연결했습니다"
+},
+"已連上 ComfyUI {0}": {
+"en": "Connected to ComfyUI {0}",
+"ja": "ComfyUI {0} に接続しました",
+"ko": "ComfyUI {0}에 연결했습니다"
+},
+"影片＝輸出節點是儲存影片這類": {
+"en": "Video = the output node saves a video",
+"ja": "動画＝出力ノードが動画を保存するもの",
+"ko": "동영상 = 출력 노드가 동영상을 저장하는 것"
+},
+"想要的畫面": {
+"en": "The picture you want",
+"ja": "欲しい画面",
+"ko": "원하는 장면"
+},
+"找找看 8188、8000、8189 這幾個埠，以及納管的每台機器…": {
+"en": "Checking ports 8188, 8000 and 8189, and every managed machine…",
+"ja": "ポート8188、8000、8189と管理下の各マシンを確認中…",
+"ko": "포트 8188, 8000, 8189와 관리 중인 모든 컴퓨터를 확인하는 중…"
+},
+"找本機的ComfyUI": {
+"en": "Find local ComfyUI",
+"ja": "ローカルのComfyUIを探す",
+"ko": "로컬 ComfyUI 찾기"
+},
+"指定ComfyUI資料夾": {
+"en": "Choose the ComfyUI folder",
+"ja": "ComfyUIフォルダーを指定",
+"ko": "ComfyUI 폴더 지정"
+},
+"挑一個工作流、寫提示詞、按產生；進度與結果在右邊": {
+"en": "Pick a workflow, write a prompt, press Generate; progress and results appear on the right",
+"ja": "ワークフローを選び、プロンプトを書いて生成。進捗と結果は右側に表示",
+"ko": "워크플로를 고르고 프롬프트를 쓴 뒤 생성을 누르세요. 진행 상황과 결과는 오른쪽에 표시됩니다"
+},
+"換一個資料夾": {
+"en": "Choose another folder",
+"ja": "別のフォルダーを選ぶ",
+"ko": "다른 폴더 선택"
+},
+"沒找到正在執行的ComfyUI。請確認它有啟動；在別台的話要加 --listen，然後把網址填在上面。": {
+"en": "No running ComfyUI found. Make sure it is started; on another machine add --listen, then enter the URL above.",
+"ja": "実行中のComfyUIが見つかりません。起動しているか確認し、別マシンなら --listen を付けて上にURLを入力してください。",
+"ko": "실행 중인 ComfyUI를 찾지 못했습니다. 실행 중인지 확인하고, 다른 컴퓨터라면 --listen을 붙인 뒤 위에 URL을 입력하세요."
+},
+"沒有匯入": {
+"en": "Not imported",
+"ja": "インポートしませんでした",
+"ko": "가져오지 않음"
+},
+"沒有模型檔": {
+"en": "No model files",
+"ja": "モデルファイルなし",
+"ko": "모델 파일 없음"
+},
+"沒有說明": {
+"en": "No details",
+"ja": "説明なし",
+"ko": "설명 없음"
+},
+"沒有這個工作流": {
+"en": "No such workflow",
+"ja": "このワークフローはありません",
+"ko": "이 워크플로가 없습니다"
+},
+"沒有這個工作流，可能被管理員刪掉了；請重新整理": {
+"en": "No such workflow; an administrator may have deleted it. Please refresh",
+"ja": "このワークフローはありません。管理者が削除した可能性があります。再読み込みしてください",
+"ko": "이 워크플로가 없습니다. 관리자가 삭제했을 수 있습니다. 새로 고침하세요"
+},
+"沒有連得上的機器：ComfyUI資料夾要在納管的機器上（代理會幫忙列出模型）。": {
+"en": "No reachable machine: the ComfyUI folder must be on a managed machine (its agent lists the models).",
+"ja": "接続できるマシンがありません。ComfyUIフォルダーは管理下のマシン上にある必要があります（エージェントがモデルを一覧表示します）。",
+"ko": "연결 가능한 컴퓨터가 없습니다. ComfyUI 폴더는 관리 중인 컴퓨터에 있어야 합니다(에이전트가 모델을 나열합니다)."
+},
+"沒有（照原樣跑）": {
+"en": "None (runs as saved)",
+"ja": "なし（そのまま実行）",
+"ko": "없음(저장된 그대로 실행)"
+},
+"沒連上": {
+"en": "Not connected",
+"ja": "接続できません",
+"ko": "연결 안 됨"
+},
+"沒連上：{0}": {
+"en": "Not connected: {0}",
+"ja": "接続できません：{0}",
+"ko": "연결 안 됨: {0}"
+},
+"清掉網址、金鑰與CA憑證；匯入的工作流與已產出的圖片、影片都留著，之後重新連上就能再用。": {
+"en": "Clears the URL, key and CA certificate; imported workflows and generated images and videos stay, ready to use again after reconnecting.",
+"ja": "URL、キー、CA証明書を消去します。インポートしたワークフローと生成済みの画像・動画は残り、再接続すれば使えます。",
+"ko": "URL, 키, CA 인증서를 지웁니다. 가져온 워크플로와 생성된 이미지·동영상은 남아 있어 다시 연결하면 사용할 수 있습니다."
+},
+"然後重新整理或重啟ComfyUI": {
+"en": "then refresh or restart ComfyUI",
+"ja": "その後、再読み込みまたはComfyUIを再起動",
+"ko": "그 뒤 새로 고치거나 ComfyUI를 다시 시작"
+},
+"產生{0}": {
+"en": "Generate {0}",
+"ja": "{0}を生成",
+"ko": "{0} 생성"
+},
+"用ComfyUI的工作流": {
+"en": "Using a ComfyUI workflow",
+"ja": "ComfyUIのワークフローを使用",
+"ko": "ComfyUI 워크플로 사용"
+},
+"用這個": {
+"en": "Use this",
+"ja": "これを使う",
+"ko": "이것 사용"
+},
+"用這個：{0}{1}": {
+"en": "Use this: {0}{1}",
+"ja": "これを使う：{0}{1}",
+"ko": "이것 사용: {0}{1}"
+},
+"秒數": {
+"en": "Seconds",
+"ja": "秒数",
+"ko": "초"
+},
+"種子要是整數，-1＝隨機": {
+"en": "Seed must be an integer; -1 = random",
+"ja": "シードは整数、-1＝ランダム",
+"ko": "시드는 정수여야 합니다. -1 = 무작위"
+},
+"第 {0} 個": {
+"en": "#{0}",
+"ja": "{0}番目",
+"ko": "{0}번째"
+},
+"節點 #": {
+"en": "Node #",
+"ja": "ノード #",
+"ko": "노드 #"
+},
+"節點 #{0}{1}（{2}）": {
+"en": "Node #{0}{1} ({2})",
+"ja": "ノード #{0}{1}（{2}）",
+"ko": "노드 #{0}{1}({2})"
+},
+"節點 #{0}（{1}）{2}": {
+"en": "Node #{0} ({1}) {2}",
+"ja": "ノード #{0}（{1}）{2}",
+"ko": "노드 #{0}({1}) {2}"
+},
+"節點 #{0}（{1}）出錯：{2}": {
+"en": "Node #{0} ({1}) failed: {2}",
+"ja": "ノード #{0}（{1}）でエラー：{2}",
+"ko": "노드 #{0}({1}) 오류: {2}"
+},
+"節點 #{0}（{1}）的 {2} 填的是 {3}，ComfyUI沒有這個選項（可選：{4}）": {
+"en": "Node #{0} ({1}) has {2} set to {3}, which ComfyUI doesn't offer (choices: {4})",
+"ja": "ノード #{0}（{1}）の {2} は {3} ですが、ComfyUIにその選択肢はありません（選択肢：{4}）",
+"ko": "노드 #{0}({1})의 {2} 값은 {3}이지만 ComfyUI에 그 선택지가 없습니다(선택지: {4})"
+},
+"節點 #{0}（{1}）要用的 {2} 不在ComfyUI裡：請放進 {3}，然後重新整理或重啟ComfyUI": {
+"en": "Node #{0} ({1}) needs {2}, which is not in ComfyUI: put it in {3}, then refresh or restart ComfyUI",
+"ja": "ノード #{0}（{1}）が使う {2} がComfyUIにありません：{3} に置いてから、再読み込みまたはComfyUIを再起動してください",
+"ko": "노드 #{0}({1})이(가) 쓰는 {2}이(가) ComfyUI에 없습니다: {3}에 넣은 뒤 새로 고치거나 ComfyUI를 다시 시작하세요"
+},
+"節點太多（最多": {
+"en": "Too many nodes (at most",
+"ja": "ノードが多すぎます（最大",
+"ko": "노드가 너무 많습니다(최대"
+},
+"節點太多（最多 ": {
+"en": "Too many nodes (at most ",
+"ja": "ノードが多すぎます（最大 ",
+"ko": "노드가 너무 많습니다(최대 "
+},
+"節點太多（最多 {0} 個）": {
+"en": "Too many nodes (at most {0})",
+"ja": "ノードが多すぎます（最大 {0} 個）",
+"ko": "노드가 너무 많습니다(최대 {0}개)"
+},
+"網址只收 http(s)://主機:埠/路徑（不能帶帳密、查詢字串）": {
+"en": "URL must be http(s)://host:port/path (no credentials or query string)",
+"ja": "URLは http(s)://ホスト:ポート/パス のみ（認証情報やクエリ文字列は不可）",
+"ko": "URL은 http(s)://호스트:포트/경로만 가능(자격 증명·쿼리 문자열 불가)"
+},
+"網址要填，例：http://127.0.0.1:8188": {
+"en": "A URL is required, e.g. http://127.0.0.1:8188",
+"ja": "URLを入力してください。例：http://127.0.0.1:8188",
+"ko": "URL을 입력하세요. 예: http://127.0.0.1:8188"
+},
+"缺節點時：在ComfyUI打開這個工作流，用ComfyUI Manager的「安裝缺失節點」裝好、重啟ComfyUI，再回來匯入。": {
+"en": "Missing nodes: open this workflow in ComfyUI, install them with ComfyUI Manager's \"Install Missing Custom Nodes\", restart ComfyUI, then import again.",
+"ja": "ノードが足りない場合：ComfyUIでこのワークフローを開き、ComfyUI Managerの「Install Missing Custom Nodes」で入れてComfyUIを再起動し、もう一度インポートしてください。",
+"ko": "노드가 없을 때: ComfyUI에서 이 워크플로를 열고 ComfyUI Manager의 'Install Missing Custom Nodes'로 설치한 뒤 ComfyUI를 다시 시작하고 다시 가져오세요."
+},
+"自動判斷（看輸出節點）": {
+"en": "Automatic (by output node)",
+"ja": "自動判定（出力ノードで判断）",
+"ko": "자동 판단(출력 노드 기준)"
+},
+"自建CA的ComfyUI請在連線設定匯入對方的CA憑證": {
+"en": "For ComfyUI with a private CA, import its CA certificate in the connection settings",
+"ja": "独自CAのComfyUIは接続設定で相手のCA証明書をインポートしてください",
+"ko": "자체 CA를 쓰는 ComfyUI는 연결 설정에서 상대의 CA 인증서를 가져오세요"
+},
+"處理時出錯": {
+"en": "Error while processing",
+"ja": "処理中にエラー",
+"ko": "처리 중 오류"
+},
+"處理時出錯：": {
+"en": "Error while processing: ",
+"ja": "処理中にエラー：",
+"ko": "처리 중 오류: "
+},
+"處理時出錯：{0}": {
+"en": "Error while processing: {0}",
+"ja": "処理中にエラー：{0}",
+"ko": "처리 중 오류: {0}"
+},
+"要先連上ComfyUI才能匯入（讀節點定義）：": {
+"en": "Connect to ComfyUI before importing (to read node definitions): ",
+"ja": "インポートの前にComfyUIへ接続してください（ノード定義を読むため）：",
+"ko": "가져오기 전에 ComfyUI에 연결하세요(노드 정의를 읽기 위해): "
+},
+"要先連上ComfyUI才能匯入：系統要讀ComfyUI的節點定義，才看得懂工作流、檢查缺什麼。": {
+"en": "Connect to ComfyUI first: the system reads ComfyUI's node definitions to understand the workflow and check what is missing.",
+"ja": "まずComfyUIに接続してください。ノード定義を読んでワークフローを理解し、不足を確認します。",
+"ko": "먼저 ComfyUI에 연결하세요. 노드 정의를 읽어 워크플로를 이해하고 누락된 것을 확인합니다."
+},
+"要用的": {
+"en": "needs",
+"ja": "が使う",
+"ko": "이(가) 쓰는"
+},
+"請找管理員設定。": {
+"en": "Please ask an administrator to set it up.",
+"ja": "管理者に設定を依頼してください。",
+"ko": "관리자에게 설정을 요청하세요."
+},
+"讀不出這個檔：不是JSON": {
+"en": "Cannot read this file: not JSON",
+"ja": "このファイルを読めません：JSONではありません",
+"ko": "이 파일을 읽을 수 없습니다: JSON이 아닙니다"
+},
+"超過 6 小時還沒跑完，已請ComfyUI停下": {
+"en": "Not finished after 6 hours; asked ComfyUI to stop",
+"ja": "6時間たっても終わらないため、ComfyUIに停止を依頼しました",
+"ko": "6시간이 지나도 끝나지 않아 ComfyUI에 중지를 요청했습니다"
+},
+"輸入圖片": {
+"en": "Input image",
+"ja": "入力画像",
+"ko": "입력 이미지"
+},
+"轉址；為了不把金鑰送到別處，不跟轉址。請填ComfyUI實際的網址": {
+"en": "redirect; to avoid sending the key elsewhere, redirects aren't followed. Enter ComfyUI's actual URL",
+"ja": "リダイレクト。キーを他へ送らないためリダイレクトには従いません。ComfyUIの実際のURLを入力してください",
+"ko": "리디렉션. 키가 다른 곳으로 가지 않도록 리디렉션을 따르지 않습니다. ComfyUI의 실제 URL을 입력하세요"
+},
+"這不像ComfyUI資料夾：找不到models，或models底下沒有checkpoints、diffusion_models、vae這類子資料夾": {
+"en": "This doesn't look like a ComfyUI folder: no models, or no checkpoints, diffusion_models, vae subfolders under models",
+"ja": "ComfyUIフォルダーではないようです：modelsがないか、models内にcheckpoints、diffusion_models、vaeなどのサブフォルダーがありません",
+"ko": "ComfyUI 폴더가 아닌 것 같습니다: models가 없거나 models 안에 checkpoints, diffusion_models, vae 같은 하위 폴더가 없습니다"
+},
+"這不是ComfyUI的工作流檔": {
+"en": "This is not a ComfyUI workflow file",
+"ja": "ComfyUIのワークフローファイルではありません",
+"ko": "ComfyUI 워크플로 파일이 아닙니다"
+},
+"這不是ComfyUI的工作流檔（找不到節點）": {
+"en": "This is not a ComfyUI workflow file (no nodes found)",
+"ja": "ComfyUIのワークフローファイルではありません（ノードが見つかりません）",
+"ko": "ComfyUI 워크플로 파일이 아닙니다(노드를 찾지 못함)"
+},
+"這些檔案歸ComfyUI管，xConsole只讀清單，不會刪除或搬動；要刪請在ComfyUI或檔案總管裡刪": {
+"en": "These files belong to ComfyUI; xConsole only reads the list and never deletes or moves them. To delete, use ComfyUI or your file manager",
+"ja": "これらはComfyUIの管理下で、xConsoleは一覧を読むだけで削除・移動はしません。削除はComfyUIかファイルマネージャーで",
+"ko": "이 파일은 ComfyUI 소유이며 xConsole은 목록만 읽고 삭제하거나 옮기지 않습니다. 삭제는 ComfyUI나 파일 관리자에서"
+},
+"這件已經結束了": {
+"en": "This job has already finished",
+"ja": "このジョブはすでに終了しています",
+"ko": "이 작업은 이미 끝났습니다"
+},
+"這件的紀錄讀不回來": {
+"en": "This job's record cannot be read",
+"ja": "このジョブの記録を読み込めません",
+"ko": "이 작업의 기록을 읽을 수 없습니다"
+},
+"這件還在跑，先取消再刪": {
+"en": "This job is still running; cancel it before deleting",
+"ja": "このジョブは実行中です。先にキャンセルしてから削除してください",
+"ko": "이 작업은 아직 실행 중입니다. 먼저 취소한 뒤 삭제하세요"
+},
+"這個工作流一定要先選一張圖": {
+"en": "This workflow needs an image first",
+"ja": "このワークフローは先に画像が必要です",
+"ko": "이 워크플로는 먼저 이미지를 선택해야 합니다"
+},
+"這個工作流已經被刪掉了": {
+"en": "This workflow has been deleted",
+"ja": "このワークフローは削除されています",
+"ko": "이 워크플로는 삭제되었습니다"
+},
+"這個工作流沒有可以在這裡調整的欄位，會照ComfyUI裡存的設定跑。": {
+"en": "This workflow has no fields to adjust here; it runs with the settings saved in ComfyUI.",
+"ja": "このワークフローにはここで調整できる項目がなく、ComfyUIに保存された設定で実行します。",
+"ko": "이 워크플로에는 여기서 조정할 항목이 없어 ComfyUI에 저장된 설정으로 실행됩니다."
+},
+"這個工作流沒有輸出節點（例如「儲存圖片」Save Image、「儲存影片」Save Video），跑完不會留下檔案；請在ComfyUI加一個再匯入": {
+"en": "This workflow has no output node (such as Save Image or Save Video), so it leaves no files; add one in ComfyUI and import again",
+"ja": "このワークフローには出力ノード（Save Image、Save Videoなど）がなく、実行してもファイルが残りません。ComfyUIで追加してから再インポートしてください",
+"ko": "이 워크플로에는 출력 노드(Save Image, Save Video 등)가 없어 실행해도 파일이 남지 않습니다. ComfyUI에서 추가한 뒤 다시 가져오세요"
+},
+"這個工作流用了舊式的群組節點（Group Node）；請在ComfyUI按「匯出（API）」存一份再匯入": {
+"en": "This workflow uses legacy Group Nodes; save it with \"Export (API)\" in ComfyUI and import that",
+"ja": "このワークフローは旧式のグループノード（Group Node）を使っています。ComfyUIの「エクスポート（API）」で保存してからインポートしてください",
+"ko": "이 워크플로는 구식 그룹 노드(Group Node)를 씁니다. ComfyUI의 'Export (API)'로 저장한 뒤 가져오세요"
+},
+"這個檔案不見了": {
+"en": "This file is missing",
+"ja": "このファイルが見つかりません",
+"ko": "이 파일이 없습니다"
+},
+"這個網址可能不是ComfyUI，例如登入頁或別的網站": {
+"en": "this URL may not be ComfyUI, e.g. a login page or another site",
+"ja": "このURLはComfyUIではない可能性があります（ログインページや別のサイトなど）",
+"ko": "이 URL은 ComfyUI가 아닐 수 있습니다(로그인 페이지나 다른 사이트 등)"
+},
+"這個網址沒有": {
+"en": "This URL has no",
+"ja": "このURLにはありません",
+"ko": "이 URL에는 없음"
+},
+"這個網址沒有 ": {
+"en": "This URL has no ",
+"ja": "このURLにはありません ",
+"ko": "이 URL에는 없음 "
+},
+"這個網址沒有 {0}：不是ComfyUI，或網址的路徑不對": {
+"en": "This URL has no {0}: it isn't ComfyUI, or the path is wrong",
+"ja": "このURLには {0} がありません：ComfyUIではないか、パスが間違っています",
+"ko": "이 URL에는 {0}이(가) 없습니다: ComfyUI가 아니거나 경로가 틀렸습니다"
+},
+"這台的代理版本太舊，不認得ComfyUI資料夾；請先更新代理": {
+"en": "This machine's agent is too old to read ComfyUI folders; update the agent first",
+"ja": "このマシンのエージェントは古く、ComfyUIフォルダーを読めません。先にエージェントを更新してください",
+"ko": "이 컴퓨터의 에이전트가 오래되어 ComfyUI 폴더를 읽지 못합니다. 먼저 에이전트를 업데이트하세요"
+},
+"這幾個節點有錯、ComfyUI不會執行它們（其他照跑）：": {
+"en": "These nodes have errors and ComfyUI won't run them (the rest runs): ",
+"ja": "次のノードにエラーがあり、ComfyUIは実行しません（他は実行）：",
+"ko": "다음 노드에 오류가 있어 ComfyUI가 실행하지 않습니다(나머지는 실행): "
+},
+"連": {
+"en": "Connection to",
+"ja": "接続先",
+"ko": "연결 대상"
+},
+"連 ": {
+"en": "Connection to ",
+"ja": "接続先 ",
+"ko": "연결 대상 "
+},
+"連 {0} 逾時：確認位址、防火牆，以及ComfyUI有沒有卡住": {
+"en": "Connection to {0} timed out: check the address, firewall, and whether ComfyUI is stuck",
+"ja": "{0} への接続がタイムアウト：アドレス、ファイアウォール、ComfyUIが固まっていないか確認してください",
+"ko": "{0} 연결 시간 초과: 주소, 방화벽, ComfyUI가 멈추지 않았는지 확인하세요"
+},
+"連上ComfyUI": {
+"en": "Connect to ComfyUI",
+"ja": "ComfyUIに接続",
+"ko": "ComfyUI에 연결"
+},
+"連上了：ComfyUI": {
+"en": "Connected: ComfyUI",
+"ja": "接続しました：ComfyUI",
+"ko": "연결됨: ComfyUI"
+},
+"連上了：ComfyUI {0}{1}": {
+"en": "Connected: ComfyUI {0}{1}",
+"ja": "接続しました：ComfyUI {0}{1}",
+"ko": "연결됨: ComfyUI {0}{1}"
+},
+"連不到 {0}：對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen": {
+"en": "Cannot reach {0}: nothing is serving on this port. Make sure ComfyUI is running; for other machines add --listen",
+"ja": "{0} に接続できません：このポートでサービスしていません。ComfyUIが起動しているか確認し、他のマシンから使うなら --listen を付けてください",
+"ko": "{0}에 연결할 수 없음: 이 포트에서 서비스하지 않습니다. ComfyUI가 실행 중인지 확인하고, 다른 컴퓨터에서 쓰려면 --listen을 붙이세요"
+},
+"逾時：確認位址、防火牆，以及ComfyUI有沒有卡住": {
+"en": "timed out: check the address, firewall, and whether ComfyUI is stuck",
+"ja": "タイムアウト：アドレス、ファイアウォール、ComfyUIが固まっていないか確認してください",
+"ko": "시간 초과: 주소, 방화벽, ComfyUI가 멈추지 않았는지 확인하세요"
+},
+"選 .json 檔": {
+"en": "Choose .json file",
+"ja": ".json を選択",
+"ko": ".json 파일 선택"
+},
+"選了才看得到它有哪些模型，缺模型時也會講清楚要放進哪個資料夾": {
+"en": "Lets you see which models it has, and tells you exactly which folder a missing model goes in",
+"ja": "指定するとモデル一覧が見え、足りないモデルをどのフォルダーに置くかも分かります",
+"ko": "지정하면 어떤 모델이 있는지 보이고, 없는 모델을 어느 폴더에 넣을지도 알려 줍니다"
+},
+"選填：ComfyUI前面有反向代理或登入外掛才需要": {
+"en": "Optional: only needed if ComfyUI sits behind a reverse proxy or login extension",
+"ja": "任意：ComfyUIの前にリバースプロキシやログイン拡張がある場合のみ",
+"ko": "선택: ComfyUI 앞에 리버스 프록시나 로그인 확장이 있을 때만 필요"
+},
+"選填：選了才列得出它有哪些模型，缺模型時講得出要放哪": {
+"en": "Optional: needed to list its models and to say where a missing model goes",
+"ja": "任意：指定するとモデル一覧と足りないモデルの置き場所が分かります",
+"ko": "선택: 지정하면 모델 목록과 없는 모델을 넣을 위치를 알려 줍니다"
+},
+"選資料夾": {
+"en": "Choose folder",
+"ja": "フォルダーを選ぶ",
+"ko": "폴더 선택"
+},
+"選這台的ComfyUI資料夾（根目錄或models）": {
+"en": "Choose this machine's ComfyUI folder (root or models)",
+"ja": "このマシンのComfyUIフォルダーを選択（ルートまたはmodels）",
+"ko": "이 컴퓨터의 ComfyUI 폴더 선택(루트 또는 models)"
+},
+"還沒串接ComfyUI": {
+"en": "ComfyUI not connected yet",
+"ja": "ComfyUIはまだ未接続",
+"ko": "ComfyUI가 아직 연결되지 않음"
+},
+"還沒串接ComfyUI。": {
+"en": "ComfyUI not connected yet.",
+"ja": "ComfyUIはまだ未接続です。",
+"ko": "ComfyUI가 아직 연결되지 않았습니다."
+},
+"還沒指定": {
+"en": "Not set",
+"ja": "未指定",
+"ko": "지정 안 됨"
+},
+"還沒指定ComfyUI資料夾": {
+"en": "ComfyUI folder not set",
+"ja": "ComfyUIフォルダーが未指定です",
+"ko": "ComfyUI 폴더가 지정되지 않았습니다"
+},
+"還沒有": {
+"en": "No ",
+"ja": "まだ",
+"ko": "아직 "
+},
+"還沒有{0}類的工作流。": {
+"en": "No {0} workflows yet.",
+"ja": "{0}のワークフローはまだありません。",
+"ko": "아직 {0} 워크플로가 없습니다."
+},
+"還沒有。": {
+"en": "None yet.",
+"ja": "まだありません。",
+"ko": "아직 없습니다."
+},
+"還沒設定ComfyUI的網址，請管理員到「畫圖 › ComfyUI › 連線與資料夾」設定": {
+"en": "The ComfyUI URL is not set; an administrator can set it in \"Draw › ComfyUI › Connection & folder\"",
+"ja": "ComfyUIのURLが未設定です。管理者が「画像生成 › ComfyUI › 接続とフォルダー」で設定してください",
+"ko": "ComfyUI URL이 설정되지 않았습니다. 관리자가 '그림 › ComfyUI › 연결 및 폴더'에서 설정하세요"
+},
+"還沒選檔案": {
+"en": "No file chosen",
+"ja": "ファイル未選択",
+"ko": "선택한 파일 없음"
+},
+"重新掃描": {
+"en": "Rescan",
+"ja": "再スキャン",
+"ko": "다시 검색"
+},
+"重新測試": {
+"en": "Test again",
+"ja": "再テスト",
+"ko": "다시 테스트"
+},
+"長度（影格數）": {
+"en": "Length (frames)",
+"ja": "長さ（フレーム数）",
+"ko": "길이(프레임 수)"
+},
+"開始產生": {
+"en": "Starting generation",
+"ja": "生成開始",
+"ko": "생성 시작"
+},
+"需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來": {
+"en": "a key is required or wrong (blocked by a reverse proxy or login extension in front of ComfyUI",
+"ja": "キーが必要か間違っています（ComfyUIの前のリバースプロキシかログイン拡張が拒否",
+"ko": "키가 필요하거나 틀렸습니다(ComfyUI 앞의 리버스 프록시나 로그인 확장이 차단"
+},
+"類的工作流": {
+"en": " workflows",
+"ja": "のワークフロー",
+"ko": " 워크플로"
+},
+"高": {
+"en": "Height",
+"ja": "高さ",
+"ko": "높이"
+},
+"（太多了，只列前 2000 個）": {
+"en": "(too many; listing the first 2000)",
+"ja": "（多すぎるため最初の2000件のみ）",
+"ko": "(너무 많아 처음 2000개만 표시)"
+},
+"（有問題）": {
+"en": "(has issues)",
+"ja": "（問題あり）",
+"ko": "(문제 있음)"
+},
+"（沒有回報版本）": {
+"en": "(no version reported)",
+"ja": "（バージョン未報告）",
+"ko": "(버전 정보 없음)"
+},
+"）。自建CA的ComfyUI請在連線設定匯入對方的CA憑證": {
+"en": "). For ComfyUI with a private CA, import its CA certificate in the connection settings",
+"ja": "）。独自CAのComfyUIは接続設定で相手のCA証明書をインポートしてください",
+"ko": "). 자체 CA를 쓰는 ComfyUI는 연결 설정에서 상대의 CA 인증서를 가져오세요"
+},
+"）出錯：": {
+"en": ") failed: ",
+"ja": "）でエラー：",
+"ko": ") 오류: "
+},
+"）的 ": {
+"en": ") has ",
+"ja": "）の ",
+"ko": ")의 "
+},
+"）要用的 ": {
+"en": ") needs ",
+"ja": "）が使う ",
+"ko": ")이(가) 쓰는 "
+},
+"），這個網址可能不是ComfyUI，例如登入頁或別的網站": {
+"en": "); this URL may not be ComfyUI, e.g. a login page or another site",
+"ja": "）。このURLはComfyUIではない可能性があります（ログインページや別のサイトなど）",
+"ko": "). 이 URL은 ComfyUI가 아닐 수 있습니다(로그인 페이지나 다른 사이트 등)"
+},
+"，ComfyUI沒有這個選項（可選：": {
+"en": ", which ComfyUI doesn't offer (choices: ",
+"ja": "、ComfyUIにその選択肢はありません（選択肢：",
+"ko": ", ComfyUI에 그 선택지가 없습니다(선택지: "
+},
+"，然後重新整理或重啟ComfyUI": {
+"en": ", then refresh or restart ComfyUI",
+"ja": "。その後、再読み込みまたはComfyUIを再起動してください",
+"ko": ", 그 뒤 새로 고치거나 ComfyUI를 다시 시작하세요"
+},
+"：不是ComfyUI，或網址的路徑不對": {
+"en": ": it isn't ComfyUI, or the path is wrong",
+"ja": "：ComfyUIではないか、パスが間違っています",
+"ko": ": ComfyUI가 아니거나 경로가 틀렸습니다"
+},
+"：對方沒有在這個埠服務。確認ComfyUI有啟動；給別台連要加 --listen": {
+"en": ": nothing is serving on this port. Make sure ComfyUI is running; for other machines add --listen",
+"ja": "：このポートでサービスしていません。ComfyUIが起動しているか確認し、他のマシンから使うなら --listen を付けてください",
+"ko": ": 이 포트에서 서비스하지 않습니다. ComfyUI가 실행 중인지 확인하고, 다른 컴퓨터에서 쓰려면 --listen을 붙이세요"
+},
+"：需要金鑰或金鑰不對（ComfyUI前面的反向代理或登入外掛擋下來）": {
+"en": ": a key is required or wrong (blocked by a reverse proxy or login extension in front of ComfyUI)",
+"ja": "：キーが必要か間違っています（ComfyUIの前のリバースプロキシかログイン拡張が拒否）",
+"ko": ": 키가 필요하거나 틀렸습니다(ComfyUI 앞의 리버스 프록시나 로그인 확장이 차단)"
 }
 }
