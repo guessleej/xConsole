@@ -153,7 +153,7 @@ EXPECT_USER_RX = [r"GET /api/chats/(blob/[0-9a]{16}|[0-9a]{12})", r"GET /api/age
 
 
 EXPECT_VIEWER_RX = [r"GET /api/(groups|catalog)", r"GET /api/groups/a{8}/(history|plan)",
-                    r"GET /api/node/a/(state|counters|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
+                    r"GET /api/node/a/(state|counters|live|machine|library|recommend|llama/args|(llama|sd)/build(/progress)?|desktop/status)",
                     r"GET /api/node/a/(logs|catalog)/a", r"GET /api/node/a/slot/a/progress"]
 EXPECT_OPERATOR_RX = [r"POST /api/node/a/slot/a/(start|stop|restart|model)", r"POST /api/node/a/(all/(start|stop|restart)|admit/a|profile/a)",
                       r"POST /api/groups/a{8}/(update|rollback)", r"POST /api/groups/a{8}/rejoin/a/(approve|reject)",
