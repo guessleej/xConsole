@@ -10860,8 +10860,10 @@ def _pipe_conn(h):
     _, _, k32, _ = _win32()
     try:
         PipeUserHandler(h, ("local-user", 0), None)
-    except (OSError, ValueError):
-        pass
+    except (BrokenPipeError, ConnectionResetError):
+        pass                                        # 對方先關了
+    except Exception as exc:  # noqa: BLE001
+        print(f"本機使用者通道處理請求失敗：{type(exc).__name__}: {exc}", flush=True)
     finally:
         k32.FlushFileBuffers(h)
         k32.DisconnectNamedPipe(h)
