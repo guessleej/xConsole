@@ -89,6 +89,8 @@ jobs:
         run: cd console && python test_network_test.py
       - name: 畫圖與影片（准入三種架構、中國來源含文字編碼器、sd-cli 參數、看門狗）
         run: cd console && python test_sd.py
+      - name: 畫圖影片作品（作品資料夾不跳脫、能力標記、表單記憶、作品牆分批取代、全螢幕檢視器）
+        run: cd console && python test_gallery.py
       - name: 補齊 LocModel 差距（Intel、SSD、引擎續傳與匯入、參考圖與多張）
         run: cd agent && python test_gaps.py
       - name: 對話附件抽文字（獨立行程、壓縮炸彈、逾時）

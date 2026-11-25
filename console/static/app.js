@@ -2154,8 +2154,30 @@ function sdMine(n, rec, redraw) {
   return c;
 }
 
-/* ---- 產生：左邊填，右邊看進度與結果；進度每 2 秒只換掉進度那幾個字與長條 */
+/* ---- 產生：左邊填，右邊看進度與結果；進度每2秒只換掉進度那幾個字與長條。下面是作品牆 */
+const SD_EDIT_LABEL = { both: "能畫也能改圖", only: "只能改圖", draw: "只能畫圖" };
+
+function sdModelLabel(m) {
+  const what = m.kind === "image" && SD_EDIT_LABEL[m.edit] ? SD_EDIT_LABEL[m.edit] : SD_KIND[m.kind];
+  return `${m.title}（${what}${m.internal ? "・手動組" : ""}${m.cn_origin ? "・中國來源" : ""}）`;
+}
+
+// 表單內容記在這個瀏覽器：每台機器、畫圖與影片各一份；參考圖不記（太大，也不該留在瀏覽器裡）
+const SD_FORM_FIELDS = ["model", "prompt", "negative", "size", "steps", "cfg", "seed", "sampler", "frames", "fps", "count", "strength"];
+const sdFormKey = (nid, kind) => `xconsole-sdform:${nid}:${kind || "all"}`;
+function sdFormLoad(nid, kind) {
+  try {
+    const v = JSON.parse(localStorage.getItem(sdFormKey(nid, kind)) || "null");
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    return Object.fromEntries(SD_FORM_FIELDS.filter((k) => typeof v[k] === "string" && v[k].length <= 2000).map((k) => [k, v[k]]));
+  } catch (_) { return null; }
+}
+function sdFormSave(nid, kind, v) {
+  try { localStorage.setItem(sdFormKey(nid, kind), JSON.stringify(v)); } catch (_) { /* 無痕或存滿：下次回來用預設值 */ }
+}
+
 function sdGen(n, rec, redraw, toRec, kind) {
+  const root = el("div", "stack");
   const wrap = el("div", "grid pair sd-gen");
   const ready = rec.models.filter((m) => m.ready && (!kind || m.kind === kind));
   const left = card("產生", rec.sd_cli ? "" : "還沒安裝畫圖引擎");
@@ -2164,8 +2186,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
   right.classList.add("rv");
   wrap.append(left, right);
   const out = el("div", "sd-out");
-  const recent = el("div", "scrollbox sd-recent");
-  right.append(out, el("h4", "pick-h", "最近產出"), recent);
+  right.append(out);
   if (!ready.length || !rec.sd_cli) {
     const w = el("div", "note warn");
     w.appendChild(document.createTextNode(!rec.sd_cli ? "這台還沒安裝 stable-diffusion.cpp。" : `這台還沒有下載好的${kind === "video" ? "影片" : kind === "image" ? "畫圖" : "畫圖／影片"}模型。`));
@@ -2176,7 +2197,9 @@ function sdGen(n, rec, redraw, toRec, kind) {
     } else w.appendChild(document.createTextNode("請找管理員安裝。"));
     left.appendChild(w);
   }
-  const fModel = selectInput(ready.map((m) => [m.id, `${m.title}（${SD_KIND[m.kind]}${m.internal ? "・手動組" : ""}${m.cn_origin ? "・中國來源" : ""}）`]), S.sdModel);
+  const saved = sdFormLoad(n.id, kind);
+  const first = [S.sdModel, saved?.model].find((id) => ready.some((m) => m.id === id));
+  const fModel = selectInput(ready.map((m) => [m.id, sdModelLabel(m)]), first);
   const fPrompt = el("textarea");
   fPrompt.placeholder = "想要的畫面，中文英文都可以。例：雪地裡的一隻紅狐狸，清晨的光，照片風格";
   fPrompt.maxLength = 2000;
@@ -2216,6 +2239,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
     initThumb.hidden = initClear.hidden = !okType;
     if (okType) initThumb.src = initState.url; else initThumb.removeAttribute("src");
     strengthBox.hidden = !okType || model()?.kind !== "image" || model()?.defaults?.image === "ref";
+    syncGo();
   };
   initPick.onclick = () => fInit.click();
   initClear.onclick = () => setInit(null);
@@ -2248,11 +2272,31 @@ function sdGen(n, rec, redraw, toRec, kind) {
   const admit = el("div", "sd-admit small");
   const err = el("div");
   const go = el("button", "btn primary", "產生");
+  const goWhy = el("p", "small warn-t sd-go-why");
+  goWhy.hidden = true;
   const row = el("div", "slot-actions");
   row.append(admit, el("span", "spacer"), go);
-  if (ready.length && rec.sd_cli) left.append(fieldBox("模型", fModel), fieldBox("提示詞", fPrompt), fieldBox("不要出現的內容", fNeg), initBox, strengthBox, fr, err, row);
+  if (ready.length && rec.sd_cli) left.append(fieldBox("模型", fModel), fieldBox("提示詞", fPrompt), fieldBox("不要出現的內容", fNeg), initBox, strengthBox, fr, err, row, goWhy);
 
   const model = () => ready.find((m) => m.id === fModel.value);
+  // 產生鈕：試算不夠、正在產、或這顆一定要圖卻還沒選圖，都先停用，並寫出為什麼
+  const gate = { admit: true, busy: false };
+  const syncGo = () => {
+    const m = model();
+    const need = !!m?.defaults?.needs_image && !initState.b64;
+    go.disabled = gate.busy || !gate.admit || need;
+    goWhy.hidden = !need;
+    if (need) goWhy.textContent = m.edit === "only" ? "這顆只能改圖：先選一張要修改的圖片" : "這顆要先選一張圖片當第一格畫面";
+  };
+  const setBusy = (on) => { gate.busy = on; syncGo(); };
+  const remember = () => {
+    if (!model()) return;
+    sdFormSave(n.id, kind, { model: fModel.value, prompt: fPrompt.value, negative: fNeg.value, size: fSize.value, steps: fSteps.value,
+      cfg: fCfg.value, seed: fSeed.value, sampler: fSampler.value, frames: fFrames.value, fps: fFps.value, count: fCount.value,
+      strength: fStrength.value });
+  };
+  left.addEventListener("input", remember);
+  left.addEventListener("change", remember);
   const applyDefaults = (m) => {
     if (!m) return;
     const d = m.defaults || {};
@@ -2315,15 +2359,16 @@ function sdGen(n, rec, redraw, toRec, kind) {
     admit.textContent = r.allow
       ? `夠：這次要約 ${fmt(r.need_gib, 0)} GiB${r.measured ? "（依實測）" : "（估算）"}，產的時候最壞剩 ${fmt(pool.worst)} GiB（底線 ${fmt(pool.floor, 0)}）${r.warnings.length ? "。" + r.warnings.join("；") : ""}`
       : r.reasons.join("；");
-    go.disabled = !r.allow;
+    gate.admit = r.allow;
+    syncGo();
   };
   fModel.onchange = () => { S.sdModel = fModel.value; applyDefaults(model()); checkAdmit(); };
   fSize.onchange = fFrames.onchange = checkAdmit;
   go.onclick = async () => {
     errNote(err, "");
-    go.disabled = true;
+    setBusy(true);
     // 中文提示詞：這台有執行中的對話模型就先翻成英文（多數畫圖、影片模型看英文效果最好），翻好的放回框裡讓人看得到
-    if (/[\u3400-\u9fff]/.test(fPrompt.value)) {
+    if (/[㐀-鿿]/.test(fPrompt.value)) {
       const chat = (n.state?.slots || []).find((x) => (x.kind === "llama" || x.kind === "strata") && x.busy && (x.caps || ["文字"]).includes("文字"));
       if (chat) {
         const zh = fPrompt.value;
@@ -2334,7 +2379,7 @@ function sdGen(n, rec, redraw, toRec, kind) {
               + " models. Rewrite the user's request as ONE concise English prompt made of comma-separated descriptive phrases "
               + "(subject, setting, style, lighting, camera). Output only the prompt." }, { role: "user", content: zh }] } });
           const en = String(out.choices?.[0]?.message?.content || "").replace(/^["'「]|["'」]$/g, "").split("\n").find((x) => x.trim()) || "";
-          if (en.trim().length >= 3) { fPrompt.value = en.trim(); toast("已把中文提示詞翻成英文（原文：" + zh.slice(0, 40) + "）", "ok"); }
+          if (en.trim().length >= 3) { fPrompt.value = en.trim(); remember(); toast("已把中文提示詞翻成英文（原文：" + zh.slice(0, 40) + "）", "ok"); }
         } catch (_) { /* 翻不了就用原文 */ }
         go.textContent = model()?.kind === "video" ? "產生影片" : "產生圖片";
       } else toast("這台沒有執行中的對話模型，提示詞照中文送出；FLUX、LTX 這類模型看英文效果比較好", "warn");
@@ -2342,19 +2387,36 @@ function sdGen(n, rec, redraw, toRec, kind) {
     let r;
     try { r = await api(`/api/node/${n.id}/sd/generate`, { method: "POST", body: params() }); } catch (ex) {
       errNote(err, ex.data?.admit ? ex.data.admit.reasons.join("；") : ex.message);
-      go.disabled = false;
+      setBusy(false);
       return;
     }
-    watchGen(n, r.id, out, recent, go);
+    wall.reload();
+    watchGen(n, r.id, out, ctl);
   };
-  if (ready.length) { applyDefaults(model()); checkAdmit(); }
 
   // 「用同樣的設定」：模型換回去、全部參數照這件填回來（尺寸、影格數不在選單裡就補一個選項）
   const pick = (sel, v, label) => {
     if (![...sel.options].some((o) => o.value === v)) { const o = el("option", null, label); o.value = v; sel.prepend(o); }
     sel.value = v;
   };
-  const form = { fModel, apply: () => applyDefaults(model()), restore: (j) => {
+  const restoreSaved = (v) => {
+    if (typeof v.prompt === "string") fPrompt.value = v.prompt;
+    if (typeof v.negative === "string") fNeg.value = v.negative;
+    if (v.model !== fModel.value) return;              // 參數是那顆模型的；換了模型就用新模型的預設
+    const num = (x) => typeof x === "string" && x.trim() !== "" && Number.isFinite(Number(x));
+    if (/^\d{2,4}x\d{2,4}$/.test(v.size || "")) pick(fSize, v.size, v.size.replace("x", "×"));
+    if (num(v.steps)) fSteps.value = v.steps;
+    if (num(v.cfg)) fCfg.value = v.cfg;
+    if (num(v.seed)) fSeed.value = v.seed;
+    if (num(v.strength)) fStrength.value = v.strength;
+    if ([...fSampler.options].some((o) => o.value === v.sampler)) fSampler.value = v.sampler;
+    if ([...fCount.options].some((o) => o.value === v.count)) fCount.value = v.count;
+    if (num(v.frames)) pick(fFrames, v.frames, `${v.frames}格`);
+    if (num(v.fps)) fFps.value = v.fps;
+    relabelFrames();
+  };
+  const reuse = (j) => {
+    if ([...fModel.options].some((o) => o.value === j.model)) { fModel.value = j.model; S.sdModel = j.model; applyDefaults(model()); }
     fPrompt.value = j.prompt;
     fNeg.value = j.negative || "";
     fSeed.value = j.seed;
@@ -2367,39 +2429,46 @@ function sdGen(n, rec, redraw, toRec, kind) {
     if (j.strength) fStrength.value = j.strength;
     setInit(null);
     if (j.init) api(`/api/node/${n.id}/sd/jobs/${j.id}/init`).then((r) => setInit(r.b64, r.mime)).catch(() => {});
+    remember();
     checkAdmit();
-  } };
-
-  // 右邊：最近產出；有在產的就接著看進度
-  const loadRecent = async (showFirst) => {
-    let jobs = [];
-    try { jobs = (await api(`/api/node/${n.id}/sd/jobs`)).jobs; } catch (ex) { errNote(recent, ex.message); return []; }
-    recent.textContent = "";
-    if (!jobs.length) recent.appendChild(el("p", "small muted", "還沒有產出。"));
-    jobs.forEach((j) => {
-      const r = el("button", "sd-job");
-      r.appendChild(el("span", "small mono", new Date(j.created * 1000).toLocaleString(uiLocale(), { hour12: false }).slice(5, 16)));
-      r.appendChild(el("span", "sd-job-p", j.prompt));
-      r.appendChild(el("span", "small " + (j.state === "failed" ? "bad-t" : j.suspect ? "warn-t" : "muted"),
-        j.suspect ? "可能壞了" : { running: "產生中", done: `${fmt(j.secs, 0)} 秒`, failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state] || j.state));
-      r.onclick = () => (j.state === "running" ? watchGen(n, j.id, out, recent, go) : showJob(n, j, out, recent, form));
-      recent.appendChild(r);
-    });
-    return jobs;
+    toast("已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）", "ok");
+    left.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  S.sdReload = loadRecent;
-  loadRecent().then((jobs) => {
-    const run = jobs.find((j) => j.state === "running");
-    if (run) watchGen(n, run.id, out, recent, go);
-    else if (jobs[0]) showJob(n, jobs[0], out, recent, form);
-    else out.appendChild(el("p", "small muted", "左邊填好按「產生」，進度與結果會出現在這裡。"));
-  });
-  return wrap;
+  if (ready.length) {
+    applyDefaults(model());
+    if (saved) restoreSaved(saved);
+    checkAdmit();
+  }
+
+  const ctl = { busy: setBusy, reload: () => wall.reload(), reuse: (j) => (!kind || j.kind === kind) && ready.some((m) => m.id === j.model) ? reuse : null };
+  const wall = sdWall(n, kind, { reuse: ctl.reuse,
+    onDeleted: (jid) => { if (out.dataset.job === jid) sdOutIdle(out); },
+    onLoaded: (jobs) => {
+      if (out.dataset.job || out.dataset.idle) return;
+      const run = jobs.find((j) => j.state === "running" && (!kind || j.kind === kind));
+      const last = jobs.find((j) => !kind || j.kind === kind);
+      if (run) watchGen(n, run.id, out, ctl);
+      else if (last) showJob(n, last, out, ctl);
+      else sdOutIdle(out);
+    } });
+  root.append(wrap, wall.card);
+  wall.reload();
+  return root;
 }
 
-function watchGen(n, jid, out, recent, go) {
+function sdOutIdle(out) {
   clearTimeout(S.genTimer);
   out.textContent = "";
+  delete out.dataset.job;
+  out.dataset.idle = "1";
+  out.appendChild(el("p", "small muted", "左邊填好按「產生」，進度與結果會出現在這裡；產過的都在下面的作品牆。"));
+}
+
+function watchGen(n, jid, out, ctl) {
+  clearTimeout(S.genTimer);
+  out.textContent = "";
+  out.dataset.job = jid;
+  delete out.dataset.idle;
   const head = el("div", "small");
   const bar = el("div", "bar");
   const seg = el("div", "seg");
@@ -2410,36 +2479,35 @@ function watchGen(n, jid, out, recent, go) {
   const top = el("div", "slot-actions");
   top.append(head, el("span", "spacer"), cancel);
   out.append(top, bar, meta);
-  go.disabled = true;
+  ctl.busy(true);
   const tick = async () => {
-    if (!out.isConnected) return;
+    if (!out.isConnected || out.dataset.job !== jid) return;
     let j;
     try { j = await api(`/api/node/${n.id}/sd/jobs/${jid}`); } catch (ex) { meta.textContent = "讀不到進度：" + ex.message; S.genTimer = setTimeout(tick, 3000); return; }
-    if (!out.isConnected) return;
+    if (!out.isConnected || out.dataset.job !== jid) return;
     const pct = j.total ? Math.floor((j.step / j.total) * 100) : 0;
     head.textContent = `${j.title}：${j.phase}${j.step ? `　${j.step}/${j.total} 步` : ""}`;
     seg.style.width = pct + "%";
     meta.textContent = `${j.width}×${j.height}${j.frames ? `、${j.frames} 格` : ""}、種子 ${j.seed}${j.s_per_it ? `、每步 ${fmt(j.s_per_it, 2)} 秒` : ""}、已經 ${Math.round(Date.now() / 1000 - j.created)} 秒`
       + (j.offload ? "　權重放系統記憶體（較慢）" : "");
     if (j.state === "running") { S.genTimer = setTimeout(tick, 2000); return; }
-    go.disabled = false;
-    const jobs = await S.sdReload?.();
-    showJob(n, (jobs || []).find((x) => x.id === jid) || j, out, recent);
+    ctl.busy(false);
+    const jobs = await ctl.reload();
+    showJob(n, (jobs || []).find((x) => x.id === jid) || j, out, ctl);
     if (j.state === "done" && S.sdRec) delete S.sdRec[n.id];       // 實測寫回模型了，推薦列要顯示
   };
   tick();
 }
 
-// 刪掉一件產出（失敗、取消、中斷的也要能刪，不然會一直留在最近產出裡）
-function sdJobDelete(n, j, out, url) {
-  const del = el("button", "btn sm danger", "刪除");
-  del.onclick = async () => {
+// 刪掉一件產出：先問一次（電腦上的檔一起刪、救不回來）。失敗、取消、中斷的也能刪，不然會一直留在作品牆上
+function sdConfirmDelete(n, j, done) {
+  const shots = j.state === "done" ? (j.outs || []).length || 1 : 0;
+  const body = el("p", null, `${shots > 1 ? `這件有${shots}張，會一起刪掉，` : ""}這台電腦作品資料夾裡的檔案也一起刪除，刪了救不回來。`);
+  modal({ title: "刪除這件作品？", bodyNode: body, confirmText: "刪除", danger: true, onConfirm: async () => {
     try { await api(`/api/node/${n.id}/sd/jobs/${j.id}/delete`, { method: "POST", body: {} }); } catch (ex) { toast(ex.message, "bad"); return; }
-    [].concat(url || []).forEach((u) => URL.revokeObjectURL(u));
-    out.textContent = "";
-    S.sdReload?.();
-  };
-  return del;
+    sdCacheDrop(n.id, j.id);
+    done?.();
+  } });
 }
 
 // 引擎算壞但沒報錯（例：LTX 開 flash attention 全白、聲音滿格）：代理檢查產出後回的問題，每項一行（逐句翻譯）
@@ -2451,10 +2519,13 @@ function sdSuspectNote(probs) {
   return p;
 }
 
-async function showJob(n, j, out, recent, form) {
+async function showJob(n, j, out, ctl) {
   clearTimeout(S.genTimer);
   out.textContent = "";
-  recent.querySelectorAll(".sd-job").forEach((b) => b.removeAttribute("aria-current"));
+  out.dataset.job = j.id;
+  delete out.dataset.idle;
+  const del = el("button", "btn sm danger", "刪除");
+  del.onclick = () => sdConfirmDelete(n, j, () => { sdOutIdle(out); ctl.reload(); });
   const info = el("div", "small muted", `${j.title}・${j.width}×${j.height}${j.frames ? `・${j.frames} 格` : ""}${(j.count || 1) > 1 ? `・${j.count} 張` : ""}`
     + `${j.init ? (j.kind === "video" ? "・從參考圖開始" : `・參考圖重繪 ${j.strength}`) : ""}・${j.steps} 步・引導 ${j.cfg}・種子 ${j.seed}`
     + (j.secs ? `・${fmt(j.secs, 0)} 秒` : "") + (j.peak_gib ? `・最高用 ${fmt(j.peak_gib)} GiB` : ""));
@@ -2462,64 +2533,401 @@ async function showJob(n, j, out, recent, form) {
     out.appendChild(el("p", "note " + (j.state === "failed" ? "bad" : "warn"), j.error || { cancelled: "已取消", interrupted: "代理重啟過，這件沒產完" }[j.state] || j.state));
     out.appendChild(info);
     const acts = el("div", "slot-actions");
-    acts.append(el("span", "spacer"), sdJobDelete(n, j, out));
+    acts.append(el("span", "spacer"), del);
     out.appendChild(acts);
   } else {
     const box = el("div", "sd-media");
     box.appendChild(el("p", "small muted", "讀取中…"));
     if (j.suspect) out.appendChild(sdSuspectNote(j.suspect));
     out.append(box, info);
-    // 一次多張：第一張先出來，其他張接著抓；點縮圖換大圖，下載的是目前這張
-    const fetchOut = async (i) => {
-      const r = await api(`/api/node/${n.id}/sd/jobs/${j.id}/output/${i}`);
-      const bin = Uint8Array.from(atob(r.b64), (ch) => ch.charCodeAt(0));
-      return { ...r, url: URL.createObjectURL(new Blob([bin], { type: r.mime })) };
-    };
+    // 一次多張：第一張先出來，其他張接著抓；點縮圖換大圖，點大圖開全螢幕
+    const count = (j.outs || []).length || 1;
     let first;
-    try { first = await fetchOut(0); } catch (ex) { box.textContent = ex.message; return; }
-    const shots = [first];
-    let curShot = first;
+    try { first = await sdShot(n.id, j.id, 0, false); } catch (ex) { box.textContent = ex.message; return; }
+    if (out.dataset.job !== j.id) return;
+    let cur = 0;
     box.textContent = "";
     const media = el(first.mime.startsWith("video") ? "video" : "img");
     media.src = first.url;
-    if (media.tagName === "VIDEO") { media.controls = true; media.loop = true; } else media.alt = j.prompt;
+    if (media.tagName === "VIDEO") { media.controls = true; media.loop = true; } else {
+      media.alt = j.prompt;
+      media.classList.add("zoomable");
+      media.title = "點一下全螢幕看";
+      media.onclick = () => sdViewer(n, [0, 1, 2, 3].slice(0, count).map((i) => ({ job: j, i })), cur, { reuseOf: ctl.reuse });
+    }
     box.appendChild(media);
-    if ((first.count || 1) > 1) {
+    if (count > 1) {
       const strip = el("div", "sd-strip");
       out.insertBefore(strip, info);
-      const thumb = (sh, i) => {
+      for (let i = 0; i < count; i++) {
+        let sh;
+        try { sh = i ? await sdShot(n.id, j.id, i, false) : first; } catch (_) { continue; }     // 少一張不影響其他張
+        if (out.dataset.job !== j.id) return;
         const b = el("button", "sd-thumb");
         b.setAttribute("aria-label", `第 ${i + 1} 張`);
         const im = el("img");
         im.src = sh.url;
         im.alt = "";
         b.appendChild(im);
-        b.onclick = () => { media.src = sh.url; curShot = sh; strip.querySelectorAll(".sd-thumb").forEach((x) => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true"); };
+        b.onclick = () => { media.src = sh.url; cur = i; strip.querySelectorAll(".sd-thumb").forEach((x) => x.removeAttribute("aria-current")); b.setAttribute("aria-current", "true"); };
         if (i === 0) b.setAttribute("aria-current", "true");
         strip.appendChild(b);
-      };
-      thumb(first, 0);
-      for (let i = 1; i < first.count; i++) {
-        try { const sh = await fetchOut(i); shots.push(sh); thumb(sh, i); } catch (_) { /* 少一張不影響其他張 */ }
       }
     }
     const acts = el("div", "slot-actions");
     const dl = el("button", "btn sm", "下載");
-    dl.onclick = () => { const a = el("a"); a.href = curShot.url; a.download = curShot.name; document.body.appendChild(a); a.click(); a.remove(); };
+    dl.onclick = () => sdDownload(n.id, j, cur);
     acts.appendChild(dl);
-    if (form) {
-      const again = el("button", "btn sm", "用同樣的設定");
-      again.onclick = () => {
-        if ([...form.fModel.options].some((o) => o.value === j.model)) { form.fModel.value = j.model; S.sdModel = j.model; form.apply(); }
-        form.restore(j);
-        toast("已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）", "ok");
-      };
-      acts.appendChild(again);
+    const again = ctl.reuse(j);
+    if (again) {
+      const b = el("button", "btn sm", "用同樣的設定");
+      b.onclick = () => again(j);
+      acts.appendChild(b);
     }
-    acts.append(el("span", "spacer"), sdJobDelete(n, j, out, shots.map((x) => x.url)));
+    const cp = el("button", "btn sm", "複製提示詞");
+    cp.onclick = () => copyText(j.prompt);
+    acts.append(cp, el("span", "spacer"), del);
     out.appendChild(acts);
   }
-  out.appendChild(el("p", "sd-prompt small", j.prompt));
+  const pr = el("p", "sd-prompt small", j.prompt);
+  pr.dataset.i18nSkip = "";
+  out.appendChild(pr);
+}
+
+/* ---- 作品：縮圖與原檔的Blob網址快取（換批、開檢視器、回到這頁都不必重抓），最多留SD_CACHE_MAX份 */
+const SD_CACHE = new Map();
+const SD_CACHE_MAX = 80;
+function sdShot(nid, jid, i, thumb) {
+  const key = `${nid}/${jid}/${i}/${thumb ? "t" : "f"}`;
+  if (SD_CACHE.has(key)) {
+    const hit = SD_CACHE.get(key);
+    SD_CACHE.delete(key);
+    SD_CACHE.set(key, hit);
+    return hit;
+  }
+  const url = `/api/node/${nid}/sd/jobs/${jid}/${thumb ? "thumb" : "output"}/${i}`;
+  const p = (thumb ? sdThumbQueue(() => api(url)) : api(url)).then((r) => {
+    const bin = Uint8Array.from(atob(r.b64), (ch) => ch.charCodeAt(0));
+    return { mime: r.mime, name: r.name, count: r.count || 1, url: URL.createObjectURL(new Blob([bin], { type: r.mime })) };
+  });
+  SD_CACHE.set(key, p);
+  p.catch(() => SD_CACHE.delete(key));
+  while (SD_CACHE.size > SD_CACHE_MAX) {
+    const [k, old] = SD_CACHE.entries().next().value;
+    SD_CACHE.delete(k);
+    old.then((s) => URL.revokeObjectURL(s.url), () => {});
+  }
+  return p;
+}
+// 舊作品的縮圖要代理第一次現縮（純Python，大圖要幾秒）：一次只送三張，免得一整批同時排隊逾時
+const SD_THUMB_Q = { running: 0, wait: [] };
+function sdThumbQueue(fn) {
+  return new Promise((ok, bad) => {
+    const run = () => {
+      SD_THUMB_Q.running++;
+      fn().then(ok, bad).finally(() => { SD_THUMB_Q.running--; SD_THUMB_Q.wait.shift()?.(); });
+    };
+    if (SD_THUMB_Q.running < 3) run(); else SD_THUMB_Q.wait.push(run);
+  });
+}
+function sdCacheDrop(nid, jid) {
+  for (const [k, p] of SD_CACHE) {
+    if (k.startsWith(`${nid}/${jid}/`)) { SD_CACHE.delete(k); p.then((s) => URL.revokeObjectURL(s.url), () => {}); }
+  }
+}
+async function sdDownload(nid, j, only) {
+  const count = j.kind === "video" ? 1 : (j.outs || []).length || 1;
+  for (const i of only === undefined ? [...Array(count).keys()] : [only]) {
+    let sh;
+    try { sh = await sdShot(nid, j.id, i, false); } catch (ex) { toast(ex.message, "bad"); return; }
+    const a = el("a");
+    a.href = sh.url;
+    a.download = sh.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+}
+
+// 作品資料夾：桌面版、代理就在這台、人也坐在這台才直接打開；其餘給路徑讓人複製（不給一顆按了在別台跳視窗的按鈕）
+function sdFolderInfo(nid) {
+  S.sdFolder = S.sdFolder || {};
+  if (!S.sdFolder[nid]) {
+    S.sdFolder[nid] = api(`/api/node/${nid}/sd/folder`);
+    S.sdFolder[nid].catch(() => { delete S.sdFolder[nid]; });
+  }
+  return S.sdFolder[nid];
+}
+function sdFolderButton(nid, cls) {
+  const slot = el("span", "sd-folder-slot");
+  sdFolderInfo(nid).then((info) => {
+    const b = el("button", cls || "btn sm", info.can_open ? "開啟作品資料夾" : "作品存放位置");
+    b.onclick = () => sdFolderOpen(nid, info);
+    slot.appendChild(b);
+  }, () => {});
+  return slot;
+}
+async function sdFolderOpen(nid, info) {
+  if (info.can_open) {
+    try { await api(`/api/node/${nid}/sd/folder/open`, { method: "POST", body: {} }); return; }
+    catch (ex) { toast("打不開：" + ex.message, "bad"); }
+  }
+  const d = el("div");
+  d.appendChild(el("p", "small muted", "作品存在產生它的那台電腦上，到那台的這個資料夾就找得到："));
+  const pre = el("pre", "code-pre mono small");
+  pre.textContent = info.path;
+  const row = el("div", "slot-actions");
+  const cp = el("button", "btn sm primary", "複製路徑");
+  cp.onclick = () => copyText(info.path);
+  row.append(el("span", "spacer"), cp);
+  d.append(pre, row);
+  modal({ title: "作品存放位置", bodyNode: d });
+}
+
+/* ---- 作品牆：畫圖、影片分開兩個分頁，一次只顯示一批（SD_WALL_PAGE件），換批時整批取代、不往下接 */
+const SD_WALL_PAGE = 12;
+const SD_WALL_RANGE = [["all", "全部"], ["1", "今天"], ["7", "近7天"], ["30", "近30天"]];
+
+// 純計算：照分頁、時間範圍、關鍵字篩出這一批（測試直接呼叫這一支）
+function sdWallSlice(jobs, f, now) {
+  const q = String(f.q || "").trim().toLowerCase();
+  const since = f.range && f.range !== "all" ? now / 1000 - Number(f.range) * 86400 : 0;
+  const hits = jobs.filter((j) => j.kind === f.tab && (!since || j.created >= since)
+    && (!q || String(j.prompt || "").toLowerCase().includes(q)));
+  const pages = Math.max(1, Math.ceil(hits.length / SD_WALL_PAGE));
+  const page = Math.min(Math.max(0, f.page | 0), pages - 1);
+  return { hits, pages, page, items: hits.slice(page * SD_WALL_PAGE, (page + 1) * SD_WALL_PAGE) };
+}
+
+// 批次按鈕：太多批時只留第一批、目前前後、最後一批
+function sdWallPageList(pages, cur) {
+  if (pages <= 7) return [...Array(pages).keys()];
+  const keep = new Set([0, pages - 1, cur - 1, cur, cur + 1].filter((x) => x >= 0 && x < pages));
+  const out = [];
+  [...keep].sort((a, b) => a - b).forEach((x, k, arr) => { if (k && x - arr[k - 1] > 1) out.push(null); out.push(x); });
+  return out;
+}
+
+function sdWall(n, kind, opts) {
+  S.sdWallF = S.sdWallF || {};
+  const f = S.sdWallF[n.id] = { tab: kind || "image", page: 0, q: "", range: "all", ...(S.sdWallF[n.id] || {}) };
+  if (kind) f.tab = kind;
+  const c = card("作品");
+  c.classList.add("rv", "sd-wall");
+  const tabs = el("div", "tabbar");
+  const q = el("input");
+  q.type = "search";
+  q.placeholder = "找提示詞";
+  q.value = f.q;
+  q.setAttribute("aria-label", "找提示詞");
+  const range = selectInput(SD_WALL_RANGE, f.range);
+  range.setAttribute("aria-label", "時間範圍");
+  const bar = el("div", "sd-wall-bar");
+  bar.append(tabs, el("span", "spacer"), q, range);
+  const grid = el("div", "sd-wall-grid");
+  const foot = el("div", "sd-wall-foot");
+  const count = el("span", "small muted");
+  const pager = el("div", "tabbar sd-wall-pages");
+  foot.append(count, el("span", "spacer"), pager);
+  c.append(bar, grid, foot);
+  let jobs = [];
+  let dir = "";
+  let viewItems = [];               // 檢視器能切換的範圍：篩選後全部產好的作品（不只這一批），一次多張的每張各一格
+  const tiles = new Map();          // id → { node, sig }：重新整理時沒變的那幾格原樣留著，畫面不跳
+  const tabBtn = {};
+  [["image", "畫圖"], ["video", "影片"]].forEach(([k, label]) => {
+    const b = el("button", null, label);
+    b.dataset.label = label;
+    b.onclick = () => { if (f.tab !== k) { f.tab = k; f.page = 0; paint(); } };
+    tabBtn[k] = b;
+    tabs.appendChild(b);
+  });
+  const paintTabs = () => {
+    Object.entries(tabBtn).forEach(([k, b]) => {
+      b.textContent = `${b.dataset.label}（${jobs.filter((j) => j.kind === k).length}）`;
+      if (k === f.tab) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+    });
+  };
+  const view = (j) => sdViewer(n, viewItems, viewItems.findIndex((x) => x.job.id === j.id), { reuseOf: opts.reuse });
+  const tile = (j) => {
+    const t = el("div", "sd-tile");
+    const shot = el("button", "sd-tile-shot");
+    shot.style.setProperty("--ar", `${j.width} / ${j.height}`);
+    shot.setAttribute("aria-label", j.state === "done" ? "全螢幕看這件" : "這件沒有產出");
+    const status = { running: "產生中", failed: "失敗", cancelled: "已取消", interrupted: "中斷" }[j.state];
+    if (status) {
+      shot.disabled = true;
+      shot.appendChild(el("span", "sd-tile-state " + (j.state === "running" ? "muted" : "bad-t"), status));
+    } else {
+      const isVideo = j.kind === "video";
+      const m = el(isVideo ? "video" : "img");
+      if (isVideo) { m.muted = true; m.preload = "metadata"; m.playsInline = true; } else m.alt = "";
+      shot.appendChild(m);
+      sdShot(n.id, j.id, 0, !isVideo).then((s) => { m.src = s.url; }, () => { shot.textContent = ""; shot.appendChild(el("span", "sd-tile-state bad-t", "讀不到")); });
+      if ((j.outs || []).length > 1) shot.appendChild(el("span", "sd-tile-badge", `${j.outs.length}張`));
+      if (j.suspect) shot.appendChild(el("span", "sd-tile-badge warn", "可能壞了"));
+      shot.onclick = () => view(j);
+    }
+    const p = el("div", "sd-tile-p", j.prompt);
+    p.dataset.i18nSkip = "";
+    p.title = j.prompt;
+    const meta = el("div", "small muted", new Date(j.created * 1000).toLocaleString(uiLocale(), { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
+    const acts = el("div", "sd-tile-acts");
+    const cp = el("button", "link-btn", "複製提示詞");
+    cp.onclick = () => copyText(j.prompt);
+    acts.appendChild(cp);
+    if (j.state === "done") {
+      const dl = el("button", "link-btn", "下載");
+      dl.onclick = () => sdDownload(n.id, j);
+      acts.appendChild(dl);
+    }
+    if (j.state !== "running") {
+      const del = el("button", "link-btn danger-t", "刪除");
+      del.onclick = () => sdConfirmDelete(n, j, () => removed(j.id));
+      acts.appendChild(del);
+    }
+    t.append(shot, p, meta, acts);
+    return t;
+  };
+  const removed = (jid) => {
+    jobs = jobs.filter((x) => x.id !== jid);
+    opts.onDeleted?.(jid);
+    paint();
+  };
+  const paint = () => {
+    paintTabs();
+    const s = sdWallSlice(jobs, f, Date.now());
+    f.page = s.page;
+    viewItems = s.hits.filter((j) => j.state === "done")
+      .flatMap((j) => (j.kind === "video" ? [0] : [...Array((j.outs || []).length || 1).keys()]).map((i) => ({ job: j, i })));
+    if (!s.items.length) {
+      tiles.clear();
+      const empty = el("div", "sd-wall-empty");
+      empty.appendChild(el("p", null, jobs.some((j) => j.kind === f.tab)
+        ? "沒有符合條件的作品，換個關鍵字或時間範圍。"
+        : `還沒有${f.tab === "video" ? "影片" : "圖片"}作品。產出的檔案同時存在產生它的那台電腦上：`));
+      if (dir && !jobs.some((j) => j.kind === f.tab)) {
+        const pre = el("pre", "code-pre mono small", dir);
+        empty.append(pre, sdFolderButton(n.id));
+      }
+      grid.replaceChildren(empty);
+    } else {
+      const keep = new Map();
+      const nodes = s.items.map((j) => {
+        const sig = `${j.state}|${j.suspect ? 1 : 0}|${(j.outs || []).length}`;
+        const old = tiles.get(j.id);
+        const node = old && old.sig === sig ? old.node : tile(j);
+        keep.set(j.id, { node, sig });
+        return node;
+      });
+      if (nodes.length !== grid.children.length || nodes.some((x, k) => grid.children[k] !== x)) grid.replaceChildren(...nodes);
+      tiles.clear();
+      keep.forEach((v, k) => tiles.set(k, v));
+    }
+    count.textContent = s.hits.length ? `第${s.page * SD_WALL_PAGE + 1}–${s.page * SD_WALL_PAGE + s.items.length}件，共${s.hits.length}件` : "";
+    pager.textContent = "";
+    if (s.pages > 1) {
+      sdWallPageList(s.pages, s.page).forEach((x) => {
+        if (x === null) { pager.appendChild(el("span", "small muted", "…")); return; }
+        const b = el("button", null, String(x + 1));
+        b.setAttribute("aria-label", `第${x + 1}批`);
+        if (x === s.page) b.setAttribute("aria-current", "true");
+        b.onclick = () => { f.page = x; paint(); };
+        pager.appendChild(b);
+      });
+    }
+  };
+  let qTimer;
+  q.oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(() => { f.q = q.value; f.page = 0; paint(); }, 250); };
+  range.onchange = () => { f.range = range.value; f.page = 0; paint(); };
+  grid.appendChild(el("p", "small muted", "讀取中…"));
+
+  const reload = async () => {
+    let r;
+    try { r = await api(`/api/node/${n.id}/sd/jobs`); } catch (ex) { errNote(grid, ex.message); return jobs; }
+    if (!c.isConnected && jobs.length) return jobs;
+    jobs = r.jobs || [];
+    dir = r.dir || "";
+    paint();
+    opts.onLoaded?.(jobs);
+    return jobs;
+  };
+  return { card: c, reload };
+}
+
+/* ---- 全螢幕檢視器：左右鍵或按鈕切上下張、1:1原尺寸、下載；影片開大播放器。沒有輸入欄位，點背景也能關 */
+function sdViewer(n, items, start, opts = {}) {
+  if (!items.length) return;
+  let at = Math.min(Math.max(0, start), items.length - 1);
+  let actual = false;
+  const back = document.activeElement;
+  const ov = el("div", "sd-viewer");
+  ov.setAttribute("role", "dialog");
+  ov.setAttribute("aria-modal", "true");
+  ov.setAttribute("aria-label", "作品檢視");
+  const stage = el("div", "sd-viewer-stage");
+  const prev = el("button", "sd-viewer-nav prev", "‹");
+  prev.setAttribute("aria-label", "上一件作品");
+  const next = el("button", "sd-viewer-nav next", "›");
+  next.setAttribute("aria-label", "下一件作品");
+  const top = el("div", "sd-viewer-top");
+  const pos = el("span", "sd-viewer-pos");
+  const one = el("button", "btn sm", "1:1原尺寸");
+  const dl = el("button", "btn sm", "下載");
+  const cp = el("button", "btn sm", "複製提示詞");
+  const again = el("button", "btn sm", "用同樣的設定");
+  const close = el("button", "btn sm", "關閉");
+  close.setAttribute("aria-label", "關閉（Esc）");
+  top.append(pos, el("span", "spacer"), one, dl, cp, again, close);
+  const cap = el("div", "sd-viewer-cap");
+  cap.dataset.i18nSkip = "";
+  ov.append(top, stage, prev, next, cap);
+
+  const show = async () => {
+    const { job, i } = items[at];
+    pos.textContent = `${at + 1}／${items.length}`;
+    prev.disabled = at === 0;
+    next.disabled = at === items.length - 1;
+    cap.textContent = job.prompt;
+    one.hidden = job.kind === "video";
+    again.hidden = !opts.reuseOf?.(job);
+    stage.replaceChildren(el("p", "sd-viewer-wait", "讀取中…"));
+    const want = at;
+    let sh;
+    try { sh = await sdShot(n.id, job.id, i, false); } catch (ex) { stage.replaceChildren(el("p", "sd-viewer-wait", ex.message)); return; }
+    if (want !== at || !ov.isConnected) return;
+    const m = el(sh.mime.startsWith("video") ? "video" : "img");
+    m.src = sh.url;
+    if (m.tagName === "VIDEO") { m.controls = true; m.loop = true; m.autoplay = true; m.playsInline = true; } else m.alt = job.prompt;
+    stage.classList.toggle("actual", actual && m.tagName === "IMG");
+    stage.replaceChildren(m);
+  };
+  const move = (d) => { const to = at + d; if (to >= 0 && to < items.length) { at = to; show(); } };
+  const shut = () => {
+    document.removeEventListener("keydown", onKey, true);
+    document.documentElement.classList.remove("viewer-open");
+    ov.remove();
+    back?.focus?.();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); shut(); return; }
+    if (e.target?.tagName === "VIDEO") return;             // 影片自己的左右鍵是快轉倒轉
+    if (e.key === "ArrowLeft") { e.preventDefault(); move(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); move(1); }
+  };
+  prev.onclick = () => move(-1);
+  next.onclick = () => move(1);
+  one.onclick = () => { actual = !actual; one.setAttribute("aria-pressed", String(actual)); stage.classList.toggle("actual", actual); };
+  dl.onclick = () => sdDownload(n.id, items[at].job, items[at].i);
+  cp.onclick = () => copyText(items[at].job.prompt);
+  again.onclick = () => { const { job } = items[at]; const r = opts.reuseOf?.(job); shut(); r?.(job); };
+  close.onclick = shut;
+  ov.addEventListener("click", (e) => { if (e.target === ov || e.target === stage) shut(); });
+  document.addEventListener("keydown", onKey, true);
+  document.documentElement.classList.add("viewer-open");       // 背後的頁面不跟著滾輪捲走
+  $("#modal-host").appendChild(ov);
+  close.focus();
+  show();
 }
 
 /* ---- 清單管理：管理者在網頁上增改刪；檔案與大小由代理讀 Hugging Face 的檔案清單 */

@@ -2332,6 +2332,22 @@
 "pattern": false
 },
 {
+"zh": "能畫也能改圖",
+"pattern": false
+},
+{
+"zh": "只能畫圖",
+"pattern": false
+},
+{
+"zh": "・手動組",
+"pattern": false
+},
+{
+"zh": "・中國來源",
+"pattern": false
+},
+{
 "zh": "產生",
 "pattern": false
 },
@@ -2341,10 +2357,6 @@
 },
 {
 "zh": "結果",
-"pattern": false
-},
-{
-"zh": "最近產出",
 "pattern": false
 },
 {
@@ -2369,14 +2381,6 @@
 },
 {
 "zh": "請找管理員安裝。",
-"pattern": false
-},
-{
-"zh": "・手動組",
-"pattern": false
-},
-{
-"zh": "・中國來源",
 "pattern": false
 },
 {
@@ -2496,6 +2500,14 @@
 "pattern": false
 },
 {
+"zh": "這顆只能改圖：先選一張要修改的圖片",
+"pattern": false
+},
+{
+"zh": "這顆要先選一張圖片當第一格畫面",
+"pattern": false
+},
+{
 "zh": "・預設",
 "pattern": false
 },
@@ -2592,23 +2604,15 @@
 "pattern": false
 },
 {
-"zh": "還沒有產出。",
+"zh": "{0}格",
+"pattern": true
+},
+{
+"zh": "已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）",
 "pattern": false
 },
 {
-"zh": "可能壞了",
-"pattern": false
-},
-{
-"zh": "產生中",
-"pattern": false
-},
-{
-"zh": "中斷",
-"pattern": false
-},
-{
-"zh": "左邊填好按「產生」，進度與結果會出現在這裡。",
+"zh": "左邊填好按「產生」，進度與結果會出現在這裡；產過的都在下面的作品牆。",
 "pattern": false
 },
 {
@@ -2637,6 +2641,30 @@
 },
 {
 "zh": "　權重放系統記憶體（較慢）",
+"pattern": false
+},
+{
+"zh": "這件有{0}張，會一起刪掉，",
+"pattern": true
+},
+{
+"zh": "這件有",
+"pattern": false
+},
+{
+"zh": "張，會一起刪掉",
+"pattern": false
+},
+{
+"zh": "{0}這台電腦作品資料夾裡的檔案也一起刪除，刪了救不回來。",
+"pattern": true
+},
+{
+"zh": "這台電腦作品資料夾裡的檔案也一起刪除，刪了救不回來",
+"pattern": false
+},
+{
+"zh": "刪除這件作品？",
 "pattern": false
 },
 {
@@ -2696,6 +2724,10 @@
 "pattern": false
 },
 {
+"zh": "點一下全螢幕看",
+"pattern": false
+},
+{
 "zh": "第 {0} 張",
 "pattern": true
 },
@@ -2708,7 +2740,131 @@
 "pattern": false
 },
 {
-"zh": "已帶入這件的全部設定（提示詞、畫幅、張數、步數、引導強度、種子、取樣方法、參考圖）",
+"zh": "複製提示詞",
+"pattern": false
+},
+{
+"zh": "開啟作品資料夾",
+"pattern": false
+},
+{
+"zh": "作品存放位置",
+"pattern": false
+},
+{
+"zh": "作品存在產生它的那台電腦上，到那台的這個資料夾就找得到：",
+"pattern": false
+},
+{
+"zh": "今天",
+"pattern": false
+},
+{
+"zh": "近7天",
+"pattern": false
+},
+{
+"zh": "近30天",
+"pattern": false
+},
+{
+"zh": "作品",
+"pattern": false
+},
+{
+"zh": "找提示詞",
+"pattern": false
+},
+{
+"zh": "時間範圍",
+"pattern": false
+},
+{
+"zh": "全螢幕看這件",
+"pattern": false
+},
+{
+"zh": "這件沒有產出",
+"pattern": false
+},
+{
+"zh": "產生中",
+"pattern": false
+},
+{
+"zh": "中斷",
+"pattern": false
+},
+{
+"zh": "讀不到",
+"pattern": false
+},
+{
+"zh": "{0}張",
+"pattern": true
+},
+{
+"zh": "可能壞了",
+"pattern": false
+},
+{
+"zh": "沒有符合條件的作品，換個關鍵字或時間範圍。",
+"pattern": false
+},
+{
+"zh": "圖片",
+"pattern": false
+},
+{
+"zh": "還沒有{0}作品。產出的檔案同時存在產生它的那台電腦上：",
+"pattern": true
+},
+{
+"zh": "還沒有",
+"pattern": false
+},
+{
+"zh": "作品。產出的檔案同時存在產生它的那台電腦上",
+"pattern": false
+},
+{
+"zh": "第{0}–{1}件，共{2}件",
+"pattern": true
+},
+{
+"zh": "件，共",
+"pattern": false
+},
+{
+"zh": "件",
+"pattern": false
+},
+{
+"zh": "第{0}批",
+"pattern": true
+},
+{
+"zh": "批",
+"pattern": false
+},
+{
+"zh": "作品檢視",
+"pattern": false
+},
+{
+"zh": "上一件作品",
+"pattern": false
+},
+{
+"zh": "下一件作品",
+"pattern": false
+},
+{
+"zh": "1:1原尺寸",
+"pattern": false
+},
+{
+"zh": "關閉（Esc）",
 "pattern": false
 },
 {
@@ -4774,10 +4930,6 @@
 {
 "zh": "讀不到 {0}",
 "pattern": true
-},
-{
-"zh": "讀不到",
-"pattern": false
 },
 {
 "zh": "主控台憑證已在 {0}（台北時間）過期，使用者連線會看到錯誤。請到「設定 → HTTPS 與憑證」匯入新憑證。",
@@ -9796,10 +9948,6 @@
 "pattern": false
 },
 {
-"zh": "圖片",
-"pattern": false
-},
-{
 "zh": "（{0}沒有產生成功）",
 "pattern": true
 },
@@ -12236,6 +12384,10 @@
 "pattern": false
 },
 {
+"zh": "這台的代理太舊，不會回報作品資料夾；請先更新代理",
+"pattern": false
+},
+{
 "zh": "分塊的位置或大小不對",
 "pattern": false
 },
@@ -12737,6 +12889,10 @@
 },
 {
 "zh": "清單裡沒有這個模型",
+"pattern": false
+},
+{
+"zh": "作品資料夾在另一台機器上，這裡打不開；請複製路徑到那台找",
 "pattern": false
 },
 {
@@ -13949,6 +14105,10 @@
 },
 {
 "zh": "最多 8 個元件",
+"pattern": false
+},
+{
+"zh": "標籤最多6個（含自動加上的「能改圖」或「只能改圖」）",
 "pattern": false
 },
 {
@@ -18804,10 +18964,6 @@
 "pattern": false
 },
 {
-"zh": "這件沒有產出",
-"pattern": false
-},
-{
 "zh": "沒有這一張",
 "pattern": false
 },
@@ -20676,7 +20832,7 @@
 "pattern": false
 },
 {
-"zh": "只能打開模型存放區或 Agent 工作資料夾底下的資料夾",
+"zh": "只能打開模型存放區、作品資料夾或Agent工作資料夾底下的資料夾",
 "pattern": false
 },
 {
