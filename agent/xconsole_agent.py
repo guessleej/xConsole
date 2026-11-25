@@ -10773,8 +10773,16 @@ def _win32():
     adv = ctypes.WinDLL("advapi32", use_last_error=True)
     k32.CreateNamedPipeW.restype = wintypes.HANDLE
     k32.CreateNamedPipeW.argtypes = [wintypes.LPCWSTR] + [wintypes.DWORD] * 6 + [ctypes.c_void_p]
-    for f in (k32.ConnectNamedPipe, k32.DisconnectNamedPipe, k32.CloseHandle, k32.FlushFileBuffers, adv.ImpersonateNamedPipeClient):
+    for f in (k32.ConnectNamedPipe, k32.DisconnectNamedPipe, k32.CloseHandle, k32.FlushFileBuffers):
         f.argtypes = [wintypes.HANDLE] + ([ctypes.c_void_p] if f is k32.ConnectNamedPipe else [])
+    k32.GetNamedPipeClientProcessId.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)]
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    adv.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    adv.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                        ctypes.POINTER(wintypes.DWORD)]
+    adv.LookupAccountSidW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD),
+                                      wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)]
     k32.ReadFile.argtypes = k32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
                                                       ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
     return ctypes, wintypes, k32, adv
@@ -10809,28 +10817,49 @@ class PipeIO(io.RawIOBase):
         return n.value
 
 
+def pipe_client_name(h):
+    """管道另一端行程的帳號（網域\帳號）。不扮演對方：桌面版以 SECURITY_IDENTIFICATION 連線，本來就不讓我們扮演。"""
+    ct, wt, k32, adv = _win32()
+    pid = wt.ULONG()
+    if not k32.GetNamedPipeClientProcessId(h, ct.byref(pid)):
+        return "?"
+    ph = k32.OpenProcess(0x1000, False, pid.value)          # PROCESS_QUERY_LIMITED_INFORMATION
+    if not ph:
+        return f"pid {pid.value}"
+    tok = wt.HANDLE()
+    try:
+        if not adv.OpenProcessToken(ph, 0x8, ct.byref(tok)):  # TOKEN_QUERY
+            return f"pid {pid.value}"
+        try:
+            size = wt.DWORD()
+            adv.GetTokenInformation(tok, 1, None, 0, ct.byref(size))   # TokenUser
+            buf = ct.create_string_buffer(size.value)
+            if not adv.GetTokenInformation(tok, 1, buf, size, ct.byref(size)):
+                return f"pid {pid.value}"
+            sid = ct.cast(buf, ct.POINTER(ct.c_void_p))[0]
+            name, dom = ct.create_unicode_buffer(256), ct.create_unicode_buffer(256)
+            nn, dn, use = wt.DWORD(256), wt.DWORD(256), wt.DWORD()
+            if adv.LookupAccountSidW(None, sid, name, ct.byref(nn), dom, ct.byref(dn), ct.byref(use)):
+                return f"{dom.value}\\{name.value}"
+            return f"pid {pid.value}"
+        finally:
+            k32.CloseHandle(tok)
+    finally:
+        k32.CloseHandle(ph)
+
+
 class PipeUserHandler(UserHandler):
-    """互動式登入的使用者才開得了這支管道（ACL），所以連得進來就放行；身分在讀到請求之後扮演對方取得。"""
+    """互動式登入的使用者才開得了這支管道（ACL），所以連得進來就放行；身分由管道另一端的行程帳號取得。"""
 
     allowed = True
 
     def setup(self):
         self.rfile = io.BufferedReader(PipeIO(self.request))
         self.wfile = PipeIO(self.request)
+        self.who = pipe_client_name(self.request)
 
     def finish(self):
         self.wfile.flush()
-
-    def _gate(self, method):
-        ct, wt, _, adv = _win32()
-        if adv.ImpersonateNamedPipeClient(self.request):
-            try:
-                n, buf = wt.DWORD(256), ct.create_unicode_buffer(256)
-                if ct.WinDLL("secur32").GetUserNameExW(2, buf, ct.byref(n)):    # NameSamCompatible：網域\帳號
-                    self.who = buf.value
-            finally:
-                adv.RevertToSelf()
-        return super()._gate(method)
 
 
 def _pipe_serve(name):

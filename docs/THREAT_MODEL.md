@@ -156,7 +156,7 @@ S假冒（Spoofing）／T竄改（Tampering）／R否認（Repudiation）／I資
 | 學生經本機通道換模型、改設定、解除鎖定 | E | 桌面App或自己寫的程式打本機通道 | 通道上的路由先過白名單：只放行查狀態、群組狀態與鎖定、已安裝的模型、對話；換模型、刪模型、群組同步、讀金鑰與記錄、執行指令一律403並講明要請管理者 | V8.2 | 已測 |
 | 別的使用者或程式冒用本機通道 | S | 同一台電腦的其他帳號（SSH登入、排程工作）連進來 | Windows具名管道的ACL只給互動式登入的使用者（另加`PIPE_REJECT_REMOTE_CLIENTS`擋網路上來的）；Linux與macOS的socket檔開0666，但代理用`SO_PEERCRED`／`LOCAL_PEERCRED`取得連線者，只放行坐在電腦前的人（Linux看logind座位的`ACTIVE_UID`、macOS看`/dev/console`的擁有者）與root；不開TCP埠 | V4.1 | 已測 |
 | 同一台的其他帳號先開一個假通道 | S | 搶在系統代理之前開同名的socket或管道，騙桌面App把對話送過去 | Unix通道資料夾只有專用帳號寫得進去（別人寫得進去代理就不開）；主控台連之前先驗socket擁有者是專用帳號、資料夾別人寫不進去；Windows用`FILE_FLAG_FIRST_PIPE_INSTANCE`，主控台驗管道擁有者是SYSTEM或系統管理員，並以`SECURITY_IDENTIFICATION`連線，對方只認得出是誰、不能冒用身分 | V4.1 | 已測 |
-| 否認經本機通道做過的事 | R | 出事後說不是自己 | 代理從作業系統取得連線者的帳號（Windows扮演具名管道的用戶端讀帳號、Unix查uid），每筆請求連同路徑與放行或拒絕寫進 `user-channel.log`（權限600，超過5 MB換一份）；對話內容不記 | V16.1 | 已測 |
+| 否認經本機通道做過的事 | R | 出事後說不是自己 | 代理從作業系統取得連線者的帳號（Windows由管道取得另一端的行程、讀它的帳號，不扮演對方；Unix查uid），每筆請求連同路徑與放行或拒絕寫進 `user-channel.log`（權限600，超過5 MB換一份）；對話內容不記 | V16.1 | 已測 |
 
 ## 3. B3 IDE／外部服務 ↔ 模型API
 
