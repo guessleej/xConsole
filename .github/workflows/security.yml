@@ -65,6 +65,8 @@ jobs:
         run: cd console && python test_engine_dist.py
       - name: 還原卡接回（一次性接回憑證、待核准、群組預設不允許）
         run: cd console && python test_rejoin.py
+      - name: 即時問題回報（回條、主管列緊急、逾時催辦、逾期提醒、處理完通知、附件看檔頭）
+        run: cd console && python test_issues.py
       - name: 群組（設定檢查、版本號、改名與刪除、主控台送設定給代理）
         run: cd console && python test_groups.py
       - name: 安全指令（停用、恢復、清除、撤銷身分；離線排著、連上先送、後下覆蓋先下、重送不重做）

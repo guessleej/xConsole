@@ -1413,6 +1413,8 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .grp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 15px; }
 .grp-checks label { display: inline-flex; align-items: center; gap: 6px; }
 .grp-plan { margin: 18px 0 6px; }
+.report-btn { font-size: 14px; margin-top: 6px; opacity: 1; }
+.tile .report-btn { display: block; }
 .grp-plan h3 { font-size: 18px; margin: 0 0 6px; }
 .grp-class { padding: 12px 0; display: flex; flex-direction: column; gap: 6px; }
 .grp-hours { display: flex; flex-direction: column; gap: 8px; margin: 6px 0; }

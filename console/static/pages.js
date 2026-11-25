@@ -132,6 +132,7 @@ const tileOf = (k, v, s) => {
   const t = el("div", "tile");
   t.append(el("div", "k", k), el("div", "v", v));
   if (s) t.appendChild(el("div", "s", s));
+  t.appendChild(reportBtn(`${S.node || ""}・${k}`));      // 數字不對當場回報（清單 #19）
   return t;
 };
 
