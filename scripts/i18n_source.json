@@ -5100,6 +5100,38 @@
 "pattern": false
 },
 {
+"zh": "待核准接回",
+"pattern": false
+},
+{
+"zh": "主機板識別碼不是秘密、照抄得到，所以要人確認：確定是同一台（例如還原卡把系統碟還原了）才按「接回」。",
+"pattern": false
+},
+{
+"zh": "{0} 想接回原來的 {1}",
+"pattern": true
+},
+{
+"zh": "想接回原來的",
+"pattern": false
+},
+{
+"zh": "接回",
+"pattern": false
+},
+{
+"zh": "當成新機器",
+"pattern": false
+},
+{
+"zh": "已接回原來那一格",
+"pattern": false
+},
+{
+"zh": "已當成新機器",
+"pattern": false
+},
+{
 "zh": "每種機型會拿到哪一版",
 "pattern": false
 },
@@ -5245,6 +5277,14 @@
 },
 {
 "zh": "筆電",
+"pattern": false
+},
+{
+"zh": "允許接回（還原卡）：機器拿得出那一格的接回憑證就接回；拿不出來但主機板識別碼一樣的，列進待核准",
+"pattern": false
+},
+{
+"zh": "還原卡",
 "pattern": false
 },
 {
@@ -11500,7 +11540,15 @@
 "pattern": false
 },
 {
-"zh": "已加入主控台：{0}（{1}）。回到網頁就看得到這台。",
+"zh": "用接回憑證接回原來那一格。",
+"pattern": false
+},
+{
+"zh": "看起來是原本的某一台，已列進待核准接回，管理者核准後接回原來那一格。",
+"pattern": false
+},
+{
+"zh": "已加入主控台：{0}（{1}）。{2}回到網頁就看得到這台。",
 "pattern": true
 },
 {
@@ -12016,7 +12064,7 @@
 "pattern": false
 },
 {
-"zh": "）。回到網頁就看得到這台。",
+"zh": "回到網頁就看得到這台。",
 "pattern": false
 },
 {
@@ -12425,6 +12473,10 @@
 },
 {
 "zh": " 埠，而且送來的權杖與憑證是這台代理的。",
+"pattern": false
+},
+{
+"zh": "主機板識別碼跟那一格一樣（識別碼不是秘密，要人確認）",
 "pattern": false
 },
 {
@@ -12936,6 +12988,10 @@
 "pattern": false
 },
 {
+"zh": "沒有這筆待核准接回",
+"pattern": false
+},
+{
 "zh": "維運只能改群組設定（模型、上下文、套用時機）；改名與種類要管理員",
 "pattern": false
 },
@@ -13037,6 +13093,10 @@
 },
 {
 "zh": "有檔案讀不出來",
+"pattern": false
+},
+{
+"zh": "新機器或原來那一格已經不在了",
 "pattern": false
 },
 {
@@ -15352,6 +15412,10 @@
 "pattern": false
 },
 {
+"zh": "允許接回要是開或關",
+"pattern": false
+},
+{
 "zh": "依機型覆寫最多 32 種機型",
 "pattern": false
 },
@@ -17540,10 +17604,6 @@
 "pattern": false
 },
 {
-"zh": "模型存放位置",
-"pattern": false
-},
-{
 "zh": "群組要 {0} 顆模型，這台只有 {1} 個可放語言模型的欄位",
 "pattern": true
 },
@@ -18916,6 +18976,30 @@
 "pattern": false
 },
 {
+"zh": "模型存放位置 {0} 寫不進去：{1}",
+"pattern": true
+},
+{
+"zh": "模型存放位置",
+"pattern": false
+},
+{
+"zh": "寫不進去",
+"pattern": false
+},
+{
+"zh": "模型改放 {0}（群組設定的存放位置）",
+"pattern": true
+},
+{
+"zh": "模型改放",
+"pattern": false
+},
+{
+"zh": "群組設定的存放位置",
+"pattern": false
+},
+{
 "zh": "：在跑的模型不在只准用的清單裡，已停掉",
 "pattern": false
 },
@@ -19957,6 +20041,22 @@
 },
 {
 "zh": "），請改小上下文或換小一點的量化",
+"pattern": false
+},
+{
+"zh": "模型存放位置 ",
+"pattern": false
+},
+{
+"zh": " 寫不進去：",
+"pattern": false
+},
+{
+"zh": "模型改放 ",
+"pattern": false
+},
+{
+"zh": "（群組設定的存放位置）",
 "pattern": false
 },
 {

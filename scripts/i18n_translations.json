@@ -26488,5 +26488,85 @@
 "en": "This is a metered connection (such as a phone hotspot); downloads resume on a regular network",
 "ja": "従量制の接続です（スマホのテザリングなど）。通常のネットワークに切り替えてからダウンロードします",
 "ko": "데이터 요금제 연결(휴대폰 핫스팟 등)입니다. 일반 네트워크로 바꾼 뒤 다운로드합니다"
+},
+"待核准接回": {
+"en": "Pending rejoin approvals",
+"ja": "承認待ちの再参加",
+"ko": "승인 대기 중인 재합류"
+},
+"主機板識別碼不是秘密、照抄得到，所以要人確認：確定是同一台（例如還原卡把系統碟還原了）才按「接回」。": {
+"en": "A motherboard ID isn't secret and can be copied, so a person has to confirm: press \"Rejoin\" only if you're sure it's the same machine (for example, a restore card reverted its system disk).",
+"ja": "マザーボードIDは秘密ではなくコピーできるため、人が確認します。同じ端末だと確信できるとき（例：復元カードがシステムディスクを戻した）だけ「再参加」を押してください。",
+"ko": "메인보드 식별자는 비밀이 아니라 복사할 수 있으므로 사람이 확인해야 합니다. 같은 컴퓨터가 확실할 때만(예: 복원 카드가 시스템 디스크를 되돌린 경우) '재합류'를 누르세요."
+},
+"{0} 想接回原來的 {1}": {
+"en": "{0} wants to rejoin as {1}",
+"ja": "{0} が元の {1} として再参加しようとしています",
+"ko": "{0}이(가) 원래의 {1}(으)로 재합류하려고 합니다"
+},
+"接回": {
+"en": "Rejoin",
+"ja": "再参加",
+"ko": "재합류"
+},
+"當成新機器": {
+"en": "Treat as new machine",
+"ja": "新しい端末として扱う",
+"ko": "새 컴퓨터로 취급"
+},
+"已接回原來那一格": {
+"en": "Rejoined as the original machine",
+"ja": "元の端末として再参加しました",
+"ko": "원래 컴퓨터로 재합류했습니다"
+},
+"已當成新機器": {
+"en": "Treated as a new machine",
+"ja": "新しい端末として扱いました",
+"ko": "새 컴퓨터로 취급했습니다"
+},
+"允許接回（還原卡）：機器拿得出那一格的接回憑證就接回；拿不出來但主機板識別碼一樣的，列進待核准": {
+"en": "Allow rejoin (restore cards): a machine with that slot's rejoin credential rejoins; one without it but with the same motherboard ID is listed for approval",
+"ja": "再参加を許可（復元カード）：その枠の再参加証明を持つ端末は再参加し、持たないがマザーボードIDが同じ端末は承認待ちに入れます",
+"ko": "재합류 허용(복원 카드): 그 자리의 재합류 자격 증명이 있으면 재합류하고, 없지만 메인보드 식별자가 같으면 승인 대기에 넣습니다"
+},
+"還原卡": {
+"en": "Restore cards",
+"ja": "復元カード",
+"ko": "복원 카드"
+},
+"用接回憑證接回原來那一格。": {
+"en": "Rejoined the original slot with the rejoin credential.",
+"ja": "再参加証明で元の枠に再参加しました。",
+"ko": "재합류 자격 증명으로 원래 자리에 재합류했습니다."
+},
+"看起來是原本的某一台，已列進待核准接回，管理者核准後接回原來那一格。": {
+"en": "This looks like an existing machine; it's been listed for rejoin approval and will take over the original slot once an administrator approves.",
+"ja": "既存の端末のようです。再参加の承認待ちに入れました。管理者が承認すると元の枠に戻ります。",
+"ko": "기존 컴퓨터로 보여 재합류 승인 대기에 넣었습니다. 관리자가 승인하면 원래 자리로 돌아갑니다."
+},
+"沒有這筆待核准接回": {
+"en": "No such pending rejoin",
+"ja": "この再参加の承認待ちはありません",
+"ko": "해당 재합류 승인 대기가 없습니다"
+},
+"允許接回要是開或關": {
+"en": "Allow rejoin must be on or off",
+"ja": "再参加の許可はオンかオフを指定してください",
+"ko": "재합류 허용은 켜기 또는 끄기여야 합니다"
+},
+"模型存放位置 {0} 寫不進去：{1}": {
+"en": "Can't write to the model storage location {0}: {1}",
+"ja": "モデルの保存場所 {0} に書き込めません：{1}",
+"ko": "모델 저장 위치 {0}에 쓸 수 없습니다: {1}"
+},
+"模型改放 {0}（群組設定的存放位置）": {
+"en": "Models now stored in {0} (the group's storage location)",
+"ja": "モデルを {0} に保存します（グループ設定の保存場所）",
+"ko": "모델을 {0}에 저장합니다(그룹 설정의 저장 위치)"
+},
+"新機器或原來那一格已經不在了": {
+"en": "The new machine or the original slot no longer exists",
+"ja": "新しい端末または元の枠がもうありません",
+"ko": "새 컴퓨터 또는 원래 자리가 더 이상 없습니다"
 }
 }

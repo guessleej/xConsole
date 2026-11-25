@@ -18,7 +18,7 @@ NAME_RX = re.compile(r"[^\x00-\x1f<>\"'`\\]{1,30}")
 MODEL_RX = re.compile(r"[A-Za-z0-9][\w./:+-]{0,159}")
 HISTORY_MAX = 20
 FIELD_NAMES = ("models", "allowed_models", "profile", "reserve_user_gib", "gpu_power_limit", "storage_root",
-               "sources", "locked", "apply_at", "rate_limit", "overrides", "user_first", "laptop_care")
+               "sources", "locked", "apply_at", "rate_limit", "overrides", "user_first", "laptop_care", "allow_rejoin")
 USER_FIRST = ("unload", "keep")                      # 使用者的程式把記憶體吃光時：先卸載模型（工作站預設）、或不動
 HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
@@ -26,7 +26,8 @@ HHMM_RX = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 def defaults():
     return {"models": [], "profile": {}, "locked": [], "reserve_user_gib": None, "storage_root": "",
             "sources": ["huggingface"], "allowed_models": [], "apply_at": {"mode": "now"}, "gpu_power_limit": None,
-            "rate_limit": None, "overrides": {}, "user_first": "unload", "laptop_care": True}
+            "rate_limit": None, "overrides": {}, "user_first": "unload", "laptop_care": True,
+            "allow_rejoin": False}
 
 
 def _num(v, lo, hi, name, integer=False):
@@ -122,6 +123,10 @@ def check(s):
     if not isinstance(lc, bool):
         raise ValueError("筆電省電要是開或關")
     out["laptop_care"] = lc
+    ar = s.get("allow_rejoin", False)
+    if not isinstance(ar, bool):
+        raise ValueError("允許接回要是開或關")
+    out["allow_rejoin"] = ar
     ov = s.get("overrides") or {}
     if not isinstance(ov, dict) or len(ov) > 32:
         raise ValueError("依機型覆寫最多 32 種機型")
