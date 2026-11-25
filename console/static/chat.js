@@ -1326,6 +1326,7 @@ function msgActs(m, acts, media) {
   btn("複製", () => acts.copy(m));
   if (m.role === "assistant") {
     btn("重新生成", () => acts.regen(i()));
+    row.appendChild(reportBtn(`對話答覆：${String(m.content || "").slice(0, 40)}`, "回報答錯"));
     const rw = el("select", "msg-rw");
     rw.setAttribute("aria-label", "調整回答");
     rw.disabled = acts.busy();
