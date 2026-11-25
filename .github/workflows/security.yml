@@ -97,6 +97,8 @@ jobs:
         run: cd console && python test_chats.py
       - name: 對話工具（讀網頁擋內網位址、聯網搜尋、寫檔與執行指令先問、本次對話不再詢問、一般使用者只動自己的資料夾）
         run: cd console && python test_chattools.py
+      - name: 定時任務與推送（規則、補跑、執行、存成對話、Telegram與Webhook、令牌加密、權限）
+        run: cd console && python test_schedules.py
       - name: Agent任務（等核准、拒絕、步數上限、停止、加密落地、重啟後標成已中斷、只能刪自己的、計畫收尾）
         run: cd console && python test_agent_tasks.py
       - name: 每天會碰到的對齊項目（新版通知與跳過版本、載入中最後一行記錄、思考開關預設、畫面守衛）

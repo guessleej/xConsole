@@ -112,6 +112,14 @@
 "pattern": false
 },
 {
+"zh": "Agent任務",
+"pattern": false
+},
+{
+"zh": "定時任務",
+"pattern": false
+},
+{
 "zh": "執行模型",
 "pattern": false
 },
@@ -9600,6 +9608,14 @@
 "pattern": false
 },
 {
+"zh": "查時間",
+"pattern": false
+},
+{
+"zh": "計算機",
+"pattern": false
+},
+{
 "zh": "列出機器",
 "pattern": false
 },
@@ -10664,6 +10680,394 @@
 "pattern": false
 },
 {
+"zh": "每日AI新聞",
+"pattern": false
+},
+{
+"zh": "搜尋今天的AI與大型語言模型重要新聞，挑5則，每則用兩三句話說明重點並附來源網址。",
+"pattern": false
+},
+{
+"zh": "明天天氣與穿搭",
+"pattern": false
+},
+{
+"zh": "查台北市明天的天氣預報（溫度、降雨機率、紫外線），給一段穿搭與要不要帶傘的建議，附資料來源。",
+"pattern": false
+},
+{
+"zh": "匯率與金價",
+"pattern": false
+},
+{
+"zh": "查今天美元、日圓、歐元兌新台幣的匯率，以及國際金價，跟昨天比漲跌多少，用表格列出並附來源。",
+"pattern": false
+},
+{
+"zh": "週五一週總結提醒",
+"pattern": false
+},
+{
+"zh": "提醒我整理這週的工作：列出一份「本週完成、遇到的問題、下週要做」的空白模板，最後提醒記得寫週報。",
+"pattern": false
+},
+{
+"zh": "・沒在跑",
+"pattern": false
+},
+{
+"zh": "第三方API・{0}・{1}{2}",
+"pattern": true
+},
+{
+"zh": "第三方API",
+"pattern": false
+},
+{
+"zh": "到時間叫模型做一件事，結果存成對話（放在「定時任務」分類，可以接著問），也可以推送到手機。主控台開著就會跑，不必開著這個網頁。",
+"pattern": false
+},
+{
+"zh": "推送管道",
+"pattern": false
+},
+{
+"zh": "新增任務",
+"pattern": false
+},
+{
+"zh": "推送管道（{0}）",
+"pattern": true
+},
+{
+"zh": "還沒有定時任務",
+"pattern": false
+},
+{
+"zh": "從範本開始，或按右上角「新增任務」自己寫",
+"pattern": false
+},
+{
+"zh": "每天{0}",
+"pattern": true
+},
+{
+"zh": "每天",
+"pattern": false
+},
+{
+"zh": "週一到週五",
+"pattern": false
+},
+{
+"zh": "每週",
+"pattern": false
+},
+{
+"zh": "每{0}分鐘",
+"pattern": true
+},
+{
+"zh": "每",
+"pattern": false
+},
+{
+"zh": "分鐘",
+"pattern": false
+},
+{
+"zh": "每{0}小時",
+"pattern": true
+},
+{
+"zh": "小時",
+"pattern": false
+},
+{
+"zh": "只跑一次",
+"pattern": false
+},
+{
+"zh": "正在執行",
+"pattern": false
+},
+{
+"zh": "下次{0}",
+"pattern": true
+},
+{
+"zh": "下次",
+"pattern": false
+},
+{
+"zh": "不會再跑",
+"pattern": false
+},
+{
+"zh": "已暫停",
+"pattern": false
+},
+{
+"zh": "暫停這個任務",
+"pattern": false
+},
+{
+"zh": "重新啟用（從現在開始算，不補暫停期間）",
+"pattern": false
+},
+{
+"zh": "啟用這個任務",
+"pattern": false
+},
+{
+"zh": "・可聯網",
+"pattern": false
+},
+{
+"zh": "・推送到{0}",
+"pattern": true
+},
+{
+"zh": "推送到",
+"pattern": false
+},
+{
+"zh": "・只存成對話",
+"pattern": false
+},
+{
+"zh": "模型：{0}{1}{2}",
+"pattern": true
+},
+{
+"zh": "（手動）",
+"pattern": false
+},
+{
+"zh": "上次{0}{1}：{2}",
+"pattern": true
+},
+{
+"zh": "立即執行",
+"pattern": false
+},
+{
+"zh": "收起紀錄",
+"pattern": false
+},
+{
+"zh": "執行紀錄（{0}）",
+"pattern": true
+},
+{
+"zh": "執行紀錄",
+"pattern": false
+},
+{
+"zh": "「{0}」和它的執行紀錄會一起刪掉；已經存成對話的結果不受影響。",
+"pattern": true
+},
+{
+"zh": "」和它的執行紀錄會一起刪掉；已經存成對話的結果不受影響",
+"pattern": false
+},
+{
+"zh": "・手動",
+"pattern": false
+},
+{
+"zh": "・{0}秒",
+"pattern": true
+},
+{
+"zh": "用了：",
+"pattern": false
+},
+{
+"zh": "（失敗）",
+"pattern": false
+},
+{
+"zh": "推送到{0}：{1}",
+"pattern": true
+},
+{
+"zh": "這次的結果也存在對話頁的「定時任務」分類，可以接著問。",
+"pattern": false
+},
+{
+"zh": "空白就用要做的事的前幾個字",
+"pattern": false
+},
+{
+"zh": "例：搜尋今天的AI重要新聞，挑5則，每則兩三句話說明並附來源網址。",
+"pattern": false
+},
+{
+"zh": "每隔一段時間",
+"pattern": false
+},
+{
+"zh": "週",
+"pattern": false
+},
+{
+"zh": "還沒有可以用的模型欄位",
+"pattern": false
+},
+{
+"zh": "允許聯網搜尋與讀網頁",
+"pattern": false
+},
+{
+"zh": "（管理者還沒設定搜尋服務，只能讀指定的網頁）",
+"pattern": false
+},
+{
+"zh": "結果存成對話（可以接著問）",
+"pattern": false
+},
+{
+"zh": "沒有完成時也推送通知",
+"pattern": false
+},
+{
+"zh": "模型沒在跑就自動啟動（最多等10分鐘）",
+"pattern": false
+},
+{
+"zh": "跑完把自動啟動的模型關掉，讓出顯示卡",
+"pattern": false
+},
+{
+"zh": "還沒有推送管道：結果只會存成對話。要推到手機，先到「推送管道」加一個Telegram。",
+"pattern": false
+},
+{
+"zh": "要模型做什麼",
+"pattern": false
+},
+{
+"zh": "寫清楚要查什麼、要什麼格式；這段會原樣交給模型。",
+"pattern": false
+},
+{
+"zh": "什麼時候跑",
+"pattern": false
+},
+{
+"zh": "照主控台這台的時間；主控台關機錯過的，12小時內開機會補跑一次。",
+"pattern": false
+},
+{
+"zh": "用哪個模型",
+"pattern": false
+},
+{
+"zh": "已儲存，正在執行一次",
+"pattern": false
+},
+{
+"zh": "編輯定時任務",
+"pattern": false
+},
+{
+"zh": "新增定時任務",
+"pattern": false
+},
+{
+"zh": "儲存並立即執行一次",
+"pattern": false
+},
+{
+"zh": "發測試訊息",
+"pattern": false
+},
+{
+"zh": "測試訊息送出了，去手機看看",
+"pattern": false
+},
+{
+"zh": "刪除「{0}」？用到它的任務會自動拿掉這個管道。",
+"pattern": true
+},
+{
+"zh": "刪除「",
+"pattern": false
+},
+{
+"zh": "」？用到它的任務會自動拿掉這個管道",
+"pattern": false
+},
+{
+"zh": "還沒有推送管道。",
+"pattern": false
+},
+{
+"zh": "加Telegram",
+"pattern": false
+},
+{
+"zh": "加Webhook",
+"pattern": false
+},
+{
+"zh": "令牌與網址加密存在主控台，存好之後畫面只顯示「已設定」。Telegram最方便：手機裝Telegram、找@BotFather建一個機器人拿Token。",
+"pattern": false
+},
+{
+"zh": "例：我的手機",
+"pattern": false
+},
+{
+"zh": "例：Teams頻道",
+"pattern": false
+},
+{
+"zh": "已設定（要換才重填）",
+"pattern": false
+},
+{
+"zh": "數字（群組是負數），或頻道的@名稱",
+"pattern": false
+},
+{
+"zh": "查找Chat ID",
+"pattern": false
+},
+{
+"zh": "跟Telegram的@BotFather建機器人時給的那一串。",
+"pattern": false
+},
+{
+"zh": "先在Telegram傳一句話給你的機器人，再按「查找Chat ID」自動填。",
+"pattern": false
+},
+{
+"zh": "已設定（{0}，要換才重填）",
+"pattern": true
+},
+{
+"zh": "要換才重填",
+"pattern": false
+},
+{
+"zh": "Webhook網址",
+"pattern": false
+},
+{
+"zh": "主控台會POST一個JSON：{\"title\", \"content\", \"source\": \"xConsole\"}，可以接Teams、LINE、n8n、Home Assistant或自家系統。",
+"pattern": false
+},
+{
+"zh": "對方要驗身分才填；放在Authorization標頭送，不會放進網址。",
+"pattern": false
+},
+{
+"zh": "編輯{0}",
+"pattern": true
+},
+{
 "zh": "xConsole 模型主控台｜云碩科技",
 "pattern": false
 },
@@ -10856,7 +11260,19 @@
 "pattern": false
 },
 {
-"zh": "你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。",
+"zh": "你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。今天是{0}（星期{1}）；要算數字用calculator，不要心算。",
+"pattern": true
+},
+{
+"zh": "你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。今天是",
+"pattern": false
+},
+{
+"zh": "星期",
+"pattern": false
+},
+{
+"zh": "要算數字用calculator，不要心算",
 "pattern": false
 },
 {
@@ -10869,6 +11285,34 @@
 },
 {
 "zh": "這個工具",
+"pattern": false
+},
+{
+"zh": "這台機器已經不在主控台了",
+"pattern": false
+},
+{
+"zh": "這台機器不在你負責的群組裡",
+"pattern": false
+},
+{
+"zh": "等了10分鐘模型還沒好",
+"pattern": false
+},
+{
+"zh": "定時任務不能用{0}這個工具",
+"pattern": true
+},
+{
+"zh": "定時任務不能用",
+"pattern": false
+},
+{
+"zh": "工具呼叫太多次，沒有收尾",
+"pattern": false
+},
+{
+"zh": "帳號已停用或不存在",
 "pattern": false
 },
 {
@@ -11052,6 +11496,14 @@
 "pattern": false
 },
 {
+"zh": "查現在的日期、時間與星期（主控台這台的當地時間）",
+"pattern": false
+},
+{
+"zh": "算數學式子（四則、次方、括號、sqrt、log等），回答數字前先用它算，不要心算",
+"pattern": false
+},
+{
 "zh": "讀一個公開網頁的文字內容（只能讀網際網路上的網頁，內網與本機位址不行）",
 "pattern": false
 },
@@ -11073,6 +11525,14 @@
 },
 {
 "zh": "在工作資料夾裡執行一條指令；每條都會先問使用者",
+"pattern": false
+},
+{
+"zh": "（星期",
+"pattern": false
+},
+{
+"zh": "）；要算數字用calculator，不要心算。",
 "pattern": false
 },
 {
@@ -11109,6 +11569,62 @@
 },
 {
 "zh": "」這個資料夾；能用的是",
+"pattern": false
+},
+{
+"zh": "第三方API只有管理員能排定時任務",
+"pattern": false
+},
+{
+"zh": "這筆第三方API已經被刪掉了",
+"pattern": false
+},
+{
+"zh": "連不上那台機器",
+"pattern": false
+},
+{
+"zh": "模型沒有在跑（可以在任務裡勾「沒在跑就自動啟動」）",
+"pattern": false
+},
+{
+"zh": "自動啟動模型要維運或管理員帳號",
+"pattern": false
+},
+{
+"zh": "啟動模型失敗：{0}",
+"pattern": true
+},
+{
+"zh": "啟動模型失敗",
+"pattern": false
+},
+{
+"zh": "Webhook回{0}",
+"pattern": true
+},
+{
+"zh": "Webhook回",
+"pattern": false
+},
+{
+"zh": "定時任務「{0}」沒有完成",
+"pattern": true
+},
+{
+"zh": "定時任務「",
+"pattern": false
+},
+{
+"zh": "」沒有完成",
+"pattern": false
+},
+{
+"zh": "原因：{0}",
+"pattern": true
+},
+{
+"zh": "原因",
 "pattern": false
 },
 {
@@ -11496,6 +12012,26 @@
 "pattern": false
 },
 {
+"zh": "啟動模型失敗：",
+"pattern": false
+},
+{
+"zh": "Telegram回{0}：{1}",
+"pattern": true
+},
+{
+"zh": "Telegram回",
+"pattern": false
+},
+{
+"zh": "原因：",
+"pattern": false
+},
+{
+"zh": "這個推送管道已經被刪掉了",
+"pattern": false
+},
+{
 "zh": "沒有這台機器：{0}",
 "pattern": true
 },
@@ -11872,6 +12408,10 @@
 "pattern": false
 },
 {
+"zh": "沒有這個功能",
+"pattern": false
+},
+{
 "zh": "這個埠只給代理連回；管理網頁在另一個埠",
 "pattern": false
 },
@@ -11948,6 +12488,10 @@
 "pattern": false
 },
 {
+"zh": "例：(1+0.05)**10*1000",
+"pattern": false
+},
+{
 "zh": "秒，預設120、最多600",
 "pattern": false
 },
@@ -11973,6 +12517,30 @@
 },
 {
 "zh": "資料已經查好了，請直接根據上面查到的內容回答，不要再查。",
+"pattern": false
+},
+{
+"zh": "資料已經查好了，請直接根據上面查到的內容交出結果，不要再查。",
+"pattern": false
+},
+{
+"zh": "模型回{0}",
+"pattern": true
+},
+{
+"zh": "模型回",
+"pattern": false
+},
+{
+"zh": "模型只有思考、沒有寫出結果；請換一顆模型，或在執行頁把思考關掉",
+"pattern": false
+},
+{
+"zh": "這個任務沒有開放{0}這個工具",
+"pattern": true
+},
+{
+"zh": "這個任務沒有開放",
 "pattern": false
 },
 {
@@ -12160,10 +12728,6 @@
 "pattern": true
 },
 {
-"zh": "Agent任務",
-"pattern": false
-},
-{
 "zh": "存不進資料庫",
 "pattern": false
 },
@@ -12194,10 +12758,6 @@
 {
 "zh": "模型回 {0}：{1}",
 "pattern": true
-},
-{
-"zh": "模型回",
-"pattern": false
 },
 {
 "zh": "Agent 任務出錯：\n",
@@ -12312,6 +12872,18 @@
 "pattern": false
 },
 {
+"zh": "帳號不存在",
+"pattern": false
+},
+{
+"zh": "xConsole測試訊息",
+"pattern": false
+},
+{
+"zh": "推送管道設定好了：之後定時任務的結果會送到這裡。",
+"pattern": false
+},
+{
 "zh": "沒有問題",
 "pattern": false
 },
@@ -12396,11 +12968,11 @@
 "pattern": false
 },
 {
-"zh": "模型回{0}",
-"pattern": true
+"zh": "（模型沒有給出回答）",
+"pattern": false
 },
 {
-"zh": "（模型沒有給出回答）",
+"zh": "定時任務排程出錯：\n",
 "pattern": false
 },
 {
@@ -12860,6 +13432,14 @@
 "pattern": false
 },
 {
+"zh": "定時任務・{0}・{1}秒",
+"pattern": true
+},
+{
+"zh": "定時任務執行出錯：\n",
+"pattern": false
+},
+{
 "zh": " 送出的憑證跟當初信任的不同，已拒絕連線（可能是代理重裝，或有人冒充）。確認後請重新執行 deploy_console.sh",
 "pattern": false
 },
@@ -12897,6 +13477,30 @@
 },
 {
 "zh": "沒帶金鑰",
+"pattern": false
+},
+{
+"zh": "每個人最多{0}個定時任務",
+"pattern": true
+},
+{
+"zh": "個定時任務",
+"pattern": false
+},
+{
+"zh": "沒有這個推送管道",
+"pattern": false
+},
+{
+"zh": "每個人最多{0}個推送管道",
+"pattern": true
+},
+{
+"zh": "個推送管道",
+"pattern": false
+},
+{
+"zh": "先填正確的Bot Token",
 "pattern": false
 },
 {
@@ -13056,6 +13660,10 @@
 "pattern": true
 },
 {
+"zh": "定時任務・",
+"pattern": false
+},
+{
 "zh": "這格的直連金鑰少於 16 個字，加密入口不收；請在 API 串接頁重新產生金鑰",
 "pattern": false
 },
@@ -13065,6 +13673,18 @@
 },
 {
 "zh": "對方回的不是 JSON",
+"pattern": false
+},
+{
+"zh": "Telegram不認這個Bot Token",
+"pattern": false
+},
+{
+"zh": "Telegram回{0}",
+"pattern": true
+},
+{
+"zh": "還沒有人傳訊息給這個機器人：先在Telegram找到它、傳一句話，再按一次查找",
 "pattern": false
 },
 {
@@ -13120,11 +13740,19 @@
 "pattern": false
 },
 {
+"zh": "這個任務已經在跑或在排隊了",
+"pattern": false
+},
+{
 "zh": "沒有連得上的機器可以讀 Hugging Face",
 "pattern": false
 },
 {
 "zh": " 的設定現在不合法，不能退回：",
+"pattern": false
+},
+{
+"zh": "這個任務沒有在跑",
 "pattern": false
 },
 {
@@ -13400,6 +14028,14 @@
 "pattern": false
 },
 {
+"zh": "式子是空的或太長",
+"pattern": false
+},
+{
+"zh": "只能算數字、四則運算、次方與常用數學函式",
+"pattern": false
+},
+{
 "zh": "指向內網或本機位址（",
 "pattern": false
 },
@@ -13432,6 +14068,18 @@
 "pattern": false
 },
 {
+"zh": "看不懂這個式子",
+"pattern": false
+},
+{
+"zh": "算不出來：{0}",
+"pattern": true
+},
+{
+"zh": "算不出來",
+"pattern": false
+},
+{
 "zh": "對方回{0}",
 "pattern": true
 },
@@ -13452,6 +14100,18 @@
 "pattern": false
 },
 {
+"zh": "次方太大",
+"pattern": false
+},
+{
+"zh": "結果太大",
+"pattern": false
+},
+{
+"zh": "算不出來：",
+"pattern": false
+},
+{
 "zh": "對方回{0}轉址但沒有新網址",
 "pattern": true
 },
@@ -13465,6 +14125,154 @@
 },
 {
 "zh": "），讀不了",
+"pattern": false
+},
+{
+"zh": "一二三四五六日",
+"pattern": false
+},
+{
+"zh": "現在是{0}（星期{1}）。這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語）。",
+"pattern": true
+},
+{
+"zh": "現在是",
+"pattern": false
+},
+{
+"zh": "這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語",
+"pattern": false
+},
+{
+"zh": "只跑一次：",
+"pattern": false
+},
+{
+"zh": "請選要用哪個模型",
+"pattern": false
+},
+{
+"zh": "要模型做的事",
+"pattern": false
+},
+{
+"zh": "）。這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語）。",
+"pattern": false
+},
+{
+"zh": "{0}格式不對",
+"pattern": true
+},
+{
+"zh": "格式不對",
+"pattern": false
+},
+{
+"zh": "{0}最多{1}字",
+"pattern": true
+},
+{
+"zh": "請填{0}",
+"pattern": true
+},
+{
+"zh": "請填",
+"pattern": false
+},
+{
+"zh": "排程方式不對",
+"pattern": false
+},
+{
+"zh": "請選日期與時間",
+"pattern": false
+},
+{
+"zh": "只跑一次的時間要在未來",
+"pattern": false
+},
+{
+"zh": "推送管道不對（可能已被刪掉）",
+"pattern": false
+},
+{
+"zh": "自動啟動與關閉模型要維運或管理員帳號",
+"pattern": false
+},
+{
+"zh": "推送方式不對",
+"pattern": false
+},
+{
+"zh": "網址",
+"pattern": false
+},
+{
+"zh": "請填Webhook網址",
+"pattern": false
+},
+{
+"zh": "網址要是http://或https://開頭",
+"pattern": false
+},
+{
+"zh": "一般帳號的Webhook只能用https://",
+"pattern": false
+},
+{
+"zh": "\n\n使用者另外的指示：{0}",
+"pattern": true
+},
+{
+"zh": "\n\n使用者另外的指示",
+"pattern": false
+},
+{
+"zh": "時間要寫成「時:分」，例如08:30",
+"pattern": false
+},
+{
+"zh": "每週要至少選一天",
+"pattern": false
+},
+{
+"zh": "間隔要在{0}分鐘到7天之間",
+"pattern": true
+},
+{
+"zh": "間隔要在",
+"pattern": false
+},
+{
+"zh": "分鐘到7天之間",
+"pattern": false
+},
+{
+"zh": "週末",
+"pattern": false
+},
+{
+"zh": "模型欄位不對",
+"pattern": false
+},
+{
+"zh": "第三方API不對",
+"pattern": false
+},
+{
+"zh": "請填Bot Token（跟@BotFather要）",
+"pattern": false
+},
+{
+"zh": "Bot Token格式不對，應該像123456789:AA…",
+"pattern": false
+},
+{
+"zh": "Chat ID格式不對：個人與群組是數字（群組是負數），頻道可以寫@名稱",
+"pattern": false
+},
+{
+"zh": "\n\n使用者另外的指示：",
 "pattern": false
 },
 {
@@ -21077,10 +21885,6 @@
 },
 {
 "zh": " MB 繼續下載 ",
-"pattern": false
-},
-{
-"zh": "已暫停",
 "pattern": false
 },
 {

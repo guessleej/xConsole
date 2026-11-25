@@ -22,6 +22,7 @@ import hashlib
 import http.client
 import hmac
 import ipaddress
+import types
 import itertools
 import json
 import os
@@ -45,6 +46,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import chats  # noqa: E402
 import chattools  # noqa: E402
+import schedules  # noqa: E402
 import computer  # noqa: E402
 import updater  # noqa: E402
 import recommend  # noqa: E402
@@ -106,7 +108,7 @@ MUST_CHANGE_OK = {("GET", "/api/me"), ("POST", "/api/account/password"), ("POST"
 # 使用者（非管理員）能用的路由：對話、Agent、畫圖影片、自己的金鑰與密碼。沒列在這裡的一律只有管理員能用：
 # 新加的路由忘了列，結果是使用者用不到，而不是不小心開放出去（console/test_roles.py 逐條檢查每一條路由都有歸屬）。
 USER_ROUTES = [
-    ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers|assistant/tools)"),
+    ("GET", r"/api/(me|fleet|branding|chats|keys|sd/catalog|agent/tasks|providers|assistant/tools|schedules)"),
     ("GET", r"/api/chats/(blob/[0-9a-f]{16}|[0-9a-f]{12})"),
     ("GET", r"/api/agent/tasks/[0-9a-f]{12}"),
     ("GET", r"/api/node/[\w.-]+/(agent/folders|sd/recommend)"),
@@ -114,6 +116,9 @@ USER_ROUTES = [
     ("POST", r"/api/(logout|account/password|chats/save|chats/delete-all|extract|preview|agent/tasks|keys/create|assistant|assistant/continue)"),
     ("POST", r"/api/chats/[0-9a-f]{12}/(rename|delete|meta)"),
     ("POST", r"/api/agent/tasks/[0-9a-f]{12}/(approve|stop|delete)"),
+    ("POST", r"/api/(schedules/save|push/save|push/telegram/chats)"),
+    ("POST", r"/api/schedules/[0-9a-f]{12}/(delete|run|stop|toggle)"),
+    ("POST", r"/api/push/[0-9a-f]{12}/(delete|test)"),
     ("POST", r"/api/node/[\w.-]+/chat/[\w.-]+"),
     ("POST", r"/api/node/[\w.-]+/agent/(folders/create|fs/list|fs/read)"),
     ("POST", r"/api/node/[\w.-]+/sd/(generate|admit)"),
@@ -959,6 +964,9 @@ ASSIST_TOOLS = [
 ]
 CONSOLE_TOOLS = {t["function"]["name"] for t in ASSIST_TOOLS}
 EXTRA_TOOLS = {
+    "current_time": (_fn("current_time", "查現在的日期、時間與星期（主控台這台的當地時間）"), None),
+    "calculator": (_fn("calculator", "算數學式子（四則、次方、括號、sqrt、log等），回答數字前先用它算，不要心算",
+                       {"expression": {"type": "string", "description": "例：(1+0.05)**10*1000"}}, ["expression"]), None),
     "read_web_page": (_fn("read_web_page", "讀一個公開網頁的文字內容（只能讀網際網路上的網頁，內網與本機位址不行）",
                           {"url": {"type": "string"}}, ["url"]), None),
     "web_search": (_fn("web_search", "用搜尋引擎找資料，回標題、網址與摘要；要細看再用read_web_page讀那一頁",
@@ -993,7 +1001,7 @@ def search_key():
 def assist_toolset(user, is_admin, node_id):
     """這個人在這台能用哪些工具。回 (OpenAI tools清單, 能用的工作資料夾名稱)。"""
     tools = list(ASSIST_TOOLS) if is_admin else []
-    tools.append(EXTRA_TOOLS["read_web_page"][0])
+    tools += [EXTRA_TOOLS[k][0] for k in ("current_time", "calculator", "read_web_page")]
     if search_cfg():
         tools.append(EXTRA_TOOLS["web_search"][0])
     folders = []
@@ -1010,7 +1018,9 @@ def assist_toolset(user, is_admin, node_id):
 
 def assist_system(tools, folders, is_admin, extra):
     names = {t["function"]["name"] for t in tools}
-    out = ["你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。"]
+    lt = time.localtime()
+    out = ["你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。"
+           f"今天是{time.strftime('%Y-%m-%d', lt)}（星期{schedules.WEEKDAYS[lt.tm_wday]}）；要算數字用calculator，不要心算。"]
     if names & CONSOLE_TOOLS:
         out.append("你可以查這個主控台管的機器與模型，但不能替使用者啟動、停止或下載；需要動作時告訴他在網頁哪裡按。")
     if "read_web_page" in names:
@@ -1071,12 +1081,26 @@ def assist_tool(name, args):
     return {"error": "沒有這個工具"}
 
 
+def simple_tool(name, args):
+    """不碰網路、不碰檔案的兩個工具：對話與定時任務共用。"""
+    if name == "current_time":
+        lt = time.localtime()
+        return {"now": time.strftime("%Y-%m-%d %H:%M:%S", lt), "weekday": "星期" + schedules.WEEKDAYS[lt.tm_wday],
+                "timezone": time.strftime("%z", lt)}
+    try:
+        return {"expression": str(args.get("expression") or ""), "result": chattools.calculate(args.get("expression"))}
+    except chattools.CalcError as exc:
+        return {"error": str(exc)}
+
+
 def assist_exec(run, name, args, audit):
     """執行一個工具（權限在這裡再檢查一次，不靠模型或畫面）。回給模型的結果（dict）。"""
     if name in CONSOLE_TOOLS:
         return assist_tool(name, args) if run["admin"] else {"error": "這個帳號不能查主控台"}
     if name not in run["names"]:
         return {"error": f"沒有{name}這個工具"}
+    if name in ("current_time", "calculator"):
+        return simple_tool(name, args)
     if name == "read_web_page":
         url = str(args.get("url") or "")
         try:
@@ -1227,6 +1251,334 @@ def assist_drive(run, audit, decision=None):
             c.setdefault("type", "function")
         convo.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
         run["queue"] = list(calls)
+
+
+# ---------------------------------------------------------------- 定時任務（規則在schedules.py，這裡負責執行）
+# 主控台每20秒看一次哪些到期；一次只跑一件、其他排隊，免得同時把顯示卡占滿。
+# 執行時再查一次擁有者的角色與群組範圍（帳號被停用、降級、範圍改了，排好的任務也跟著失效）。
+SCHED = {"queue": [], "running": None, "cancel": threading.Event(), "wake": threading.Event()}
+_SCHED_LOCK = threading.Lock()
+SCHED_TICK = 20
+SCHED_START_WAIT = 600
+
+
+def _sealed_json(row):
+    try:
+        return json.loads(chat_unseal(row["body"]))
+    except Exception:  # noqa: BLE001  # 解不開（金鑰換過、資料壞了）就當沒有這筆，不讓整個排程停掉
+        return None
+
+
+def sched_rows(user=None):
+    """[(擁有者, 任務id, 任務)]"""
+    out = []
+    for r in STORE.sealed_rows("schedules", user):
+        t = _sealed_json(r)
+        if t:
+            out.append((r["user"], r["id"], t))
+    return out
+
+
+def sched_get(user, tid):
+    return next((t for _, i, t in sched_rows(user) if i == tid), None)
+
+
+def sched_put(user, tid, task):
+    STORE.sealed_put("schedules", tid, user, chat_seal(json.dumps(task, ensure_ascii=False).encode()))
+
+
+def chan_all(user):
+    """{管道id: {"pub": 公開欄位, "sec": 令牌與網址}}"""
+    out = {}
+    for r in STORE.sealed_rows("push_channels", user):
+        d = _sealed_json(r)
+        if d:
+            out[r["id"]] = d
+    return out
+
+
+def chan_public(cid, d):
+    return {"id": cid, **d["pub"], "secret_set": bool(d.get("sec"))}
+
+
+def sched_owner(user):
+    """回 (使用者那一列, 角色)；帳號不在或停用了回 (None, None)。"""
+    row = STORE.user_get(user)
+    if not row or row.get("disabled"):
+        return None, None
+    return row, row.get("role") or "user"
+
+
+def sched_target_check(row, role, target):
+    """這個人現在還能不能用這個模型。回錯誤訊息或None。"""
+    if target["kind"] == "provider":
+        if role != "admin":
+            return "第三方API只有管理員能排定時任務"
+        return None if STORE.provider_get(target["id"]) else "這筆第三方API已經被刪掉了"
+    node = next((n for n in fleet()["nodes"] if n["id"] == target["node"]), None)
+    if not node:
+        return "這台機器已經不在主控台了"
+    sc = scope_of(row)
+    if sc is not None and node_group_id(node["id"]) not in sc:
+        return "這台機器不在你負責的群組裡"
+    return None
+
+
+def sched_label(target):
+    if target["kind"] == "provider":
+        p = STORE.provider_get(target["id"]) or {}
+        return f"{p.get('name') or '第三方API'}・{target.get('model') or p.get('default_model') or ''}"
+    st = next((n.get("state") for n in fleet_state()["nodes"] if n["id"] == target["node"]), None) or {}
+    sl = next((x for x in st.get("slots") or [] if x.get("id") == target["slot"]), {})
+    name = next((n["name"] for n in fleet()["nodes"] if n["id"] == target["node"]), target["node"])
+    return f"{sl.get('model') or target['slot']}（{name}）"
+
+
+def _slot_busy(target):
+    code, st = call_node(target["node"], "/state", timeout=30)
+    if code != 200:
+        return None
+    sl = next((x for x in st.get("slots") or [] if x.get("id") == target["slot"]), None)
+    return bool(sl and sl.get("busy") and sl.get("state") == "active")
+
+
+def sched_ensure_model(user, task, role):
+    """本機模型沒在跑：任務有勾「自動啟動」而且擁有者是維運或管理員就啟動它，最多等10分鐘。回 (錯誤, 這次有沒有啟動)。"""
+    t = task["target"]
+    if t["kind"] != "local":
+        return None, False
+    busy = _slot_busy(t)
+    if busy:
+        return None, False
+    if busy is None:
+        return "連不上那台機器", False
+    if not task.get("auto_start"):
+        return "模型沒有在跑（可以在任務裡勾「沒在跑就自動啟動」）", False
+    if role not in ("admin", "operator"):
+        return "自動啟動模型要維運或管理員帳號", False
+    code, out = call_node(t["node"], f"/slot/{t['slot']}/start", "POST", {}, timeout=240)
+    STORE.audit(user, "", "schedule.start_model", f"{t['node']}/{t['slot']}", code == 200, {"message": out.get("error")})
+    if code != 200:
+        return f"啟動模型失敗：{out.get('error') or code}", False
+    end = time.time() + SCHED_START_WAIT
+    while time.time() < end and not SCHED["cancel"].is_set():
+        if _slot_busy(t):
+            return None, True
+        time.sleep(5)
+    return "等了10分鐘模型還沒好", True
+
+
+def sched_tools(task):
+    names = ["current_time", "calculator"]
+    if task.get("web"):
+        names.append("read_web_page")
+        if search_cfg():
+            names.append("web_search")
+    return [EXTRA_TOOLS[k][0] for k in names]
+
+
+def sched_tool(user, name, args):
+    """無人值守只給不會改動任何電腦的工具。"""
+    if name in ("current_time", "calculator"):
+        return simple_tool(name, args)
+    if name == "read_web_page":
+        url = str(args.get("url") or "")
+        try:
+            out = chattools.fetch(url)
+        except chattools.FetchError as exc:
+            return {"error": str(exc)}
+        STORE.audit(user, "", "schedule.tool", "read_web_page", True, {"url": url[:300], "chars": len(out["text"])})
+        return out
+    if name == "web_search":
+        cfg = search_cfg()
+        if not cfg:
+            return {"error": "管理者還沒設定搜尋服務"}
+        try:
+            return {"results": chattools.search(cfg, args.get("query"), search_key())}
+        except chattools.FetchError as exc:
+            return {"error": str(exc)}
+    return {"error": f"定時任務不能用{name}這個工具"}
+
+
+def sched_llm(user, task):
+    """叫模型把事情做完。回 (正文, 錯誤, 工具步驟)。"""
+    tools = sched_tools(task)
+    names = {t["function"]["name"] for t in tools}
+    convo = [{"role": "system", "content": schedules.unattended_system(time.time())}, {"role": "user", "content": task["prompt"]}]
+    steps = []
+    model = types.SimpleNamespace(model=task["target"])
+    for rnd in range(schedules.TOOL_ROUNDS + 1):
+        if SCHED["cancel"].is_set():
+            return None, "已停止", steps
+        last = rnd == schedules.TOOL_ROUNDS
+        req = {"messages": convo, "stream": False, "max_tokens": 4096, "temperature": 0.3}
+        if last:
+            convo.append({"role": "user", "content": "資料已經查好了，請直接根據上面查到的內容交出結果，不要再查。"})
+        else:
+            req["tools"] = tools
+        code, out = agent_model_call(model, req)
+        if code != 200 and "tools" in req:
+            req.pop("tools")
+            code, out = agent_model_call(model, req)
+        if code != 200:
+            return None, out.get("error") or f"模型回{code}", steps
+        msg = ((out.get("choices") or [{}])[0]).get("message") or {}
+        calls = [] if last else [c for c in (msg.get("tool_calls") or []) if isinstance(c, dict)][:4]
+        if not calls:
+            text = schedules.strip_think(msg.get("content"))
+            if not text:
+                return None, "模型只有思考、沒有寫出結果；請換一顆模型，或在執行頁把思考關掉", steps
+            return text[:schedules.RESULT_MAX], None, steps
+        for c in calls:
+            c.setdefault("id", "call_" + secrets.token_hex(4))
+            c.setdefault("type", "function")
+        convo.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": calls})
+        for c in calls:
+            name, args = _call_args(c)
+            result = sched_tool(user, name, args) if name in names else {"error": f"這個任務沒有開放{name}這個工具"}
+            steps.append({"tool": name, "args": {k: str(v)[:200] for k, v in args.items()},
+                          **({"error": result["error"]} if isinstance(result, dict) and result.get("error") else {})})
+            convo.append({"role": "tool", "tool_call_id": c["id"], "content": json.dumps(result, ensure_ascii=False)[:4000]})
+    return None, "工具呼叫太多次，沒有收尾", steps
+
+
+def push_ip_admin(ip):
+    """管理員設的Webhook可以送到內網（n8n、Home Assistant、自家系統）；本機、連結本機（雲端中繼資料）一律不行。
+    一般帳號只能送到網際網路（chattools.ip_ok），免得被拿來敲內網。"""
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    if isinstance(a, ipaddress.IPv6Address) and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    return not (a.is_loopback or a.is_link_local or a.is_multicast or a.is_unspecified or a.is_reserved)
+
+
+def push_send(user, ch, title, content):
+    """送一則推送。回錯誤訊息或None。令牌只在這裡解開，不寫進記錄。"""
+    pub, sec = ch["pub"], ch.get("sec") or {}
+    row = STORE.user_get(user) or {}
+    allow = push_ip_admin if row.get("role") == "admin" else chattools.ip_ok
+    try:
+        if pub["kind"] == "telegram":
+            # Telegram 的 API 規定令牌放在網址路徑裡（沒有標頭的寫法）：這個網址只在這裡組，不寫進任何記錄
+            code, data, _ = chattools.request_json("POST", f"https://api.telegram.org/bot{sec.get('token')}/sendMessage",
+                                                   schedules.push_payload("telegram", title, content, pub["chat_id"]))
+            if code != 200 or not (data or {}).get("ok"):
+                return f"Telegram回{code}：{((data or {}).get('description') or '')[:200]}"
+            return None
+        hdr = {"Authorization": f"Bearer {sec['bearer']}"} if sec.get("bearer") else {}
+        code, _, _ = chattools.request_json("POST", sec["url"], schedules.push_payload("webhook", title, content), hdr, allow=allow)
+        return None if 200 <= code < 300 else f"Webhook回{code}"
+    except chattools.FetchError as exc:
+        return str(exc)
+
+
+def sched_execute(user, tid, manual):
+    """跑一件任務：叫模型 → 存成對話 → 推送 → 寫紀錄。"""
+    task = sched_get(user, tid)
+    if not task:
+        return
+    row, role = sched_owner(user)
+    t0 = time.time()
+    rec = {"ts": int(t0), "manual": bool(manual), "ok": False}
+    started = False
+    err = None
+    if not row:
+        err = "帳號已停用或不存在"
+    else:
+        err = sched_target_check(row, role, task["target"])
+    text, steps = None, []
+    if not err:
+        rec["model"] = sched_label(task["target"])
+        err, started = sched_ensure_model(user, task, role)
+    if not err:
+        text, err, steps = sched_llm(user, task)
+    rec.update(secs=round(time.time() - t0, 1), steps=steps[:30])
+    if text:
+        rec.update(ok=True, result=text)
+        if task.get("save_chat", True):
+            title = f"{task['name']}・{time.strftime('%m/%d %H:%M', time.localtime(t0))}"
+            tgt = f"slot:{task['target']['node']}:{task['target']['slot']}" if task["target"]["kind"] == "local" else f"prov:{task['target']['id']}"
+            code, out = chats.save(STORE, chat_seal, user, {"title": title, "target": tgt, "msgs": [
+                {"role": "user", "content": task["prompt"]},
+                {"role": "assistant", "content": text, "stat": f"定時任務・{rec.get('model', '')}・{rec['secs']}秒"}]})
+            if code == 200:
+                chats.meta(STORE, chat_seal, chat_unseal, user, out["id"], {"category": schedules.CATEGORY})
+                rec["chat"] = out["id"]
+    else:
+        rec["error"] = err
+    if task.get("channels") and (text or task.get("notify_fail", True)):
+        chans = chan_all(user)
+        title = task["name"] if text else f"定時任務「{task['name']}」沒有完成"
+        body = text or f"原因：{err}"
+        rec["pushes"] = []
+        for cid in task["channels"]:
+            ch = chans.get(cid)
+            perr = push_send(user, ch, title, body) if ch else "這個推送管道已經被刪掉了"
+            rec["pushes"].append({"name": (ch or {}).get("pub", {}).get("name") or cid, "ok": perr is None, **({"error": perr} if perr else {})})
+    if started and task.get("auto_stop"):
+        code, out = call_node(task["target"]["node"], f"/slot/{task['target']['slot']}/stop", "POST", {}, timeout=240)
+        STORE.audit(user, "", "schedule.stop_model", f"{task['target']['node']}/{task['target']['slot']}", code == 200,
+                    {"message": out.get("error")})
+    cur = sched_get(user, tid)
+    if cur is None:                      # 跑的時候被刪掉了：不要把它寫回來
+        return
+    cur["runs"] = ([{k: v for k, v in rec.items() if k != "result"} | ({"result": rec["result"][:schedules.RESULT_MAX]} if rec.get("result") else {})]
+                   + (cur.get("runs") or []))[:schedules.KEEP_RUNS]
+    sched_put(user, tid, cur)
+    STORE.audit(user, "", "schedule.run", tid, rec["ok"], {"manual": bool(manual), "secs": rec["secs"], "steps": len(steps),
+                                                         "pushes": len(rec.get("pushes") or []), "message": rec.get("error")})
+
+
+def sched_enqueue(user, tid, manual=False):
+    with _SCHED_LOCK:
+        if SCHED["running"] == (user, tid) or any(q[:2] == (user, tid) for q in SCHED["queue"]):
+            return False
+        SCHED["queue"].append((user, tid, manual))
+    SCHED["wake"].set()
+    return True
+
+
+def sched_tick(now=None):
+    """看哪些到期：到期的先把下次的起算點設成現在（失敗也不會每20秒重試），再排進佇列；錯過太久的直接跳到下一次。"""
+    now = now or time.time()
+    for user, tid, task in sched_rows():
+        what, _ = schedules.plan(task, now)
+        if what is None:
+            continue
+        task["anchor"] = now
+        if task["rule"]["kind"] == "once":
+            task["enabled"] = False
+        sched_put(user, tid, task)
+        if what == "run":
+            sched_enqueue(user, tid)
+
+
+def sched_loop():
+    while True:
+        try:
+            sched_tick()
+        except Exception:  # noqa: BLE001  # 一件任務壞掉不能讓整個排程停掉
+            import traceback
+            print("定時任務排程出錯：\n" + traceback.format_exc(), flush=True)
+        while True:
+            with _SCHED_LOCK:
+                job = SCHED["queue"].pop(0) if SCHED["queue"] else None
+                SCHED["running"] = job[:2] if job else None
+            if not job:
+                break
+            SCHED["cancel"].clear()
+            try:
+                sched_execute(*job)
+            except Exception:  # noqa: BLE001
+                import traceback
+                print("定時任務執行出錯：\n" + traceback.format_exc(), flush=True)
+            finally:
+                with _SCHED_LOCK:
+                    SCHED["running"] = None
+        SCHED["wake"].wait(SCHED_TICK)
+        SCHED["wake"].clear()
 
 
 def call_node(node_id, path, method="GET", body=None, timeout=40):
@@ -4241,6 +4593,128 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             conn.close()
 
+    # ---- 定時任務與推送管道：每個人只看得到、改得到自己的
+    def _sched_list(self):
+        now = time.time()
+        with _SCHED_LOCK:
+            running = SCHED["running"]
+            queued = [q[1] for q in SCHED["queue"] if q[0] == self.user]
+        tasks = []
+        for _, tid, t in sched_rows(self.user):
+            nxt = schedules.next_after(t["rule"], t["anchor"]) if t.get("enabled") else None
+            tasks.append({"id": tid, **{k: t.get(k) for k in ("name", "prompt", "rule", "target", "channels", "save_chat", "enabled",
+                                                              "web", "notify_fail", "auto_start", "auto_stop")},
+                          "rule_text": schedules.rule_text(t["rule"]), "next": max(nxt, now) if nxt else None,
+                          "model": sched_label(t["target"]), "runs": (t.get("runs") or [])[:5],
+                          "running": running == (self.user, tid), "queued": tid in queued})
+        return {"tasks": tasks, "channels": [chan_public(cid, d) for cid, d in chan_all(self.user).items()],
+                "search": bool(search_cfg()), "may_operate": self.is_admin or (self.who or {}).get("role") == "operator", "now": now}
+
+    def _sched_post(self, path, body):
+        may_op = self.is_admin or (self.who or {}).get("role") == "operator"
+        try:
+            if path == "/api/schedules/save":
+                tid = body.get("id")
+                old = sched_get(self.user, tid) if tid else None
+                if tid and old is None:
+                    return self._json(404, {"error": "沒有這個任務"})
+                if not tid and len(sched_rows(self.user)) >= schedules.TASKS_MAX:
+                    return self._json(400, {"error": f"每個人最多{schedules.TASKS_MAX}個定時任務"})
+                task = schedules.clean_task(body, set(chan_all(self.user)), may_op, old=old)
+                row, role = sched_owner(self.user)
+                err = sched_target_check(row, role, task["target"]) if row else "帳號不存在"
+                if err:
+                    return self._json(400, {"error": err})
+                tid = tid or schedules.new_id()
+                task["runs"] = (old or {}).get("runs") or []
+                sched_put(self.user, tid, task)
+                self._audit("schedule.save", tid, True, {"name": task["name"], "rule": schedules.rule_text(task["rule"]),
+                                                         "channels": len(task["channels"]), "new": old is None})
+                if body.get("run_now") is True:
+                    sched_enqueue(self.user, tid, manual=True)
+                return self._json(200, {"id": tid})
+            m = re.fullmatch(r"/api/schedules/([0-9a-f]{12})/(delete|run|stop|toggle)", path)
+            if m:
+                tid, act = m.groups()
+                task = sched_get(self.user, tid)
+                if task is None:
+                    return self._json(404, {"error": "沒有這個任務"})
+                if act == "delete":
+                    STORE.sealed_delete("schedules", tid, self.user)
+                    with _SCHED_LOCK:
+                        SCHED["queue"] = [q for q in SCHED["queue"] if q[:2] != (self.user, tid)]
+                        if SCHED["running"] == (self.user, tid):
+                            SCHED["cancel"].set()
+                elif act == "run":
+                    if not sched_enqueue(self.user, tid, manual=True):
+                        return self._json(409, {"error": "這個任務已經在跑或在排隊了"})
+                elif act == "stop":
+                    with _SCHED_LOCK:
+                        was = len(SCHED["queue"])
+                        SCHED["queue"] = [q for q in SCHED["queue"] if q[:2] != (self.user, tid)]
+                        hit = SCHED["running"] == (self.user, tid)
+                        if hit:
+                            SCHED["cancel"].set()
+                    if not hit and was == len(SCHED["queue"]):
+                        return self._json(409, {"error": "這個任務沒有在跑"})
+                else:
+                    on = body.get("enabled") is True
+                    task["enabled"] = on
+                    if on:
+                        task["anchor"] = time.time()          # 重新啟用從現在算，不補暫停期間
+                    sched_put(self.user, tid, task)
+                self._audit("schedule." + act, tid, True, {"name": task["name"], **({"enabled": task["enabled"]} if act == "toggle" else {})})
+                return self._json(200, {"ok": True})
+            if path == "/api/push/save":
+                cid = body.get("id")
+                have = chan_all(self.user)
+                if cid and cid not in have:
+                    return self._json(404, {"error": "沒有這個推送管道"})
+                if not cid and len(have) >= schedules.CHANNELS_MAX:
+                    return self._json(400, {"error": f"每個人最多{schedules.CHANNELS_MAX}個推送管道"})
+                old = have.get(cid) if cid else None
+                if old and old["pub"]["kind"] != body.get("kind"):
+                    old = None
+                pub, sec = schedules.clean_channel(body, (old or {}).get("sec"), self.is_admin)
+                cid = cid or schedules.new_id()
+                STORE.sealed_put("push_channels", cid, self.user, chat_seal(json.dumps({"pub": pub, "sec": sec}, ensure_ascii=False).encode()))
+                self._audit("push.save", cid, True, {"kind": pub["kind"], "name": pub["name"], "new": old is None})
+                return self._json(200, chan_public(cid, {"pub": pub, "sec": sec}))
+            m = re.fullmatch(r"/api/push/([0-9a-f]{12})/(delete|test)", path)
+            if m:
+                cid, act = m.groups()
+                ch = chan_all(self.user).get(cid)
+                if not ch:
+                    return self._json(404, {"error": "沒有這個推送管道"})
+                if act == "delete":
+                    STORE.sealed_delete("push_channels", cid, self.user)
+                    for _, tid, t in sched_rows(self.user):     # 從所有任務拿掉這個管道
+                        if cid in t.get("channels", []):
+                            t["channels"] = [c for c in t["channels"] if c != cid]
+                            sched_put(self.user, tid, t)
+                    self._audit("push.delete", cid, True, {"name": ch["pub"]["name"]})
+                    return self._json(200, {"ok": True})
+                err = push_send(self.user, ch, "xConsole測試訊息", "推送管道設定好了：之後定時任務的結果會送到這裡。")
+                self._audit("push.test", cid, err is None, {"kind": ch["pub"]["kind"], "message": err})
+                return self._json(200 if err is None else 502, {"ok": err is None, **({"error": err} if err else {})})
+            if path == "/api/push/telegram/chats":
+                token = str(body.get("token") or "").strip()
+                if not token and body.get("id"):
+                    token = (chan_all(self.user).get(str(body["id"])) or {}).get("sec", {}).get("token", "")
+                if not schedules.TELEGRAM_TOKEN_RX.fullmatch(token):
+                    return self._json(400, {"error": "先填正確的Bot Token"})
+                try:
+                    code, data, _ = chattools.request_json("GET", f"https://api.telegram.org/bot{token}/getUpdates")
+                except chattools.FetchError as exc:
+                    return self._json(502, {"error": str(exc)})
+                if code != 200 or not (data or {}).get("ok"):
+                    return self._json(400, {"error": "Telegram不認這個Bot Token" if code in (401, 404) else f"Telegram回{code}"})
+                found = schedules.telegram_chats(data)
+                return self._json(200, {"chats": found, **({} if found else {"hint": "還沒有人傳訊息給這個機器人：先在Telegram找到它、傳一句話，再按一次查找"})})
+        except schedules.Bad as exc:
+            return self._json(400, {"error": str(exc)})
+        return self._json(404, {"error": "沒有這個功能"})
+
     def _assist(self, body):
         """對話的工具：模型要查資料就呼叫工具，會動到電腦的先停下來問。每一步（用了什麼工具）也回給畫面看。"""
         node_id, slot_id = str(body.get("node") or ""), str(body.get("slot") or "")
@@ -4622,6 +5096,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.is_admin:
                     out["folders"] = [f for f in out["folders"] if f["owner"] == self.user]
             return self._json(code, out)
+        if path == "/api/schedules":
+            return self._json(200, self._sched_list())
         if path == "/api/agent/tasks":
             with _AGENT_LOCK:
                 rows = sorted((t for t in AGENT_TASKS.values() if self.is_admin or t.user == self.user), key=lambda x: -x.created)
@@ -5225,6 +5701,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._audit("agent." + act.replace("folders/", "folder_"), f"{node_id}/{body.get('name') or body.get('path')}",
                             code == 200, {"message": out.get("error"), "path": out.get("path")})
             return self._json(code, out)
+        if path.startswith("/api/schedules/") or path.startswith("/api/push/"):
+            return self._sched_post(path, body)
         if path == "/api/agent/tasks":
             if not self._mine_folder(str(body.get("node") or ""), body.get("folder")):
                 return self._json(404, {"error": "沒有這個工作資料夾"})
@@ -6060,6 +6538,7 @@ def main():
         loop.daemon_threads = True
         threading.Thread(target=loop.serve_forever, daemon=True).start()
         print(f"桌面版：視窗走 http://127.0.0.1:{APP_PORT}（只有這台）；區網存取{'開' if bind == '0.0.0.0' else '關'}", flush=True)
+    threading.Thread(target=sched_loop, daemon=True, name="schedules").start()
     n = agent_tasks_load()
     if n:
         print(f"讀回{n}件Agent任務", flush=True)

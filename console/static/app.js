@@ -306,6 +306,11 @@ function renderNav() {
     subBtn("這台", "home", !homeAll() && !v.startsWith("group:"), () => { S.homeAll = false; go("home"); });
   }
   // 第二列：執行（日常）→ 角色欄位（一台跑好幾個模型時才需要）→ API 串接（給 IDE）
+  // 第二列：Agent（交代一件事）→ 定時任務（到時間自動做）
+  if (active === "agent") {
+    subBtn("Agent任務", "agent", v === "agent");
+    subBtn("定時任務", "schedule", v === "schedule");
+  }
   if (active === "run" && cur && isAdmin()) {
     subBtn("執行模型", "run", v === "run");
     subBtn("角色欄位", "node:" + cur.id, v.startsWith("node:"));
@@ -6040,6 +6045,7 @@ function render() {
   else if (v.startsWith("api:")) viewApi();
   else if (v === "chat") viewChat();
   else if (v === "agent") viewAgent();
+  else if (v === "schedule") viewSchedule();
   else if (v === "image") viewCreate("image");
   else if (v === "video") viewCreate("video");
   else if (v === "settings") viewSettings();
@@ -7009,7 +7015,7 @@ async function refresh() {
     // 執行、Agent、畫圖、影片也一樣：有選到一半的設定、進行中的載入進度或任務，各自只更新自己那一塊
     // 剛登入的第一次一定整頁畫：使用者登入後直接落在對話頁，下面那條只換導覽列，頁面會一片空白
     if (S.firstPaint) { S.firstPaint = false; render(); return; }
-    if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
+    if (["settings", "apis", "chat", "models", "run", "agent", "schedule", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
       renderNav();
       S.live?.();                // 有登記局部更新的頁（執行頁的狀態列）只換那一塊
     } else quietRender();

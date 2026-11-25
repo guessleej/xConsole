@@ -77,6 +77,7 @@ function topOf(v) {
   if (v === "models" || v === "lib" || v.startsWith("lib:")) return "models";
   if (v === "run" || v === "apis" || v.startsWith("api:") || v.startsWith("node:")) return "run";
   if (v === "chat" || v === "assist") return "chat";
+  if (v === "schedule") return "agent";
   if (v === "logs") return "settings";
   return v;
 }

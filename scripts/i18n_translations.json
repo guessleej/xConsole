@@ -23205,9 +23205,9 @@
 "ko": "\"은(는) 네트워크가 아닙니다(예: 198.51.100.0/24)"
 },
 " 的整數": {
-"en": "",
-"ja": " の整数にしてください",
-"ko": "의 정수여야 합니다"
+"en": " integer",
+"ja": " の整数",
+"ko": " 정수"
 },
 "有效時間要是 ": {
 "en": "Validity must be ",
@@ -26568,5 +26568,1760 @@
 "en": "The new machine or the original slot no longer exists",
 "ja": "新しい端末または元の枠がもうありません",
 "ko": "새 컴퓨터 또는 원래 자리가 더 이상 없습니다"
+},
+"定時任務": {
+"en": "Scheduled tasks",
+"ja": "定期タスク",
+"ko": "예약 작업"
+},
+"排進": {
+"en": "queue",
+"ja": "キューに入れる",
+"ko": "대기열에 넣기"
+},
+"查時間": {
+"en": "Current time",
+"ja": "時刻を確認",
+"ko": "현재 시각"
+},
+"計算機": {
+"en": "Calculator",
+"ja": "電卓",
+"ko": "계산기"
+},
+"每日AI新聞": {
+"en": "Daily AI news",
+"ja": "毎日のAIニュース",
+"ko": "매일 AI 뉴스"
+},
+"搜尋今天的AI與大型語言模型重要新聞，挑5則，每則用兩三句話說明重點並附來源網址。": {
+"en": "Search today's important AI and large language model news, pick 5 stories, explain each in two or three sentences, and include source links.",
+"ja": "今日のAIと大規模言語モデルの重要ニュースを検索し、5件選んで各2〜3文で要点を説明し、出典URLを付けてください。",
+"ko": "오늘의 AI와 대규모 언어 모델 주요 뉴스를 검색해 5건을 골라 각각 두세 문장으로 요점을 설명하고 출처 URL을 붙여 주세요."
+},
+"明天天氣與穿搭": {
+"en": "Tomorrow's weather and outfit",
+"ja": "明日の天気と服装",
+"ko": "내일 날씨와 옷차림"
+},
+"查台北市明天的天氣預報（溫度、降雨機率、紫外線），給一段穿搭與要不要帶傘的建議，附資料來源。": {
+"en": "Check tomorrow's weather forecast for Taipei (temperature, chance of rain, UV) and suggest what to wear and whether to bring an umbrella, with sources.",
+"ja": "台北市の明日の天気予報（気温、降水確率、紫外線）を調べ、服装と傘が必要かのアドバイスを出典付きで書いてください。",
+"ko": "타이베이시 내일 일기예보(기온, 강수 확률, 자외선)를 찾아 옷차림과 우산이 필요한지 조언하고 출처를 붙여 주세요."
+},
+"匯率與金價": {
+"en": "Exchange rates and gold",
+"ja": "為替と金価格",
+"ko": "환율과 금 시세"
+},
+"查今天美元、日圓、歐元兌新台幣的匯率，以及國際金價，跟昨天比漲跌多少，用表格列出並附來源。": {
+"en": "Check today's USD, JPY and EUR rates against the New Taiwan dollar and the international gold price, compare with yesterday, list them in a table with sources.",
+"ja": "今日の米ドル・円・ユーロの対台湾ドル為替レートと国際金価格を調べ、昨日との比較を出典付きの表で示してください。",
+"ko": "오늘 미국 달러·엔·유로의 대만 달러 환율과 국제 금 시세를 찾아 어제와 비교해 출처와 함께 표로 정리해 주세요."
+},
+"週五一週總結提醒": {
+"en": "Friday weekly wrap-up reminder",
+"ja": "金曜の週まとめリマインダー",
+"ko": "금요일 주간 정리 알림"
+},
+"提醒我整理這週的工作：列出一份「本週完成、遇到的問題、下週要做」的空白模板，最後提醒記得寫週報。": {
+"en": "Remind me to wrap up the week: give a blank template for 'done this week, problems, next week' and remind me to write the weekly report.",
+"ja": "今週の仕事を整理するよう促してください：「今週完了・問題点・来週やること」の空のテンプレートを出し、最後に週報を書くよう念押ししてください。",
+"ko": "이번 주 업무 정리를 알려 주세요: '이번 주 완료, 겪은 문제, 다음 주 할 일' 빈 템플릿을 주고 마지막에 주간 보고서 작성을 상기시켜 주세요."
+},
+"・沒在跑": {
+"en": " · not running",
+"ja": "・停止中",
+"ko": " · 실행 안 함"
+},
+"第三方API・{0}・{1}{2}": {
+"en": "Third-party API · {0} · {1}{2}",
+"ja": "サードパーティAPI・{0}・{1}{2}",
+"ko": "타사 API · {0} · {1}{2}"
+},
+"第三方API": {
+"en": "Third-party API",
+"ja": "サードパーティAPI",
+"ko": "타사 API"
+},
+"到時間叫模型做一件事，結果存成對話（放在「定時任務」分類，可以接著問），也可以推送到手機。主控台開著就會跑，不必開著這個網頁。": {
+"en": "At a set time, have a model do something; the result is saved as a chat (in the “Scheduled tasks” category, so you can follow up) and can be pushed to your phone. It runs while the console is running — this page doesn't need to stay open.",
+"ja": "決まった時刻にモデルに作業させ、結果をチャット（「定期タスク」分類、続けて質問できます）として保存し、スマホに通知することもできます。コンソールが動いていれば実行され、このページを開いておく必要はありません。",
+"ko": "정해진 시간에 모델이 작업하게 하고, 결과를 채팅('예약 작업' 분류, 이어서 질문 가능)으로 저장하며 휴대폰으로 푸시할 수도 있습니다. 콘솔이 켜져 있으면 실행되므로 이 페이지를 열어 둘 필요는 없습니다."
+},
+"推送管道": {
+"en": "Push channels",
+"ja": "通知先",
+"ko": "푸시 채널"
+},
+"新增任務": {
+"en": "New task",
+"ja": "タスクを追加",
+"ko": "작업 추가"
+},
+"推送管道（{0}）": {
+"en": "Push channels ({0})",
+"ja": "通知先（{0}）",
+"ko": "푸시 채널 ({0})"
+},
+"還沒有定時任務": {
+"en": "No scheduled tasks yet",
+"ja": "まだ定期タスクがありません",
+"ko": "아직 예약 작업이 없습니다"
+},
+"從範本開始，或按右上角「新增任務」自己寫": {
+"en": "Start from a template, or click “New task” at the top right",
+"ja": "テンプレートから始めるか、右上の「タスクを追加」で作成してください",
+"ko": "템플릿으로 시작하거나 오른쪽 위 '작업 추가'로 직접 만드세요"
+},
+"每天{0}": {
+"en": "Daily {0}",
+"ja": "毎日{0}",
+"ko": "매일 {0}"
+},
+"每天": {
+"en": "Daily",
+"ja": "毎日",
+"ko": "매일"
+},
+"週一到週五": {
+"en": "Weekdays",
+"ja": "平日",
+"ko": "평일"
+},
+"每週": {
+"en": "Every week ",
+"ja": "毎週",
+"ko": "매주 "
+},
+"每{0}分鐘": {
+"en": "Every {0} min",
+"ja": "{0}分ごと",
+"ko": "{0}분마다"
+},
+"分鐘": {
+"en": " min",
+"ja": "分",
+"ko": "분"
+},
+"每{0}小時": {
+"en": "Every {0} h",
+"ja": "{0}時間ごと",
+"ko": "{0}시간마다"
+},
+"小時": {
+"en": " h",
+"ja": "時間",
+"ko": "시간"
+},
+"只跑一次": {
+"en": "Once",
+"ja": "1回だけ",
+"ko": "한 번만"
+},
+"正在執行": {
+"en": "Running",
+"ja": "実行中",
+"ko": "실행 중"
+},
+"下次{0}": {
+"en": "Next {0}",
+"ja": "次回{0}",
+"ko": "다음 {0}"
+},
+"下次": {
+"en": "Next ",
+"ja": "次回",
+"ko": "다음 "
+},
+"不會再跑": {
+"en": "Won't run again",
+"ja": "今後は実行されません",
+"ko": "더 이상 실행되지 않음"
+},
+"暫停這個任務": {
+"en": "Pause this task",
+"ja": "このタスクを一時停止",
+"ko": "이 작업 일시 중지"
+},
+"重新啟用（從現在開始算，不補暫停期間）": {
+"en": "Re-enable (counts from now; paused runs aren't made up)",
+"ja": "再開（今から数え、停止中の分は実行しません）",
+"ko": "다시 사용(지금부터 계산, 중지 기간은 보충하지 않음)"
+},
+"啟用這個任務": {
+"en": "Enable this task",
+"ja": "このタスクを有効にする",
+"ko": "이 작업 사용"
+},
+"・可聯網": {
+"en": " · web",
+"ja": " ・ネット可",
+"ko": " · 웹 사용"
+},
+"・推送到{0}": {
+"en": " · push to {0}",
+"ja": "・{0}に通知",
+"ko": " · {0}(으)로 푸시"
+},
+"推送到": {
+"en": "Push to",
+"ja": "通知先",
+"ko": "푸시 대상"
+},
+"・只存成對話": {
+"en": " · saved as a chat only",
+"ja": "・チャットに保存のみ",
+"ko": " · 채팅으로만 저장"
+},
+"模型：{0}{1}{2}": {
+"en": "Model: {0}{1}{2}",
+"ja": "モデル：{0}{1}{2}",
+"ko": "모델: {0}{1}{2}"
+},
+"（手動）": {
+"en": " (manual)",
+"ja": "（手動）",
+"ko": " (수동)"
+},
+"上次{0}{1}：{2}": {
+"en": "Last {0}{1}: {2}",
+"ja": "前回{0}{1}：{2}",
+"ko": "지난번 {0}{1}: {2}"
+},
+"立即執行": {
+"en": "Run now",
+"ja": "今すぐ実行",
+"ko": "지금 실행"
+},
+"收起紀錄": {
+"en": "Hide history",
+"ja": "履歴を閉じる",
+"ko": "기록 접기"
+},
+"執行紀錄（{0}）": {
+"en": "Run history ({0})",
+"ja": "実行履歴（{0}）",
+"ko": "실행 기록 ({0})"
+},
+"執行紀錄": {
+"en": "Run history",
+"ja": "実行履歴",
+"ko": "실행 기록"
+},
+"「{0}」和它的執行紀錄會一起刪掉；已經存成對話的結果不受影響。": {
+"en": "“{0}” and its run history will be deleted; results already saved as chats are kept.",
+"ja": "「{0}」と実行履歴は削除されます。チャットに保存済みの結果は残ります。",
+"ko": "'{0}'와 실행 기록이 함께 삭제됩니다. 이미 채팅으로 저장된 결과는 남습니다."
+},
+"」和它的執行紀錄會一起刪掉；已經存成對話的結果不受影響": {
+"en": "” and its run history will be deleted; results already saved as chats are kept",
+"ja": "」と実行履歴は削除されます。チャットに保存済みの結果は残ります",
+"ko": "'와 실행 기록이 함께 삭제됩니다. 이미 채팅으로 저장된 결과는 남습니다"
+},
+"・手動": {
+"en": " · manual",
+"ja": "・手動",
+"ko": " · 수동"
+},
+"・{0}秒": {
+"en": " · {0} s",
+"ja": "・{0}秒",
+"ko": " · {0}초"
+},
+"用了：": {
+"en": "Used: ",
+"ja": "使用：",
+"ko": "사용: "
+},
+"（失敗）": {
+"en": " (failed)",
+"ja": "（失敗）",
+"ko": " (실패)"
+},
+"推送到{0}：{1}": {
+"en": "Push to {0}: {1}",
+"ja": "{0}への通知：{1}",
+"ko": "{0}(으)로 푸시: {1}"
+},
+"這次的結果也存在對話頁的「定時任務」分類，可以接著問。": {
+"en": "This result is also saved in the “Scheduled tasks” category on the Chat page, so you can follow up.",
+"ja": "この結果はチャットページの「定期タスク」分類にも保存され、続けて質問できます。",
+"ko": "이번 결과는 채팅 페이지의 '예약 작업' 분류에도 저장되어 이어서 질문할 수 있습니다."
+},
+"空白就用要做的事的前幾個字": {
+"en": "Leave blank to use the first few words of the task",
+"ja": "空欄ならやることの最初の数文字を使います",
+"ko": "비워 두면 할 일의 앞부분을 사용합니다"
+},
+"例：搜尋今天的AI重要新聞，挑5則，每則兩三句話說明並附來源網址。": {
+"en": "e.g. Search today's important AI news, pick 5, two or three sentences each with source links.",
+"ja": "例：今日のAI重要ニュースを検索し、5件選んで各2〜3文で説明し出典URLを付ける。",
+"ko": "예: 오늘의 AI 주요 뉴스를 검색해 5건을 골라 각각 두세 문장으로 설명하고 출처 URL을 붙이기."
+},
+"每隔一段時間": {
+"en": "At an interval",
+"ja": "一定間隔で",
+"ko": "일정 간격으로"
+},
+"還沒有可以用的模型欄位": {
+"en": "No model slots available yet",
+"ja": "使えるモデルスロットがまだありません",
+"ko": "사용할 수 있는 모델 슬롯이 아직 없습니다"
+},
+"允許聯網搜尋與讀網頁": {
+"en": "Allow web search and reading web pages",
+"ja": "ウェブ検索とページ閲覧を許可",
+"ko": "웹 검색과 웹 페이지 읽기 허용"
+},
+"（管理者還沒設定搜尋服務，只能讀指定的網頁）": {
+"en": " (the administrator hasn't set up a search service; only given pages can be read)",
+"ja": "（管理者が検索サービスを設定していないため、指定したページのみ読めます）",
+"ko": " (관리자가 검색 서비스를 설정하지 않아 지정한 페이지만 읽을 수 있습니다)"
+},
+"結果存成對話（可以接著問）": {
+"en": "Save the result as a chat (you can follow up)",
+"ja": "結果をチャットに保存（続けて質問できます）",
+"ko": "결과를 채팅으로 저장(이어서 질문 가능)"
+},
+"沒有完成時也推送通知": {
+"en": "Also push a notice when it doesn't finish",
+"ja": "完了しなかったときも通知する",
+"ko": "완료되지 않았을 때도 푸시 알림"
+},
+"模型沒在跑就自動啟動（最多等10分鐘）": {
+"en": "Start the model automatically if it isn't running (waits up to 10 minutes)",
+"ja": "モデルが停止中なら自動で起動（最大10分待機）",
+"ko": "모델이 실행 중이 아니면 자동으로 시작(최대 10분 대기)"
+},
+"跑完把自動啟動的模型關掉，讓出顯示卡": {
+"en": "Stop the auto-started model afterwards to free the GPU",
+"ja": "自動起動したモデルを終了後に止め、GPUを空ける",
+"ko": "끝나면 자동 시작한 모델을 멈춰 GPU를 비우기"
+},
+"還沒有推送管道：結果只會存成對話。要推到手機，先到「推送管道」加一個Telegram。": {
+"en": "No push channels yet: results are only saved as chats. To get them on your phone, add a Telegram under “Push channels”.",
+"ja": "通知先がまだありません。結果はチャットに保存されるだけです。スマホで受け取るには「通知先」でTelegramを追加してください。",
+"ko": "아직 푸시 채널이 없습니다. 결과는 채팅으로만 저장됩니다. 휴대폰으로 받으려면 '푸시 채널'에서 Telegram을 추가하세요."
+},
+"要模型做什麼": {
+"en": "What should the model do",
+"ja": "モデルにやらせること",
+"ko": "모델이 할 일"
+},
+"寫清楚要查什麼、要什麼格式；這段會原樣交給模型。": {
+"en": "Say clearly what to look up and the format you want; this is passed to the model as is.",
+"ja": "何を調べ、どんな形式にするかを明確に書いてください。この文はそのままモデルに渡されます。",
+"ko": "무엇을 찾고 어떤 형식을 원하는지 분명히 쓰세요. 이 내용은 그대로 모델에 전달됩니다."
+},
+"什麼時候跑": {
+"en": "When to run",
+"ja": "いつ実行するか",
+"ko": "언제 실행할지"
+},
+"照主控台這台的時間；主控台關機錯過的，12小時內開機會補跑一次。": {
+"en": "Uses this console's clock; runs missed while the console was off are made up once if it comes back within 12 hours.",
+"ja": "このコンソールの時刻で動きます。停止中に逃した分は、12時間以内に起動すれば1回だけ実行します。",
+"ko": "이 콘솔의 시각을 기준으로 합니다. 꺼져 있어서 놓친 실행은 12시간 안에 켜지면 한 번 보충합니다."
+},
+"用哪個模型": {
+"en": "Which model",
+"ja": "どのモデルを使うか",
+"ko": "어떤 모델을 쓸지"
+},
+"已儲存，正在執行一次": {
+"en": "Saved, running once now",
+"ja": "保存しました。今から1回実行します",
+"ko": "저장했습니다. 지금 한 번 실행합니다"
+},
+"編輯定時任務": {
+"en": "Edit scheduled task",
+"ja": "定期タスクを編集",
+"ko": "예약 작업 편집"
+},
+"新增定時任務": {
+"en": "New scheduled task",
+"ja": "定期タスクを追加",
+"ko": "예약 작업 추가"
+},
+"儲存並立即執行一次": {
+"en": "Save and run once now",
+"ja": "保存して今すぐ1回実行",
+"ko": "저장하고 지금 한 번 실행"
+},
+"發測試訊息": {
+"en": "Send a test message",
+"ja": "テストメッセージを送る",
+"ko": "테스트 메시지 보내기"
+},
+"測試訊息送出了，去手機看看": {
+"en": "Test message sent — check your phone",
+"ja": "テストメッセージを送りました。スマホを確認してください",
+"ko": "테스트 메시지를 보냈습니다. 휴대폰을 확인하세요"
+},
+"刪除「{0}」？用到它的任務會自動拿掉這個管道。": {
+"en": "Delete “{0}”? Tasks using it will drop this channel automatically.",
+"ja": "「{0}」を削除しますか？使っているタスクからは自動で外れます。",
+"ko": "'{0}'을(를) 삭제할까요? 이 채널을 쓰는 작업에서 자동으로 빠집니다."
+},
+"刪除「": {
+"en": "Delete “",
+"ja": "「",
+"ko": "'"
+},
+"」？用到它的任務會自動拿掉這個管道": {
+"en": "”? Tasks using it will drop this channel automatically",
+"ja": "」を削除しますか？使っているタスクからは自動で外れます",
+"ko": "'을(를) 삭제할까요? 이 채널을 쓰는 작업에서 자동으로 빠집니다"
+},
+"還沒有推送管道。": {
+"en": "No push channels yet.",
+"ja": "通知先はまだありません。",
+"ko": "아직 푸시 채널이 없습니다."
+},
+"加Telegram": {
+"en": "Add Telegram",
+"ja": "Telegramを追加",
+"ko": "Telegram 추가"
+},
+"加Webhook": {
+"en": "Add Webhook",
+"ja": "Webhookを追加",
+"ko": "Webhook 추가"
+},
+"令牌與網址加密存在主控台，存好之後畫面只顯示「已設定」。Telegram最方便：手機裝Telegram、找@BotFather建一個機器人拿Token。": {
+"en": "Tokens and URLs are stored encrypted on the console; once saved the page only shows “set”. Telegram is the easiest: install Telegram on your phone and ask @BotFather to create a bot to get a token.",
+"ja": "トークンとURLは暗号化してコンソールに保存され、保存後は「設定済み」とだけ表示されます。Telegramが一番簡単です：スマホにTelegramを入れ、@BotFatherでボットを作ってトークンを取得してください。",
+"ko": "토큰과 URL은 암호화해 콘솔에 저장되며, 저장 후에는 '설정됨'으로만 표시됩니다. Telegram이 가장 간단합니다: 휴대폰에 Telegram을 설치하고 @BotFather로 봇을 만들어 토큰을 받으세요."
+},
+"例：我的手機": {
+"en": "e.g. My phone",
+"ja": "例：自分のスマホ",
+"ko": "예: 내 휴대폰"
+},
+"例：Teams頻道": {
+"en": "e.g. Teams channel",
+"ja": "例：Teamsチャンネル",
+"ko": "예: Teams 채널"
+},
+"已設定（要換才重填）": {
+"en": "Set (re-enter only to change)",
+"ja": "設定済み（変えるときだけ入力）",
+"ko": "설정됨(바꿀 때만 다시 입력)"
+},
+"數字（群組是負數），或頻道的@名稱": {
+"en": "A number (groups are negative), or a channel's @name",
+"ja": "数字（グループは負の数）、またはチャンネルの@名前",
+"ko": "숫자(그룹은 음수) 또는 채널의 @이름"
+},
+"查找Chat ID": {
+"en": "Find Chat ID",
+"ja": "Chat IDを探す",
+"ko": "Chat ID 찾기"
+},
+"跟Telegram的@BotFather建機器人時給的那一串。": {
+"en": "The string Telegram's @BotFather gave you when you created the bot.",
+"ja": "Telegramの@BotFatherでボットを作ったときにもらった文字列です。",
+"ko": "Telegram의 @BotFather로 봇을 만들 때 받은 문자열입니다."
+},
+"先在Telegram傳一句話給你的機器人，再按「查找Chat ID」自動填。": {
+"en": "Send your bot a message in Telegram first, then click “Find Chat ID” to fill it in.",
+"ja": "まずTelegramでボットにメッセージを送り、「Chat IDを探す」を押すと自動入力されます。",
+"ko": "먼저 Telegram에서 봇에게 메시지를 보낸 다음 'Chat ID 찾기'를 누르면 자동으로 채워집니다."
+},
+"已設定（{0}，要換才重填）": {
+"en": "Set ({0}; re-enter only to change)",
+"ja": "設定済み（{0}、変えるときだけ入力）",
+"ko": "설정됨({0}, 바꿀 때만 다시 입력)"
+},
+"要換才重填": {
+"en": "re-enter only to change",
+"ja": "変えるときだけ入力",
+"ko": "바꿀 때만 다시 입력"
+},
+"Webhook網址": {
+"en": "Webhook URL",
+"ja": "Webhook URL",
+"ko": "Webhook URL"
+},
+"對方要驗身分才填；放在Authorization標頭送，不會放進網址。": {
+"en": "Only if the receiver checks identity; sent in the Authorization header, never in the URL.",
+"ja": "受け側が認証する場合だけ入力。Authorizationヘッダーで送り、URLには入れません。",
+"ko": "받는 쪽이 인증할 때만 입력하세요. Authorization 헤더로 보내며 URL에는 넣지 않습니다."
+},
+"編輯{0}": {
+"en": "Edit {0}",
+"ja": "{0}を編集",
+"ko": "{0} 편집"
+},
+"星期": {
+"en": "weekday",
+"ja": "曜日",
+"ko": "요일"
+},
+"要算數字用calculator，不要心算": {
+"en": "use calculator for numbers; don't do mental arithmetic",
+"ja": "数字の計算はcalculatorを使い、暗算しないこと",
+"ko": "숫자 계산은 calculator를 쓰고 암산하지 말 것"
+},
+"這台機器已經不在主控台了": {
+"en": "This machine is no longer in the console",
+"ja": "このマシンはもうコンソールにありません",
+"ko": "이 머신은 더 이상 콘솔에 없습니다"
+},
+"這台機器不在你負責的群組裡": {
+"en": "This machine isn't in a group you manage",
+"ja": "このマシンは担当グループに入っていません",
+"ko": "이 머신은 담당 그룹에 속해 있지 않습니다"
+},
+"等了10分鐘模型還沒好": {
+"en": "Waited 10 minutes and the model still isn't ready",
+"ja": "10分待ってもモデルの準備ができません",
+"ko": "10분을 기다렸지만 모델이 아직 준비되지 않았습니다"
+},
+"定時任務不能用{0}這個工具": {
+"en": "Scheduled tasks can't use the {0} tool",
+"ja": "定期タスクでは{0}ツールを使えません",
+"ko": "예약 작업에서는 {0} 도구를 쓸 수 없습니다"
+},
+"定時任務不能用": {
+"en": "Scheduled tasks can't use ",
+"ja": "定期タスクでは使えません：",
+"ko": "예약 작업에서 쓸 수 없음: "
+},
+"工具呼叫太多次，沒有收尾": {
+"en": "Too many tool calls; didn't finish",
+"ja": "ツール呼び出しが多すぎて完了しませんでした",
+"ko": "도구 호출이 너무 많아 마무리하지 못했습니다"
+},
+"帳號已停用或不存在": {
+"en": "Account disabled or missing",
+"ja": "アカウントが無効か存在しません",
+"ko": "계정이 비활성화되었거나 없습니다"
+},
+"查現在的日期、時間與星期（主控台這台的當地時間）": {
+"en": "Check the current date, time and weekday (this console's local time)",
+"ja": "現在の日付・時刻・曜日を確認（このコンソールの現地時刻）",
+"ko": "현재 날짜, 시각, 요일 확인(이 콘솔의 현지 시각)"
+},
+"算數學式子（四則、次方、括號、sqrt、log等），回答數字前先用它算，不要心算": {
+"en": "Evaluate a math expression (arithmetic, powers, brackets, sqrt, log…); use it before giving any number, don't do mental arithmetic",
+"ja": "数式を計算（四則、べき乗、括弧、sqrt、logなど）。数字を答える前に必ず使い、暗算しないこと",
+"ko": "수식 계산(사칙연산, 거듭제곱, 괄호, sqrt, log 등). 숫자를 답하기 전에 사용하고 암산하지 말 것"
+},
+"（星期": {
+"en": " (",
+"ja": "（",
+"ko": " ("
+},
+"）；要算數字用calculator，不要心算。": {
+"en": "); use calculator for numbers, don't do mental arithmetic.",
+"ja": "）。数字の計算はcalculatorを使い、暗算しないこと。",
+"ko": "). 숫자 계산은 calculator를 쓰고 암산하지 말 것."
+},
+"第三方API只有管理員能排定時任務": {
+"en": "Only administrators can schedule tasks with a third-party API",
+"ja": "サードパーティAPIで定期タスクを組めるのは管理者だけです",
+"ko": "타사 API로 예약 작업을 만들 수 있는 사람은 관리자뿐입니다"
+},
+"這筆第三方API已經被刪掉了": {
+"en": "This third-party API has been deleted",
+"ja": "このサードパーティAPIは削除されています",
+"ko": "이 타사 API는 삭제되었습니다"
+},
+"連不上那台機器": {
+"en": "Can't reach that machine",
+"ja": "そのマシンに接続できません",
+"ko": "그 머신에 연결할 수 없습니다"
+},
+"模型沒有在跑（可以在任務裡勾「沒在跑就自動啟動」）": {
+"en": "The model isn't running (tick “Start automatically if it isn't running” in the task)",
+"ja": "モデルが停止中です（タスクで「停止中なら自動で起動」をオンにできます）",
+"ko": "모델이 실행 중이 아닙니다(작업에서 '실행 중이 아니면 자동 시작'을 선택할 수 있습니다)"
+},
+"自動啟動模型要維運或管理員帳號": {
+"en": "Starting models automatically needs an operator or administrator account",
+"ja": "モデルの自動起動には運用担当か管理者のアカウントが必要です",
+"ko": "모델 자동 시작에는 운영자 또는 관리자 계정이 필요합니다"
+},
+"啟動模型失敗：{0}": {
+"en": "Failed to start the model: {0}",
+"ja": "モデルの起動に失敗しました：{0}",
+"ko": "모델 시작 실패: {0}"
+},
+"啟動模型失敗": {
+"en": "Failed to start the model",
+"ja": "モデルの起動に失敗しました",
+"ko": "모델 시작 실패"
+},
+"Webhook回{0}": {
+"en": "Webhook returned {0}",
+"ja": "Webhookの応答{0}",
+"ko": "Webhook 응답 {0}"
+},
+"Webhook回": {
+"en": "Webhook returned ",
+"ja": "Webhookの応答",
+"ko": "Webhook 응답 "
+},
+"定時任務「{0}」沒有完成": {
+"en": "Scheduled task “{0}” didn't finish",
+"ja": "定期タスク「{0}」は完了しませんでした",
+"ko": "예약 작업 '{0}'이(가) 완료되지 않았습니다"
+},
+"定時任務「": {
+"en": "Scheduled task “",
+"ja": "定期タスク「",
+"ko": "예약 작업 '"
+},
+"」沒有完成": {
+"en": "” didn't finish",
+"ja": "」は完了しませんでした",
+"ko": "'이(가) 완료되지 않았습니다"
+},
+"原因：{0}": {
+"en": "Reason: {0}",
+"ja": "理由：{0}",
+"ko": "이유: {0}"
+},
+"原因": {
+"en": "Reason",
+"ja": "理由",
+"ko": "이유"
+},
+"啟動模型失敗：": {
+"en": "Failed to start the model: ",
+"ja": "モデルの起動に失敗しました：",
+"ko": "모델 시작 실패: "
+},
+"Telegram回{0}：{1}": {
+"en": "Telegram returned {0}: {1}",
+"ja": "Telegramの応答{0}：{1}",
+"ko": "Telegram 응답 {0}: {1}"
+},
+"Telegram回": {
+"en": "Telegram returned ",
+"ja": "Telegramの応答",
+"ko": "Telegram 응답 "
+},
+"原因：": {
+"en": "Reason: ",
+"ja": "理由：",
+"ko": "이유: "
+},
+"這個推送管道已經被刪掉了": {
+"en": "This push channel has been deleted",
+"ja": "この通知先は削除されています",
+"ko": "이 푸시 채널은 삭제되었습니다"
+},
+"沒有這個功能": {
+"en": "No such function",
+"ja": "この機能はありません",
+"ko": "이 기능은 없습니다"
+},
+"例：(1+0.05)**10*1000": {
+"en": "e.g. (1+0.05)**10*1000",
+"ja": "例：(1+0.05)**10*1000",
+"ko": "예: (1+0.05)**10*1000"
+},
+"資料已經查好了，請直接根據上面查到的內容交出結果，不要再查。": {
+"en": "The data has been gathered; give the result based on it now and don't search again.",
+"ja": "資料はそろいました。上で調べた内容をもとに結果を出し、これ以上調べないでください。",
+"ko": "자료는 다 모았습니다. 위에서 찾은 내용으로 결과를 내고 더 찾지 마세요."
+},
+"模型只有思考、沒有寫出結果；請換一顆模型，或在執行頁把思考關掉": {
+"en": "The model only thought and didn't write a result; switch to another model or turn thinking off on the Run page",
+"ja": "モデルが思考だけで結果を書きませんでした。別のモデルに替えるか、実行ページで思考をオフにしてください",
+"ko": "모델이 생각만 하고 결과를 쓰지 않았습니다. 다른 모델로 바꾸거나 실행 페이지에서 사고를 끄세요"
+},
+"這個任務沒有開放{0}這個工具": {
+"en": "This task doesn't allow the {0} tool",
+"ja": "このタスクでは{0}ツールを許可していません",
+"ko": "이 작업은 {0} 도구를 허용하지 않습니다"
+},
+"這個任務沒有開放": {
+"en": "This task doesn't allow ",
+"ja": "このタスクでは許可されていません：",
+"ko": "이 작업에서 허용되지 않음: "
+},
+"帳號不存在": {
+"en": "Account doesn't exist",
+"ja": "アカウントが存在しません",
+"ko": "계정이 없습니다"
+},
+"xConsole測試訊息": {
+"en": "xConsole test message",
+"ja": "xConsoleテストメッセージ",
+"ko": "xConsole 테스트 메시지"
+},
+"推送管道設定好了：之後定時任務的結果會送到這裡。": {
+"en": "The push channel is set up: results of scheduled tasks will arrive here.",
+"ja": "通知先の設定ができました。今後、定期タスクの結果はここに届きます。",
+"ko": "푸시 채널이 설정되었습니다. 앞으로 예약 작업 결과가 여기로 옵니다."
+},
+"定時任務・{0}・{1}秒": {
+"en": "Scheduled task · {0} · {1} s",
+"ja": "定期タスク・{0}・{1}秒",
+"ko": "예약 작업 · {0} · {1}초"
+},
+"每個人最多{0}個定時任務": {
+"en": "At most {0} scheduled tasks per person",
+"ja": "1人あたり定期タスクは最大{0}個です",
+"ko": "1인당 예약 작업은 최대 {0}개입니다"
+},
+"個定時任務": {
+"en": " scheduled tasks",
+"ja": "個の定期タスク",
+"ko": "개의 예약 작업"
+},
+"沒有這個推送管道": {
+"en": "No such push channel",
+"ja": "この通知先はありません",
+"ko": "해당 푸시 채널이 없습니다"
+},
+"每個人最多{0}個推送管道": {
+"en": "At most {0} push channels per person",
+"ja": "1人あたり通知先は最大{0}個です",
+"ko": "1인당 푸시 채널은 최대 {0}개입니다"
+},
+"個推送管道": {
+"en": " push channels",
+"ja": "個の通知先",
+"ko": "개의 푸시 채널"
+},
+"先填正確的Bot Token": {
+"en": "Enter a valid Bot Token first",
+"ja": "先に正しいBot Tokenを入力してください",
+"ko": "먼저 올바른 Bot Token을 입력하세요"
+},
+"定時任務・": {
+"en": "Scheduled task · ",
+"ja": "定期タスク・",
+"ko": "예약 작업 · "
+},
+"Telegram不認這個Bot Token": {
+"en": "Telegram doesn't accept this Bot Token",
+"ja": "TelegramがこのBot Tokenを認めません",
+"ko": "Telegram이 이 Bot Token을 인정하지 않습니다"
+},
+"Telegram回{0}": {
+"en": "Telegram returned {0}",
+"ja": "Telegramの応答{0}",
+"ko": "Telegram 응답 {0}"
+},
+"還沒有人傳訊息給這個機器人：先在Telegram找到它、傳一句話，再按一次查找": {
+"en": "Nobody has messaged this bot yet: find it in Telegram, send it a message, then click Find again",
+"ja": "まだ誰もこのボットにメッセージを送っていません。Telegramでボットを探して一言送り、もう一度「探す」を押してください",
+"ko": "아직 아무도 이 봇에게 메시지를 보내지 않았습니다. Telegram에서 봇을 찾아 한마디 보낸 뒤 다시 찾기를 누르세요"
+},
+"這個任務已經在跑或在排隊了": {
+"en": "This task is already running or queued",
+"ja": "このタスクはすでに実行中か順番待ちです",
+"ko": "이 작업은 이미 실행 중이거나 대기 중입니다"
+},
+"這個任務沒有在跑": {
+"en": "This task isn't running",
+"ja": "このタスクは実行中ではありません",
+"ko": "이 작업은 실행 중이 아닙니다"
+},
+"式子是空的或太長": {
+"en": "The expression is empty or too long",
+"ja": "式が空か長すぎます",
+"ko": "식이 비어 있거나 너무 깁니다"
+},
+"只能算數字、四則運算、次方與常用數學函式": {
+"en": "Only numbers, arithmetic, powers and common math functions",
+"ja": "数字、四則演算、べき乗、よく使う数学関数だけ計算できます",
+"ko": "숫자, 사칙연산, 거듭제곱, 자주 쓰는 수학 함수만 계산할 수 있습니다"
+},
+"看不懂這個式子": {
+"en": "Can't understand this expression",
+"ja": "この式を解釈できません",
+"ko": "이 식을 이해할 수 없습니다"
+},
+"算不出來：{0}": {
+"en": "Can't compute: {0}",
+"ja": "計算できません：{0}",
+"ko": "계산할 수 없음: {0}"
+},
+"算不出來": {
+"en": "Can't compute",
+"ja": "計算できません",
+"ko": "계산할 수 없음"
+},
+"次方太大": {
+"en": "Exponent too large",
+"ja": "べき乗が大きすぎます",
+"ko": "거듭제곱이 너무 큽니다"
+},
+"結果太大": {
+"en": "Result too large",
+"ja": "結果が大きすぎます",
+"ko": "결과가 너무 큽니다"
+},
+"算不出來：": {
+"en": "Can't compute: ",
+"ja": "計算できません：",
+"ko": "계산할 수 없음: "
+},
+"一二三四五六日": {
+"en": "MTWTFSS",
+"ja": "月火水木金土日",
+"ko": "월화수목금토일"
+},
+"現在是{0}（星期{1}）。這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語）。": {
+"en": "It is now {0} ({1}). This task runs on a schedule and nobody is around to answer questions: no small talk, no counter-questions, no “I can't” — just finish the job and deliver the result. The result is pushed to a phone, so use bullet points and short paragraphs; cite web sources with links. Answer in the language of the task; any Chinese must be Traditional Chinese (Taiwan usage).",
+"ja": "現在は{0}（{1}）です。これは予定時刻に自動実行されるタスクで、質問に答える人はいません。あいさつ・聞き返し・「できません」は不要で、作業を終えて結果を出してください。結果はスマホに通知されるので、箇条書きと短い段落にし、ウェブ情報は出典URLを付けてください。タスクの言語で答え、中国語は必ず繁体字（台湾の用語）にしてください。",
+"ko": "지금은 {0}({1})입니다. 정해진 시간에 자동으로 실행되는 작업이라 질문에 답할 사람이 없습니다. 인사, 되묻기, '할 수 없습니다'는 빼고 작업을 끝내 결과를 내세요. 결과는 휴대폰으로 푸시되므로 글머리표와 짧은 단락을 쓰고, 웹 자료는 출처 URL을 붙이세요. 작업에 쓰인 언어로 답하고, 중국어는 반드시 번체(대만 용어)로 쓰세요."
+},
+"現在是": {
+"en": "It is now ",
+"ja": "現在は",
+"ko": "지금은 "
+},
+"只跑一次：": {
+"en": "Once: ",
+"ja": "1回だけ：",
+"ko": "한 번만: "
+},
+"請選要用哪個模型": {
+"en": "Choose which model to use",
+"ja": "使うモデルを選んでください",
+"ko": "사용할 모델을 선택하세요"
+},
+"要模型做的事": {
+"en": "What the model should do",
+"ja": "モデルにやらせること",
+"ko": "모델이 할 일"
+},
+"格式不對": {
+"en": "Invalid format",
+"ja": "形式が正しくありません",
+"ko": "형식이 올바르지 않습니다"
+},
+"請填{0}": {
+"en": "Please fill in {0}",
+"ja": "{0}を入力してください",
+"ko": "{0}을(를) 입력하세요"
+},
+"請填": {
+"en": "Please fill in ",
+"ja": "入力してください：",
+"ko": "입력하세요: "
+},
+"排程方式不對": {
+"en": "Invalid schedule type",
+"ja": "スケジュールの種類が正しくありません",
+"ko": "예약 방식이 올바르지 않습니다"
+},
+"請選日期與時間": {
+"en": "Choose a date and time",
+"ja": "日付と時刻を選んでください",
+"ko": "날짜와 시간을 선택하세요"
+},
+"只跑一次的時間要在未來": {
+"en": "A one-time run must be in the future",
+"ja": "1回だけの実行は未来の時刻にしてください",
+"ko": "한 번만 실행하는 시간은 미래여야 합니다"
+},
+"推送管道不對（可能已被刪掉）": {
+"en": "Invalid push channel (it may have been deleted)",
+"ja": "通知先が正しくありません（削除された可能性があります）",
+"ko": "푸시 채널이 올바르지 않습니다(삭제되었을 수 있음)"
+},
+"自動啟動與關閉模型要維運或管理員帳號": {
+"en": "Starting and stopping models automatically needs an operator or administrator account",
+"ja": "モデルの自動起動・停止には運用担当か管理者のアカウントが必要です",
+"ko": "모델 자동 시작·중지에는 운영자 또는 관리자 계정이 필요합니다"
+},
+"推送方式不對": {
+"en": "Invalid push type",
+"ja": "通知方法が正しくありません",
+"ko": "푸시 방식이 올바르지 않습니다"
+},
+"請填Webhook網址": {
+"en": "Please fill in the Webhook URL",
+"ja": "Webhook URLを入力してください",
+"ko": "Webhook URL을 입력하세요"
+},
+"網址要是http://或https://開頭": {
+"en": "The URL must start with http:// or https://",
+"ja": "URLはhttp://かhttps://で始めてください",
+"ko": "URL은 http:// 또는 https://로 시작해야 합니다"
+},
+"一般帳號的Webhook只能用https://": {
+"en": "Webhooks for regular accounts must use https://",
+"ja": "一般アカウントのWebhookはhttps://のみです",
+"ko": "일반 계정의 Webhook은 https://만 쓸 수 있습니다"
+},
+"時間要寫成「時:分」，例如08:30": {
+"en": "Write the time as HH:MM, e.g. 08:30",
+"ja": "時刻は「時:分」で書いてください（例：08:30）",
+"ko": "시간은 '시:분'으로 쓰세요(예: 08:30)"
+},
+"每週要至少選一天": {
+"en": "Choose at least one day for weekly",
+"ja": "毎週は少なくとも1日選んでください",
+"ko": "매주는 최소 하루를 선택하세요"
+},
+"間隔要在{0}分鐘到7天之間": {
+"en": "The interval must be between {0} minutes and 7 days",
+"ja": "間隔は{0}分から7日の間にしてください",
+"ko": "간격은 {0}분에서 7일 사이여야 합니다"
+},
+"間隔要在": {
+"en": "The interval must be between ",
+"ja": "間隔の範囲：",
+"ko": "간격 범위: "
+},
+"分鐘到7天之間": {
+"en": " minutes and 7 days",
+"ja": "分から7日の間",
+"ko": "분에서 7일 사이"
+},
+"週末": {
+"en": "Weekends",
+"ja": "週末",
+"ko": "주말"
+},
+"模型欄位不對": {
+"en": "Invalid model slot",
+"ja": "モデルスロットが正しくありません",
+"ko": "모델 슬롯이 올바르지 않습니다"
+},
+"第三方API不對": {
+"en": "Invalid third-party API",
+"ja": "サードパーティAPIが正しくありません",
+"ko": "타사 API가 올바르지 않습니다"
+},
+"請填Bot Token（跟@BotFather要）": {
+"en": "Please fill in the Bot Token (ask @BotFather)",
+"ja": "Bot Tokenを入力してください（@BotFatherで取得）",
+"ko": "Bot Token을 입력하세요(@BotFather에서 받기)"
+},
+"Bot Token格式不對，應該像123456789:AA…": {
+"en": "Invalid Bot Token; it should look like 123456789:AA…",
+"ja": "Bot Tokenの形式が正しくありません。123456789:AA…のような形です",
+"ko": "Bot Token 형식이 올바르지 않습니다. 123456789:AA… 같은 형태여야 합니다"
+},
+"Chat ID格式不對：個人與群組是數字（群組是負數），頻道可以寫@名稱": {
+"en": "Invalid Chat ID: people and groups are numbers (groups are negative); channels can be @name",
+"ja": "Chat IDの形式が正しくありません。個人とグループは数字（グループは負の数）、チャンネルは@名前でも可",
+"ko": "Chat ID 형식이 올바르지 않습니다. 개인과 그룹은 숫자(그룹은 음수), 채널은 @이름도 됩니다"
+},
+"存放在 {0}・剩 {1} GiB": {
+"en": "Stored in {0} · {1} GiB free",
+"ja": "{0}に保存・残り{1} GiB",
+"ko": "{0}에 저장 · 남은 용량 {1} GiB"
+},
+"llama.cpp {0}・從 {1} 收進來・{2}": {
+"en": "llama.cpp {0} · taken in from {1} · {2}",
+"ja": "llama.cpp {0}・{1}から取り込み・{2}",
+"ko": "llama.cpp {0} · {1}에서 가져옴 · {2}"
+},
+"收進來": {
+"en": "taken in",
+"ja": "取り込み",
+"ko": "가져옴"
+},
+"的推理引擎包": {
+"en": " inference engine package",
+"ja": "の推論エンジンパッケージ",
+"ko": " 추론 엔진 패키지"
+},
+"從內部鏡像刪除": {
+"en": "Delete from internal mirror",
+"ja": "内部ミラーから削除",
+"ko": "내부 미러에서 삭제"
+},
+"刪掉主控台上這個模型的 {0} 個檔（約 {1} GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載。": {
+"en": "Delete the {0} files of this model on the console (about {1} GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed.",
+"ja": "コンソール上のこのモデルのファイル{0}個（約{1} GiB）を削除します。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします。",
+"ko": "콘솔에 있는 이 모델 파일 {0}개(약 {1} GiB)를 삭제합니다. 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다."
+},
+"刪掉主控台上這個模型的": {
+"en": "Delete this model's files on the console: ",
+"ja": "コンソール上のこのモデルのファイルを削除：",
+"ko": "콘솔의 이 모델 파일 삭제: "
+},
+"個檔（約": {
+"en": " files (about ",
+"ja": " 個のファイル（約",
+"ko": " 개 파일(약 "
+},
+"GiB），無法復原；機器上已經下載好的不受影響，之後要用會重新從 Hugging Face 下載": {
+"en": "GiB). This can't be undone; copies already downloaded to machines are not affected, and it will be downloaded from Hugging Face again when needed",
+"ja": "GiB）。元に戻せません。マシンにダウンロード済みのものは影響を受けず、必要になればHugging Faceから再ダウンロードします",
+"ko": "GiB). 되돌릴 수 없습니다. 머신에 이미 받은 것은 영향 없고, 필요하면 Hugging Face에서 다시 받습니다"
+},
+"排進 {0} 個檔": {
+"en": "Queued {0} files",
+"ja": "{0}個のファイルをキューに入れました",
+"ko": "파일 {0}개를 대기열에 넣었습니다"
+},
+"這個 repo 沒有符合的 GGUF": {
+"en": "This repo has no matching GGUF",
+"ja": "このリポジトリに合うGGUFがありません",
+"ko": "이 저장소에는 맞는 GGUF가 없습니다"
+},
+"想接回原來的": {
+"en": "Wants to reconnect as the original ",
+"ja": "元の",
+"ko": "원래의 "
+},
+"還讀不到": {
+"en": "Can't read yet",
+"ja": "まだ読めません",
+"ko": "아직 읽을 수 없음"
+},
+"的硬體，等它們連上主控台再看": {
+"en": "'s hardware; check again once they connect to the console",
+"ja": "のハードウェア。コンソールに接続されてから確認してください",
+"ko": "의 하드웨어. 콘솔에 연결된 뒤 다시 확인하세요"
+},
+"這個群組還沒有機器。": {
+"en": "This group has no machines yet.",
+"ja": "このグループにはまだマシンがありません。",
+"ko": "이 그룹에는 아직 머신이 없습니다."
+},
+"放不下：改用": {
+"en": "Doesn't fit: use ",
+"ja": "収まりません：代わりに",
+"ko": "공간 부족: 대신 "
+},
+"空的就照群組設定": {
+"en": "Leave empty to follow the group settings",
+"ja": "空欄ならグループ設定に従います",
+"ko": "비워 두면 그룹 설정을 따릅니다"
+},
+"還讀不到硬體的": {
+"en": "Hardware not read yet for ",
+"ja": "ハードウェアをまだ読めていない：",
+"ko": "아직 하드웨어를 읽지 못함: "
+},
+"主控台會POST一個JSON：{\"title\", \"content\", \"source\": \"xConsole\"}，可以接Teams、LINE、n8n、Home Assistant或自家系統。": {
+"en": "The console POSTs a JSON {\"title\", \"content\", \"source\": \"xConsole\"}; it can go to Teams, LINE, n8n, Home Assistant or your own system.",
+"ja": "コンソールはJSON {\"title\", \"content\", \"source\": \"xConsole\"} をPOSTします。Teams、LINE、n8n、Home Assistant、自社システムにつなげます。",
+"ko": "콘솔이 JSON {\"title\", \"content\", \"source\": \"xConsole\"}을 POST합니다. Teams, LINE, n8n, Home Assistant 또는 자체 시스템에 연결할 수 있습니다."
+},
+"'\n# 主控台備妥的Windows執行環境包（內附Python與相依、Visual C++執行階段）的sha256；空的＝沒有，改用這台的Python\n$RT = '": {
+"en": "'\n# sha256 of the Windows runtime package prepared by the console (bundles Python, dependencies and the Visual C++ runtime); empty = none, use this machine's Python\n$RT = '",
+"ja": "'\n# コンソールが用意したWindows実行環境パッケージ（Python・依存関係・Visual C++ランタイム同梱）のsha256。空＝なし、このマシンのPythonを使う\n$RT = '",
+"ko": "'\n# 콘솔이 준비한 Windows 실행 환경 패키지(Python, 의존성, Visual C++ 런타임 포함)의 sha256. 비어 있음 = 없음, 이 머신의 Python 사용\n$RT = '"
+},
+"你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。今天是{0}（星期{1}）；要算數字用calculator，不要心算。": {
+"en": "You are the xConsole chat assistant; answer in Traditional Chinese (Taiwan usage). Call tools when you need data instead of guessing; if the tools find nothing, say so. Keep answers short, in bullet points. Today is {0} ({1}); use calculator for numbers, don't do mental arithmetic.",
+"ja": "あなたはxConsoleコンソールのチャットアシスタントです。繁体字中国語（台湾の用語）で答えてください。資料が必要ならツールで調べ、推測しないこと。見つからなければそう言うこと。短く箇条書きで。今日は{0}（{1}）です。数字はcalculatorで計算し、暗算しないこと。",
+"ko": "당신은 xConsole 콘솔의 채팅 도우미입니다. 번체 중국어(대만 용어)로 답하세요. 자료가 필요하면 추측하지 말고 도구로 찾고, 못 찾으면 그렇다고 말하세요. 짧게 글머리표로 답하세요. 오늘은 {0}({1})입니다. 숫자는 calculator로 계산하고 암산하지 마세요."
+},
+"你是xConsole主控台的對話助理，用繁體中文（台灣用語）回答。需要資料時呼叫工具查，不要猜；工具查不到就說查不到。回答簡短、條列重點。今天是": {
+"en": "You are the xConsole chat assistant; answer in Traditional Chinese (Taiwan usage). Call tools when you need data instead of guessing; if the tools find nothing, say so. Keep answers short, in bullet points. Today is ",
+"ja": "あなたはxConsoleコンソールのチャットアシスタントです。繁体字中国語（台湾の用語）で答えてください。資料が必要ならツールで調べ、推測しないこと。見つからなければそう言うこと。短く箇条書きで。今日は",
+"ko": "당신은 xConsole 콘솔의 채팅 도우미입니다. 번체 중국어(대만 용어)로 답하세요. 자료가 필요하면 추측하지 말고 도구로 찾고, 못 찾으면 그렇다고 말하세요. 짧게 글머리표로 답하세요. 오늘은 "
+},
+"可放模型約": {
+"en": "Room for models about ",
+"ja": "モデルの置き場 約",
+"ko": "모델용 공간 약 "
+},
+"・可放模型約 ": {
+"en": " · room for models about ",
+"ja": "・モデルの置き場 約",
+"ko": " · 모델용 공간 약 "
+},
+"不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例": {
+"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
+"ja": "はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
+"ko": "은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
+},
+":Q4_K_M），或先加進推薦清單": {
+"en": ":Q4_K_M), or add it to the recommended list first",
+"ja": "：Q4_K_M）、先におすすめリストに追加してください",
+"ko": ":Q4_K_M) 먼저 추천 목록에 추가하세요"
+},
+"在這種機型上連用硬碟都跑不動，請改小一點的模型": {
+"en": " can't run on this kind of machine even from disk; choose a smaller model",
+"ja": "はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
+"ko": "은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
+},
+" 不在推薦清單，主控台不知道它有哪些量化：請寫明量化（例 ": {
+"en": " isn't in the recommended list, so the console doesn't know its quantizations: specify one (e.g. ",
+"ja": " はおすすめリストにないため、コンソールは量子化の種類を知りません。量子化を指定するか（例 ",
+"ko": " 은(는) 추천 목록에 없어 콘솔이 양자화 종류를 모릅니다. 양자화를 지정하거나(예: "
+},
+" 在這種機型上連用硬碟都跑不動，請改小一點的模型": {
+"en": " can't run on this kind of machine even from disk; choose a smaller model",
+"ja": " はこの機種ではディスクを使っても動きません。もっと小さいモデルにしてください",
+"ko": " 은(는) 이 기종에서는 디스크를 써도 실행되지 않습니다. 더 작은 모델로 바꾸세요"
+},
+"已加入主控台：{0}（{1}）。{2}回到網頁就看得到這台。": {
+"en": "Added to the console: {0} ({1}). {2}Go back to the web page to see this machine.",
+"ja": "コンソールに追加しました：{0}（{1}）。{2}ウェブページに戻るとこのマシンが見えます。",
+"ko": "콘솔에 추가했습니다: {0}({1}). {2}웹 페이지로 돌아가면 이 머신이 보입니다."
+},
+"跟 {0} 拿推理引擎包沒成功：{1}": {
+"en": "Getting the inference engine package from {0} failed: {1}",
+"ja": "{0}から推論エンジンパッケージを取得できませんでした：{1}",
+"ko": "{0}에서 추론 엔진 패키지를 받지 못했습니다: {1}"
+},
+"拿推理引擎包沒成功": {
+"en": "Getting the inference engine package failed",
+"ja": "推論エンジンパッケージを取得できませんでした",
+"ko": "추론 엔진 패키지를 받지 못했습니다"
+},
+"回到網頁就看得到這台。": {
+"en": "Go back to the web page to see this machine.",
+"ja": "ウェブページに戻るとこのマシンが見えます。",
+"ko": "웹 페이지로 돌아가면 이 머신이 보입니다."
+},
+"定時任務排程出錯：\n": {
+"en": "Scheduled-task scheduler error:\n",
+"ja": "定期タスクのスケジューラーでエラー：\n",
+"ko": "예약 작업 스케줄러 오류:\n"
+},
+" 拿推理引擎包沒成功：": {
+"en": " getting the inference engine package failed: ",
+"ja": " 推論エンジンパッケージを取得できませんでした：",
+"ko": " 추론 엔진 패키지를 받지 못했습니다: "
+},
+"主機板識別碼跟那一格一樣（識別碼不是秘密，要人確認）": {
+"en": "The motherboard ID matches that slot (the ID isn't a secret; a person must confirm)",
+"ja": "マザーボードIDがその枠と同じです（IDは秘密ではないので人が確認します）",
+"ko": "메인보드 ID가 그 칸과 같습니다(ID는 비밀이 아니므로 사람이 확인해야 합니다)"
+},
+"定時任務執行出錯：\n": {
+"en": "Scheduled task error:\n",
+"ja": "定期タスクの実行でエラー：\n",
+"ko": "예약 작업 실행 오류:\n"
+},
+"這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語": {
+"en": "This task runs on a schedule and nobody is around to answer questions: no small talk, no counter-questions, no “I can't” — just finish the job and deliver the result. The result is pushed to a phone, so use bullet points and short paragraphs; cite web sources with links. Answer in the language of the task; any Chinese must be Traditional Chinese (Taiwan usage",
+"ja": "これは予定時刻に自動実行されるタスクで、質問に答える人はいません。あいさつ・聞き返し・「できません」は不要で、作業を終えて結果を出してください。結果はスマホに通知されるので、箇条書きと短い段落にし、ウェブ情報は出典URLを付けてください。タスクの言語で答え、中国語は必ず繁体字（台湾の用語",
+"ko": "정해진 시간에 자동으로 실행되는 작업이라 질문에 답할 사람이 없습니다. 인사, 되묻기, '할 수 없습니다'는 빼고 작업을 끝내 결과를 내세요. 결과는 휴대폰으로 푸시되므로 글머리표와 짧은 단락을 쓰고, 웹 자료는 출처 URL을 붙이세요. 작업에 쓰인 언어로 답하고, 중국어는 반드시 번체(대만 용어"
+},
+"）。這是排定時間自動執行的任務，旁邊沒有人可以回答問題：不要寒暄、不要反問、不要說「我無法」，直接把事情做完並交出結果。結果會推送到手機，用條列、段落短一點；引用網路資料要附來源網址。用任務描述的語言回答，中文一律用繁體中文（台灣用語）。": {
+"en": "). This task runs on a schedule and nobody is around to answer questions: no small talk, no counter-questions, no “I can't” — just finish the job and deliver the result. The result is pushed to a phone, so use bullet points and short paragraphs; cite web sources with links. Answer in the language of the task; any Chinese must be Traditional Chinese (Taiwan usage).",
+"ja": "）。これは予定時刻に自動実行されるタスクで、質問に答える人はいません。あいさつ・聞き返し・「できません」は不要で、作業を終えて結果を出してください。結果はスマホに通知されるので、箇条書きと短い段落にし、ウェブ情報は出典URLを付けてください。タスクの言語で答え、中国語は必ず繁体字（台湾の用語）にしてください。",
+"ko": "). 정해진 시간에 자동으로 실행되는 작업이라 질문에 답할 사람이 없습니다. 인사, 되묻기, '할 수 없습니다'는 빼고 작업을 끝내 결과를 내세요. 결과는 휴대폰으로 푸시되므로 글머리표와 짧은 단락을 쓰고, 웹 자료는 출처 URL을 붙이세요. 작업에 쓰인 언어로 답하고, 중국어는 반드시 번체(대만 용어)로 쓰세요."
+},
+"{0}格式不對": {
+"en": "{0} has an invalid format",
+"ja": "{0}の形式が正しくありません",
+"ko": "{0} 형식이 올바르지 않습니다"
+},
+"{0}最多{1}字": {
+"en": "{0}: at most {1} characters",
+"ja": "{0}は最大{1}文字です",
+"ko": "{0}은(는) 최대 {1}자입니다"
+},
+"」的覆寫": {
+"en": "” override",
+"ja": "」の上書き",
+"ko": "' 덮어쓰기"
+},
+"主控台識別碼檔內容不正確，已改名為": {
+"en": "The console ID file is invalid; it was renamed to ",
+"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
+"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
+},
+"並產生新的；企業版授權要請云碩依新識別碼重簽": {
+"en": "and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
+"ja": "新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
+"ko": "새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
+},
+"主控台識別碼檔內容不正確，已改名為 ": {
+"en": "The console ID file is invalid; it was renamed to ",
+"ja": "コンソールIDファイルの内容が正しくないため、名前を変えました：",
+"ko": "콘솔 ID 파일 내용이 올바르지 않아 이름을 바꿨습니다: "
+},
+" 並產生新的；企業版授權要請云碩依新識別碼重簽": {
+"en": " and a new one was created; ask xCloudinfo to re-sign the enterprise license for the new ID",
+"ja": " 新しいIDを作成しました。企業版ライセンスは新しいIDでxCloudinfoに再署名を依頼してください",
+"ko": " 새 ID를 만들었습니다. 기업판 라이선스는 새 ID로 xCloudinfo에 다시 서명을 요청하세요"
+},
+"模型名稱或檔名不合法": {
+"en": "Invalid model name or file name",
+"ja": "モデル名またはファイル名が正しくありません",
+"ko": "모델 이름 또는 파일 이름이 올바르지 않습니다"
+},
+"內部鏡像正在從 Hugging Face 下載": {
+"en": "The internal mirror is downloading from Hugging Face",
+"ja": "内部ミラーがHugging Faceからダウンロード中です",
+"ko": "내부 미러가 Hugging Face에서 내려받는 중입니다"
+},
+"%），稍後再試": {
+"en": "%); try again later",
+"ja": "%）。しばらくしてからもう一度",
+"ko": "%). 잠시 후 다시 시도하세요"
+},
+"檔名不合法": {
+"en": "Invalid file name",
+"ja": "ファイル名が正しくありません",
+"ko": "파일 이름이 올바르지 않습니다"
+},
+"{0} 沒有 {1}": {
+"en": "{0} has no {1}",
+"ja": "{0}に{1}がありません",
+"ko": "{0}에 {1}이(가) 없습니다"
+},
+"內部鏡像下載": {
+"en": "Internal mirror download",
+"ja": "内部ミラーのダウンロード",
+"ko": "내부 미러 다운로드"
+},
+"已重新排隊": {
+"en": "Queued again",
+"ja": "再度キューに入れました",
+"ko": "다시 대기열에 넣었습니다"
+},
+"內部鏡像正在從 Hugging Face 下載 ": {
+"en": "The internal mirror is downloading from Hugging Face ",
+"ja": "内部ミラーがHugging Faceからダウンロード中：",
+"ko": "내부 미러가 Hugging Face에서 내려받는 중: "
+},
+"的檔案清單": {
+"en": "'s file list",
+"ja": "のファイル一覧",
+"ko": "의 파일 목록"
+},
+"內部鏡像下載 ": {
+"en": "Internal mirror download ",
+"ja": "内部ミラーのダウンロード：",
+"ko": "내부 미러 다운로드: "
+},
+" 失敗（": {
+"en": " failed (",
+"ja": " 失敗（",
+"ko": " 실패("
+},
+"），已重新排隊": {
+"en": "), queued again",
+"ja": "）、再度キューに入れました",
+"ko": "), 다시 대기열에 넣었습니다"
+},
+"大小不對（{0}／{1}），下次會接著下載": {
+"en": "Wrong size ({0}/{1}); the download will resume next time",
+"ja": "サイズが違います（{0}／{1}）。次回続きからダウンロードします",
+"ko": "크기가 다릅니다({0}/{1}). 다음에 이어서 내려받습니다"
+},
+"下次會接著下載": {
+"en": "The download will resume next time",
+"ja": "次回続きからダウンロードします",
+"ko": "다음에 이어서 내려받습니다"
+},
+"這個模型還在下載，等下載完再刪": {
+"en": "This model is still downloading; delete it when the download finishes",
+"ja": "このモデルはまだダウンロード中です。終わってから削除してください",
+"ko": "이 모델은 아직 내려받는 중입니다. 끝난 뒤 삭제하세요"
+},
+" 的檔案清單": {
+"en": "'s file list",
+"ja": " のファイル一覧",
+"ko": "의 파일 목록"
+},
+"大小不對（": {
+"en": "Wrong size (",
+"ja": "サイズが違います（",
+"ko": "크기가 다릅니다("
+},
+"），下次會接著下載": {
+"en": "); the download will resume next time",
+"ja": "）。次回続きからダウンロードします",
+"ko": "). 다음에 이어서 내려받습니다"
+},
+"SHA-256 跟 Hugging Face 公布的不同，已刪除，會重新下載": {
+"en": "The SHA-256 doesn't match what Hugging Face publishes; deleted and will download again",
+"ja": "SHA-256がHugging Faceの公開値と違うため削除しました。再ダウンロードします",
+"ko": "SHA-256이 Hugging Face 공개 값과 달라 삭제했습니다. 다시 내려받습니다"
+},
+"xConsole 工作站互傳": {
+"en": "xConsole workstation transfer",
+"ja": "xConsoleワークステーション間転送",
+"ko": "xConsole 워크스테이션 간 전송"
+},
+"這台的其他程式把系統記憶體用到只剩": {
+"en": "Other programs on this machine left only ",
+"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは",
+"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
+},
+"GiB），為了不讓電腦卡住": {
+"en": "GiB), so to keep the computer from freezing",
+"ja": "GiB）。パソコンが固まらないよう",
+"ko": "GiB)입니다. 컴퓨터가 멈추지 않도록"
+},
+"先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
+"en": "unloaded this model first. Close programs you don't need, then click Start to use it again",
+"ja": "このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
+"ko": "이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
+},
+"等太久了（超過 4 小時）": {
+"en": "Waited too long (over 4 hours)",
+"ja": "待ち時間が長すぎます（4時間超）",
+"ko": "너무 오래 기다렸습니다(4시간 초과)"
+},
+"沒有主控台的網址": {
+"en": "No console URL",
+"ja": "コンソールのURLがありません",
+"ko": "콘솔 URL이 없습니다"
+},
+"這台的其他程式把系統記憶體用到只剩 ": {
+"en": "Other programs on this machine left only ",
+"ja": "このマシンのほかのプログラムがシステムメモリを使い、残りは ",
+"ko": "이 머신의 다른 프로그램이 시스템 메모리를 써서 남은 용량이 "
+},
+" GiB（底線 ": {
+"en": " GiB of system memory (floor ",
+"ja": " GiB（下限 ",
+"ko": " GiB(하한 "
+},
+" GiB），為了不讓電腦卡住，": {
+"en": " GiB), so to keep the computer from freezing,",
+"ja": " GiB）。パソコンが固まらないよう、",
+"ko": " GiB)입니다. 컴퓨터가 멈추지 않도록,"
+},
+" 先把這個模型卸載了。關掉用不到的程式之後，按「啟動」就能再用": {
+"en": " unloaded this model first. Close programs you don't need, then click Start to use it again",
+"ja": " このモデルを先に解放しました。不要なプログラムを閉じてから「起動」を押せば再び使えます",
+"ko": " 이 모델을 먼저 내렸습니다. 쓰지 않는 프로그램을 닫은 뒤 '시작'을 누르면 다시 쓸 수 있습니다"
+},
+"用電池中": {
+"en": "On battery",
+"ja": "バッテリー駆動中",
+"ko": "배터리 사용 중"
+},
+"接上電源再": {
+"en": "plug in, then ",
+"ja": "電源につないでから",
+"ko": "전원을 연결한 뒤 "
+},
+"從同群組的": {
+"en": "from the same group's ",
+"ja": "同じグループの",
+"ko": "같은 그룹의 "
+},
+"互傳並核對 SHA-256": {
+"en": "transfer and verify SHA-256",
+"ja": "転送してSHA-256を照合",
+"ko": "전송하고 SHA-256 확인"
+},
+"連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
+"en": "Can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
+"ja": "コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
+"ko": "콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
+},
+"電量": {
+"en": "Battery",
+"ja": "電池残量",
+"ko": "배터리"
+},
+"，接上電源再": {
+"en": ", plug in, then ",
+"ja": "、電源につないでから",
+"ko": ", 전원을 연결한 뒤 "
+},
+"平台名稱不合法：{0}": {
+"en": "Invalid platform name: {0}",
+"ja": "プラットフォーム名が正しくありません：{0}",
+"ko": "플랫폼 이름이 올바르지 않습니다: {0}"
+},
+"平台名稱不合法": {
+"en": "Invalid platform name",
+"ja": "プラットフォーム名が正しくありません",
+"ko": "플랫폼 이름이 올바르지 않습니다"
+},
+"跟主控台拿推理引擎沒成功": {
+"en": "Getting the inference engine from the console failed",
+"ja": "コンソールから推論エンジンを取得できませんでした",
+"ko": "콘솔에서 추론 엔진을 받지 못했습니다"
+},
+"同機型編好的推理引擎在這台裝不起來": {
+"en": "The inference engine built on the same model of machine won't install here",
+"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません",
+"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다"
+},
+"互傳埠的防火牆規則{0}不了（要以系統管理員或 SYSTEM 執行）：{1}": {
+"en": "Couldn't {0} the firewall rule for the transfer port (needs administrator or SYSTEM): {1}",
+"ja": "転送ポートのファイアウォール規則を{0}できません（管理者かSYSTEMで実行が必要）：{1}",
+"ko": "전송 포트 방화벽 규칙을 {0}할 수 없습니다(관리자 또는 SYSTEM으로 실행 필요): {1}"
+},
+"互傳埠的防火牆規則": {
+"en": "Firewall rule for the transfer port",
+"ja": "転送ポートのファイアウォール規則",
+"ko": "전송 포트 방화벽 규칙"
+},
+"不了（要以系統管理員或 SYSTEM 執行": {
+"en": "failed (needs administrator or SYSTEM",
+"ja": "できません（管理者かSYSTEMで実行が必要",
+"ko": "실패(관리자 또는 SYSTEM으로 실행 필요"
+},
+"互傳安排裡的檔名或 sha256 不對": {
+"en": "The file name or sha256 in the transfer plan is wrong",
+"ja": "転送計画のファイル名かsha256が正しくありません",
+"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다"
+},
+"的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過": {
+"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered",
+"ja": "のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性",
+"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음"
+},
+"等同群組的其他機器下載好再互傳": {
+"en": "Wait for other machines in the group to finish downloading, then transfer",
+"ja": "同じグループのほかのマシンのダウンロード完了を待ってから転送します",
+"ko": "같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
+},
+"互傳票證快到期，等主控台下一輪": {
+"en": "The transfer ticket is about to expire; waiting for the console's next round",
+"ja": "転送チケットの期限が近いので、コンソールの次の回を待ちます",
+"ko": "전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
+},
+"：從同群組的 ": {
+"en": ": from the same group's ",
+"ja": "：同じグループの",
+"ko": ": 같은 그룹의 "
+},
+" 互傳並核對 SHA-256": {
+"en": " transfer and verify SHA-256",
+"ja": " から転送してSHA-256を照合",
+"ko": " 에서 전송하고 SHA-256 확인"
+},
+"放行": {
+"en": "allow",
+"ja": "許可",
+"ko": "허용"
+},
+"本機使用者通道開不起來：資料夾 {0} 別人寫得進去": {
+"en": "The local user channel can't open: others can write to folder {0}",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー{0}にほかの人が書き込めます",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 {0}에 다른 사람이 쓸 수 있습니다"
+},
+"本機使用者通道開不起來：資料夾": {
+"en": "The local user channel can't open: folder",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더"
+},
+"別人寫得進去": {
+"en": "others can write to it",
+"ja": "ほかの人が書き込めます",
+"ko": "다른 사람이 쓸 수 있습니다"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}": {
+"en": "The local user channel can't open (another program may have taken the name): {0}",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：{0}",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): {0}"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱": {
+"en": "The local user channel can't open (another program may have taken the name",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음"
+},
+"群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
+"en": "The group only allows transfers within the group, but no reachable machine in the group has this model",
+"ja": "グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
+"ko": "그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
+},
+"：連不上主控台的內部鏡像，群組又不允許直接從 Hugging Face 下載": {
+"en": ": can't reach the console's internal mirror, and the group doesn't allow downloading straight from Hugging Face",
+"ja": "：コンソールの内部ミラーに接続できず、グループはHugging Faceからの直接ダウンロードを許可していません",
+"ko": ": 콘솔의 내부 미러에 연결할 수 없고, 그룹은 Hugging Face에서 직접 내려받는 것을 허용하지 않습니다"
+},
+"寫不進去": {
+"en": "can't be written",
+"ja": "書き込めません",
+"ko": "쓸 수 없습니다"
+},
+"模型改放": {
+"en": "Models moved to",
+"ja": "モデルの置き場を変更",
+"ko": "모델 위치 변경"
+},
+"群組設定的存放位置": {
+"en": "Storage location set by the group",
+"ja": "グループ設定の保存場所",
+"ko": "그룹에서 정한 저장 위치"
+},
+"（電量 ": {
+"en": " (battery ",
+"ja": "（電池残量 ",
+"ko": " (배터리 "
+},
+"平台名稱不合法：": {
+"en": "Invalid platform name: ",
+"ja": "プラットフォーム名が正しくありません：",
+"ko": "플랫폼 이름이 올바르지 않습니다: "
+},
+"跟主控台拿推理引擎沒成功：": {
+"en": "Getting the inference engine from the console failed: ",
+"ja": "コンソールから推論エンジンを取得できませんでした：",
+"ko": "콘솔에서 추론 엔진을 받지 못했습니다: "
+},
+"同機型編好的推理引擎在這台裝不起來：": {
+"en": "The inference engine built on the same model of machine won't install here: ",
+"ja": "同じ機種でビルドした推論エンジンがこのマシンに入りません：",
+"ko": "같은 기종에서 빌드한 추론 엔진을 이 머신에 설치할 수 없습니다: "
+},
+"推理引擎裝不起來": {
+"en": "The inference engine won't install",
+"ja": "推論エンジンをインストールできません",
+"ko": "추론 엔진을 설치할 수 없습니다"
+},
+"不了（要以系統管理員或 SYSTEM 執行）：": {
+"en": "failed (needs administrator or SYSTEM): ",
+"ja": "できません（管理者かSYSTEMで実行が必要）：",
+"ko": "실패(관리자 또는 SYSTEM으로 실행 필요): "
+},
+"互傳安排裡的檔名或 sha256 不對：": {
+"en": "The file name or sha256 in the transfer plan is wrong: ",
+"ja": "転送計画のファイル名かsha256が正しくありません：",
+"ko": "전송 계획의 파일 이름 또는 sha256이 올바르지 않습니다: "
+},
+" 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）": {
+"en": "'s SHA-256 differs from what the console gave; deleted (the sender's file may be damaged or altered)",
+"ja": " のSHA-256がコンソールの値と違うため削除しました（送信側のファイルが壊れているか改ざんされた可能性）",
+"ko": "의 SHA-256이 콘솔 값과 달라 삭제했습니다(보낸 쪽 파일이 손상되었거나 변조되었을 수 있음)"
+},
+"的 SHA-256（之後才能送給同群組的機器": {
+"en": "'s SHA-256 (needed before it can be sent to machines in the group",
+"ja": "のSHA-256（照合後にグループ内のマシンへ送れます",
+"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음"
+},
+"：等同群組的其他機器下載好再互傳": {
+"en": ": wait for other machines in the group to finish downloading, then transfer",
+"ja": "：同じグループのほかのマシンのダウンロード完了を待ってから転送します",
+"ko": ": 같은 그룹의 다른 머신이 다 받은 뒤 전송합니다"
+},
+"：互傳票證快到期，等主控台下一輪": {
+"en": ": the transfer ticket is about to expire; waiting for the console's next round",
+"ja": "：転送チケットの期限が近いので、コンソールの次の回を待ちます",
+"ko": ": 전송 티켓이 곧 만료되어 콘솔의 다음 차례를 기다립니다"
+},
+"拒絕：不是坐在這台電腦前的人": {
+"en": "Refused: not the person sitting at this computer",
+"ja": "拒否：このパソコンの前にいる人ではありません",
+"ko": "거부: 이 컴퓨터 앞에 있는 사람이 아닙니다"
+},
+"拒絕：不是使用者層的操作": {
+"en": "Refused: not a user-level operation",
+"ja": "拒否：ユーザー層の操作ではありません",
+"ko": "거부: 사용자 수준 작업이 아닙니다"
+},
+"本機使用者通道開不起來：{0}": {
+"en": "The local user channel can't open: {0}",
+"ja": "ローカルユーザーチャネルを開けません：{0}",
+"ko": "로컬 사용자 채널을 열 수 없습니다: {0}"
+},
+"本機使用者通道開不起來": {
+"en": "The local user channel can't open",
+"ja": "ローカルユーザーチャネルを開けません",
+"ko": "로컬 사용자 채널을 열 수 없습니다"
+},
+"本機使用者通道開不起來：資料夾 ": {
+"en": "The local user channel can't open: folder ",
+"ja": "ローカルユーザーチャネルを開けません：フォルダー ",
+"ko": "로컬 사용자 채널을 열 수 없습니다: 폴더 "
+},
+" 別人寫得進去": {
+"en": " others can write to it",
+"ja": " ほかの人が書き込めます",
+"ko": " 다른 사람이 쓸 수 있습니다"
+},
+"本機通道的另一端關了": {
+"en": "The other end of the local channel closed",
+"ja": "ローカルチャネルの相手側が閉じました",
+"ko": "로컬 채널의 상대편이 닫혔습니다"
+},
+"本機使用者通道開不起來（可能有別的程式先占了這個名稱）：": {
+"en": "The local user channel can't open (another program may have taken the name): ",
+"ja": "ローカルユーザーチャネルを開けません（ほかのプログラムが名前を使っている可能性）：",
+"ko": "로컬 사용자 채널을 열 수 없습니다(다른 프로그램이 이름을 먼저 쓰고 있을 수 있음): "
+},
+"本機使用者通道處理請求失敗：{0}: {1}": {
+"en": "The local user channel failed to handle a request: {0}: {1}",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした：{0}: {1}",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: {0}: {1}"
+},
+"本機使用者通道處理請求失敗": {
+"en": "The local user channel failed to handle a request",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다"
+},
+"本機使用者通道：{0}（只開放使用者層操作，稽核在 {1}）": {
+"en": "Local user channel: {0} (user-level operations only; audit log at {1})",
+"ja": "ローカルユーザーチャネル：{0}（ユーザー層の操作のみ、監査ログは{1}）",
+"ko": "로컬 사용자 채널: {0}(사용자 수준 작업만, 감사 기록은 {1})"
+},
+"本機使用者通道": {
+"en": "Local user channel",
+"ja": "ローカルユーザーチャネル",
+"ko": "로컬 사용자 채널"
+},
+"只開放使用者層操作，稽核在": {
+"en": "user-level operations only; audit log at",
+"ja": "ユーザー層の操作のみ、監査ログは",
+"ko": "사용자 수준 작업만, 감사 기록 위치"
+},
+"互傳完了但存放區掃不到": {
+"en": "Transfer finished but the storage area doesn't show the files",
+"ja": "転送は終わりましたが保存場所に見つかりません",
+"ko": "전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
+},
+"：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器": {
+"en": ": the group only allows transfers within the group, but no reachable machine in the group has this model",
+"ja": "：グループ内の転送しか許可されていませんが、このモデルを持つ接続可能なマシンがグループにありません",
+"ko": ": 그룹 안 전송만 허용되는데, 그룹에 이 모델을 가진 연결 가능한 머신이 없습니다"
+},
+"模型存放位置 ": {
+"en": "Model storage location ",
+"ja": "モデルの保存場所 ",
+"ko": "모델 저장 위치 "
+},
+" 寫不進去：": {
+"en": " can't be written: ",
+"ja": " に書き込めません：",
+"ko": " 에 쓸 수 없습니다: "
+},
+"模型改放 ": {
+"en": "Models moved to ",
+"ja": "モデルの置き場を変更：",
+"ko": "모델 위치 변경: "
+},
+"（群組設定的存放位置）": {
+"en": " (storage location set by the group)",
+"ja": "（グループ設定の保存場所）",
+"ko": " (그룹에서 정한 저장 위치)"
+},
+"換上這顆": {
+"en": "Switch to this model",
+"ja": "このモデルに切り替え",
+"ko": "이 모델로 교체"
+},
+"GiB 的模型": {
+"en": "GiB model",
+"ja": "GiBのモデル",
+"ko": "GiB 모델"
+},
+"推理引擎裝不起來：": {
+"en": "The inference engine won't install: ",
+"ja": "推論エンジンをインストールできません：",
+"ko": "추론 엔진을 설치할 수 없습니다: "
+},
+"這台同時送的份數到上限": {
+"en": "This machine is already sending as many copies as it can",
+"ja": "このマシンの同時送信数が上限です",
+"ko": "이 머신의 동시 전송 수가 한도입니다"
+},
+"份），稍後再試": {
+"en": " copies); try again later",
+"ja": "件）。しばらくしてからもう一度",
+"ko": "개). 잠시 후 다시 시도하세요"
+},
+"：核對 ": {
+"en": ": verifying ",
+"ja": "：照合 ",
+"ko": ": 확인 "
+},
+" 的 SHA-256（之後才能送給同群組的機器）": {
+"en": "'s SHA-256 (needed before it can be sent to machines in the group)",
+"ja": " のSHA-256（照合後にグループ内のマシンへ送れます）",
+"ko": "의 SHA-256(확인해야 그룹 안 머신에 보낼 수 있음)"
+},
+"互傳沒成功": {
+"en": "Transfer failed",
+"ja": "転送に失敗しました",
+"ko": "전송 실패"
+},
+"本機使用者通道開不起來：": {
+"en": "The local user channel can't open: ",
+"ja": "ローカルユーザーチャネルを開けません：",
+"ko": "로컬 사용자 채널을 열 수 없습니다: "
+},
+"本機使用者通道處理請求失敗：": {
+"en": "The local user channel failed to handle a request: ",
+"ja": "ローカルユーザーチャネルが要求を処理できませんでした：",
+"ko": "로컬 사용자 채널이 요청을 처리하지 못했습니다: "
+},
+"本機使用者通道：": {
+"en": "Local user channel: ",
+"ja": "ローカルユーザーチャネル：",
+"ko": "로컬 사용자 채널: "
+},
+"（只開放使用者層操作，稽核在 ": {
+"en": " (user-level operations only; audit log at ",
+"ja": "（ユーザー層の操作のみ、監査ログは ",
+"ko": " (사용자 수준 작업만, 감사 기록 위치 "
+},
+"：互傳完了但存放區掃不到": {
+"en": ": transfer finished but the storage area doesn't show the files",
+"ja": "：転送は終わりましたが保存場所に見つかりません",
+"ko": ": 전송은 끝났지만 저장 위치에서 찾을 수 없습니다"
+},
+"換上這顆 ": {
+"en": "Switch to this model ",
+"ja": "このモデルに切り替え ",
+"ko": "이 모델로 교체 "
+},
+" GiB 的模型": {
+"en": " GiB model",
+"ja": " GiBのモデル",
+"ko": " GiB 모델"
+},
+"這台同時送的份數到上限（": {
+"en": "This machine is already sending as many copies as it can (",
+"ja": "このマシンの同時送信数が上限です（",
+"ko": "이 머신의 동시 전송 수가 한도입니다("
+},
+" 份），稍後再試": {
+"en": " copies); try again later",
+"ja": " 件）。しばらくしてからもう一度",
+"ko": "개). 잠시 후 다시 시도하세요"
+},
+"互傳埠 {0} 開不起來：{1}": {
+"en": "Transfer port {0} can't open: {1}",
+"ja": "転送ポート{0}を開けません：{1}",
+"ko": "전송 포트 {0}을(를) 열 수 없습니다: {1}"
+},
+"互傳埠": {
+"en": "Transfer port",
+"ja": "転送ポート",
+"ko": "전송 포트"
+},
+"開不起來": {
+"en": "can't open",
+"ja": "開けません",
+"ko": "열 수 없음"
+},
+"：跟 ": {
+"en": ": with ",
+"ja": "：相手 ",
+"ko": ": 상대 "
+},
+" 互傳沒成功（": {
+"en": " transfer failed (",
+"ja": " との転送に失敗（",
+"ko": " 와(과)의 전송 실패("
+},
+"打包給同機型的機器時出錯（這台照常能用）：{0}\n": {
+"en": "Error packing for machines of the same model (this machine still works normally): {0}\n",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：{0}\n",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): {0}\n"
+},
+"打包給同機型的機器時出錯（這台照常能用": {
+"en": "Error packing for machines of the same model (this machine still works normally",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능"
+},
+"互傳埠 ": {
+"en": "Transfer port ",
+"ja": "転送ポート ",
+"ko": "전송 포트 "
+},
+" 開不起來：": {
+"en": " can't open: ",
+"ja": " を開けません：",
+"ko": " 을(를) 열 수 없습니다: "
+},
+"打包給同機型的機器時出錯（這台照常能用）：": {
+"en": "Error packing for machines of the same model (this machine still works normally): ",
+"ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：",
+"ko": "같은 기종용 패키지를 만들다 오류(이 머신은 평소대로 사용 가능): "
 }
 }

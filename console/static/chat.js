@@ -12,7 +12,7 @@
    共用的 renderRich、codeBlock、openPreview 在 pages.js。 */
 
 const CHAT2 = { list: null, cur: null, q: "", blob: {}, media: {}, ctx: {}, migrated: false, sideOpen: false, filter: "all", cat: "" };
-const TOOL_LABEL = { list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型",
+const TOOL_LABEL = { current_time: "查時間", calculator: "計算機", list_machines: "列出機器", machine_detail: "看這台的狀態", recommend_models: "查推薦模型", installed_models: "查已下載的模型",
   read_web_page: "讀網頁", web_search: "聯網搜尋", list_files: "列出檔案", read_file: "讀檔", write_file: "寫檔", run_command: "執行指令" };
 const TOOL_KIND_ZH = { file_write: "寫檔", command: "執行指令" };
 const STAR_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 1.8l2.5 5.2 5.7.8-4.1 4 1 5.6L10 14.7l-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/></svg>';

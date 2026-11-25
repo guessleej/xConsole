@@ -5,9 +5,11 @@
 DNS解析一次、檢查每一個位址、再直接連那個位址（不讓第二次解析換成內網，DNS rebinding），轉址每一跳都重新檢查。
 聯網搜尋：管理者在設定填的搜尋端點（SearXNG相容的JSON），沒設就不給模型這個工具。
 """
+import ast
 import http.client
 import ipaddress
 import json
+import math
 import re
 import socket
 import ssl
@@ -74,7 +76,7 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
         self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
-def _open(url, timeout, allow=ip_ok):
+def _connect(url, timeout, allow=ip_ok):
     u = urllib.parse.urlsplit(url)
     if u.scheme not in ("http", "https") or not u.hostname:
         raise FetchError("只能讀http://或https://的網頁")
@@ -87,17 +89,43 @@ def _open(url, timeout, allow=ip_ok):
         raise FetchError("網址的埠不對") from exc
     ip = resolve(u.hostname, port, allow)
     conn = (_PinnedHTTPS if tls else _PinnedHTTP)(u.hostname, ip, port, timeout)
-    path = (u.path or "/") + (f"?{u.query}" if u.query else "")
+    return conn, u.hostname, (u.path or "/") + (f"?{u.query}" if u.query else "")
+
+
+def _open(url, timeout, allow=ip_ok):
+    conn, host, path = _connect(url, timeout, allow)
     try:
         conn.request("GET", path, headers={"User-Agent": UA, "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
                                            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8"})
         return conn, conn.getresponse()
     except ssl.SSLError as exc:
         conn.close()
-        raise FetchError(f"{u.hostname}的憑證驗證不過") from exc
+        raise FetchError(f"{host}的憑證驗證不過") from exc
     except (OSError, http.client.HTTPException) as exc:
         conn.close()
-        raise FetchError(f"連不到{u.hostname}：{type(exc).__name__}") from exc
+        raise FetchError(f"連不到{host}：{type(exc).__name__}") from exc
+
+
+def request_json(method, url, payload=None, headers=None, timeout=20, allow=ip_ok):
+    """推送通知用：送或讀一個JSON。位址檢查、憑證驗證、不跟轉址都跟讀網頁同一套。回 (狀態碼, 解開的JSON或None, 回應前2 KB)。"""
+    conn, host, path = _connect(url, timeout, allow)
+    body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None
+    try:
+        conn.request(method, path, body=body, headers={"User-Agent": UA, "Accept": "application/json",
+                                                       **({"Content-Type": "application/json"} if body is not None else {}), **(headers or {})})
+        r = conn.getresponse()
+        raw = r.read(256 * 1024)
+    except ssl.SSLError as exc:
+        raise FetchError(f"{host}的憑證驗證不過") from exc
+    except (OSError, http.client.HTTPException) as exc:
+        raise FetchError(f"連不到{host}：{type(exc).__name__}") from exc
+    finally:
+        conn.close()
+    try:
+        data = json.loads(raw or b"null")
+    except ValueError:
+        data = None
+    return r.status, data, raw[:2048].decode("utf-8", "replace")
 
 
 class _Text(HTMLParser):
@@ -236,3 +264,54 @@ def search(cfg, query, key="", timeout=20):
         return parse_results(json.loads(raw[:FETCH_MAX]))
     except ValueError as exc:
         raise FetchError("搜尋服務回的不是JSON（SearXNG要開format=json）") from exc
+
+
+# ---------------------------------------------------------------- 計算機（對話與定時任務的工具）
+# 不用 eval：只認數字、四則、次方、取餘數、括號與幾個數學函式；次方與結果都有上限，丟不出算到當機的式子
+_CALC_FN = {"sqrt": math.sqrt, "abs": abs, "round": round, "log": math.log, "log10": math.log10, "exp": math.exp,
+            "sin": math.sin, "cos": math.cos, "tan": math.tan, "floor": math.floor, "ceil": math.ceil, "min": min, "max": max}
+_CALC_CONST = {"pi": math.pi, "e": math.e}
+_CALC_OPS = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b, ast.Mult: lambda a, b: a * b, ast.Div: lambda a, b: a / b,
+             ast.FloorDiv: lambda a, b: a // b, ast.Mod: lambda a, b: a % b, ast.Pow: lambda a, b: a ** b}
+
+
+class CalcError(Exception):
+    pass
+
+
+def calculate(expr):
+    """算一個數學式子，回數字。看不懂或太大的式子丟 CalcError。"""
+    expr = str(expr or "").strip().replace("×", "*").replace("÷", "/").replace("^", "**").replace("，", ",")
+    if not expr or len(expr) > 300:
+        raise CalcError("式子是空的或太長")
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        raise CalcError("看不懂這個式子") from exc
+
+    def ev(n):
+        if isinstance(n, ast.Expression):
+            return ev(n.body)
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)) and not isinstance(n.value, bool):
+            return n.value
+        if isinstance(n, ast.Name) and n.id in _CALC_CONST:
+            return _CALC_CONST[n.id]
+        if isinstance(n, ast.UnaryOp) and isinstance(n.op, (ast.USub, ast.UAdd)):
+            v = ev(n.operand)
+            return -v if isinstance(n.op, ast.USub) else v
+        if isinstance(n, ast.BinOp) and type(n.op) in _CALC_OPS:
+            a, b = ev(n.left), ev(n.right)
+            if isinstance(n.op, ast.Pow) and (abs(b) > 1000 or abs(a) > 1e100):
+                raise CalcError("次方太大")
+            v = _CALC_OPS[type(n.op)](a, b)
+            if isinstance(v, (int, float)) and abs(v) > 1e300:
+                raise CalcError("結果太大")
+            return v
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in _CALC_FN and not n.keywords and len(n.args) <= 4:
+            return _CALC_FN[n.func.id](*[ev(a) for a in n.args])
+        raise CalcError("只能算數字、四則運算、次方與常用數學函式")
+    try:
+        v = ev(tree)
+    except (ZeroDivisionError, ValueError, OverflowError) as exc:
+        raise CalcError(f"算不出來：{type(exc).__name__}") from exc
+    return round(v, 10) if isinstance(v, float) else v

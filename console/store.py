@@ -88,6 +88,10 @@ class Store:
         CREATE INDEX IF NOT EXISTS agent_tasks_user ON agent_tasks(user, created);
         CREATE TABLE IF NOT EXISTS agent_folders(
           node TEXT, folder TEXT, owner TEXT, created REAL, PRIMARY KEY(node, folder));
+        CREATE TABLE IF NOT EXISTS schedules(
+          id TEXT PRIMARY KEY, user TEXT, created REAL, updated REAL, body TEXT);
+        CREATE TABLE IF NOT EXISTS push_channels(
+          id TEXT PRIMARY KEY, user TEXT, created REAL, updated REAL, body TEXT);
         CREATE TABLE IF NOT EXISTS safety_cmds(
           id TEXT PRIMARY KEY, node TEXT, kind TEXT, opts TEXT, state TEXT, created REAL, by TEXT,
           tried REAL, error TEXT, done REAL, result TEXT, closed_by TEXT);
@@ -428,6 +432,8 @@ class Store:
             self.db.execute("DELETE FROM chat_blobs WHERE user=?", (username,))
             self.db.execute("DELETE FROM sessions WHERE user=?", (username,))
             self.db.execute("DELETE FROM agent_tasks WHERE user=?", (username,))
+            self.db.execute("DELETE FROM schedules WHERE user=?", (username,))
+            self.db.execute("DELETE FROM push_channels WHERE user=?", (username,))
         return n > 0
 
     # ---- Agent任務：body是呼叫端tls.seal加密過的enc:v1: 密文（交代的事、計畫、步驟紀錄都是使用者內容），這裡只存不解
@@ -453,6 +459,33 @@ class Store:
     def agent_task_delete(self, tid, user):
         with self.lock:
             return self.db.execute("DELETE FROM agent_tasks WHERE id=? AND user=?", (tid, user)).rowcount > 0
+
+    # ---- 定時任務與推送管道：body是呼叫端tls.seal加密過的enc:v1: 密文（提示詞、結果、令牌、Webhook網址），這裡只存不解
+    def sealed_put(self, table, rid, user, body):
+        if table not in ("schedules", "push_channels"):
+            raise ValueError(table)
+        if not body.startswith("enc:v1:"):
+            raise ValueError("沒有加密，拒絕寫入")
+        now = time.time()
+        with self.lock:
+            self.db.execute(f"INSERT INTO {table}(id,user,created,updated,body) VALUES(?,?,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET body=excluded.body, updated=excluded.updated WHERE user=excluded.user",
+                            (rid, user, now, now, body))
+
+    def sealed_rows(self, table, user=None):
+        if table not in ("schedules", "push_channels"):
+            raise ValueError(table)
+        q, args = f"SELECT id,user,created,updated,body FROM {table}", ()
+        if user is not None:
+            q, args = q + " WHERE user=?", (user,)
+        with self.lock:
+            return [dict(zip(("id", "user", "created", "updated", "body"), r)) for r in self.db.execute(q + " ORDER BY created", args).fetchall()]
+
+    def sealed_delete(self, table, rid, user):
+        if table not in ("schedules", "push_channels"):
+            raise ValueError(table)
+        with self.lock:
+            return self.db.execute(f"DELETE FROM {table} WHERE id=? AND user=?", (rid, user)).rowcount > 0
 
     # ---- Agent 資料夾的擁有者（資料夾本身在代理那台；這裡只記是誰建的）
     def folder_owner(self, node, folder):
