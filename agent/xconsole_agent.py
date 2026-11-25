@@ -537,6 +537,131 @@ def load_and_uptime():
     return load, up
 
 
+_CPU_PREV = {}
+
+
+def _cpu_times():
+    """整機累計的(閒置, 總計)時間；macOS沒有便宜的讀法，回None。"""
+    if OS == "linux":
+        f = (load_text("/proc/stat") or "").split("\n", 1)[0].split()
+        if f[:1] != ["cpu"] or len(f) < 5:
+            return None
+        v = [int(x) for x in f[1:9]]
+        return v[3] + (v[4] if len(v) > 4 else 0), sum(v)
+    if OS == "windows":
+        import ctypes
+        idle, kern, user = ctypes.c_ulonglong(), ctypes.c_ulonglong(), ctypes.c_ulonglong()
+        if not ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kern), ctypes.byref(user)):
+            return None
+        return idle.value, kern.value + user.value      # 核心時間本來就含閒置
+    return None
+
+
+def cpu_usage():
+    """整機CPU使用率（%）。Linux與Windows跟上一次讀到的累計時間相減；第一次沒有前一筆，先隔0.25秒取一次。
+    macOS用ps把各行程的%cpu加總再除以核心數（ps給的是近期的衰減平均，比瞬間值平滑）。"""
+    if OS == "darwin":
+        rc, out, _ = sh(["ps", "-A", "-o", "%cpu="], timeout=5)
+        if rc != 0:
+            return None
+        total = sum(float(x) for x in out.split() if re.fullmatch(r"[\d.]+", x))
+        return round(min(100.0, total / (os.cpu_count() or 1)), 1)
+    t = _cpu_times()
+    if not t:
+        return None
+    prev = _CPU_PREV.get("t")
+    if not prev or t[1] <= prev[1]:
+        time.sleep(0.25)
+        prev, t = t, _cpu_times()
+        if not t or t[1] <= prev[1]:
+            return None
+    _CPU_PREV["t"] = t
+    return round(max(0.0, min(100.0, 100 * (1 - (t[0] - prev[0]) / (t[1] - prev[1])))), 1)
+
+
+# 焊在板上的統一記憶體：型號就決定了記憶體種類，Linux讀不到dmidecode（要root）時照這張表
+SOLDERED_MEM = (("Radeon 8060S", "LPDDR5X"), ("Radeon 8050S", "LPDDR5X"), ("GB10", "LPDDR5X"),
+                ("Thor", "LPDDR5X"), ("Orin", "LPDDR5"))
+SMBIOS_MEM = {20: "DDR", 21: "DDR2", 24: "DDR3", 26: "DDR4", 27: "LPDDR", 28: "LPDDR2", 29: "LPDDR3",
+              30: "LPDDR4", 34: "DDR5", 35: "LPDDR5"}
+_MEM_KIND = {"started": False, "val": None}
+
+
+def _probe_mem_kind():
+    kind, speed = None, None
+    if OS == "darwin":
+        rc, out, _ = sh(["system_profiler", "SPMemoryDataType", "-json"], timeout=20)
+        items = []
+        if rc == 0:
+            try:
+                items = json.loads(out).get("SPMemoryDataType") or []
+            except ValueError:
+                pass
+        for it in items:
+            kind = kind or it.get("dimm_type") or next((d.get("dimm_type") for d in it.get("_items") or [] if d.get("dimm_type")), None)
+    elif OS == "windows":
+        rc, out, _ = sh(["powershell", "-NoProfile", "-Command",
+                         "Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1 SMBIOSMemoryType,ConfiguredClockSpeed | ConvertTo-Json"],
+                        timeout=20)
+        try:
+            d = json.loads(out) if rc == 0 and out.strip() else {}
+        except ValueError:
+            d = {}
+        kind = SMBIOS_MEM.get(int(d.get("SMBIOSMemoryType") or 0))
+        speed = int(d.get("ConfiguredClockSpeed") or 0) or None
+    else:
+        rc, out, _ = sh(["dmidecode", "-t", "17"], timeout=10)
+        if rc == 0:
+            m = re.search(r"^\s*Type:\s*((?:LP)?DDR\d\w*)", out, re.M)
+            kind = m.group(1) if m else None
+            s = re.search(r"Configured Memory Speed:\s*(\d+)\s*MT/s", out)
+            speed = int(s.group(1)) if s else None
+    if not kind:
+        hay = f"{_chip_probe().get('gpu') or ''} {cpu_name()}"
+        kind = next((k for name, k in SOLDERED_MEM if name.lower() in hay.lower()), None)
+    return f"{kind}-{speed}" if kind and speed else kind
+
+
+def mem_kind():
+    """記憶體種類（DDR5-5600、LPDDR5X…）。查法都要跑系統工具、要好幾秒，背景查一次快取起來；查好之前回None。"""
+    if not _MEM_KIND["started"]:
+        _MEM_KIND["started"] = True
+
+        def run():
+            try:
+                _MEM_KIND["val"] = _probe_mem_kind()
+            except Exception:  # noqa: BLE001  # 查不到就不顯示，不影響其他狀態
+                _MEM_KIND["val"] = None
+        threading.Thread(target=run, daemon=True).start()
+    return _MEM_KIND["val"]
+
+
+def live_stats():
+    """監測頁與執行頁每2秒要的數字。只讀：不重算池子、不量速度，比/state輕很多。"""
+    reg = registry()
+    gpus = probe_gpus()
+    ms = mem_stats()
+    slots = []
+    for s in reg["slots"]:
+        if not s.get("unit"):
+            continue
+        state = unit_state(s["unit"])
+        busy = state in ("active", "activating")
+        slots.append({"id": s["id"], "role": s.get("role"), "model": s.get("model"), "state": state, "busy": busy,
+                      "ram_gib": unit_rss_gib(s["unit"]) if busy else 0.0})
+    return {
+        "ts": time.time(),
+        "cpu": {"usage": cpu_usage(), "cores": os.cpu_count(), "name": cpu_name() or None,
+                "load": os.getloadavg()[0] if hasattr(os, "getloadavg") else None},
+        "ram": {"total_gib": round(ms["total"] / GIB, 1), "used_gib": round((ms["total"] - ms["avail"]) / GIB, 1),
+                "kind": mem_kind()},
+        "gpus": [{"id": g.get("id"), "name": g.get("name"), "use": g.get("use"), "temp": g.get("temp"), "power": g.get("power"),
+                  "total_gib": round((g.get("vram_total") or 0) / GIB, 1), "used_gib": round((g.get("vram_used") or 0) / GIB, 1)}
+                 for g in gpus],
+        "slots": slots,
+    }
+
+
 def disk_free(path):
     """(剩餘, 總量) GiB。os.statvfs Windows 沒有，用 shutil.disk_usage。"""
     du = shutil.disk_usage(path)
@@ -5295,7 +5420,8 @@ def full_state():
         "profiles": reg["profiles"],
         "pools": p,
         "cpu": {"load": cpu.get("load"), "cores": cpu.get("cores"),
-                "usage": cpu.get("usage"), "temp": cpu.get("temp")},
+                "usage": cpu.get("usage") if cpu.get("usage") is not None else cpu_usage(), "temp": cpu.get("temp")},
+        "mem_kind": mem_kind(),
         "gpu": {"use": ((hw or {}).get("gpu") or {}).get("use"),
                 "temp": ((hw or {}).get("gpu") or {}).get("temp"),
                 "power": ((hw or {}).get("gpu") or {}).get("power"),
@@ -8904,6 +9030,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(code, body)
         if path == "/counters":
             return self._send(200, counters())
+        if path == "/live":
+            return self._send(200, live_stats())
         m = re.fullmatch(r"/apikey/([\w.-]+)", path)
         if m:
             return self._send(*apikey_info(m.group(1)))

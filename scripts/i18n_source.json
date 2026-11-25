@@ -8,6 +8,10 @@
 "pattern": false
 },
 {
+"zh": "不到 1 tok/s",
+"pattern": false
+},
+{
 "zh": "請先登入",
 "pattern": false
 },
@@ -244,11 +248,23 @@
 "pattern": false
 },
 {
+"zh": "模型載入中",
+"pattern": false
+},
+{
+"zh": "有模型在跑",
+"pattern": false
+},
+{
 "zh": "群組總覽",
 "pattern": false
 },
 {
 "zh": "這台",
+"pattern": false
+},
+{
+"zh": "監測",
 "pattern": false
 },
 {
@@ -8632,10 +8648,6 @@
 "pattern": false
 },
 {
-"zh": "不到 1 tok/s",
-"pattern": false
-},
-{
 "zh": "（依這台實測校正）",
 "pattern": false
 },
@@ -8728,7 +8740,11 @@
 "pattern": false
 },
 {
-"zh": "生成速度",
+"zh": "生成速度・最近一次",
+"pattern": false
+},
+{
+"zh": "生成速度・實測",
 "pattern": false
 },
 {
@@ -8840,15 +8856,35 @@
 "pattern": true
 },
 {
+"zh": "沒有放進這一層",
+"pattern": false
+},
+{
+"zh": "、{0}層專家",
+"pattern": true
+},
+{
+"zh": "層專家",
+"pattern": false
+},
+{
+"zh": "注意力與共用權重{0}放這裡，最快",
+"pattern": true
+},
+{
+"zh": "注意力與共用權重",
+"pattern": false
+},
+{
+"zh": "放這裡，最快",
+"pattern": false
+},
+{
 "zh": "模型層放顯示卡，最快",
 "pattern": false
 },
 {
 "zh": "模型放在這一塊，最快",
-"pattern": false
-},
-{
-"zh": "沒有放進這一層",
 "pattern": false
 },
 {
@@ -8861,6 +8897,18 @@
 },
 {
 "zh": "平常只給引擎用，模型不放這裡",
+"pattern": false
+},
+{
+"zh": "剩下的{0}層專家放這裡，比較慢",
+"pattern": true
+},
+{
+"zh": "剩下的",
+"pattern": false
+},
+{
+"zh": "層專家放這裡，比較慢",
 "pattern": false
 },
 {
@@ -9909,6 +9957,90 @@
 },
 {
 "zh": "個模型可選；點「預設模型」欄就會列出來",
+"pattern": false
+},
+{
+"zh": "{0} 連不上，換一台看。",
+"pattern": true
+},
+{
+"zh": "連不上，換一台看",
+"pattern": false
+},
+{
+"zh": "監測・{0}",
+"pattern": true
+},
+{
+"zh": "每2秒更新一次，只讀系統資訊，不會改這台的任何設定。",
+"pattern": false
+},
+{
+"zh": "模型行程",
+"pattern": false
+},
+{
+"zh": "這台的模型欄位與各自佔用的系統記憶體",
+"pattern": false
+},
+{
+"zh": "其他機器",
+"pattern": false
+},
+{
+"zh": "跟全站一樣每15秒更新；點「看這台」切過去",
+"pattern": false
+},
+{
+"zh": "顯示卡使用率",
+"pattern": false
+},
+{
+"zh": "看這台",
+"pattern": false
+},
+{
+"zh": "{0}個執行緒",
+"pattern": true
+},
+{
+"zh": "個執行緒",
+"pattern": false
+},
+{
+"zh": "一分鐘負載{0}",
+"pattern": true
+},
+{
+"zh": "一分鐘負載",
+"pattern": false
+},
+{
+"zh": "已用{0}%",
+"pattern": true
+},
+{
+"zh": "顯示卡{0}・{1}",
+"pattern": true
+},
+{
+"zh": "使用率讀不到",
+"pattern": false
+},
+{
+"zh": "顯示記憶體{0} / {1} GiB",
+"pattern": true
+},
+{
+"zh": "載入中",
+"pattern": false
+},
+{
+"zh": "沒在跑",
+"pattern": false
+},
+{
+"zh": "這台還沒有模型欄位。",
 "pattern": false
 },
 {

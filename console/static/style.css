@@ -1475,3 +1475,19 @@ h3.sd-sec { margin: 24px 0 10px; font-size: 17px; }
 .comfy-fields textarea { margin-bottom: 2px; }
 .sd-thumb.comfy-thumb-file { width: 64px; height: 64px; font-weight: 700; }
 .sd-media audio { width: 100%; margin: 24px; }
+
+/* 導覽列「執行」旁的小圓點、監測頁 */
+.nav-dot { display: inline-block; margin-left: 6px; vertical-align: middle; }
+.run-dot.busy { background: var(--warn); animation-duration: .9s; }
+.mon-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.mon-card { display: flex; flex-direction: column; gap: 4px; }
+.mon-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mon-head b { overflow-wrap: anywhere; }
+.mon-v { font-size: 22px; font-weight: 700; white-space: nowrap; }
+.mon-v.warn { color: var(--warn-t); }
+.mon-v.bad { color: var(--bad); }
+.plan-bar i.warn { background: var(--warn); }
+.plan-bar i.bad { background: var(--bad); }
+.mon-spark { width: 100%; height: 40px; display: block; }
+.mon-spark polyline { fill: none; stroke: var(--brand); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.mon-sub { min-height: 1.4em; }
