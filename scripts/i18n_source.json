@@ -16044,6 +16044,10 @@
 "pattern": false
 },
 {
+"zh": "xConsole 工作站互傳",
+"pattern": false
+},
+{
 "zh": "啟動中",
 "pattern": false
 },
@@ -16129,6 +16133,10 @@
 },
 {
 "zh": "這台已被管理者停用，請洽IT",
+"pattern": false
+},
+{
+"zh": "沒有位址",
 "pattern": false
 },
 {
@@ -16309,6 +16317,26 @@
 },
 {
 "zh": "收到管理者的安全指令",
+"pattern": false
+},
+{
+"zh": "票證不是給這個檔的",
+"pattern": false
+},
+{
+"zh": "票證過期",
+"pattern": false
+},
+{
+"zh": "{0}：從同群組的 {1} 互傳並核對 SHA-256",
+"pattern": true
+},
+{
+"zh": "從同群組的",
+"pattern": false
+},
+{
+"zh": "互傳並核對 SHA-256",
 "pattern": false
 },
 {
@@ -16968,7 +16996,7 @@
 "pattern": false
 },
 {
-"zh": "同群組互傳與內部鏡像還沒上線，這次從 Hugging Face 取得",
+"zh": "內部鏡像還沒上線，網路來源用這台設定的 Hugging Face 位址",
 "pattern": false
 },
 {
@@ -17016,6 +17044,70 @@
 "pattern": false
 },
 {
+"zh": "票證不對",
+"pattern": false
+},
+{
+"zh": "票證格式不對",
+"pattern": false
+},
+{
+"zh": "票證已經用過",
+"pattern": false
+},
+{
+"zh": "互傳埠的防火牆規則{0}不了（要以系統管理員或 SYSTEM 執行）：{1}",
+"pattern": true
+},
+{
+"zh": "互傳埠的防火牆規則",
+"pattern": false
+},
+{
+"zh": "不了（要以系統管理員或 SYSTEM 執行",
+"pattern": false
+},
+{
+"zh": "互傳安排裡的檔名或 sha256 不對：{0}",
+"pattern": true
+},
+{
+"zh": "互傳安排裡的檔名或 sha256 不對",
+"pattern": false
+},
+{
+"zh": "{0} 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）",
+"pattern": true
+},
+{
+"zh": "的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過",
+"pattern": false
+},
+{
+"zh": "{0}：等同群組的其他機器下載好再互傳",
+"pattern": true
+},
+{
+"zh": "等同群組的其他機器下載好再互傳",
+"pattern": false
+},
+{
+"zh": "{0}：互傳票證快到期，等主控台下一輪",
+"pattern": true
+},
+{
+"zh": "互傳票證快到期，等主控台下一輪",
+"pattern": false
+},
+{
+"zh": "：從同群組的 ",
+"pattern": false
+},
+{
+"zh": " 互傳並核對 SHA-256",
+"pattern": false
+},
+{
 "zh": "放行",
 "pattern": false
 },
@@ -17032,11 +17124,11 @@
 "pattern": false
 },
 {
-"zh": "本機使用者通道開不起來：{0}",
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}",
 "pattern": true
 },
 {
-"zh": "本機使用者通道開不起來",
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱",
 "pattern": false
 },
 {
@@ -18180,6 +18272,14 @@
 "pattern": false
 },
 {
+"zh": "{0}：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器",
+"pattern": true
+},
+{
+"zh": "群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器",
+"pattern": false
+},
+{
 "zh": "：查不到 Hugging Face 上的檔案（",
 "pattern": false
 },
@@ -18260,11 +18360,51 @@
 "pattern": false
 },
 {
+"zh": "不了（要以系統管理員或 SYSTEM 執行）：",
+"pattern": false
+},
+{
+"zh": "埠不對",
+"pattern": false
+},
+{
+"zh": "互傳安排裡的檔名或 sha256 不對：",
+"pattern": false
+},
+{
+"zh": " 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）",
+"pattern": false
+},
+{
+"zh": "{0}：核對 {1} 的 SHA-256（之後才能送給同群組的機器）",
+"pattern": true
+},
+{
+"zh": "的 SHA-256（之後才能送給同群組的機器",
+"pattern": false
+},
+{
+"zh": "：等同群組的其他機器下載好再互傳",
+"pattern": false
+},
+{
+"zh": "：互傳票證快到期，等主控台下一輪",
+"pattern": false
+},
+{
 "zh": "拒絕：不是坐在這台電腦前的人",
 "pattern": false
 },
 {
 "zh": "拒絕：不是使用者層的操作",
+"pattern": false
+},
+{
+"zh": "本機使用者通道開不起來：{0}",
+"pattern": true
+},
+{
+"zh": "本機使用者通道開不起來",
 "pattern": false
 },
 {
@@ -18280,15 +18420,15 @@
 "pattern": false
 },
 {
-"zh": "本機使用者通道開不起來：",
+"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：",
 "pattern": false
 },
 {
-"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：{0}",
+"zh": "本機使用者通道處理請求失敗：{0}: {1}",
 "pattern": true
 },
 {
-"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱",
+"zh": "本機使用者通道處理請求失敗",
 "pattern": false
 },
 {
@@ -19188,6 +19328,18 @@
 "pattern": false
 },
 {
+"zh": "{0}：互傳完了但存放區掃不到",
+"pattern": true
+},
+{
+"zh": "互傳完了但存放區掃不到",
+"pattern": false
+},
+{
+"zh": "：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器",
+"pattern": false
+},
+{
 "zh": " 不在「只准用的模型」清單裡",
 "pattern": false
 },
@@ -19240,6 +19392,54 @@
 "pattern": false
 },
 {
+"zh": "互傳埠只收同一個網段的機器",
+"pattern": false
+},
+{
+"zh": "互傳埠只提供模型檔",
+"pattern": false
+},
+{
+"zh": "這台沒有核對過的這個檔",
+"pattern": false
+},
+{
+"zh": "這台同時送的份數到上限（{0} 份），稍後再試",
+"pattern": true
+},
+{
+"zh": "這台同時送的份數到上限",
+"pattern": false
+},
+{
+"zh": "份），稍後再試",
+"pattern": false
+},
+{
+"zh": "試連的參數不對",
+"pattern": false
+},
+{
+"zh": "：核對 ",
+"pattern": false
+},
+{
+"zh": " 的 SHA-256（之後才能送給同群組的機器）",
+"pattern": false
+},
+{
+"zh": "{0}：跟 {1} 互傳沒成功（{2}）",
+"pattern": true
+},
+{
+"zh": "跟",
+"pattern": false
+},
+{
+"zh": "互傳沒成功",
+"pattern": false
+},
+{
 "zh": "這個通道只給坐在這台電腦前的人用",
 "pattern": false
 },
@@ -19248,7 +19448,11 @@
 "pattern": false
 },
 {
-"zh": "本機使用者通道開不起來（可能有別的程式先占了這個名稱）：",
+"zh": "本機使用者通道開不起來：",
+"pattern": false
+},
+{
+"zh": "本機使用者通道處理請求失敗：",
 "pattern": false
 },
 {
@@ -19780,6 +19984,10 @@
 "pattern": false
 },
 {
+"zh": "：互傳完了但存放區掃不到",
+"pattern": false
+},
+{
 "zh": "：存放區找不到（可能被刪了），下次對齊會重新準備",
 "pattern": false
 },
@@ -19821,6 +20029,38 @@
 },
 {
 "zh": "試過所有位址與代理伺服器",
+"pattern": false
+},
+{
+"zh": "這台同時送的份數到上限（",
+"pattern": false
+},
+{
+"zh": " 份），稍後再試",
+"pattern": false
+},
+{
+"zh": "加",
+"pattern": false
+},
+{
+"zh": "互傳埠 {0} 開不起來：{1}",
+"pattern": true
+},
+{
+"zh": "互傳埠",
+"pattern": false
+},
+{
+"zh": "開不起來",
+"pattern": false
+},
+{
+"zh": "：跟 ",
+"pattern": false
+},
+{
+"zh": " 互傳沒成功（",
 "pattern": false
 },
 {
@@ -20053,6 +20293,22 @@
 },
 {
 "zh": "（試過所有位址與代理伺服器）：",
+"pattern": false
+},
+{
+"zh": "互傳埠 ",
+"pattern": false
+},
+{
+"zh": " 開不起來：",
+"pattern": false
+},
+{
+"zh": "核對通過",
+"pattern": false
+},
+{
+"zh": "跟 Hugging Face 公布的不同，這台不送",
 "pattern": false
 },
 {

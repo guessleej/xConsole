@@ -241,7 +241,7 @@ def member_status(g, online, align, clone=None, rejoin=None, last_seen=None, adm
     if same and st.get("applied", 0) >= v:
         return out("ready", "就緒", f"已套用 v{v}")
     if same and st.get("phase") in ("queued", "preparing", "applying"):
-        run = next((s for s in reversed(st.get("steps") or []) if s.get("state") == "run"), None)
+        run = next((s for s in reversed(st.get("steps") or []) if s.get("state") in ("run", "wait")), None)  # wait：等同群組互傳
         pct = run.get("pct") if run else None
         return out("preparing", "準備中", (run or {}).get("step", "") if pct is None else f"下載 {pct}%", pct)
     if same and st.get("prepared", 0) >= v:

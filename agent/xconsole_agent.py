@@ -17,8 +17,10 @@ import base64
 import functools
 import glob
 import hashlib
+import hmac
 import http.client
 import io
+import ipaddress
 import json
 import math
 import os
@@ -4917,6 +4919,8 @@ def _download_job(jid, dest):
                     raise IOError(f"{os.path.basename(f)} 的 SHA-256 跟 Hugging Face 公布的不同，已刪除，請重新下載")
                 j.setdefault("verified", []).append(os.path.basename(f))
             os.replace(part, out)
+            if want and _under(out, gguf_root()):
+                verified_mark(out, want)                  # 同群組互傳只送核對過的檔
             done_before += sizes[repo, f]
         j["state"] = "done"
     except InterruptedError as exc:
@@ -8882,6 +8886,8 @@ class Handler(BaseHTTPRequestHandler):
             record_model_measure(m.group(1), nm)
             return self._send(200, {"ok": True, "model": nm,
                                     "est": (registry().get("model_est") or {}).get(nm)})
+        if path == "/peer/probe":
+            return self._send(*peer_probe(body))
         if path == "/group/sync":
             return self._send(*group_sync(body))
         m = re.fullmatch(r"/slot/([\w.-]+)/model", path)
@@ -9790,6 +9796,9 @@ def group_sync(body):
     tok = body.get("hf_token")
     if isinstance(tok, str) and len(tok) < 400:
         GROUP_HF["token"] = tok
+    peers = body.get("peers")
+    if isinstance(peers, dict) and len(peers) <= 32:
+        GROUP_PEERS.update(at=time.time(), plans={str(k)[:200]: v for k, v in peers.items() if isinstance(v, dict)})
     with GROUP_LOCK:
         st = group_state()
         st["offset"] = now - time.time()     # 主控台時鐘減本機時鐘（代理重啟後的後備）
@@ -9802,7 +9811,7 @@ def group_sync(body):
             st["steps"] = [{"step": f"收到群組設定 v{v}", "state": "ok", "at": int(time.time())}]
         _gwrite(st)
     GROUP_WAKE.set()
-    return 200, group_public()
+    return 200, {**group_public(), "peer": peer_info(s)}
 
 
 def group_lock(item):
@@ -9846,10 +9855,21 @@ def _group_find(spec):
 
 def _group_fetch(st, spec):
     """存放區沒有就從 Hugging Face 下載（核對 SHA-256），一次一個。回模型，失敗丟例外。"""
+    srcs = set((st.get("settings") or {}).get("sources") or ["huggingface"])
     m = _group_find(spec)
     if m:
         _gstep(st, f"{spec}：存放區已有")
+        if "group" in srcs:
+            _peer_verify_existing(st, spec, m)
         return m
+    if "group" in srcs:
+        if _peer_fetch(st, spec):
+            m = _group_find(spec)
+            if not m:
+                raise RuntimeError(f"{spec}：互傳完了但存放區掃不到")
+            return m
+        if not srcs - {"group"}:
+            raise RuntimeError(f"{spec}：群組只允許同群組互傳，但同群組裡沒有連得到、已經有這顆的機器")
     repo, quant = _group_spec(spec)
     code, info = hf_files(repo, GROUP_HF["token"])
     if code != 200:
@@ -9906,8 +9926,8 @@ def _group_prepare(st, s):
     for k, label in (("gpu_power_limit", "顯卡功耗上限"), ("storage_root", "模型存放位置"), ("reserve_user_gib", "保留給使用者的記憶體")):
         if s.get(k) not in (None, "", 0):
             _gstep(st, f"{label}這一版的代理還不支援，先略過", "skip")
-    if set(s.get("sources") or []) - {"huggingface"}:
-        _gstep(st, "同群組互傳與內部鏡像還沒上線，這次從 Hugging Face 取得", "skip")
+    if "mirror" in (s.get("sources") or []):
+        _gstep(st, "內部鏡像還沒上線，網路來源用這台設定的 Hugging Face 位址", "skip")
     reg = registry()
     slots = _group_slots(reg)
     if len(specs) > len(slots):
@@ -10089,6 +10109,7 @@ def group_tick():
     with GROUP_LOCK:
         st = group_state()
     s, v = st.get("settings"), st.get("version")
+    peer_serve(bool(s) and "group" in (s.get("sources") or []) and not safety_disabled())
     if not s or not v or safety_disabled():         # 停用中：設定先收著，恢復時再準備與套用
         return
     try:
@@ -10115,6 +10136,11 @@ def group_tick():
             _gsave(st)
     except GroupSuperseded:
         GROUP_WAKE.set()                              # 有更新的版本：馬上做新的
+    except PeerWait as exc:
+        if st["steps"] and st["steps"][-1]["state"] == "run":
+            st["steps"].pop()
+        if not st["steps"] or st["steps"][-1]["step"] != str(exc):
+            _gstep(st, str(exc), "wait")             # 還在準備中：主控台下一輪送來新的安排就接著做
     except Exception as exc:  # noqa: BLE001
         st.update(phase="failed", error=str(exc)[:300],
                   nofit={"spec": exc.spec, "slot": exc.slot, "suggest": exc.suggest} if isinstance(exc, GroupNoFit) else None)
@@ -10641,6 +10667,368 @@ def safety_run(body):
     print(f"收到管理者的安全指令：{kind}", flush=True)
     return 200, res
 
+
+# ---- 工作站互傳（清單 #12）
+# 同群組的機器互相傳模型檔，省下對外頻寬。送的那台另開一個只給互傳用的埠：只收同網段、只讀存放區裡核對過 sha256 的檔，
+# 每個請求都要帶主控台發的 60 秒一次性票證（用送方自己的權杖簽，主控台與送方之外沒人簽得出來）。
+# 收的那台續傳、逐檔核對主控台給的 sha256（來自 Hugging Face 公布值，或第一台下載時核對過的值），對不上就丟掉。
+PEER_PORT = int(os.environ.get("XCONSOLE_PEER_PORT") or 9403)
+PEER_MAX = 2                                   # 每台同時最多送給 2 台
+PEER_FW = "xConsole 工作站互傳"
+PEER_TTL = 60
+VERIFIED_FILE = os.path.join(STATE_DIR, "verified-models.json")
+_VERIFIED_LOCK = threading.Lock()
+_PEER_LOCK = threading.Lock()
+_PEER = {"srv": None, "busy": threading.BoundedSemaphore(PEER_MAX), "used": {}, "nets": (0.0, [])}
+GROUP_PEERS = {"at": 0.0, "plans": {}}         # 主控台這一輪給的互傳安排（含一次性票證）：只放記憶體
+
+
+class PeerWait(Exception):
+    """這一輪先不取：等同群組的機器下載好、或等主控台下一輪發新的票證。不算失敗。"""
+
+
+def _rel(path):
+    return os.path.relpath(os.path.realpath(path), os.path.realpath(gguf_root())).replace(os.sep, "/")
+
+
+def peer_rel_ok(rel):
+    """互傳的檔名只能是存放區底下的相對路徑：不能有 ..、絕對路徑或反斜線。回完整路徑或 None。"""
+    rel = str(rel or "")
+    parts = rel.split("/")
+    if not rel or len(rel) > 400 or "\\" in rel or ":" in rel or rel.startswith("/") or ".." in parts or "" in parts \
+            or not rel.endswith(".gguf"):
+        return None
+    root = os.path.realpath(gguf_root())
+    full = os.path.realpath(os.path.join(root, *parts))
+    return full if full.startswith(root + os.sep) else None
+
+
+def verified_mark(path, sha):
+    st = os.stat(path)
+    with _VERIFIED_LOCK:
+        d = load_json(VERIFIED_FILE, {})
+        d[_rel(path)] = {"sha256": sha, "size": st.st_size, "mtime": int(st.st_mtime)}
+        save_json(VERIFIED_FILE, d)
+
+
+def verified_files():
+    """核對過 sha256、之後沒被動過（大小與修改時間都沒變）的模型檔：相對路徑 → {sha256, size}。"""
+    out = {}
+    for rel, v in load_json(VERIFIED_FILE, {}).items():
+        full = peer_rel_ok(rel)
+        try:
+            st = os.stat(full) if full else None
+        except OSError:
+            st = None
+        if st and st.st_size == v.get("size") and int(st.st_mtime) == v.get("mtime"):
+            out[rel] = {"sha256": v["sha256"], "size": v["size"]}
+    return out
+
+
+def _model_files(m):
+    """一顆模型的所有檔（每個分片＋看圖用的 mmproj），相對存放區。不在存放區裡的不算。"""
+    base = os.path.basename(m["path"])[:-5]
+    x = SHARD_RX.search(base)
+    stem = base[:x.start()] if x else base
+    d = m.get("dir") or os.path.dirname(m["path"])
+    try:
+        names = sorted(f for f in os.listdir(d) if f.endswith(".gguf")
+                       and (f[:-5] == stem or (f[:-5].startswith(stem) and SHARD_RX.search(f[:-5]))))
+    except OSError:
+        return []
+    paths = [os.path.join(d, f) for f in names] + ([m["mmproj"]] if m.get("mmproj") else [])
+    root = gguf_root()
+    return [_rel(p) for p in paths if _under(p, root)]
+
+
+def local_nets():
+    """這台所在的網段（含回環）。互傳埠只收這些網段來的連線；一分鐘重查一次（換 Wi-Fi 會變）。"""
+    at, nets = _PEER["nets"]
+    if time.time() - at < 60 and nets:
+        return nets
+    if OS == "linux":
+        _, txt, _ = sh(["ip", "-o", "-f", "inet", "addr", "show"])
+        cidrs = re.findall(r"inet (\d+\.\d+\.\d+\.\d+/\d+)", txt)
+    elif OS == "darwin":
+        _, txt, _ = sh(["ifconfig"])
+        cidrs = [f"{a}/{ipaddress.IPv4Address(int(mask, 16))}"
+                 for a, mask in re.findall(r"inet (\d+\.\d+\.\d+\.\d+) netmask 0x([0-9a-f]{8})", txt)]
+    else:
+        _, txt, _ = sh(["powershell", "-NoProfile", "-Command",
+                        "Get-NetIPAddress -AddressFamily IPv4 | ForEach-Object { $_.IPAddress + '/' + $_.PrefixLength }"])
+        cidrs = re.findall(r"(\d+\.\d+\.\d+\.\d+/\d+)", txt)
+    nets = [ipaddress.ip_network("127.0.0.0/8")]
+    for c in cidrs:
+        try:
+            nets.append(ipaddress.ip_interface(c).network)
+        except ValueError:
+            continue
+    _PEER["nets"] = (time.time(), nets)
+    return nets
+
+
+def peer_addrs():
+    """給主控台排程用：這台在各網段的位址（不含回環）。"""
+    if OS == "linux":
+        _, txt, _ = sh(["ip", "-o", "-f", "inet", "addr", "show"])
+        found = re.findall(r"inet (\d+\.\d+\.\d+\.\d+)/", txt)
+    elif OS == "darwin":
+        _, txt, _ = sh(["ifconfig"])
+        found = re.findall(r"inet (\d+\.\d+\.\d+\.\d+) netmask", txt)
+    else:
+        found = [_local_ip()]
+    return [a for a in dict.fromkeys(found) if not a.startswith("127.")][:8]
+
+
+def peer_client_ok(ip):
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(a in n for n in local_nets())
+
+
+def peer_ticket_ok(ticket, rel):
+    """主控台發的票證：本文（一次性編號、檔名、到期時間、收方）＋用這台權杖簽的 HMAC。回空字串＝可以。"""
+    try:
+        body, sig = str(ticket).rsplit(".", 1)
+        want = hmac.new(TOKEN.encode(), body.encode(), hashlib.sha256).hexdigest()
+        if not secrets.compare_digest(sig, want):
+            return "票證不對"
+        t = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    except (ValueError, TypeError):
+        return "票證格式不對"
+    now = time.time() + (group_state().get("offset") or 0)      # 到期時間是主控台的時鐘
+    if t.get("f") != rel:
+        return "票證不是給這個檔的"
+    if not isinstance(t.get("x"), (int, float)) or now > t["x"]:
+        return "票證過期"
+    with _PEER_LOCK:
+        _PEER["used"] = {k: v for k, v in _PEER["used"].items() if v > now}
+        if t.get("n") in _PEER["used"]:
+            return "票證已經用過"
+        _PEER["used"][t.get("n")] = t["x"] + 5
+    return ""
+
+
+class PeerHandler(BaseHTTPRequestHandler):
+    server_version = "xconsole-peer"
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def _send(self, code, obj):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):  # noqa: N802
+        if not peer_client_ok(self.client_address[0]):
+            return self._send(403, {"error": "互傳埠只收同一個網段的機器"})
+        path = urllib.parse.unquote(self.path.split("?")[0])
+        if path == "/peer/ping":
+            return self._send(200, {"ok": True, "service": "xconsole-peer"})
+        if not path.startswith("/peer/file/"):
+            return self._send(404, {"error": "互傳埠只提供模型檔"})
+        rel = path[len("/peer/file/"):]
+        why = peer_ticket_ok(self.headers.get("X-Peer-Ticket", ""), rel)
+        if why:
+            return self._send(403, {"error": why, "ticket": True})
+        full = peer_rel_ok(rel)
+        if not full or rel not in verified_files():
+            return self._send(404, {"error": "這台沒有核對過的這個檔"})
+        if not _PEER["busy"].acquire(blocking=False):
+            return self._send(503, {"error": f"這台同時送的份數到上限（{PEER_MAX} 份），稍後再試"})
+        try:
+            size = os.path.getsize(full)
+            m = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range", ""))
+            start = int(m.group(1)) if m and int(m.group(1)) < size else 0
+            self.send_response(206 if start else 200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(size - start))
+            if start:
+                self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
+            self.end_headers()
+            with open(full, "rb") as fh:
+                fh.seek(start)
+                while chunk := fh.read(4 * 1024 * 1024):
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            _PEER["busy"].release()
+        return None
+
+
+def peer_firewall(on):
+    """Windows：防火牆規則只收本機網段（所有網路設定檔，含公用網路）；群組關掉互傳就移除。其他系統由代理自己擋網段。"""
+    if OS != "windows":
+        return
+    cmd = (f"Get-NetFirewallRule -DisplayName '{PEER_FW}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule; "
+           + (f"New-NetFirewallRule -DisplayName '{PEER_FW}' -Direction Inbound -Protocol TCP -LocalPort {PEER_PORT} "
+              "-RemoteAddress LocalSubnet -Action Allow -Profile Any | Out-Null" if on else ""))
+    rc, _, err = sh(["powershell", "-NoProfile", "-Command", cmd], timeout=60)
+    if rc != 0:
+        print(f"互傳埠的防火牆規則{'加' if on else '移除'}不了（要以系統管理員或 SYSTEM 執行）：{err[:160]}", flush=True)
+
+
+def peer_serve(on):
+    """群組有開「同群組互傳」才聽互傳埠；關掉就停掉並移除防火牆規則。"""
+    with _PEER_LOCK:
+        srv = _PEER["srv"]
+        if on and not srv:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            ctx.load_cert_chain(CERT_FILE, KEY_FILE)
+            try:
+                srv = AgentTLSServer(("0.0.0.0", PEER_PORT), PeerHandler)
+            except OSError as exc:
+                print(f"互傳埠 {PEER_PORT} 開不起來：{exc}", flush=True)
+                return
+            srv.ctx = ctx
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            _PEER["srv"] = srv
+            peer_firewall(True)
+        elif not on and srv:
+            srv.shutdown()
+            srv.server_close()
+            _PEER["srv"] = None
+            peer_firewall(False)
+
+
+def peer_info(s):
+    """回給主控台排程：這台聽不聽互傳埠、在哪些位址、憑證，以及群組要的模型裡哪幾顆已經核對過、可以送。"""
+    have, specs = verified_files(), {}
+    for spec in (s or {}).get("models") or []:
+        m = _group_find(spec) if spec != "auto" else None
+        files = _model_files(m) if m else []
+        if files and all(r in have for r in files):
+            specs[spec] = [{"rel": r, **have[r]} for r in files]
+    try:
+        with open(CERT_FILE, encoding="utf-8") as fh:
+            cert = fh.read()
+    except OSError:
+        cert = ""                                  # 還沒有代理憑證：互傳埠也開不起來，只回報這台有哪些檔
+    return {"port": PEER_PORT, "listening": bool(_PEER["srv"]) and bool(cert), "addrs": peer_addrs(), "cert": cert,
+            "specs": specs}
+
+
+def _peer_ctx(cert):
+    ctx = ssl.create_default_context(cadata=cert)       # 信任依據只有主控台轉來的那台代理憑證，主機名稱照樣核對
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
+def peer_probe(body):
+    """主控台排程前請收方試連送方：每個位址試一次互傳埠，回第一個連得上的。"""
+    try:
+        port = int(body.get("port"))
+        addrs = [str(a) for a in body.get("addrs") or []][:8]
+        ctx = _peer_ctx(str(body.get("cert") or ""))
+    except (TypeError, ValueError, ssl.SSLError):
+        return 400, {"error": "試連的參數不對"}
+    if not 0 < port < 65536:
+        return 400, {"error": "埠不對"}
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
+    why = "沒有位址"
+    for a in addrs:
+        try:
+            ip = ipaddress.ip_address(a)
+        except ValueError:
+            continue
+        if not (ip.is_private or ip.is_loopback) or ip.version != 4:
+            continue
+        t0 = time.time()
+        try:
+            with op.open(f"https://{ip}:{port}/peer/ping", timeout=5) as r:
+                if r.status == 200:
+                    return 200, {"ok": True, "addr": str(ip), "ms": int((time.time() - t0) * 1000)}
+        except Exception as exc:  # noqa: BLE001
+            why = str(exc)[:160]
+    return 200, {"ok": False, "error": why}
+
+
+def _peer_get(off, f):
+    """跟送方拿一個檔：續傳、核對 sha256、核對過才改名並記下。票證被拒（過期、用過）丟 PeerWait，等下一輪的新票證。"""
+    rel, want = str(f.get("rel") or ""), str(f.get("sha256") or "")
+    dest = peer_rel_ok(rel)
+    if not dest or not re.fullmatch(r"[0-9a-f]{64}", want):
+        raise ValueError(f"互傳安排裡的檔名或 sha256 不對：{rel[:80]}")
+    if verified_files().get(rel, {}).get("sha256") == want:
+        return
+    ip = ipaddress.ip_address(str(off.get("addr")))
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    part = dest + ".part"
+    have = os.path.getsize(part) if os.path.exists(part) else 0
+    req = urllib.request.Request(f"https://{ip}:{int(off['port'])}/peer/file/{urllib.parse.quote(rel)}",
+                                 headers={"X-Peer-Ticket": str(f.get("ticket") or ""), **({"Range": f"bytes={have}-"} if have else {})})
+    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=_peer_ctx(off["cert"])))
+    try:
+        resp = op.open(req, timeout=60)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403, 503):
+            raise PeerWait(f"{off.get('name') or ip}：{(json.loads(exc.read() or b'{}') or {}).get('error') or exc.code}") from exc
+        raise
+    with resp, open(part, "ab" if have and resp.status == 206 else "wb") as fh:
+        while chunk := resp.read(8 * 1024 * 1024):
+            fh.write(chunk)
+    got = _sha256_file(part)
+    if not secrets.compare_digest(got, want):
+        os.remove(part)
+        raise OSError(f"{os.path.basename(rel)} 的 SHA-256 跟主控台給的不同，已刪除（送的那台的檔可能壞了或被改過）")
+    os.replace(part, dest)
+    verified_mark(dest, got)
+
+
+def _peer_verify_existing(st, spec, m):
+    """存放區早就有、還沒核對過的檔（舊版代理下載的）：跟 Hugging Face 公布的 sha256 核對一次，對得上才拿來送給別台。"""
+    have = verified_files()
+    todo = [r for r in _model_files(m) if r not in have]
+    if not todo:
+        return
+    try:
+        shas = _hf_shas(_group_spec(spec)[0], GROUP_HF["token"])
+    except Exception:  # noqa: BLE001
+        return                                    # 連不到 Hugging Face：這台先不送，不影響它自己用
+    for rel in todo:
+        want = next((v for k, v in shas.items() if k.rsplit("/", 1)[-1] == rel.rsplit("/", 1)[-1]), None)
+        full = peer_rel_ok(rel)
+        if want and full:
+            _gstep(st, f"{spec}：核對 {os.path.basename(rel)} 的 SHA-256（之後才能送給同群組的機器）", "run")
+            ok = secrets.compare_digest(_sha256_file(full), want)
+            if ok:
+                verified_mark(full, want)
+            _gstep(st, f"{spec}：{os.path.basename(rel)} {'核對通過' if ok else '跟 Hugging Face 公布的不同，這台不送'}",
+                   "ok" if ok else "skip")
+
+
+def _peer_fetch(st, spec):
+    """照主控台這一輪的安排跟同群組的機器拿。拿到回 True；這輪先等回 PeerWait；連不上或檔不對回 False（改走其他來源）。"""
+    plan = GROUP_PEERS["plans"].get(spec) or {}
+    if plan.get("wait"):
+        raise PeerWait(f"{spec}：等同群組的其他機器下載好再互傳")
+    if not plan.get("offers"):
+        return False
+    if time.time() - GROUP_PEERS["at"] > PEER_TTL - 10:
+        raise PeerWait(f"{spec}：互傳票證快到期，等主控台下一輪")
+    for off in plan["offers"]:
+        text = f"{spec}：從同群組的 {off.get('name') or off.get('addr')} 互傳並核對 SHA-256"
+        _gstep(st, text, "run")
+        try:
+            for f in off.get("files") or []:
+                _peer_get(off, f)
+            _gstep(st, text)
+            return True
+        except PeerWait:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            _gstep(st, f"{spec}：跟 {off.get('name') or off.get('addr')} 互傳沒成功（{str(exc)[:120]}）", "skip")
+    return False
 
 # ---- 本機使用者通道（清單 #28）
 # 受管的機器上，坐在電腦前的學生或員工經這個通道跟系統代理說話：只開放使用者層的操作，不看權杖，

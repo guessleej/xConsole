@@ -56,6 +56,8 @@ jobs:
         run: python console/test_console_id.py
       - name: 本機使用者通道（Linux與macOS的Unix socket、Windows的具名管道與ACL）
         run: python agent/test_user_channel.py
+      - name: 工作站互傳（三種系統的網段判斷與互傳埠）
+        run: python agent/test_peer.py
       - name: Windows工作站執行環境包（檢查、上傳、從GitHub下載核對sha256、加入碼才拿得到、腳本寫死sha256）
         run: python console/test_winrt.py
       - name: 推薦清單
