@@ -18,7 +18,6 @@ import json
 import os
 import re
 import secrets
-import select
 import shutil
 import socket
 import ssl
@@ -582,31 +581,29 @@ def e2e():
         time.sleep(4)                         # 全部都在主控台那邊掛著
         early = len(results)
         # 這時同一個來源再開沒登入的連線：前 64 條收、第 65 條被關
-        anon = []
-        opened = time.time()
-        for _ in range(70):
-            anon.append(socket.create_connection(("127.0.0.1", lport), timeout=5))
-        time.sleep(1)
-        for s in anon:
+        # 沒登入的連線做完TLS握手就不送請求，佔著位子：被擋的主控台一接受就關，握手會失敗。
+        # 用握手成敗判斷，不靠「幾秒內有沒有被關」：慢的機器上主控台接受排隊的連線要好幾秒
+        anon, shut = [], []
+
+        def squat():
+            s = None
             try:
-                s.send(b"\x16")             # 像 TLS 握手的第一個位元組
+                s = socket.create_connection(("127.0.0.1", lport), timeout=60)
+                tls = ctx.wrap_socket(s, server_hostname="127.0.0.1")
             except OSError:
-                pass
-        # 被擋的那幾條主控台一接受就關掉，慢的機器要等它把排隊的連線接受完；
-        # 沒被擋的要等握手逾時15秒才關，所以只在12秒內收：收到6條就再看半秒有沒有多擋
-        closed = set()
-        extra = 0.0
-        while time.time() - opened < 12 and (len(closed) < 6 or extra < 0.5):
-            rd, _, _ = select.select([s for s in anon if s not in closed], [], [], 0.25)
-            if len(closed) >= 6:
-                extra += 0.25
-            for s in rd:
-                try:
-                    if s.recv(1) == b"":
-                        closed.add(s)
-                except OSError:
-                    closed.add(s)
-        refused = len(closed)
+                if s is not None:
+                    s.close()
+                with lock:
+                    shut.append(1)
+                return
+            with lock:
+                anon.append(tls)
+        sq = [threading.Thread(target=squat) for _ in range(70)]
+        for th in sq:
+            th.start()
+        for th in sq:
+            th.join(90)
+        refused = len(shut)
         for s in anon:
             s.close()
         for th in ths:
