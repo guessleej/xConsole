@@ -283,10 +283,6 @@ jobs:
           # 自建 runner 同一台還有別的工作與服務：主控台與連回通道用系統給的空埠，不固定占 9400／9402
           read -r XC_PORT XC_LINK < <(python -c 'import socket;s=[socket.socket() for _ in (0,1)];[x.bind(("127.0.0.1",0)) for x in s];print(*[x.getsockname()[1] for x in s])')
           echo "XC_PORT=$XC_PORT" >> "$GITHUB_ENV"
-          # rootless Docker：ZAP 容器裡的 localhost 不是主機，主機的 localhost 要走 10.0.2.2。
-          # 直接問 daemon 是不是 rootless（不論是靠 DOCKER_HOST 還是 docker context 選到的都抓得到）
-          if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q rootless; then
-            echo "ZAP_HOST=10.0.2.2"; else echo "ZAP_HOST=localhost"; fi >> "$GITHUB_ENV"
           export XCONSOLE_PORT="$XC_PORT" XCONSOLE_LINK_PORT="$XC_LINK"
           printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
             | python console/xconsole_server.py --set-credentials
@@ -297,6 +293,21 @@ jobs:
         run: |
           docker ps -aq --no-trunc --filter ancestor=ghcr.io/zaproxy/zaproxy:stable | sort > "$RUNNER_TEMP/zap-before"
           docker image inspect -f '{{.Id}}' ghcr.io/zaproxy/zaproxy:stable > "$RUNNER_TEMP/zap-image-before" 2>/dev/null || true
+      # ZAP action用--network host起容器。rootless Docker的host網路有兩種：rootlesskit開了detach-netns
+      # （rootlesskit 3的預設）就是主機本身，localhost直通；沒開時是rootlesskit自己的網路命名空間，主機的localhost要走10.0.2.2。
+      # 用同一個映像、同樣的網路模式實際連一次，連得到哪個就掃哪個
+      - name: 找出ZAP容器連得到主控台的位址
+        run: |
+          for h in localhost 10.0.2.2; do
+            if docker run --rm --network host --entrypoint python3 ghcr.io/zaproxy/zaproxy:stable \
+                 -c 'import socket,sys;socket.create_connection((sys.argv[1],int(sys.argv[2])),10).close()' "$h" "$XC_PORT"; then
+              echo "ZAP_HOST=$h" >> "$GITHUB_ENV"
+              echo "ZAP容器經$h連到主控台"
+              exit 0
+            fi
+          done
+          echo "::error::ZAP容器用localhost與10.0.2.2都連不到主控台（埠$XC_PORT）"
+          exit 1
       - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: https://${{ env.ZAP_HOST }}:${{ env.XC_PORT }}

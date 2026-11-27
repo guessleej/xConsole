@@ -554,7 +554,7 @@ def e2e():
         call("/api/nodes/cl-01/clone-clear", {})
 
         # ---- 三、連線上限
-        held, results, lock = [], [], threading.Lock()
+        held, results, done, lock = [], [], {}, threading.Lock()
         lv = json.load(open(alink))["v"]      # 跟真的代理一樣回報手上的通道設定版本：版本對了才會掛著等
 
         def hold(n):
@@ -570,6 +570,7 @@ def e2e():
                 body = json.loads(r.read())
                 with lock:
                     results.append((r.status, body.get("cmds")))
+                    done[n["id"]] = time.time()
             except Exception as exc:  # noqa: BLE001
                 with lock:
                     results.append((0, str(exc)))
@@ -582,23 +583,30 @@ def e2e():
         early = len(results)
         # 這時同一個來源再開沒登入的連線：前 64 條收、第 65 條被關
         anon = []
-        refused = 0
+        opened = time.time()
         for _ in range(70):
             anon.append(socket.create_connection(("127.0.0.1", lport), timeout=5))
         time.sleep(1)
-        # 被擋的那幾條主控台一接受就關掉：一起看哪些已經被關（逐條等會等到握手逾時 15 秒，沒被擋的也會被關）
         for s in anon:
             try:
                 s.send(b"\x16")             # 像 TLS 握手的第一個位元組
             except OSError:
                 pass
-        rd, _, _ = select.select(anon, [], [], 1)
-        for s in rd:
-            try:
-                if s.recv(1) == b"":
-                    refused += 1
-            except OSError:
-                refused += 1
+        # 被擋的那幾條主控台一接受就關掉，慢的機器要等它把排隊的連線接受完；
+        # 沒被擋的要等握手逾時15秒才關，所以只在12秒內收：收到6條就再看半秒有沒有多擋
+        closed = set()
+        extra = 0.0
+        while time.time() - opened < 12 and (len(closed) < 6 or extra < 0.5):
+            rd, _, _ = select.select([s for s in anon if s not in closed], [], [], 0.25)
+            if len(closed) >= 6:
+                extra += 0.25
+            for s in rd:
+                try:
+                    if s.recv(1) == b"":
+                        closed.add(s)
+                except OSError:
+                    closed.add(s)
+        refused = len(closed)
         for s in anon:
             s.close()
         for th in ths:
@@ -615,9 +623,13 @@ def e2e():
             if "ws-01" not in w["waiting"]:
                 break
             time.sleep(0.25)
+        # 假的那200台只輪詢一次，輪詢結束後ONLINE_GRACE秒內還算在線；慢的機器上前面的步驟拖得久，
+        # 照每台實際輪詢結束的時間算出一定還在線的（留5秒誤差），這些都要列在等待名單裡
+        cutoff = time.time() - (agentlink.ONLINE_GRACE - 5)
+        must = {i for i, t in done.items() if t > cutoff}
         check("在線的機器還沒收到新的通道憑證：不換上，設定頁列出還在等哪幾台；不能再按一次",
-              code == 200 and w["rotating"] and len(w["waiting"]) >= 190 and "ws-01" not in w["waiting"]
-              and code2 == 409, (out.get("message"), out2.get("message"), len(w["waiting"]), w["waiting"][:3]))
+              code == 200 and w["rotating"] and must and must <= set(w["waiting"]) and "ws-01" not in w["waiting"]
+              and code2 == 409, (out.get("message"), out2.get("message"), len(must), len(w["waiting"]), sorted(must - set(w["waiting"]))[:3]))
         for c in held:
             c.close()
     finally:

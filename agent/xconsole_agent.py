@@ -11611,6 +11611,7 @@ def _peer_fetch(st, spec):
 # 換模型、改設定、解除群組鎖定一律只走主控台通道
 USER_GET = re.compile(r"/healthz|/|/state|/group/state|/library|/apiinfo/[\w.-]+/brief")
 USER_POST = re.compile(r"/chat/[\w.-]+")
+USER_DRAIN_MAX = 1024 * 1024     # 拒絕前最多讀掉這麼多本文，超過的直接關
 # SYSTEM 與系統管理員全權；互動式登入的使用者（坐在電腦前或遠端桌面）可讀寫；網路上來的連線另由 PIPE_REJECT_REMOTE_CLIENTS 擋
 USER_PIPE_SDDL = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)"
 USER_LOG = os.path.join(STATE_DIR, "user-channel.log")
@@ -11670,15 +11671,25 @@ class UserHandler(Handler):
         # /healthz 不帶任何資料：誰都問得到，桌面版才認得出這台是受管的，連上了再由身分決定給不給用
         if path != "/healthz" and not self.allowed:
             user_audit(self.who, method, path, "拒絕：不是坐在這台電腦前的人")
-            self._send(403, {"error": "這個通道只給坐在這台電腦前的人用"})
+            self._refuse({"error": "這個通道只給坐在這台電腦前的人用"})
             return False
         if not (USER_GET if method == "GET" else USER_POST).fullmatch(path):
             user_audit(self.who, method, path, "拒絕：不是使用者層的操作")
-            self._send(403, {"error": "這台由學校或公司統一管理：這裡只能看狀態、對話、看已安裝的模型；"
-                                     "換模型、改設定要請管理者在主控台做", "managed": True})
+            self._refuse({"error": "這台由學校或公司統一管理：這裡只能看狀態、對話、看已安裝的模型；"
+                                   "換模型、改設定要請管理者在主控台做", "managed": True})
             return False
         user_audit(self.who, method, path, "放行")
         return True
+
+    def _refuse(self, obj):
+        # 先讀掉本文再回：回完就關，對方的本文若還沒送完會收到Broken pipe，看不到拒絕的原因
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if 0 < n <= USER_DRAIN_MAX:
+            self.rfile.read(n)
+        self._send(403, obj)
 
     def do_GET(self):  # noqa: N802
         if self._gate("GET"):
