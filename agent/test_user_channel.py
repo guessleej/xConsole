@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 os.environ["XCONSOLE_HOME"] = tempfile.mkdtemp(prefix="xc-uch-")
@@ -71,6 +72,24 @@ for method, path in (("POST", "/slot/main/model"), ("POST", "/library/delete"), 
                      ("GET", "/apikey/main"), ("POST", "/group/sync"), ("POST", "/agent/exec"), ("GET", "/logs/main")):
     st, out = call(method, path)
     case(f"  {method} {path}：拒絕，講明要請管理者", st == 403 and out.get("managed") and "管理者" in out.get("error", ""), (st, out))
+
+body = json.dumps({"engine": "llama", "model": "x/y"}).encode()
+c = userchan.Conn(WHERE, ME, 10)
+try:
+    c.putrequest("POST", "/slot/main/model")
+    c.putheader("Content-Type", "application/json")
+    c.putheader("Content-Length", str(len(body)))
+    c.putheader("Connection", "close")
+    c.endheaders()
+    time.sleep(1)
+    c.send(body)
+    r = c.getresponse()
+    late = (r.status, json.loads(r.read() or b"{}"))
+except OSError as exc:
+    late = (0, repr(exc))
+finally:
+    c.close()
+case("  本文晚一秒才送到：照樣收到拒絕與原因，不是Broken pipe", late[0] == 403 and late[1].get("managed"), late)
 
 log = audit()
 case("每筆寫稽核：誰、做什麼、放行或拒絕", log and all(x["who"] and x["path"] and x["verdict"] for x in log)

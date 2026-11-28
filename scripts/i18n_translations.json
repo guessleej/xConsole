@@ -28128,5 +28128,170 @@
 "en": "Error packaging for machines of the same type (this machine still works normally): ",
 "ja": "同じ機種向けのパッケージ作成でエラー（このマシンは通常どおり使えます）：",
 "ko": "같은 기종용 패키지를 만드는 중 오류(이 머신은 정상 사용 가능): "
+},
+"模型載入中": {
+"en": "Model loading",
+"ja": "モデル読み込み中",
+"ko": "모델 로딩 중"
+},
+"有模型在跑": {
+"en": "A model is running",
+"ja": "モデル実行中",
+"ko": "모델 실행 중"
+},
+"監測": {
+"en": "Monitor",
+"ja": "モニター",
+"ko": "모니터"
+},
+"生成速度・最近一次": {
+"en": "Generation speed · latest",
+"ja": "生成速度・直近",
+"ko": "생성 속도 · 최근"
+},
+"生成速度・實測": {
+"en": "Generation speed · measured",
+"ja": "生成速度・実測",
+"ko": "생성 속도 · 실측"
+},
+"層專家": {
+"en": " expert layers",
+"ja": "層のエキスパート",
+"ko": "개 레이어 전문가"
+},
+"注意力與共用權重": {
+"en": "Attention and shared weights",
+"ja": "アテンションと共有重み",
+"ko": "어텐션과 공유 가중치"
+},
+"放這裡，最快": {
+"en": " go here, fastest",
+"ja": "をここに配置（最速）",
+"ko": "여기에 배치, 가장 빠름"
+},
+"剩下的": {
+"en": "The remaining ",
+"ja": "残りの",
+"ko": "나머지 "
+},
+"層專家放這裡，比較慢": {
+"en": " expert layers go here, slower",
+"ja": "層のエキスパートをここに配置（遅め）",
+"ko": "개 레이어 전문가를 여기에 배치, 느림"
+},
+"注意力與共用權重{0}放這裡，最快": {
+"en": "Attention and shared weights{0} go here, fastest",
+"ja": "アテンションと共有重み{0}をここに配置（最速）",
+"ko": "어텐션과 공유 가중치{0}를 여기에 배치, 가장 빠름"
+},
+"、{0}層專家": {
+"en": ", {0} expert layers",
+"ja": "、{0}層のエキスパート",
+"ko": ", 전문가 레이어 {0}개"
+},
+"剩下的{0}層專家放這裡，比較慢": {
+"en": "The remaining {0} expert layers go here, slower",
+"ja": "残り{0}層のエキスパートをここに配置（遅め）",
+"ko": "나머지 전문가 레이어 {0}개를 여기에 배치, 느림"
+},
+"監測・{0}": {
+"en": "Monitor · {0}",
+"ja": "モニター・{0}",
+"ko": "모니터 · {0}"
+},
+"連不上，換一台看": {
+"en": " is unreachable. Pick another machine",
+"ja": "に接続できません。別のマシンを選んでください",
+"ko": "에 연결할 수 없습니다. 다른 머신을 선택하세요"
+},
+"每2秒更新一次，只讀系統資訊，不會改這台的任何設定。": {
+"en": "Updates every 2 seconds. Read-only system info; nothing on this machine is changed.",
+"ja": "2秒ごとに更新。システム情報を読むだけで、このマシンの設定は変更しません。",
+"ko": "2초마다 갱신됩니다. 시스템 정보만 읽으며 이 머신의 설정은 바꾸지 않습니다."
+},
+"模型行程": {
+"en": "Model processes",
+"ja": "モデルのプロセス",
+"ko": "모델 프로세스"
+},
+"這台的模型欄位與各自佔用的系統記憶體": {
+"en": "Model slots on this machine and the system memory each uses",
+"ja": "このマシンのモデルスロットと各システムメモリ使用量",
+"ko": "이 머신의 모델 슬롯과 각각 사용하는 시스템 메모리"
+},
+"其他機器": {
+"en": "Other machines",
+"ja": "ほかのマシン",
+"ko": "다른 머신"
+},
+"跟全站一樣每15秒更新；點「看這台」切過去": {
+"en": "Updates every 15 seconds like the rest of the console; click “View” to switch",
+"ja": "コンソール全体と同じく15秒ごとに更新。「表示」で切り替え",
+"ko": "콘솔 전체와 같이 15초마다 갱신; '보기'를 눌러 전환"
+},
+"顯示卡使用率": {
+"en": "GPU usage",
+"ja": "GPU使用率",
+"ko": "GPU 사용률"
+},
+"看這台": {
+"en": "View",
+"ja": "表示",
+"ko": "보기"
+},
+"個執行緒": {
+"en": " threads",
+"ja": "スレッド",
+"ko": "개 스레드"
+},
+"{0}個執行緒": {
+"en": "{0} threads",
+"ja": "{0}スレッド",
+"ko": "{0}개 스레드"
+},
+"一分鐘負載": {
+"en": "1-min load ",
+"ja": "1分間の負荷",
+"ko": "1분 부하 "
+},
+"一分鐘負載{0}": {
+"en": "1-min load {0}",
+"ja": "1分間の負荷{0}",
+"ko": "1분 부하 {0}"
+},
+"已用{0}%": {
+"en": "{0}% used",
+"ja": "使用率{0}%",
+"ko": "{0}% 사용"
+},
+"顯示卡{0}・{1}": {
+"en": "GPU {0} · {1}",
+"ja": "GPU{0}・{1}",
+"ko": "GPU {0} · {1}"
+},
+"顯示記憶體{0} / {1} GiB": {
+"en": "VRAM {0} / {1} GiB",
+"ja": "VRAM {0} / {1} GiB",
+"ko": "VRAM {0} / {1} GiB"
+},
+"使用率讀不到": {
+"en": "Usage unavailable",
+"ja": "使用率を取得できません",
+"ko": "사용률을 읽을 수 없음"
+},
+"載入中": {
+"en": "Loading",
+"ja": "読み込み中",
+"ko": "로딩 중"
+},
+"沒在跑": {
+"en": "Not running",
+"ja": "停止中",
+"ko": "실행 안 함"
+},
+"這台還沒有模型欄位。": {
+"en": "No model slots on this machine yet.",
+"ja": "このマシンにはまだモデルスロットがありません。",
+"ko": "이 머신에는 아직 모델 슬롯이 없습니다."
 }
 }

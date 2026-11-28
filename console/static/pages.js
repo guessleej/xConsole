@@ -77,6 +77,7 @@ function topOf(v) {
   if (v === "models" || v === "lib" || v.startsWith("lib:")) return "models";
   if (v === "run" || v === "apis" || v.startsWith("api:") || v.startsWith("node:")) return "run";
   if (v === "chat" || v === "assist") return "chat";
+  if (v === "monitor") return "home";
   if (v === "logs") return "settings";
   return v;
 }
@@ -271,11 +272,13 @@ function statusBar(n, s) {
   const pool = n.state.pools?.unified || n.state.pools?.vram;
   const ram = n.state.pools?.ram;
   const stats = el("div", "sb-stats");
-  const stat = (k, v) => { const d = el("div"); d.append(el("span", "k", k), el("b", "mono", v)); stats.appendChild(d); };
+  const stat = (key, k, v) => { const d = el("div"); d.dataset.k = key; d.append(el("span", "k", k), el("b", "mono", v)); stats.appendChild(d); };
+  const last = S.lastTps?.[`${n.id}:${s.id}`];
   const sp = s.measure?.decode_max ?? s.measure?.decode_min;
-  if (sp) stat("生成速度", `${fmt(sp, 1)} tok/s`);
-  if (pool) stat(n.state.pools.memory_model === "discrete" ? "顯示記憶體" : "記憶體", `${fmt(pool.used_gib, 1)} / ${fmt(pool.total_gib, 0)} GiB`);
-  if (ram && n.state.pools.memory_model !== "unified_single") stat("系統記憶體", `${fmt(ram.used_gib, 1)} / ${fmt(ram.total_gib, 0)} GiB`);
+  if (last) stat("speed", "生成速度・最近一次", tpsText(last));
+  else if (sp) stat("speed", "生成速度・實測", tpsText(sp));
+  if (pool) stat("pool", n.state.pools.memory_model === "discrete" ? "顯示記憶體" : "記憶體", `${fmt(pool.used_gib, 1)} / ${fmt(pool.total_gib, 0)} GiB`);
+  if (ram && n.state.pools.memory_model !== "unified_single") stat("ram", "系統記憶體", `${fmt(ram.used_gib, 1)} / ${fmt(ram.total_gib, 0)} GiB`);
   const url = `http://${hostOf(n)}:${s.port}/v1`;
   const urlBox = el("div", "sb-url");
   urlBox.appendChild(el("code", "mono", url));
@@ -404,6 +407,7 @@ async function viewRun() {
   holder.appendChild(statusHolder);
   if (rs) statusHolder.appendChild(statusBar(n, rs));
   if (rs) holder.appendChild(runLogBox(n, rs));
+  if (rs) liveLoop(n.id, statusHolder, (lv) => statusLive(statusHolder, n, rs, lv));
 
   // thinking／lan 先顯示欄位現在的設定；使用者沒動過就不送，代理沿用原本的（不會悄悄改成 0.0.0.0）
   // 應用程式的視窗（一般人單機用）：新模型預設只給這台自己用、不先思考，跟代理的桌面版預設一致
@@ -413,8 +417,9 @@ async function viewRun() {
     const m = models.find((x) => x.id === sel.value);
     const slotId = slotSel?.value || rs?.id || slots[0]?.id || null;
     const slot = slots.find((s) => s.id === slotId);
-    const p = m.plan || null;
+    const p = planAt(m, st.ctx);
     const running = !!(m.in_use && slot && m.in_use === slot.id && slot.busy);
+    st.replan = (ctx) => { const pp = planAt(m, ctx); drawPlan(left, n, m, pp); return pp; };
     drawPlan(left, n, m, p);
     drawSettings(right, n, m, p, slot, running, st, prog, statusHolder);
     if (slot?.unit && slot.id !== infoFor) {
@@ -429,7 +434,7 @@ async function viewRun() {
         // 不能沿用開頁時那顆的 running（不然選了沒在跑的模型，按鈕會寫成「套用設定並重新載入」）
         const cur = models.find((x) => x.id === sel.value);
         const curRunning = !!(cur.in_use && slot && cur.in_use === slot.id && slot.busy);
-        if (right.isConnected) drawSettings(right, n, cur, cur.plan || null, slot, curRunning, st, prog, statusHolder);
+        if (right.isConnected) drawSettings(right, n, cur, planAt(cur, st.ctx), slot, curRunning, st, prog, statusHolder);
       }).catch(() => {});
     }
   };
@@ -452,6 +457,32 @@ async function viewRun() {
   reveal(holder);
 }
 
+// 換上下文長度：用模型頁一起算好的那一份（等級、分層、KV）；實測速度跟上下文長短關係不大，照舊用實測
+function planAt(m, ctx) {
+  const base = m.plan || null;
+  const alt = ctx && m.plan_by_ctx?.[ctx];
+  if (!base || !alt) return base;
+  return { ...base, ...alt, tok_s: base.measured ? base.tok_s : alt.tok_s };
+}
+
+// 執行中的狀態列每2秒換數字：只改文字，不重畫整列
+function statusLive(holder, n, s, lv) {
+  const set = (key, text) => { const b = holder.querySelector(`[data-k="${key}"] b`); if (b && b.textContent !== text) b.textContent = text; };
+  const mm = n.state.pools?.memory_model;
+  const gpus = lv.gpus || [];
+  if (mm === "discrete" && gpus.length) {
+    set("pool", `${fmt(gpus.reduce((a, g) => a + (g.used_gib || 0), 0), 1)} / ${fmt(gpus.reduce((a, g) => a + (g.total_gib || 0), 0), 0)} GiB`);
+  } else if (mm === "unified_single" && lv.ram) {
+    set("pool", `${fmt(lv.ram.used_gib, 1)} / ${fmt(lv.ram.total_gib, 0)} GiB`);
+  }
+  if (lv.ram && mm !== "unified_single") set("ram", `${fmt(lv.ram.used_gib, 1)} / ${fmt(lv.ram.total_gib, 0)} GiB`);
+  const last = S.lastTps?.[`${n.id}:${s.id}`];
+  if (last) {
+    const d = holder.querySelector('[data-k="speed"]');
+    if (d) { d.querySelector(".k").textContent = "生成速度・最近一次"; set("speed", tpsText(last)); }
+  }
+}
+
 function drawPlan(c, n, m, p) {
   c.querySelectorAll(":scope > :not(.card-head)").forEach((x) => x.remove());
   const pools = n.state.pools || {};
@@ -472,12 +503,17 @@ function drawPlan(c, n, m, p) {
   const g = pools.unified || pools.vram;
   const gpuName = mm === "unified_single" ? "統一記憶體" : mm === "unified_split" ? "GPU 那一塊" : (n.state.chip?.gpu ? `顯示卡・${n.state.chip.gpu}` : "顯示卡");
   if (g || (pools.gpus || []).length) {
-    row("gpu", gpuName, g?.total_gib, sp.gpu, sp.gpu ? (mm === "discrete" ? "模型層放顯示卡，最快" : "模型放在這一塊，最快") : "沒有放進這一層");
+    const kept = p?.cpu_moe && m.layers ? Math.max(0, m.layers - p.cpu_moe) : null;
+    row("gpu", gpuName, g?.total_gib, sp.gpu, !sp.gpu ? "沒有放進這一層"
+      : kept != null ? `注意力與共用權重${kept ? `、${kept}層專家` : ""}放這裡，最快`
+      : mm === "discrete" ? "模型層放顯示卡，最快" : "模型放在這一塊，最快");
   }
   if (mm !== "unified_single") {
-    row("ram", mm === "unified_split" ? "系統那一塊" : "系統記憶體", pools.ram?.total_gib, sp.ram,
+    const kind = n.state.mem_kind ? `・${n.state.mem_kind}` : "";
+    row("ram", (mm === "unified_split" ? "系統那一塊" : "系統記憶體") + kind, pools.ram?.total_gib, sp.ram,
       mm === "unified_split" ? (sp.ram ? "放不下 GPU 那塊的權重以頁快取暫存在這裡，這部分隨時可以丟；KV 與引擎本身丟不掉，已算進准入，跑的時候有看門狗盯著" : "平常只給引擎用，模型不放這裡")
-        : sp.ram ? "放不下顯示卡的專家層放這裡，比較慢" : `剩下的保留給系統（至少留 ${fmt(pools.floors?.ram, 0)} GiB）`);
+        : sp.ram ? (p?.cpu_moe ? `剩下的${p.cpu_moe}層專家放這裡，比較慢` : "放不下顯示卡的專家層放這裡，比較慢")
+        : `剩下的保留給系統（至少留 ${fmt(pools.floors?.ram, 0)} GiB）`);
   }
   row("disk", "硬碟・按需讀取", null, sp.disk,
     sp.disk ? "記憶體放不下的部分從硬碟映射，用到才讀；速度取決於硬碟，通常不到 1 tok/s" : "不需要");
@@ -519,7 +555,11 @@ function drawSettings(c, n, m, p, slot, running, st, prog, statusHolder) {
       const b = el("button", null, ctx ? `${ctx / 1024}K` : "自動");
       b.title = ctx ? `KV 約 ${fmt(kvAt(ctx))} GiB` : "用模型的預設";
       if (ctx === st.ctx) b.setAttribute("aria-current", "true");
-      b.onclick = () => { st.ctx = ctx; st.touched.ctx = true; drawSettings(c, n, m, p, slot, running, st, prog, statusHolder); };
+      b.onclick = () => {
+        st.ctx = ctx;
+        st.touched.ctx = true;
+        drawSettings(c, n, m, st.replan ? st.replan(ctx) : p, slot, running, st, prog, statusHolder);
+      };
       bar.appendChild(b);
     });
     c.appendChild(bar);
@@ -1560,3 +1600,169 @@ function openProvider(presets, p) {
 $("#menubtn")?.addEventListener("click", () => { $("#mnav").hidden = false; });
 $("#mnav-close")?.addEventListener("click", closeMobileNav);
 $("#mnav")?.addEventListener("click", (e) => { if (e.target.id === "mnav") closeMobileNav(); });
+
+/* ================================================================ 監測
+   這台的CPU、記憶體、每張顯示卡、模型行程，每2秒更新；只讀系統資訊，不改任何設定。
+   多台時下面列其他機器的摘要（跟全站一樣15秒更新），點一下切過去看。 */
+
+const MON_SAMPLES = 60;          // 2秒一筆，畫最近2分鐘
+
+function monLevel(v, warn, bad) { return v == null ? "" : v >= bad ? "bad" : v >= warn ? "warn" : ""; }
+
+function sparkline(vals) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${MON_SAMPLES - 1} 100`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("class", "mon-spark");
+  svg.setAttribute("aria-hidden", "true");
+  const line = document.createElementNS(ns, "polyline");
+  svg.appendChild(line);
+  svg.update = (arr) => {
+    const pts = arr.map((v, i) => `${i + MON_SAMPLES - arr.length},${100 - Math.max(0, Math.min(100, v ?? 0))}`).join(" ");
+    line.setAttribute("points", pts);
+  };
+  svg.update(vals);
+  return svg;
+}
+
+function monCard(title) {
+  const c = el("section", "card mon-card");
+  const h = el("div", "mon-head");
+  const t = el("b", null, title);
+  const v = el("span", "mon-v mono", "—");
+  h.append(t, v);
+  const bar = el("div", "plan-bar");
+  const fill = el("i");
+  bar.appendChild(fill);
+  const sub = el("div", "small muted mon-sub");
+  const spark = sparkline([]);
+  c.append(h, bar, spark, sub);
+  const hist = [];
+  c.set = ({ pct, value, sub: s, level, title: tt }) => {
+    if (tt && t.textContent !== tt) t.textContent = tt;
+    const text = value ?? (pct != null ? `${fmt(pct, 0)}%` : "讀不到");
+    if (v.textContent !== text) v.textContent = text;
+    v.className = "mon-v mono " + (level || "");
+    fill.style.width = pct != null ? `${Math.max(0, Math.min(100, pct))}%` : "0";
+    fill.className = level || "";
+    if (sub.textContent !== s) sub.textContent = s || "";
+    hist.push(pct);
+    if (hist.length > MON_SAMPLES) hist.shift();
+    spark.update(hist);
+  };
+  return c;
+}
+
+function viewMonitor() {
+  const main = $("#main");
+  const v = S.view;
+  const n = curNode();
+  main.textContent = "";
+  const wrap = el("div", "wrap");
+  main.appendChild(wrap);
+  if (!n || !n.online) {
+    wrap.appendChild(el("p", "note warn", !n ? "還沒有機器。" : `${n.name} 連不上，換一台看。`));
+    return;
+  }
+  const head = el("div", "page-head");
+  head.append(el("h1", null, `監測・${n.name}`), el("p", "small muted", "每2秒更新一次，只讀系統資訊，不會改這台的任何設定。"));
+  wrap.appendChild(head);
+  const grid = el("div", "grid mon-grid");
+  const cpu = monCard("CPU");
+  const ram = monCard("記憶體");
+  grid.append(cpu, ram);
+  wrap.appendChild(grid);
+  const gpuCards = new Map();
+  const procs = card("模型行程", "這台的模型欄位與各自佔用的系統記憶體");
+  const tbl = el("table");
+  const tb = el("tbody");
+  const thead = el("thead");
+  const hr = el("tr");
+  ["欄位", "模型", "狀態", "系統記憶體"].forEach((x) => hr.appendChild(el("th", null, x)));
+  thead.appendChild(hr);
+  tbl.append(thead, tb);
+  procs.appendChild(tbl);
+  wrap.appendChild(procs);
+  const others = (S.fleet?.nodes || []).filter((x) => x.id !== n.id);
+  let otherBody = null;
+  if (others.length) {
+    const oc = card("其他機器", "跟全站一樣每15秒更新；點「看這台」切過去");
+    const t2 = el("table");
+    otherBody = el("tbody");
+    const h2 = el("tr");
+    ["機器", "CPU", "記憶體", "顯示卡使用率", ""].forEach((x) => h2.appendChild(el("th", null, x)));
+    const th2 = el("thead");
+    th2.appendChild(h2);
+    t2.append(th2, otherBody);
+    oc.appendChild(t2);
+    wrap.appendChild(oc);
+  }
+  const drawOthers = () => {
+    if (!otherBody) return;
+    const rows = (S.fleet?.nodes || []).filter((x) => x.id !== n.id).map((x) => {
+      const stt = x.state || {};
+      const pl = stt.pools || {};
+      const mem = pl.unified || pl.ram;
+      const gu = (pl.gpus || []).map((g) => g.use).filter((u) => u != null);
+      return [x, !x.online ? "連不上" : stt.cpu?.usage != null ? `${fmt(stt.cpu.usage, 0)}%` : "—",
+        !x.online || !mem ? "—" : `${fmt(mem.used_gib, 1)} / ${fmt(mem.total_gib, 0)} GiB`,
+        !x.online ? "—" : gu.length ? gu.map((u) => `${fmt(u, 0)}%`).join("・") : "—"];
+    });
+    const sig = JSON.stringify(rows.map((r) => r.slice(1).concat(r[0].id)));
+    if (otherBody.dataset.sig === sig) return;
+    otherBody.dataset.sig = sig;
+    otherBody.replaceChildren(...rows.map(([x, c1, c2, c3]) => {
+      const tr = el("tr");
+      tr.append(el("td", null, x.name), el("td", "mono", c1), el("td", "mono", c2), el("td", "mono", c3));
+      const td = el("td");
+      const b = el("button", "btn sm", "看這台");
+      b.onclick = () => { setNode(x.id); go("monitor"); };
+      td.appendChild(b);
+      tr.appendChild(td);
+      return tr;
+    }));
+  };
+  drawOthers();
+  S.live = drawOthers;
+  const onLive = (lv) => {
+    const c = lv.cpu || {};
+    cpu.set({ pct: c.usage, level: monLevel(c.usage, 80, 95),
+      value: c.usage == null ? "讀不到" : undefined,
+      sub: [c.name, c.cores ? `${c.cores}個執行緒` : null, c.usage == null && c.load != null ? `一分鐘負載${fmt(c.load, 2)}` : null]
+        .filter(Boolean).join("・") });
+    const r = lv.ram || {};
+    const rp = r.total_gib ? (r.used_gib / r.total_gib) * 100 : null;
+    ram.set({ pct: rp, level: monLevel(rp, 85, 95), value: rp == null ? "讀不到" : `${fmt(r.used_gib, 1)} / ${fmt(r.total_gib, 0)} GiB`,
+      sub: [r.kind, rp != null ? `已用${fmt(rp, 0)}%` : null].filter(Boolean).join("・") });
+    const seen = new Set();
+    (lv.gpus || []).forEach((g, i) => {
+      const key = String(g.id ?? i);
+      seen.add(key);
+      let gc = gpuCards.get(key);
+      if (!gc) { gc = monCard(""); gpuCards.set(key, gc); grid.appendChild(gc); }
+      const vp = g.total_gib ? (g.used_gib / g.total_gib) * 100 : null;
+      const lvl = [monLevel(g.use, 80, 95), monLevel(vp, 90, 97), monLevel(g.temp, 80, 90)];
+      gc.set({ title: `顯示卡${key}・${g.name || ""}`.replace(/・$/, ""), pct: g.use, level: lvl.includes("bad") ? "bad" : lvl.includes("warn") ? "warn" : "",
+        value: g.use == null ? "使用率讀不到" : undefined,
+        sub: [g.total_gib ? `顯示記憶體${fmt(g.used_gib, 1)} / ${fmt(g.total_gib, 0)} GiB` : null,
+          g.temp != null ? `${fmt(g.temp, 0)}°C` : null, g.power != null ? `${fmt(g.power, 0)} W` : null].filter(Boolean).join("・") });
+    });
+    gpuCards.forEach((gc, key) => { if (!seen.has(key)) { gc.remove(); gpuCards.delete(key); } });
+    const slots = lv.slots || [];
+    const sig = JSON.stringify(slots.map((s) => [s.id, s.model, s.state, s.ram_gib]));
+    if (tb.dataset.sig !== sig) {
+      tb.dataset.sig = sig;
+      tb.replaceChildren(...(slots.length ? slots.map((s) => {
+        const tr = el("tr");
+        const dot = el("span", s.busy ? "run-dot" : "");
+        const st = el("td");
+        st.append(dot, document.createTextNode(s.state === "activating" ? "載入中" : s.busy ? "執行中" : "沒在跑"));
+        tr.append(el("td", null, s.role || s.id), el("td", null, s.model || "—"), st, el("td", "mono", s.busy ? `${fmt(s.ram_gib, 1)} GiB` : "—"));
+        return tr;
+      }) : [(() => { const tr = el("tr"); const td = el("td", "muted", "這台還沒有模型欄位。"); td.colSpan = 4; tr.appendChild(td); return tr; })()]));
+    }
+  };
+  liveLoop(n.id, grid, onLive);
+  if (S.view === v) reveal(wrap);
+}

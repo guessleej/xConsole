@@ -26,6 +26,21 @@ function cnChip() {
 }
 const fmt = (n, d = 1) => (n === null || n === undefined || Number.isNaN(n)) ? "—" : Number(n).toFixed(d);
 const int = (n) => (n === null || n === undefined) ? "—" : Math.round(n).toLocaleString(uiLocale());
+const tpsText = (v) => (v < 1 ? "不到 1 tok/s" : `${fmt(v, 1)} tok/s`);
+
+// 執行頁、監測頁開著時每隔幾秒讀一次這台的即時數字；換頁、區塊被拿掉或分頁藏到背景就不讀
+function liveLoop(nodeId, anchor, onData, ms = 2000) {
+  const v = S.view;
+  const alive = () => anchor.isConnected && S.view === v;
+  const tick = async () => {
+    if (!alive()) return;
+    if (!document.hidden) {
+      try { onData(await api(`/api/node/${nodeId}/live`)); } catch (_) { /* 這一輪讀不到，下一輪再試 */ }
+    }
+    if (alive()) setTimeout(tick, ms);
+  };
+  tick();
+}
 
 function toast(msg, kind) {
   const t = el("div", "toast" + (kind ? " " + kind : ""), msg);
@@ -347,9 +362,17 @@ function renderNav() {
   const items = navItems();
   const v = S.view;
   const active = topOf(v);
+  // 「執行」旁的小圓點：這台有模型在跑就亮，載入中改成忙碌的樣子；不用進執行頁就知道
+  const rsNow = llmSlots(curNode()).filter((s) => s.unit && s.busy);
+  const dotCls = rsNow.some((s) => s.state === "activating") ? "run-dot busy" : rsNow.length ? "run-dot" : "";
   items.forEach(([key, label]) => {
     const b = el("button", null, label);
     if (key === active) b.setAttribute("aria-current", "true");
+    if (key === "run" && dotCls) {
+      const d = el("span", "nav-dot " + dotCls);
+      d.title = dotCls.includes("busy") ? "模型載入中" : "有模型在跑";
+      b.appendChild(d);
+    }
     b.onclick = () => { closeMobileNav(); go(key); };
     nav.appendChild(b);
   });
@@ -362,10 +385,12 @@ function renderNav() {
     sub.appendChild(b);
   };
   const cur = curNode();
-  // 第二列：概覽在多台時可切「這台／全部機器」
-  if (active === "home" && ((S.fleet.nodes || []).length > 1 || v.startsWith("group:"))) {
-    subBtn("群組總覽", "home", homeAll() || v.startsWith("group:"), () => { S.homeAll = true; go("home"); });
-    subBtn("這台", "home", !homeAll() && !v.startsWith("group:"), () => { S.homeAll = false; go("home"); });
+  // 第二列：概覽在多台時可切「這台／全部機器」；監測（每2秒的即時數字）一律在這裡
+  if (active === "home") {
+    const many = (S.fleet.nodes || []).length > 1 || v.startsWith("group:");
+    if (many) subBtn("群組總覽", "home", v !== "monitor" && (homeAll() || v.startsWith("group:")), () => { S.homeAll = true; go("home"); });
+    subBtn(many ? "這台" : "概覽", "home", v !== "monitor" && !homeAll() && !v.startsWith("group:"), () => { S.homeAll = false; go("home"); });
+    if (cur) subBtn("監測", "monitor", v === "monitor");
   }
   // 第二列：執行（日常）→ 角色欄位（一台跑好幾個模型時才需要）→ API 串接（給 IDE）
   if (active === "run" && cur && isAdmin()) {
@@ -6233,6 +6258,7 @@ function render() {
   else if (v.startsWith("group:")) viewGroup();
   else if (v === "models") viewLib();
   else if (v === "run") viewRun();
+  else if (v === "monitor") viewMonitor();
   else if (v.startsWith("node:")) viewNode();
   else if (v === "apis") viewApis();
   else if (v.startsWith("api:")) viewApi();
@@ -7207,7 +7233,7 @@ async function refresh() {
     // 執行、Agent、畫圖、影片也一樣：有選到一半的設定、進行中的載入進度或任務，各自只更新自己那一塊
     // 剛登入的第一次一定整頁畫：使用者登入後直接落在對話頁，下面那條只換導覽列，頁面會一片空白
     if (S.firstPaint) { S.firstPaint = false; render(); return; }
-    if (["settings", "apis", "chat", "models", "run", "agent", "image", "video"].includes(S.view) || S.view.startsWith("api:")) {
+    if (["settings", "apis", "chat", "models", "run", "agent", "image", "video", "monitor"].includes(S.view) || S.view.startsWith("api:")) {
       renderNav();
       S.live?.();                // 有登記局部更新的頁（執行頁的狀態列）只換那一塊
     } else quietRender();
