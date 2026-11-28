@@ -9448,6 +9448,14 @@
 "pattern": false
 },
 {
+"zh": "下載 .svg",
+"pattern": false
+},
+{
+"zh": "預覽圖形",
+"pattern": false
+},
+{
 "zh": "執行預覽",
 "pattern": false
 },
@@ -10316,6 +10324,14 @@
 "pattern": false
 },
 {
+"zh": "改圖",
+"pattern": false
+},
+{
+"zh": "改",
+"pattern": false
+},
+{
 "zh": "沒有連得上的機器可以產生",
 "pattern": false
 },
@@ -10572,15 +10588,15 @@
 "pattern": false
 },
 {
-"zh": "描述想要的畫面（附一張圖就是改圖）。Enter 送出",
+"zh": "描述想要的畫面，可以說「直式」「畫4張」；附一張圖，或接著說「把背景換成海邊」就是改圖。Enter 送出",
 "pattern": false
 },
 {
-"zh": "描述影片內容（附一張圖當第一格）。Enter 送出",
+"zh": "描述影片內容，可以說「直式」「5秒」；附一張圖當第一格。Enter 送出",
 "pattern": false
 },
 {
-"zh": "問點什麼，或說「畫一張…」「生成一段…的影片」（Enter 送出，Shift+Enter 換行）",
+"zh": "問點什麼（Enter 送出，Shift+Enter 換行）；要畫圖或做影片先按下面的「畫圖」「影片」，或打 /畫、/影片",
 "pattern": false
 },
 {
@@ -10674,6 +10690,82 @@
 {
 "zh": "超過 15 MB",
 "pattern": false
+},
+{
+"zh": "{0}已下載・選了就載入",
+"pattern": true
+},
+{
+"zh": "已下載・選了就載入",
+"pattern": false
+},
+{
+"zh": "（放不下）",
+"pattern": false
+},
+{
+"zh": "會換掉{0}現在在跑的「{1}」，載入期間對話與API都暫停。",
+"pattern": true
+},
+{
+"zh": "會換掉",
+"pattern": false
+},
+{
+"zh": "現在在跑的「",
+"pattern": false
+},
+{
+"zh": "」，載入期間對話與API都暫停",
+"pattern": false
+},
+{
+"zh": "在{0}載入「{1}」。",
+"pattern": true
+},
+{
+"zh": "載入「",
+"pattern": false
+},
+{
+"zh": "這顆要用到硬碟才放得下，能跑但很慢。",
+"pattern": false
+},
+{
+"zh": "要調上下文長度、思考、區網存取，到「執行」頁載入。",
+"pattern": false
+},
+{
+"zh": "載入{0}？",
+"pattern": true
+},
+{
+"zh": "載入",
+"pattern": false
+},
+{
+"zh": "正在載入{0}…（大模型要一兩分鐘）",
+"pattern": true
+},
+{
+"zh": "正在載入",
+"pattern": false
+},
+{
+"zh": "…（大模型要一兩分鐘",
+"pattern": false
+},
+{
+"zh": "已載入{0}",
+"pattern": true
+},
+{
+"zh": "{0}放不下：{1}",
+"pattern": true
+},
+{
+"zh": "載入失敗：{0}",
+"pattern": true
 },
 {
 "zh": "這則對話的模型目前沒有在執行，先在上面換一個",
@@ -13706,6 +13798,10 @@
 {
 "zh": "{0} 要在 {1}～{2} 之間",
 "pattern": true
+},
+{
+"zh": "改圖來源的格式不對",
+"pattern": false
 },
 {
 "zh": "訊息格式不對（最多 ",
@@ -17497,10 +17593,6 @@
 },
 {
 "zh": "[Unit]\nDescription=xConsole 欄位 ",
-"pattern": false
-},
-{
-"zh": "載入",
 "pattern": false
 },
 {

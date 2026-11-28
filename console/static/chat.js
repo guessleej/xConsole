@@ -3,7 +3,8 @@
    - 對話紀錄存在主控台（加密落地，/api/chats*），換瀏覽器、重新整理都在；左邊可以搜尋、改名、刪除。
    - 每則回答：複製、重新生成、調整回答（更簡潔…改用英文）、編輯、刪除；重新生成與調整回答會留下各版本可切換。
    - 對話設定：系統提示詞與取樣參數（第三方 API 只送它支援的標準參數，由主控台把關）。
-   - 說「畫一張…」「生成一段…的影片」直接產出；附圖說「把…改成…」改圖。輸入列也有「畫圖」「影片」鈕。
+   - 按「畫圖」「影片」或打 /畫、/改圖、/影片 才產出（不依文字猜）；附圖或接著上一張說「把…改成…」改圖，
+     說「直式」「9:16」「5秒」會照著調尺寸與長度。
    - 快超過上下文時，把較早的對話摘要起來再送（畫面上原文照留），標示「已壓縮前 N 則」。
    - 「工具」打開時，本機模型可以讀網頁、聯網搜尋（管理者設了搜尋端點才有）、讀寫自己的Agent工作資料夾，
      管理員另外可以查主控台與執行指令；寫檔與執行指令一律先問，可勾「本次對話不再詢問同類操作」。
@@ -98,9 +99,10 @@ function packMsg(m) {
       ...(steps != null ? { steps } : {}), ...(model ? { model } : {}), log: (log || []).slice(-60) };
   }
   if (m.gen) {
-    const { node, job, kind, prompt, model, title, state, error, asked, count, edit } = m.gen;
+    const { node, job, kind, prompt, model, title, state, error, asked, count, edit, base } = m.gen;
     o.gen = { node, kind, count: count || 1, ...(job ? { job } : {}), ...(prompt ? { prompt } : {}), ...(model ? { model } : {}), ...(title ? { title } : {}),
-      ...(state ? { state } : {}), ...(error ? { error } : {}), ...(asked ? { asked } : {}), ...(edit ? { edit } : {}) };
+      ...(state ? { state } : {}), ...(error ? { error } : {}), ...(asked ? { asked } : {}), ...(edit ? { edit } : {}),
+      ...(base?.node && base?.job ? { base: { node: base.node, job: base.job } } : {}) };
   }
   return o;
 }
@@ -229,7 +231,7 @@ async function streamInto(t, body, reply, paint, signal) {
   }
   const rd = res.body.getReader();
   const dec = new TextDecoder();
-  let buf = "", timings = null, usage = null, last = 0;
+  let buf = "", timings = null, usage = null, last = 0, n = 0, t1 = 0;
   reply.pending = false;
   for (;;) {
     const { value, done } = await rd.read();
@@ -249,7 +251,10 @@ async function streamInto(t, body, reply, paint, signal) {
       const delta = j.choices?.[0]?.delta || {};
       if (delta.reasoning_content) reply.reasoning = (reply.reasoning || "") + delta.reasoning_content;
       if (delta.content) reply.content += delta.content;
+      // llama.cpp 串流一個片段大約一個 token：從第一個字起算，生成中就看得到速度
+      if (delta.content || delta.reasoning_content) { if (!n++) t1 = performance.now(); }
     }
+    if (n > 1) reply.live = `${n} tokens・${tpsText((n - 1) / ((performance.now() - t1) / 1000 || 1))}`;
     // 只重畫這一則（最多每 120 毫秒一次）；使用者往上捲在看舊訊息時不把他拉回底部
     if (performance.now() - last > 120) { last = performance.now(); paint(); }
   }
@@ -258,34 +263,94 @@ async function streamInto(t, body, reply, paint, signal) {
 
 /* ---- 在對話裡畫圖、做影片 */
 
+// 產圖一律要明講：按「畫圖／影片」或打斜線指令。LocModel 3.6.2 也拿掉了依文字猜，
+// 「畫一張流程圖」「讓這個柱狀圖動起來」都曾被當成要產圖、做影片
+const GEN_CMD = /^\/(改圖|改|edit|畫|圖|image|img|draw|影片|video)(?:\s+|$)/i;
+const EDIT_VERB = /(改|換|變|去掉|拿掉|刪掉|移除|擦掉|加上|加個|加一|增加|放上|調|修|替換|上色|風格|背景|衣服|髮型|顏色|美顏|修復|清晰|浮水印|戴上|穿上|拿著|更亮|更暗|亮一點|暗一點)/;
+const EDIT_ASK = /(是什麼|寫了什麼|多少|辨識|看看|看一下|分析|描述|翻譯|摘要|總結|擷取|哪|怎麼|如何|為什麼|解釋|告訴我|能不能|可以嗎|嗎[？?]?$|[？?])/;
+const REDRAW = /^(請|你)?(再|重新|另外)(畫|來|生成|做|產生)/;
 const CN_NUM = { 一: 1, 兩: 2, 二: 2, 三: 3, 四: 4, 1: 1, 2: 2, 3: 3, 4: 4 };
-function detectGen(text, hasImage, mode) {
+
+// lastImage：這則對話上一個回答是剛畫好的圖，接著說「把背景換成海邊」就在那張上改（「再畫一張」還是重畫）
+function detectGen(text, hasImage, mode, lastImage = false) {
   const s = text.trim();
-  const count = Math.min(4, CN_NUM[(s.match(/([一兩二三四1-4])\s*[張幅]/) || [])[1]] || 1);
-  const edit = hasImage && /(把|將|幫我把|請把).{0,80}(改成|換成|變成|改為|改得|換掉|去掉|拿掉|加上|移除)/.test(s);
-  if (mode === "video") return { kind: "video", count: 1, edit: false };
-  if (mode === "image") return { kind: "image", count, edit: hasImage };
-  if (/(生成|產生|做|拍|製作)\s*(一|1)?\s*(段|支|部|個)?.{0,60}(影片|動畫|短片|視頻)/.test(s)) return { kind: "video", count: 1, edit: false };
-  if (edit) return { kind: "image", count: 1, edit: true };
-  if (/^(請|幫我|幫忙|麻煩|可以)?\s*(你)?\s*畫/.test(s) || /(生成|產生|做|來)\s*([一兩二三四1-4])?\s*[張幅]\s*.{0,60}(圖|照片|插畫|海報|插圖|桌布|頭像)/.test(s)
-    || /(生成|產生).{0,30}(的圖|圖片|插圖|照片)$/.test(s)) return { kind: "image", count, edit: false };
+  const cmd = (s.match(GEN_CMD) || [])[1]?.toLowerCase();
+  const kind = cmd ? (cmd === "影片" || cmd === "video" ? "video" : "image") : mode === "video" || mode === "image" ? mode : null;
+  if (!kind) return null;
+  const body = cmd ? s.replace(GEN_CMD, "").trim() : s;
+  if (kind === "video") return { kind, count: 1, edit: false, text: body };
+  const count = Math.min(4, CN_NUM[(body.match(/([一兩二三四1-4])\s*[張幅]/) || [])[1]] || 1);
+  if (hasImage) return { kind, count, edit: true, text: body };
+  const wantEdit = cmd === "改圖" || cmd === "改" || cmd === "edit" || (EDIT_VERB.test(body) && !EDIT_ASK.test(body) && !REDRAW.test(body));
+  if (lastImage && wantEdit) return { kind, count: 1, edit: true, last: true, text: body };
+  return { kind, count, edit: false, text: body };
+}
+
+// 從一句話猜比例與影片長度；尺寸照模型預設的像素總量換比例，不會因為改直式就變大變慢
+const GEN_ASPECT = [
+  [/9\s*[:：比]\s*16|直式|直立|手機桌布|手機背景|限時動態|限動|短影音|reels|shorts|抖音/i, 9 / 16],
+  [/16\s*[:：比]\s*9|橫式|電腦桌布|桌面桌布|寬螢幕|banner|封面/i, 16 / 9],
+  [/3\s*[:：比]\s*4|海報/, 3 / 4],
+  [/4\s*[:：比]\s*3/, 4 / 3],
+  [/1\s*[:：比]\s*1|方形|正方形|頭像|大頭貼|logo|貼圖/i, 1],
+];
+function genOptions(kind, text, d = {}) {
+  const w0 = d.width || 1024, h0 = d.height || 1024;
+  const a = (GEN_ASPECT.find(([rx]) => rx.test(text)) || [])[1];
+  const r16 = (x) => Math.max(256, Math.round(x / 16) * 16);
+  const o = a ? { width: r16(Math.sqrt(w0 * h0 * a)), height: r16(Math.sqrt((w0 * h0) / a)) } : { width: w0, height: h0 };
+  if (kind === "video") {
+    const fps = d.fps || 24, step = d.frame_step || 8;
+    const sec = Number((text.match(/(\d+(?:\.\d+)?)\s*秒/) || [])[1]);
+    // 各家影格規則不同：LTX 8n+1、Wan 4n+1、MiniMax-H3 引擎自己對齊；上下限跟畫圖頁的選項一致
+    const [lo, hi] = step === 1 ? [39, 107] : step === 4 ? [17, 97] : [17, 121];
+    o.frames = sec > 0 ? Math.min(hi, Math.max(lo, Math.round((sec * fps) / step) * step + 1)) : d.frames || 33;
+    o.fps = fps;
+  }
+  return o;
+}
+
+// 這則對話裡同一種產出最近一次的提示詞：「再亮一點」就接著上一次改，不必重寫整句
+function lastGenPrompt(cur, kind) {
+  for (let i = cur.msgs.length - 1; i >= 0; i--) {
+    const g = cur.msgs[i].gen;
+    if (g?.prompt && g.kind === kind && g.state === "done") return g.prompt;
+  }
+  return "";
+}
+
+// 上一個回答如果是剛畫好的圖就回它（要接著改）；中間隔了一般回答就不算
+function lastGenImage(cur) {
+  for (let i = cur.msgs.length - 1; i >= 0; i--) {
+    const m = cur.msgs[i];
+    if (m.role !== "assistant") continue;
+    return m.gen?.kind === "image" && m.gen.state === "done" && m.gen.job ? m.gen : null;
+  }
   return null;
 }
 
-// 中文描述交給對話模型改寫成英文提示詞（多數畫圖模型英文效果最好）；沒有本機文字模型或改寫失敗就用原文
-async function genPrompt(t, text, kind, edit) {
-  if (!t?.local) return text;
+async function genImageUrl(g) {
+  const [o] = await genMedia({ node: g.node, job: g.job, count: 1 });
+  return `data:${o.mime};base64,${o.b64}`;
+}
+
+// 中文描述交給對話模型改寫成英文提示詞（多數畫圖模型英文效果最好）；沒有本機文字模型或改寫失敗就用原文。
+// prev：上一次的提示詞，使用者是在微調上一張時就在它上面改
+async function genPrompt(t, text, kind, edit, prev = "") {
+  const fallback = prev && !edit && /^(再|換|改|把它|把這|繼續|同樣|一樣|還是|背景|顏色|風格|更|加上|去掉)/.test(text) ? `${prev}, ${text}` : text;
+  if (!t?.local) return fallback;
   try {
     const out = await askOnce(t, [
       { role: "system", content: "You write prompts for " + (kind === "video" ? "text-to-video" : "text-to-image") + " models. Rewrite the user's request as ONE concise English prompt "
         + "made of comma-separated descriptive phrases (subject, setting, style, lighting, camera). "
         + (edit ? "The user is editing an existing picture: describe how the FINAL picture should look after the change. " : "")
-        + "Output only the prompt, no quotes, no explanation." },
-      { role: "user", content: text },
+        + (prev && !edit ? "If the request refines the previous picture, start from the previous prompt and apply only the change. " : "")
+        + "Keep any text the user wants shown in the picture exactly as written. Output only the prompt, no quotes, no explanation." },
+      { role: "user", content: (prev && !edit ? `Previous prompt: ${prev}\n\n` : "") + `Request: ${text}` },
     ], 300);
     const p = out.replace(/^["'「]|["'」]$/g, "").split("\n").find((x) => x.trim()) || "";
-    return p.length >= 3 && p.length <= 1500 ? p.trim() : text;
-  } catch (_) { return text; }
+    return p.length >= 3 && p.length <= 1500 ? p.trim() : fallback;
+  } catch (_) { return fallback; }
 }
 
 function genNodeOf(t) {
@@ -295,7 +360,9 @@ function genNodeOf(t) {
 
 async function runGen(cur, t, reply, text, intent, initImage, paint) {
   const n = genNodeOf(t);
-  const g = reply.gen = { node: n?.id || "-", kind: intent.kind, count: intent.count || 1, asked: text, edit: !!intent.edit, state: "prepare" };
+  const prev = lastGenPrompt(cur, intent.kind);
+  const g = reply.gen = { node: n?.id || "-", kind: intent.kind, count: intent.count || 1, asked: text, edit: !!intent.edit, state: "prepare",
+    ...(intent.base ? { base: intent.base } : {}) };
   reply.pending = false;
   if (!n || !n.online) { Object.assign(g, { state: "failed", error: "沒有連得上的機器可以產生" }); return; }
   paint();
@@ -307,12 +374,13 @@ async function runGen(cur, t, reply, text, intent, initImage, paint) {
   const model = ready.find((m) => m.id === S.sdModel) || ready[0];
   g.model = model.id; g.title = model.title;
   g.state = "prompt"; paint();
-  g.prompt = await genPrompt(t, text, intent.kind, intent.edit);
+  g.prompt = await genPrompt(t, text, intent.kind, intent.edit, prev);
   if (cur._genStop) { Object.assign(g, { state: "failed", error: "已停止" }); return; }
   const d = model.defaults || {};
-  const body = { model: model.id, prompt: g.prompt, negative: "", width: d.width || 1024, height: d.height || 1024,
+  const opt = genOptions(intent.kind, text, d);
+  const body = { model: model.id, prompt: g.prompt, negative: "", width: opt.width, height: opt.height,
     steps: d.steps ?? 20, cfg: d.cfg ?? 1, seed: -1, sampler: d.sampler || "euler",
-    ...(intent.kind === "video" ? { frames: d.frames || 33, fps: d.fps || 24 } : { count: g.count }),
+    ...(intent.kind === "video" ? { frames: opt.frames, fps: opt.fps } : { count: g.count }),
     ...(initImage ? { init_image: initImage, ...(intent.kind === "image" ? { strength: 0.65 } : {}) } : {}) };
   let r;
   try { r = await api(`/api/node/${n.id}/sd/generate`, { method: "POST", body }); } catch (ex) {
@@ -598,8 +666,9 @@ async function viewChat() {
     toolB.title = t?.local ? (isAdmin() ? "讓模型呼叫工具：查主控台、讀網頁、聯網搜尋、讀寫Agent工作資料夾、執行指令；寫檔與執行指令會先問你"
       : "讓模型呼叫工具：讀網頁、聯網搜尋、讀寫你自己的Agent工作資料夾；寫檔會先問你") : "第三方API不開放主控台的工具";
     ta.placeholder = cur.mode === "computer" ? "交代電腦要做的事，例：打開記事本，寫一段會議通知並存到桌面。Enter 送出"
-      : cur.mode === "image" ? "描述想要的畫面（附一張圖就是改圖）。Enter 送出" : cur.mode === "video" ? "描述影片內容（附一張圖當第一格）。Enter 送出"
-      : "問點什麼，或說「畫一張…」「生成一段…的影片」（Enter 送出，Shift+Enter 換行）";
+      : cur.mode === "image" ? "描述想要的畫面，可以說「直式」「畫4張」；附一張圖，或接著說「把背景換成海邊」就是改圖。Enter 送出"
+      : cur.mode === "video" ? "描述影片內容，可以說「直式」「5秒」；附一張圖當第一格。Enter 送出"
+      : "問點什麼（Enter 送出，Shift+Enter 換行）；要畫圖或做影片先按下面的「畫圖」「影片」，或打 /畫、/影片";
   };
   pcB.onclick = async () => {
     if (cur.mode === "computer") { cur.mode = "chat"; syncMode(); return; }
@@ -694,7 +763,60 @@ async function viewChat() {
   inputRow.append(docsRow, ta, tools);
   drawDocs();
   mainCol.append(noteRow, inputRow);
-  sel.onchange = () => { cur.target = sel.value; syncMode(); syncStatus(); syncThink(); if (cur.id) saveChat(cur); };
+  sel.onchange = () => {
+    if (sel.value.startsWith("load:")) { loadFromChat(sel.value.slice(5)); return; }
+    cur.target = sel.value; syncMode(); syncStatus(); syncThink(); if (cur.id) saveChat(cur);
+  };
+  // 已下載、還沒在跑的模型也列進來，選了就載入：不必先跑去執行頁（維運與管理員才能換模型）
+  const ln = curNode();
+  if (canOperate() && ln?.online) {
+    api(`/api/node/${ln.id}/library`).then((lib) => {
+      const idle = (lib.gguf || []).concat(lib.strata || []).filter((m) => !m.in_use);
+      if (!idle.length || !sel.isConnected) return;
+      const g = el("optgroup");
+      g.label = `${ln.name}已下載・選了就載入`;
+      idle.forEach((m) => {
+        const o = el("option", null, `${m.name}${m.quant ? "・" + m.quant : ""}・${fmt(m.size_gib)} GiB${m.plan?.level === "no" ? "（放不下）" : ""}`);
+        o.value = `load:${m.id}`;
+        o.disabled = m.plan?.level === "no";
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+      sel.disabled = false;
+      CHAT2.idle = { node: ln.id, models: idle };
+    }).catch(() => {});
+  }
+  const loadFromChat = (mid) => {
+    sel.value = cur.target || "";
+    const m = CHAT2.idle?.models.find((x) => x.id === mid);
+    const n = (S.fleet?.nodes || []).find((x) => x.id === CHAT2.idle?.node);
+    if (!m || !n) return;
+    const slot = runningSlot(n) || llmSlots(n)[0] || null;
+    const d = el("div");
+    d.appendChild(el("p", null, slot?.busy ? `會換掉${n.name}現在在跑的「${slot.model}」，載入期間對話與API都暫停。`
+      : `在${n.name}載入「${m.name}」。`));
+    if (m.plan?.level === "disk") d.appendChild(el("p", "note warn", "這顆要用到硬碟才放得下，能跑但很慢。"));
+    d.appendChild(el("p", "small muted", "要調上下文長度、思考、區網存取，到「執行」頁載入。"));
+    modal({ title: `載入${m.name}？`, bodyNode: d, confirmText: "載入", onConfirm: async () => {
+      status.textContent = `正在載入${m.name}…（大模型要一兩分鐘）`;
+      sel.disabled = true;
+      let s = slot;
+      try {
+        if (!s) s = (await api(`/api/node/${n.id}/slots/add`, { method: "POST", body: { type: "empty", role: "主模型", tier: "", caps: ["文字"] } })).slot;
+        const body = m.engine === "llama" ? { engine: "llama", model: m.id, ...(m.plan?.level === "disk" ? { allow_disk: true } : {}) }
+          : { pack: m.pack, native: m.native };
+        const r = await api(`/api/node/${n.id}/slot/${s.id}/model`, { method: "POST", body });
+        toast(`已載入${r.model || m.name}`, "ok");
+        (r.warnings || []).forEach((w) => toast(w, "warn"));
+        cur.target = `slot:${n.id}:${s.id}`;
+        if (cur.id) saveChat(cur);
+      } catch (ex) {
+        toast(ex.data?.admit ? `${m.name}放不下：${ex.data.admit.reasons.join("；")}` : `載入失敗：${ex.message}`, "bad");
+      }
+      await refresh();
+      if (S.view === v) viewChat();
+    } });
+  };
   syncMode();
   syncStatus();
   syncThink();
@@ -751,7 +873,12 @@ async function viewChat() {
       const body = { messages: history, stream: true, ...sampleBody(cur, t), ...thinkBody(t), ...(t.prov ? { model: t.prov.default_model } : {}) };
       const { timings, usage } = await streamInto(t, body, reply, paintOf(reply), cur.ctl.signal);
       const sp = timings?.predicted_per_second;
-      if (sp) cur.lastSpeed = sp;
+      reply.live = null;
+      if (sp) {
+        cur.lastSpeed = sp;
+        // 執行頁的狀態列用：這顆在這台最近一次實際的生成速度
+        if (t.local) S.lastTps = { ...(S.lastTps || {}), [`${t.n.id}:${t.s.id}`]: sp };
+      }
       reply.stat = [usage?.completion_tokens ? `${usage.completion_tokens} tokens` : null, `${fmt((performance.now() - t0) / 1000, 1)} 秒`,
         sp ? `${fmt(sp, 1)} tok/s` : null].filter(Boolean).join("・");
     } catch (ex) {
@@ -760,6 +887,7 @@ async function viewChat() {
       else reply.error = ex.message;
     } finally {
       cur.ctl = null;
+      reply.live = null;
       if (!reply.content && !reply.error && reply.stat !== "已停止") reply.content = "（沒有回答）";
       reply.pending = false;
       if (reply.alts) {
@@ -781,7 +909,8 @@ async function viewChat() {
     if (cur.docs.some((d) => d.busy)) { toast("附件還在讀取，等一下再送", "bad"); return; }
     const t = tgt();
     if (cur.mode === "computer") { await runComputer(text); return; }
-    const intent = detectGen(text, !!cur.image, cur.mode);
+    const lastG = lastGenImage(cur);
+    const intent = detectGen(text, !!cur.image, cur.mode, !!lastG);
     if (!t && !intent) { toast("這則對話的模型目前沒有在執行，先在上面換一個", "bad"); return; }
     if (cur.image && !intent && !t.vision) { toast("這個模型看不懂圖片；要問圖請換一個標了「看圖」的模型，要改圖請說「把…改成…」或按「畫圖」", "bad"); return; }
     const user = { role: "user", content: text, image: cur.image || null,
@@ -790,15 +919,17 @@ async function viewChat() {
     cur.msgs.push(user);
     const reply = { role: "assistant", content: "", pending: true };
     cur.msgs.push(reply);
-    const initImage = intent && cur.image ? cur.image : null;
+    let initImage = intent && cur.image ? cur.image : null;
+    if (intent?.last) {
+      try { initImage = await genImageUrl(lastG); intent.base = { node: lastG.node, job: lastG.job }; } catch (_) { intent.edit = false; }
+    }
     ta.value = ""; cur.draft = ""; cur.image = null; cur.docs = []; drawDocs();
-    if (cur.mode !== "chat") { cur.mode = "chat"; syncMode(); }
     if (box.querySelector(".chat-empty")) box.textContent = "";
     box.append(chatBubble(user, cur.msgs.length - 2, acts), chatBubble(reply, cur.msgs.length - 1, acts));
     box.scrollTop = box.scrollHeight;
     if (intent) {
       lock(true);
-      try { await runGen(cur, t, reply, text, intent, initImage, paintOf(reply)); } finally {
+      try { await runGen(cur, t, reply, intent.text || text, intent, initImage, paintOf(reply)); } finally {
         reply.content = genText(reply.gen);
         lock(false);
         paintReply(reply, box, true, acts);
@@ -922,9 +1053,10 @@ async function viewChat() {
     const m = cur.msgs[i];
     const u = cur.msgs[i - 1];
     const t = tgt();
-    const intent = { kind: m.gen.kind, count: m.gen.count || 1, edit: !!m.gen.edit };
+    const intent = { kind: m.gen.kind, count: m.gen.count || 1, edit: !!m.gen.edit, ...(m.gen.base ? { base: m.gen.base } : {}) };
     let init = null;
     if (m.gen.edit && u?.image) { try { init = await imgDataUrl(u.image); } catch (_) { init = null; } }
+    else if (m.gen.edit && m.gen.base) { try { init = await genImageUrl(m.gen.base); } catch (_) { init = null; } }
     const asked = m.gen.asked || u?.content || "";
     m.gen = null; m.content = ""; m.pending = true;
     paintReply(m, box, false, acts);
@@ -960,17 +1092,18 @@ async function viewChat() {
         return;
       }
       m.content = v;
+      const wasGen = cur.msgs[i + 1]?.gen?.kind;           // 改的是要產圖的那句：重送照樣產圖，不因為沒按鈕就變成一般回答
       cur.msgs.splice(i + 1);
       if (i === 0) cur.title = v.replace(/\s+/g, " ").slice(0, 30);
       const reply = { role: "assistant", content: "", pending: true };
       cur.msgs.push(reply);
       drawAll();
-      const intent = detectGen(v, !!m.image, "chat");
+      const intent = detectGen(v, !!m.image, wasGen || "chat");
       if (intent) {
         let init = null;
         if (m.image) { try { init = await imgDataUrl(m.image); } catch (_) { init = null; } }
         lock(true);
-        try { await runGen(cur, tgt(), reply, v, intent, init, paintOf(reply)); } finally {
+        try { await runGen(cur, tgt(), reply, intent.text || v, intent, init, paintOf(reply)); } finally {
           reply.content = genText(reply.gen); lock(false); paintReply(reply, box, true, acts); saveChat(cur);
         }
         return;
@@ -1175,6 +1308,7 @@ function paintMsg(m, final, acts) {
   if (m.role === "assistant") renderRich(b, m.content || (m.pending ? "…" : ""), !final && !m.stat && !m.error);
   else b.appendChild(el("div", "msg-text", m.content));
   if (m.stat) b.appendChild(el("div", "msg-stat small muted", m.stat));
+  else if (!final && m.live) b.appendChild(el("div", "msg-stat small muted mono", m.live));
   if (m.error) b.appendChild(el("p", "note bad", m.error));
   if (final && !m.pending && acts) b.appendChild(msgActs(m, acts));
 }

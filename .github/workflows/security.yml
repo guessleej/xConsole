@@ -131,6 +131,8 @@ jobs:
         run: cd console && python test_desktop.py
       - name: 對話回答的 Markdown 排版（標題、清單、表格、連結只收 http／https、不用 innerHTML）
         run: node console/test_markdown.js
+      - name: 對話頁對齊LocModel 3.6.2（明講才產圖、接著改上一張、尺寸與秒數、語法高亮、已下載的模型直接載入）
+        run: node console/test_chat_parity.js
       - name: 介面語言（字典格式、佔位符、涵蓋率 95% 以上、翻譯函式實跑）
         run: cd console && python test_i18n.py
       - name: 安全測試（未登入、票證、IDOR 等價、路徑穿越、節流、標頭、TLS）

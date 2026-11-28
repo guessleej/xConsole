@@ -152,9 +152,16 @@ def main():
                      ({"msgs": [], "settings": {"temperature": 3}}, "溫度超出範圍"),
                      ({"msgs": [], "settings": {"top_k": 1.5}}, "Top K 要整數"),
                      ({"id": "../etc/passwd", "msgs": []}, "編號格式"),
-                     ({"msgs": [{"role": "assistant", "content": "", "gen": {"node": "n1", "job": "zz", "kind": "image"}}]}, "畫圖工作編號格式")):
+                     ({"msgs": [{"role": "assistant", "content": "", "gen": {"node": "n1", "job": "zz", "kind": "image"}}]}, "畫圖工作編號格式"),
+                     ({"msgs": [{"role": "assistant", "content": "", "gen": {"node": "n1", "job": "0123abcd", "kind": "image", "edit": True,
+                                                                              "base": {"node": "../x", "job": "0123abcd"}}}]}, "改圖來源的機器格式")):
         st, out, _ = req("POST", "/api/chats/save", bad)
         check(f"擋下：{why}", st == 400, out)
+
+    gen = {"node": "n1", "job": "0123abcd", "kind": "image", "edit": True, "base": {"node": "n1", "job": "89abcdef", "extra": "x"}}
+    st, out, _ = req("POST", "/api/chats/save", {"msgs": [{"role": "user", "content": "把背景換成海邊"}, {"role": "assistant", "content": "", "gen": gen}]})
+    saved = chats.clean_msgs([{"role": "assistant", "content": "", "gen": gen}])[0][0]["gen"] if st == 200 else None
+    check("接著改上一張：存下改的是哪一件（只存機器與工作編號）", st == 200 and saved and saved.get("base") == {"node": "n1", "job": "89abcdef"}, (st, out, saved))
 
     # ---- 訊息刪掉，附圖跟著刪
     st, out, _ = req("POST", "/api/chats/save", {"id": cid, "title": "t", "msgs": [{"role": "user", "content": "只剩文字"}]})
