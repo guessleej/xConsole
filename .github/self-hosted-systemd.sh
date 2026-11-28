@@ -1,6 +1,6 @@
-# 只給 .50 自建 runner 用（security.yml 的整合測試以 `.` 載入）：讓測試接得上 xcloud 帳號的 systemd --user。
-# runner 是系統服務，環境裡沒有 XDG_RUNTIME_DIR；家目錄是 runner 自己的（/mnt/disk16/ci-runners/xConsole/rN/home），
-# 測試的資料都留在那裡，不碰 .50 真正的家目錄。例外有兩個：
+# 只給 .50／.70 自建 runner 用（security.yml 的整合測試以 `.` 載入）：讓測試接得上 xcloud 帳號的 systemd --user。
+# runner 是系統服務，環境裡沒有 XDG_RUNTIME_DIR；家目錄是 runner 自己的（.50 在 /mnt/disk16/ci-runners/xConsole/rN/home，
+# .70 在 /media/xcloud/nvme2t/ci-runners/xConsole/rN/home），測試的資料都留在那裡，不碰真正的家目錄。例外有兩個：
 # 1. systemd 使用者管理員只讀真正家目錄的 ~/.config/systemd/user，所以把 runner 家目錄的同一路徑連過去
 #    （測試的單元名稱是隨機的，結束時自己刪掉）。
 # 2. 經 systemd --user 帶起來的行程拿到的是真正的家目錄（代理的 llama 單元跑 xconsole_agent.py --launch-llama，

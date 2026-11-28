@@ -26,8 +26,8 @@ jobs:
           - { os: ubuntu-24.04, py: '3.9' }          # macOS 內建命令列工具的 Python 是 3.9，最低要支援到這裡
           - { os: macos-15, py: '3.12' }
           - { os: windows-2025, py: '3.12' }
-    # Ubuntu 這幾項：同一儲存庫的 PR、push 走 .50 自建 runner，來自 fork 的 PR 留在 GitHub 代管機器；macOS、Windows 不能在 .50 跑，照舊
-    runs-on: ${{ fromJSON(startsWith(matrix.os, 'ubuntu') && !github.event.pull_request.head.repo.fork && '["self-hosted","xconsole"]' || format('"{0}"', matrix.os)) }}
+    # Ubuntu 這幾項：同一儲存庫的 PR、push 走 .50／.70 自建 runner，來自 fork 的 PR 留在 GitHub 代管機器；macOS、Windows 照舊
+    runs-on: ${{ fromJSON(startsWith(matrix.os, 'ubuntu') && !github.event.pull_request.head.repo.fork && '["self-hosted","xconsole-ci"]' || format('"{0}"', matrix.os)) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -143,7 +143,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, macos-15, windows-2025]
-    # Ubuntu 這幾項：同一儲存庫的 PR、push 走 .50 自建 runner，來自 fork 的 PR 留在 GitHub 代管機器；macOS、Windows 不能在 .50 跑，照舊
+    # Ubuntu 這一項會裝成真正的系統服務：只排到 .50（xconsole 標籤只有 .50 有），.70 跑著正式服務，不在那裡實裝
     runs-on: ${{ fromJSON(startsWith(matrix.os, 'ubuntu') && !github.event.pull_request.head.repo.fork && '["self-hosted","xconsole"]' || format('"{0}"', matrix.os)) }}
     # .50 上這一項會裝成 xcloud 帳號的 systemd 使用者服務（固定名稱、固定埠 9400／9401／9402）：同一時間只准跑一個
     concurrency:

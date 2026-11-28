@@ -306,9 +306,10 @@ def main():
         check("空欄位放入 GGUF：自動配一個沒人用的埠並啟動", st == 200 and d5.get("port") and d5["port"] != llm_port
               and active(f"xc-{SLOT2}-llama.service") == "active", d5)
 
-        # ---- 7b. 綁卡：這台沒有 GPU，指定卡號要被擋下，欄位維持原狀；帶 null（自動）照常
+        # ---- 7b. 綁卡：指定這台沒有的卡號要被擋下，欄位維持原狀；帶 null（自動）照常
+        # 卡號用 97：CI 機器有的有 8 張卡，「7」在那裡是真的卡
         before = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
-        st, e = ag("POST", f"/slot/{SLOT2}/model", {"engine": "llama", "model": "acme--tiny/tiny-Q4_K_M", "gpus": ["7"], "force": True})
+        st, e = ag("POST", f"/slot/{SLOT2}/model", {"engine": "llama", "model": "acme--tiny/tiny-Q4_K_M", "gpus": ["97"], "force": True})
         after = json.load(open(os.path.join(ahome, ".xconsole", "registry.json")))
         check("指定不存在的卡 → 400，講清楚這台有哪些卡", st == 400 and "沒有這些卡" in (e.get("error") or ""), e)
         check("  欄位設定沒被動到", [x for x in before["slots"] if x["id"] == SLOT2] == [x for x in after["slots"] if x["id"] == SLOT2])
