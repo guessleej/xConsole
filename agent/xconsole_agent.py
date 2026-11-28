@@ -7304,6 +7304,63 @@ def model_dir_browse(path=""):
     return browse_dirs(path, lambda p: check_model_dir(p)[1], [*browse_roots(), *extra], extra)
 
 
+# ComfyUI資料夾：只列模型檔的名稱與大小給畫面看，不讀內容、不刪、不搬（那些檔案歸ComfyUI管）
+COMFY_FOLDERS = ("diffusion_models", "unet", "checkpoints", "text_encoders", "clip", "vae", "loras")
+COMFY_EXT = (".safetensors", ".sft", ".ckpt", ".pt", ".pth", ".bin", ".gguf")
+COMFY_SCAN_MAX = 2000
+
+
+def comfy_models_dir(full):
+    """ComfyUI的根目錄或它的models資料夾都收。回 (根目錄, models資料夾) 或 None。"""
+    models = os.path.join(full, "models")
+    if os.path.isdir(models) and any(os.path.isdir(os.path.join(models, s)) for s in COMFY_FOLDERS):
+        return full, models
+    if any(os.path.isdir(os.path.join(full, s)) for s in COMFY_FOLDERS):
+        return os.path.dirname(full), full
+    return None
+
+
+def comfy_roots():
+    return [*browse_roots(), *(d for d in data_bases() if os.path.isdir(d))]
+
+
+def comfy_browse(path=""):
+    return browse_dirs(path, lambda p: None if comfy_models_dir(p) else "不像ComfyUI資料夾（找不到models或checkpoints、diffusion_models、vae這類子資料夾）",
+                       comfy_roots(), [d for d in data_bases() if os.path.isdir(d)])
+
+
+def comfy_scan(path):
+    full = in_browse_roots(str(path or ""), comfy_roots()) if "\x00" not in str(path or "") else None
+    if full is None:
+        return 400, {"error": "只能指定家目錄、資料磁碟或外接碟底下的資料夾"}
+    if not os.path.isdir(full):
+        return 404, {"error": "沒有這個資料夾"}
+    got = comfy_models_dir(full)
+    if not got:
+        return 400, {"error": "這不像ComfyUI資料夾：找不到models，或models底下沒有checkpoints、diffusion_models、vae這類子資料夾"}
+    root, models = got
+    folders, count = {}, 0
+    for sub in COMFY_FOLDERS:
+        d = os.path.join(models, sub)
+        if not os.path.isdir(d):
+            continue
+        rows = []
+        for top, dirs, files in os.walk(d):                 # 不跟符號連結進資料夾，免得繞到別處
+            dirs[:] = sorted(x for x in dirs if not x.startswith(".") and os.path.relpath(top, d).count(os.sep) < 3)
+            for fn in sorted(files):
+                if count >= COMFY_SCAN_MAX or not fn.lower().endswith(COMFY_EXT):
+                    continue
+                p = os.path.join(top, fn)
+                try:
+                    size = os.path.getsize(p)
+                except OSError:
+                    continue
+                rows.append({"name": os.path.relpath(p, d).replace(os.sep, "/"), "gib": round(size / 2**30, 2)})
+                count += 1
+        folders[sub] = rows
+    return 200, {"root": root, "models": models, "folders": folders, "truncated": count >= COMFY_SCAN_MAX}
+
+
 def browse_dirs(path, denied, allowed=None, extra_roots=()):
     """資料夾瀏覽器：只列子資料夾的名稱（不列檔案），每一個用 denied(路徑) 標出能不能選。沒給路徑＝從家目錄開始。
     allowed：能瀏覽的根目錄（預設 browse_roots）；extra_roots：另外列成快捷鍵的根目錄。"""
@@ -9023,6 +9080,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/agent/browse":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             return self._send(*agent_browse((q.get("path") or [""])[0]))
+        if path == "/comfy/browse":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self._send(*comfy_browse((q.get("path") or [""])[0]))
         return self._send(404, {"error": "找不到"})
 
     def do_POST(self):  # noqa: N802
@@ -9143,6 +9203,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(*cancel_download(m.group(1)))
         if path == "/library/dirs":
             return self._send(*set_model_dirs(body))
+        if path == "/comfy/scan":
+            return self._send(*comfy_scan(body.get("path")))
         if path == "/library/delete":
             return self._send(*delete_model(str(body.get("id") or "")))
         m = re.fullmatch(r"/apiinfo/([\w.-]+)/settings", path)
@@ -10788,7 +10850,7 @@ SAFETY_ID_RX = re.compile(r"[0-9a-f]{24}")
 DISABLED = {"error": "這台已被管理者停用，請洽IT", "disabled_by_admin": True}
 # 停用中仍然可以做的：停止、看狀態類的檢查、接收群組設定（存起來，恢復後才套用）、更新代理、改這台的設定
 DISABLED_OK = re.compile(r"/safety|/group/sync|/slot/[\w.-]+/stop|/all/stop|/admit/[\w.-]+|/self/update|/machine"
-                         r"|/library/(hf|hf/profile|hf/search|hf/tree|upload/status|upload/cancel|delete|dirs)"
+                         r"|/library/(hf|hf/profile|hf/search|hf/tree|upload/status|upload/cancel|delete|dirs)|/comfy/scan"
                          r"|/library/download/[0-9a-f]{8}/cancel|/(llama|sd)/(build|import)/(cancel|status)|/sd/delete"
                          r"|/sd/jobs/[0-9a-f]{8}/(cancel|delete)|/agent/(exec/cancel|folders/unlink)|/profiles/[a-z][a-z0-9_-]{0,31}/delete")
 

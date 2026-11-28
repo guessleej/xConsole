@@ -1058,14 +1058,17 @@ async function openPreview(html) {
 
 // 資料夾瀏覽器：只列子資料夾（不列檔案），不能選的標出原因；選好就連結給 Agent 用
 // 資料夾瀏覽器。opts.kind="models"：挑一個放著模型檔的資料夾加進模型庫（只讀）；沒給＝Agent 工作資料夾
+// opts.kind="comfy"：挑ComfyUI的根目錄或models資料夾，選好交給 done 存（這裡不呼叫API）
 function openFolderBrowser(n, done, opts = {}) {
   const models = opts.kind === "models";
+  const comfyDir = opts.kind === "comfy";
   const d = el("div", "fb");
   const head = el("div", "fb-head");
   const list = el("div", "fb-list scrollbox");
   const err = el("div");
   d.append(head, list, err);
-  const ov = modal({ title: models ? "選這台放著模型檔的資料夾" : "選這台的一個資料夾給 Agent 用", bodyNode: d, hasInput: true });
+  const ov = modal({ title: comfyDir ? "選這台的ComfyUI資料夾（根目錄或models）" : models ? "選這台放著模型檔的資料夾" : "選這台的一個資料夾給 Agent 用",
+    bodyNode: d, hasInput: true });
   ov.querySelector(".modal").classList.add("wide");
   let cur = null;
   const pick = el("button", "btn primary", "用這個資料夾");
@@ -1073,7 +1076,7 @@ function openFolderBrowser(n, done, opts = {}) {
   const go2 = async (path) => {
     loading(list);
     let r;
-    try { r = await api(`/api/node/${n.id}/${models ? "library" : "agent"}/browse?path=${encodeURIComponent(path || "")}`); } catch (ex) { errNote(list, ex.message); return; }
+    try { r = await api(`/api/node/${n.id}/${comfyDir ? "comfy" : models ? "library" : "agent"}/browse?path=${encodeURIComponent(path || "")}`); } catch (ex) { errNote(list, ex.message); return; }
     cur = r;
     head.textContent = "";
     const roots = el("div", "chips");
@@ -1093,6 +1096,7 @@ function openFolderBrowser(n, done, opts = {}) {
   };
   pick.onclick = async () => {
     if (!cur?.ok) return;
+    if (comfyDir) { ov.remove(); done(cur.path); return; }
     let r;
     try {
       r = models ? await api(`/api/node/${n.id}/library/dirs`, { method: "POST", body: { add: cur.path } })
@@ -1407,16 +1411,27 @@ async function viewCreate(kind) {
   main.textContent = "";
   const wrap = el("div", "wrap");
   main.appendChild(wrap);
-  if (!n || !n.online) { wrap.appendChild(el("p", "note warn", n ? `${n.name} 連不上。` : "還沒有機器。")); return; }
   const head = el("div", "page-head");
   head.appendChild(el("h1", null, kind === "image" ? "畫圖" : "生成影片"));
   head.appendChild(el("span", "spacer"));
+  // 兩種跑法：這台內建的引擎（stable-diffusion.cpp），或串接ComfyUI跑匯入的工作流
+  S.createSrc = S.createSrc || lsGet("xc.createSrc") || "engine";
+  const src = el("div", "tabbar src-switch");
+  [["engine", "內建引擎"], ["comfy", "ComfyUI"]].forEach(([k, label]) => {
+    const b = el("button", null, label);
+    if (k === S.createSrc) b.setAttribute("aria-current", "true");
+    b.onclick = () => { S.createSrc = k; lsSet("xc.createSrc", k); viewCreate(kind); };
+    src.appendChild(b);
+  });
+  head.appendChild(src);
   const dl = el("button", "btn sm", kind === "image" ? "下載畫圖模型" : "下載影片模型");
   dl.onclick = () => { S.libTab = "sd"; S.sdSub = "rec"; go("models"); };
-  if (isAdmin()) head.appendChild(dl);
+  if (isAdmin() && S.createSrc === "engine") head.appendChild(dl);
   wrap.appendChild(head);
   const holder = el("div");
   wrap.appendChild(holder);
+  if (S.createSrc === "comfy") { comfyPane(holder, kind); return; }
+  if (!n || !n.online) { holder.appendChild(el("p", "note warn", n ? `${n.name} 連不上。` : "還沒有機器。")); return; }
   loading(holder);
   let rec;
   try { rec = await getSdRec(n.id); } catch (ex) { errNote(holder, ex.message); return; }
