@@ -23,6 +23,8 @@ jobs:
     name: 0 Tests
     # 同一儲存庫的 PR、push、排程、標籤走 .50 自建 runner；來自 fork 的 PR 一律留在 GitHub 代管機器，外人的程式不進公司內網
     runs-on: ${{ fromJSON(github.event.pull_request.head.repo.fork && '"ubuntu-24.04"' || '["self-hosted","xconsole"]') }}
+    # .50上整個工作約10分鐘、NAS忙的時候約45分鐘；卡住時到上限就結束，不佔著runner
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -149,6 +151,8 @@ jobs:
           if [ "$RUNNER_ENVIRONMENT" = self-hosted ]; then . .github/self-hosted-systemd.sh; fi
           python test/test_machine_admin.py
       - name: 瀏覽器實測（Playwright：只有畫面上看得出來的問題）
+        # .50上約2分鐘
+        timeout-minutes: 20
         run: |
           python -m pip install --disable-pip-version-check playwright==1.65.0
           # 自建 runner 沒有免密碼 sudo，Chromium 需要的系統函式庫已裝在 .50，只下載瀏覽器本身
@@ -283,10 +287,6 @@ jobs:
           # 自建 runner 同一台還有別的工作與服務：主控台與連回通道用系統給的空埠，不固定占 9400／9402
           read -r XC_PORT XC_LINK < <(python -c 'import socket;s=[socket.socket() for _ in (0,1)];[x.bind(("127.0.0.1",0)) for x in s];print(*[x.getsockname()[1] for x in s])')
           echo "XC_PORT=$XC_PORT" >> "$GITHUB_ENV"
-          # rootless Docker：ZAP 容器裡的 localhost 不是主機，主機的 localhost 要走 10.0.2.2。
-          # 直接問 daemon 是不是 rootless（不論是靠 DOCKER_HOST 還是 docker context 選到的都抓得到）
-          if docker info --format '{{json .SecurityOptions}}' 2>/dev/null | grep -q rootless; then
-            echo "ZAP_HOST=10.0.2.2"; else echo "ZAP_HOST=localhost"; fi >> "$GITHUB_ENV"
           export XCONSOLE_PORT="$XC_PORT" XCONSOLE_LINK_PORT="$XC_LINK"
           printf 'admin\n%s\n' "$(python -c 'import secrets;print(secrets.token_urlsafe(18))')" \
             | python console/xconsole_server.py --set-credentials
@@ -297,6 +297,21 @@ jobs:
         run: |
           docker ps -aq --no-trunc --filter ancestor=ghcr.io/zaproxy/zaproxy:stable | sort > "$RUNNER_TEMP/zap-before"
           docker image inspect -f '{{.Id}}' ghcr.io/zaproxy/zaproxy:stable > "$RUNNER_TEMP/zap-image-before" 2>/dev/null || true
+      # ZAP action用--network host起容器。rootless Docker的host網路有兩種：rootlesskit開了detach-netns
+      # （rootlesskit 3的預設）就是主機本身，localhost直通；沒開時是rootlesskit自己的網路命名空間，主機的localhost要走10.0.2.2。
+      # 用同一個映像、同樣的網路模式實際連一次，連得到哪個就掃哪個
+      - name: 找出ZAP容器連得到主控台的位址
+        run: |
+          for h in localhost 10.0.2.2; do
+            if docker run --rm --network host --entrypoint python3 ghcr.io/zaproxy/zaproxy:stable \
+                 -c 'import socket,sys;socket.create_connection((sys.argv[1],int(sys.argv[2])),10).close()' "$h" "$XC_PORT"; then
+              echo "ZAP_HOST=$h" >> "$GITHUB_ENV"
+              echo "ZAP容器經$h連到主控台"
+              exit 0
+            fi
+          done
+          echo "::error::ZAP容器用localhost與10.0.2.2都連不到主控台（埠$XC_PORT）"
+          exit 1
       - uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: https://${{ env.ZAP_HOST }}:${{ env.XC_PORT }}
