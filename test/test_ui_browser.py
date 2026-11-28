@@ -15,7 +15,7 @@ import tempfile
 import time
 
 try:
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import Error as PWError, sync_playwright
 except ImportError:
     print("沒有安裝 playwright，略過（pip install playwright && python -m playwright install chromium）")
     sys.exit(0 if os.environ.get("CI") is None else 1)
@@ -25,6 +25,9 @@ W = tempfile.mkdtemp(prefix="xc-ui-")
 AH, CH = os.path.join(W, "agent"), os.path.join(W, "console")
 PW = "ui-browser-2026"
 OK = True
+FETCH_MS = 20000       # 攔下的請求轉給主控台最多等這麼久
+EVAL_MS = 30000        # 等頁面裡的非同步函式（refresh、開設定窗）最多這麼久
+ROUTE_ERRS = []
 
 
 def check(name, cond, detail=""):
@@ -92,15 +95,55 @@ def start():
     return agent, console, f"https://127.0.0.1:{cp}"
 
 
-def with_slot(route):
-    """真的 /api/fleet 加上一個開著的主腦欄位。"""
-    r = route.fetch()
-    data = r.json()
+def _give_up(route, exc):
+    """改寫失敗就照原樣放行：處理函式丟出例外時請求永遠等不到回應，頁面輪詢一次就多卡一筆。"""
+    ROUTE_ERRS.append(f"{route.request.url.split('/api/', 1)[-1]}：{str(exc).splitlines()[0][:100]}")
+    try:
+        route.fallback()
+    except PWError:
+        pass                            # 已經被處理（取消攔截的瞬間）或頁面已關：沒有要放行的了
+
+
+def patched(edit):
+    """包成 route 處理函式：拿主控台真的回應，交給 edit 改內容再回給頁面。"""
+    def handler(route):
+        try:
+            r = route.fetch(timeout=FETCH_MS)
+            data = r.json()
+            edit(data)
+            route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
+        except (PWError, ValueError) as exc:
+            _give_up(route, exc)
+    return handler
+
+
+def canned(body):
+    """直接回固定的 JSON，不經主控台。"""
+    def handler(route):
+        try:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+        except PWError as exc:
+            _give_up(route, exc)
+    return handler
+
+
+FLEET = {"slot": SLOT}   # /api/fleet 要補上的主腦欄位；換內容改這裡，不重掛處理函式（頁面一直在輪詢，重掛會撞上進行中的請求）
+
+
+def _add_slot(data):
     for n in data.get("nodes") or []:
         st = n.setdefault("state", {}) or {}
         n["state"] = st
-        st["slots"] = [SLOT] + [s for s in st.get("slots") or [] if s.get("id") != "brain"]
-    route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
+        st["slots"] = [FLEET["slot"]] + [s for s in st.get("slots") or [] if s.get("id") != "brain"]
+
+
+with_slot = patched(_add_slot)
+
+
+def settle(pg, js):
+    """跑頁面裡會回 Promise 的運算式並等它完成；page.evaluate 本身不會逾時，請求卡住時測試會一直掛著。"""
+    return pg.evaluate(f"([what, ms]) => Promise.race([{js}, new Promise((_, no) => "
+                       "setTimeout(() => no(new Error(what + '：' + ms + '毫秒內沒完成')), ms))])", [js, EVAL_MS])
 
 
 def login(pg, base):
@@ -113,46 +156,37 @@ def login(pg, base):
 
 def test_cn_label(pg):
     """清單 #27：正在執行的模型是中國來源，欄位卡上要有紅底「中國來源」標籤。"""
-    def cn(route):
-        r = route.fetch()
-        data = r.json()
-        for n in data.get("nodes") or []:
-            st = n.setdefault("state", {}) or {}
-            n["state"] = st
-            st["slots"] = [dict(SLOT, model="Qwen3-8B-Instruct", cn_origin=True)] + \
-                [s for s in st.get("slots") or [] if s.get("id") != "brain"]
-        route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
-    pg.unroute("**/api/fleet")
-    pg.route("**/api/fleet", cn)
-    pg.evaluate("refresh().then(() => go('node:local'))")
+    FLEET["slot"] = dict(SLOT, model="Qwen3-8B-Instruct", cn_origin=True)
     try:
+        settle(pg, "refresh().then(() => go('node:local'))")
         pg.wait_for_selector(".chip.cn", timeout=8000)
         got = pg.evaluate("(() => { const c = document.querySelector('.chip.cn'); return [c.textContent, getComputedStyle(c).backgroundColor]; })()")
     except Exception as e:  # noqa: BLE001
         got = str(e)[:120]
+    finally:
+        FLEET["slot"] = SLOT
     check("中國來源：欄位卡上是紅底「中國來源」標籤", got == ["中國來源", "rgb(176, 16, 16)"], got)
-    pg.unroute("**/api/fleet")
-    pg.route("**/api/fleet", with_slot)
-    pg.evaluate("refresh()")
+    settle(pg, "refresh()")
 
 
 def test_api_list(pg):
     """BUG-1：清單頁打精簡版 apiinfo（不算執行設定），回來之後表格要出現模型名稱。"""
-    asked = []
+    asked, reply = [], canned(INFO)
 
     def info(route):
         asked.append(route.request.url)
-        route.fulfill(status=200, content_type="application/json", body=json.dumps(INFO))
+        reply(route)
     pg.route("**/api/node/*/apiinfo/brain**", info)
-    pg.evaluate("go('apis')")
     try:
+        pg.evaluate("go('apis')")
         pg.wait_for_selector("table.api-table td:has-text('ui-test-model-q4')", timeout=5000)
         shown = True
     except Exception:  # noqa: BLE001
         shown = False
+    finally:
+        pg.unroute("**/api/node/*/apiinfo/brain**")
     check("API 串接清單：apiinfo 回來後表格出現模型名稱", shown)
     check("  清單頁打的是精簡版（/brief，不算執行設定）", asked and all(u.endswith("/brief") for u in asked), asked)
-    pg.unroute("**/api/node/*/apiinfo/brain**")
 
 
 def test_mobile_width(ctx, base):
@@ -162,8 +196,7 @@ def test_mobile_width(ctx, base):
         pg = ctx.new_page()
         pg.set_viewport_size({"width": w, "height": 800})
         pg.route("**/api/fleet", with_slot)
-        pg.route("**/api/node/*/apiinfo/brain**",
-                 lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+        pg.route("**/api/node/*/apiinfo/brain**", canned(INFO))
         pg.goto(base + "/")
         pg.wait_for_selector("#nav button", state="attached", timeout=30000)
         tabs = pg.evaluate("settingsTabs().map(([k]) => k)")
@@ -183,19 +216,18 @@ def test_mobile_width(ctx, base):
 
 def test_desktop_toggle(pg):
     """BUG-4：這台不能操作桌面時，「操作電腦」核取方塊要停用，不是只用橘字說明。"""
-    def machine(route):
-        r = route.fetch()
-        data = r.json()
+    def no_desktop(data):
         data["desktop"] = {"how": None, "why": "這台沒有圖形桌面（沒有 X11 或 Wayland 工作階段）"}
         data.setdefault("settings", {})["desktop_enabled"] = False
-        route.fulfill(response=r, body=json.dumps(data), headers={**r.headers, "content-type": "application/json"})
-    pg.route("**/api/node/local/machine", machine)
-    pg.evaluate("openMachineSettings('local')")
-    box = pg.locator(".modal label.check-row:has-text('操作這台的桌面') input[type=checkbox]")
-    box.wait_for(state="attached", timeout=15000)
-    check("不能操作桌面：「操作電腦」核取方塊停用", box.is_disabled())
-    pg.locator(".modal .x, .modal button:has-text('取消')").first.click()
-    pg.unroute("**/api/node/local/machine")
+    pg.route("**/api/node/local/machine", patched(no_desktop))
+    try:
+        settle(pg, "openMachineSettings('local')")
+        box = pg.locator(".modal label.check-row:has-text('操作這台的桌面') input[type=checkbox]")
+        box.wait_for(state="attached", timeout=15000)
+        check("不能操作桌面：「操作電腦」核取方塊停用", box.is_disabled())
+        pg.locator(".modal .x, .modal button:has-text('取消')").first.click()
+    finally:
+        pg.unroute("**/api/node/local/machine")
 
 
 def test_home_quiet(pg):
@@ -206,7 +238,7 @@ def test_home_quiet(pg):
     # 用 JS 屬性做記號，不用 data-*：屬性會改到 outerHTML，比對時就被當成有變
     pg.evaluate("""() => { document.querySelector('section.hero .hero-glow').__keep = 1;
                            document.querySelector('.hero h1').__keep = 1; }""")
-    pg.evaluate("refresh()")
+    settle(pg, "refresh()")
     pg.wait_for_timeout(1500)
     kept = pg.evaluate("() => [!!document.querySelector('section.hero .hero-glow').__keep, !!document.querySelector('.hero h1').__keep,"
                        " document.querySelectorAll('section.hero').length, document.querySelector('#live-text').textContent]")
@@ -214,7 +246,7 @@ def test_home_quiet(pg):
     check("  自動更新本身成功（不是重畫出錯被吞掉）", kept[3] == "即時", kept[3])
     # 有變的數字要真的換上去：把「現在執行」改成別顆再更新一次
     SLOT["model"] = "Changed-Model-For-Test"
-    pg.evaluate("refresh()")
+    settle(pg, "refresh()")
     pg.wait_for_timeout(1500)
     shown = pg.evaluate("() => [document.querySelector('.hero .tiles').textContent, !!document.querySelector('section.hero .hero-glow').__keep]")
     SLOT["model"] = "Mistral-Medium-3.5-128B-Instruct-UD-Q4_K_XL"
@@ -224,7 +256,7 @@ def test_home_quiet(pg):
     pg.evaluate("""() => { window.__fn = document.querySelector('.hero-edit').onclick;
                            document.querySelector('.hero-edit').__keep = 1;
                            const hw = document.querySelector('#main section.card.hw'); if (hw) hw.__keep = 1; }""")
-    pg.evaluate("refresh()")
+    settle(pg, "refresh()")
     pg.wait_for_timeout(1500)
     st = pg.evaluate("""() => { const b = document.querySelector('.hero-edit'), hw = document.querySelector('#main section.card.hw');
                                 return [!!b.__keep, b.onclick !== window.__fn, hw ? !!hw.__keep : null]; }""")
@@ -254,7 +286,14 @@ UNTRANSLATED = """() => { const out = new Set();
 
 def test_gateway_ui(pg):
     """加密入口：在 API 串接頁產生金鑰（完整金鑰只顯示一次）、清單出現、撤銷；單格頁有加密網址、直連開關、範例切換。"""
-    pg.route("**/api/node/*/apiinfo/brain**", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+    pg.route("**/api/node/*/apiinfo/brain**", canned(INFO))
+    try:
+        _gateway_steps(pg)
+    finally:
+        pg.unroute("**/api/node/*/apiinfo/brain**")
+
+
+def _gateway_steps(pg):
     pg.evaluate("go('apis')")
     pg.wait_for_selector("h2:has-text('加密入口與金鑰')", timeout=10000)
     url = pg.locator(".copyrow .v").first.text_content()
@@ -296,7 +335,6 @@ def test_gateway_ui(pg):
     pg.wait_for_selector("h2:has-text('明文直連')", timeout=10000)
     check("  切到直連：範例換成直連網址", INFO["public_url"] in pg.locator("pre.code").text_content())
     pg.evaluate("S.apiMode = 'gw'")
-    pg.unroute("**/api/node/*/apiinfo/brain**")
 
 
 def test_user_journey(pg, base):
@@ -356,15 +394,20 @@ def test_english(ctx, base):
     pg.goto(base + "/")
     pg.wait_for_selector("#nav button", state="attached", timeout=30000)
     left = {}
-    pg.route("**/api/node/*/apiinfo/brain**", lambda r: r.fulfill(status=200, content_type="application/json", body=json.dumps(INFO)))
+    pg.route("**/api/node/*/apiinfo/brain**", canned(INFO))
     for v in ["home", "run", "apis", "api:local:brain", "settings:machines", "settings:engine", "settings:tls", "settings:report",
               "settings:users"]:
         if v.startswith("settings:"):
             pg.evaluate("(t) => { S.settingsTab = t; go('settings'); }", v.split(":", 1)[1])
         else:
             pg.evaluate("(v) => go(v)", v)
+        # 翻譯在畫面換完之後才接著做，機器忙時要好幾秒：先等畫面換好，再等到翻完或到期限，到期限還有中文才算沒翻到
         pg.wait_for_timeout(2500)
+        end = time.time() + 20
         got = pg.evaluate(UNTRANSLATED)
+        while got and time.time() < end:
+            pg.wait_for_timeout(500)
+            got = pg.evaluate(UNTRANSLATED)
         if got:
             left[v] = got
     check("英文介面：概覽、執行與設定各分頁沒有沒翻到的介面字", not left, left)
@@ -400,6 +443,8 @@ def main():
             test_english(ctx, base)
             b.close()
         check("瀏覽器沒有 JavaScript 錯誤", not errs, errs[:3])
+        if ROUTE_ERRS:
+            print(f"攔下的請求有{len(ROUTE_ERRS)}次改寫不成、照原樣放行：{ROUTE_ERRS[:3]}")
     finally:
         for proc in (console, agent):
             proc.terminate()
