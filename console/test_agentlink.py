@@ -579,7 +579,10 @@ def e2e():
             th.start()
             time.sleep(0.01)
         time.sleep(4)                         # 全部都在主控台那邊掛著
-        early = len(results)
+        # 背景的群組對齊每分鐘會對在線的機器送一筆指令，拿到指令的輪詢本來就該馬上回；空手提早回來才表示沒掛住
+        with lock:
+            early = [r for r in results if not (r[0] == 200 and r[1])]
+            early_cmds = [c.get("path") for r in results if r[0] == 200 and r[1] for c in r[1]]
         # 這時同一個來源再開沒登入的連線：前 64 條收、第 65 條被關
         # 沒登入的連線做完TLS握手就不送請求，佔著位子：被擋的主控台一接受就關，握手會失敗。
         # 用握手成敗判斷，不靠「幾秒內有沒有被關」：慢的機器上主控台接受排隊的連線要好幾秒
@@ -608,10 +611,11 @@ def e2e():
             s.close()
         for th in ths:
             th.join(40)
-        # 連得上＝200 且有回指令清單；剛輪詢過的 fake-000 可能剛好收到每分鐘一次的群組對齊，也算連得上
+        # 連得上＝200 且有回指令清單；剛好收到群組對齊的那幾台也算連得上
         ok200 = sum(1 for st, cmds in results if st == 200 and isinstance(cmds, list))
         check(f"同一來源 200 支已驗證的代理同時掛著長輪詢：全部連得上（{ok200}/200）",
-              ok200 == 200 and early == 0 and time.time() - t0 >= 20, (ok200, early, [r for r in results if r[0] != 200 or not isinstance(r[1], list)][:3]))
+              ok200 == 200 and not early and time.time() - t0 >= 20,
+              (ok200, early[:3], early_cmds, [r for r in results if r[0] != 200 or not isinstance(r[1], list)][:3]))
         check(f"同一來源沒登入的連線：仍在第 65 條起被擋（70 條被關 {refused} 條）", refused == 6, refused)
         code, out = call("/api/link/rotate", {})
         code2, out2 = call("/api/link/rotate", {})
